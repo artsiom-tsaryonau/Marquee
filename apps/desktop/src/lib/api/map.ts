@@ -1,6 +1,8 @@
+import { convertFileSrc } from '@tauri-apps/api/core';
 import { artFromSeed } from '../art';
 import type { GameEntry } from '../types';
 import type { Edition, LibraryRoot, LibrarySnapshot, Runner } from './contracts';
+import { isDesktopRuntime } from './desktop';
 
 function pickRunner(snap: LibrarySnapshot): Runner | null {
   const selected = snap.settings.selected_runner_id
@@ -46,7 +48,17 @@ export function editionToGame(edition: Edition, snap: LibrarySnapshot): GameEntr
     timeToBeat: null,
     achievements: null,
     art: artFromSeed(`${edition.id}:${edition.title}`),
+    coverUrl: coverSrc(edition.cover_path),
   };
+}
+
+function coverSrc(path: string | null): string | undefined {
+  if (!path || !isDesktopRuntime()) return undefined;
+  try {
+    return convertFileSrc(path);
+  } catch {
+    return undefined;
+  }
 }
 
 export function gamesFromSnapshot(snap: LibrarySnapshot): GameEntry[] {

@@ -6,7 +6,9 @@
   import { fuzzy } from '../format';
   import type { Source } from '../types';
   import Cover from '../components/Cover.svelte';
+  import GhostCover from '../components/GhostCover.svelte';
   import Icon from '../components/Icon.svelte';
+  import InstallMenu from '../components/InstallMenu.svelte';
 
   let { collection = null }: { collection?: 'ps2' | null } = $props();
   let query = $state('');
@@ -91,28 +93,38 @@
 
   <p class="count">{shown.length} {shown.length === 1 ? 'game' : 'games'}</p>
 
+  {#if !shown.length && (app.libraryStatus === 'loading' || app.libraryStatus === 'failed' || query || app.games.length)}
+    <div class="empty-banner">
+      {#if app.libraryStatus === 'loading'}
+        <p>Loading library…</p>
+      {:else if app.libraryStatus === 'failed'}
+        <p>{app.loadError ?? 'Could not open the library.'}</p>
+      {:else}
+        <p>Nothing matches “{query}”.</p>
+      {/if}
+    </div>
+  {:else if !shown.length && !query && app.games.length === 0}
+    <div class="empty-banner actions">
+      <p>No PS2 games yet.</p>
+      <button class="btn primary" data-nav onclick={() => app.addPs2Folder()}>Add PS2 folder</button>
+      <InstallMenu />
+      {#if app.lastScan?.skipped_unsupported}
+        <p>Skipped {app.lastScan.skipped_unsupported} unsupported files. Import .iso files for this milestone.</p>
+      {/if}
+    </div>
+  {/if}
+
   <div class="grid">
     {#each shown as game (game.id)}
       <div animate:flip={{ duration: dur }} in:scale={{ start: 0.92, duration: dur }}>
         <Cover {game} showTitle />
       </div>
     {:else}
-      <div class="empty">
-        <Icon name="sparkle" size={36} />
-        {#if app.libraryStatus === 'loading'}
-          <p>Loading library…</p>
-        {:else if app.libraryStatus === 'failed'}
-          <p>{app.loadError ?? 'Could not open the library.'}</p>
-        {:else if !query && app.games.length === 0}
-          <p>No PS2 games yet.</p>
-          <button class="btn primary" data-nav onclick={() => app.addPs2Folder()}>Add PS2 folder</button>
-          {#if app.lastScan?.skipped_unsupported}
-            <p>Skipped {app.lastScan.skipped_unsupported} unsupported files. Import .iso files for this milestone.</p>
-          {/if}
-        {:else}
-          <p>Nothing matches “{query}”.</p>
-        {/if}
-      </div>
+      {#if !query && app.games.length === 0 && app.libraryStatus !== 'loading' && app.libraryStatus !== 'failed'}
+        {#each Array(12) as _, i (i)}
+          <GhostCover onclick={() => app.addPs2Folder()} />
+        {/each}
+      {/if}
     {/each}
   </div>
 </div>
@@ -198,11 +210,18 @@
   .grid :global(.wrap) {
     width: 100%;
   }
-  .empty {
-    grid-column: 1 / -1;
-    display: grid;
-    place-items: center;
-    padding: 80px 0;
-    color: var(--text-dim);
+  .empty-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin: 8px 0 4px;
+    color: var(--text-soft);
+  }
+  .empty-banner.actions {
+    margin-top: 18px;
+  }
+  .empty-banner p {
+    margin: 0;
   }
 </style>

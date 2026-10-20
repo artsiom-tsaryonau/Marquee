@@ -28,6 +28,7 @@ export interface Edition {
   missing: boolean;
   serial: string | null;
   region: string | null;
+  cover_path: string | null;
 }
 
 export interface MediaFile {
@@ -105,7 +106,12 @@ export type CoreEvent =
   | { type: 'session_started'; session: Session }
   | { type: 'session_ended'; session: Session }
   | { type: 'session_failed'; session: Session }
-  | { type: 'library_changed' };
+  | { type: 'library_changed' }
+  | { type: 'tool_install_started'; tool_id: string; channel: string }
+  | { type: 'tool_install_progress'; tool_id: string; message: string }
+  | { type: 'tool_install_finished'; tool_id: string; runner_id: string | null }
+  | { type: 'tool_install_failed'; tool_id: string; message: string }
+  | { type: 'artwork_finished'; fetched: number; skipped: number; failed: number };
 
 export interface LibraryApi {
   kind: 'demo' | 'desktop';
@@ -120,4 +126,13 @@ export interface LibraryApi {
   setFavourite(editionId: string, favorite: boolean): Promise<void>;
   setDisplayTitle(editionId: string, title: string): Promise<void>;
   subscribe(handler: (event: CoreEvent) => void): () => void;
+  whenReady(): Promise<void>;
+  installPcsx2(channel?: string): Promise<Runner[]>;
+  refreshArtwork(editionId?: string): Promise<ArtworkReport>;
+}
+
+export interface ArtworkReport {
+  fetched: number;
+  skipped: number;
+  failed: number;
 }

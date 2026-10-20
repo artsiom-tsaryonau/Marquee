@@ -45,8 +45,9 @@ pub fn launch(
     edition_id: &str,
     extra_args: &[String],
     sink: Arc<dyn EventSink>,
+    xdg_config: Option<std::path::PathBuf>,
 ) -> Result<Session> {
-    let (session, argv, runner_kind) = {
+    let (session, argv, runner_kind, isolate) = {
         let db = db
             .lock()
             .map_err(|_| AppError::new("DB", "database lock poisoned"))?;
@@ -82,10 +83,7 @@ pub fn launch(
             None => runners::pick_default(&runners).cloned(),
         }
         .ok_or_else(|| {
-            AppError::new(
-                "RUNNER_MISSING",
-                "PCSX2 is not installed. See docs/PS2.md.",
-            )
+            AppError::new("RUNNER_MISSING", "PCSX2 is not installed. See docs/PS2.md.")
         })?;
         runners::require_launchable(&runner)?;
         let argv = runners::launch_argv(&runner, &media.path, extra_args)?;
@@ -104,14 +102,15 @@ pub fn launch(
             state: SessionState::Running,
             error: None,
         };
-        (session, argv, runner.kind)
+        let isolate = runners::uses_marquee_prefix(&runner);
+        (session, argv, runner.kind, isolate)
     };
 
     sink.emit(crate::model::CoreEvent::SessionStarted {
         session: session.clone(),
     });
 
-    let child = spawn(&argv);
+    let child = spawn(&argv, if isolate { xdg_config.as_deref() } else { None });
     match child {
         Ok(child) => {
             let db = Arc::clone(&db);
@@ -159,16 +158,19 @@ pub fn launch(
     }
 }
 
-fn spawn(argv: &[String]) -> std::io::Result<std::process::Child> {
+fn spawn(argv: &[String], xdg_config: Option<&Path>) -> std::io::Result<std::process::Child> {
     let (bin, args) = argv
         .split_first()
         .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "empty argv"))?;
-    Command::new(bin)
-        .args(args)
+    let mut cmd = Command::new(bin);
+    cmd.args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
+        .stderr(Stdio::null());
+    if let Some(home) = xdg_config {
+        cmd.env("XDG_CONFIG_HOME", home);
+    }
+    cmd.spawn()
 }
 
 fn wait_and_finish(

@@ -123,13 +123,14 @@
     z-index: 40;
     background: rgb(0 0 0 / 0.55);
     backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
   }
   .dialog {
     position: fixed;
     z-index: 41;
     left: 50%;
     top: 50%;
-    translate: -50% -50%;
+    transform: translate(-50%, -50%);
     width: min(760px, calc(100vw - 32px));
     max-height: calc(100vh - 32px);
     overflow: auto;
@@ -217,7 +218,7 @@
   }
   .steps li.now {
     color: var(--text);
-    background: color-mix(in oklab, var(--accent) 18%, var(--field));
+    background: color-mix(in srgb, var(--accent) 18%, var(--field));
   }
   .steps li.done {
     color: var(--text-soft);

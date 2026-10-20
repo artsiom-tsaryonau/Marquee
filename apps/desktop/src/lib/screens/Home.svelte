@@ -7,6 +7,8 @@
   import Logo from '../components/Logo.svelte';
   import Icon from '../components/Icon.svelte';
   import Artwork from '../components/Artwork.svelte';
+  import InstallMenu from '../components/InstallMenu.svelte';
+  import { homeAtmosphere } from '../art';
 
   const continuePlaying = $derived(
     app.games.filter((g) => g.lastPlayed).sort((a, b) => b.lastPlayed!.localeCompare(a.lastPlayed!)).slice(0, 10),
@@ -24,29 +26,38 @@
   const g = $derived(app.hero);
   const dur = $derived(app.reduceMotion ? 0 : 320);
   const empty = $derived(!g);
+  const addFolder = () => app.addPs2Folder();
 </script>
 
 <div class="home">
-  {#if g}
   <div class="hero-art" aria-hidden="true">
-    {#key g.id}
-      <div class="hero-layer" transition:fade={{ duration: dur * 1.4 }}><Artwork art={g.art} /></div>
+    {#key g?.id ?? 'atmosphere'}
+      <div class="hero-layer" transition:fade={{ duration: dur * 1.4 }}>
+        {#if g?.coverUrl}
+          <img class="hero-cover" src={g.coverUrl} alt="" />
+        {:else}
+          <Artwork art={g?.art ?? homeAtmosphere} />
+        {/if}
+      </div>
     {/key}
   </div>
-  {/if}
   <header class="hero">
     {#if empty}
       <div class="info">
         <p class="eyebrow"><span class="pill">PlayStation 2</span></p>
-        <h1 class="empty-title">Your library is empty</h1>
+        <Logo game={{ title: 'Marquee', art: homeAtmosphere }} size="xl" />
         <p class="tagline">Choose a folder of PS2 .iso files. Marquee will not download games or BIOS files.</p>
         {#if app.libraryStatus === 'failed'}
           <p class="tagline">{app.loadError}</p>
         {/if}
+        {#if app.installProgress}
+          <p class="tagline">{app.installProgress}</p>
+        {/if}
         <div class="actions">
-          <button class="btn primary" data-nav onclick={() => app.addPs2Folder()}>
+          <button class="btn primary" data-nav onclick={addFolder}>
             <Icon name="plus" /> Add PS2 folder
           </button>
+          <InstallMenu />
           <button class="btn glass" data-nav onclick={() => app.go('settings')}>Settings</button>
         </div>
       </div>
@@ -66,10 +77,18 @@
           {#if g.lastPlayed}<span>Last played {ago(g.lastPlayed)}</span>{/if}
         </div>
         <div class="actions">
-          <button class="btn primary" data-nav style="--accent-h:{g.art.hue2}" onclick={() => (g.installed ? app.play(g) : app.demo ? app.install(g.title, { kind: 'game', id: g.id }) : app.addPs2Folder())}>
-            <Icon name={g.installed ? 'play' : 'download'} />
-            {g.installed ? 'Play' : app.demo ? 'Install' : 'Reconnect'}
-          </button>
+          {#if !app.demo && g.setupState === 'runner_missing'}
+            <InstallMenu tone="primary" />
+          {:else}
+            <button class="btn primary" data-nav style="--accent-h:{g.art.hue2}" onclick={() => {
+              if (g.installed) app.play(g);
+              else if (app.demo) app.install(g.title, { kind: 'game', id: g.id });
+              else app.addPs2Folder();
+            }}>
+              <Icon name={g.installed ? 'play' : 'download'} />
+              {g.installed ? 'Play' : app.demo ? 'Install' : 'Reconnect'}
+            </button>
+          {/if}
           <button class="btn glass" data-nav onclick={() => app.open(g)}>Details</button>
           <button class="btn glass icon" data-nav aria-label="Favourite" onclick={() => app.toggleFavorite(g)}>
             <Icon name="star" filled={g.favorite} />
@@ -80,17 +99,17 @@
     {/if}
   </header>
 
-  <Row title="Continue playing" games={continuePlaying} shape="wide" />
+  <Row title="Continue playing" games={continuePlaying} shape="wide" placeholders={empty ? 4 : 0} onPlaceholder={addFolder} />
   {#if app.demo}
     <Row title="Ports ready to play" games={portsReady} />
     <Row title="Hidden gems in your backlog" games={hiddenGems} />
   {/if}
-  <Row title="Favourites" games={favorites} />
+  <Row title="Favourites" games={favorites} placeholders={empty ? 6 : 0} />
   {#if app.demo}
     <Row title="Quick wins · under 6 hours" games={quickWins} />
   {/if}
-  <Row title="Recently added" games={recentlyAdded} />
-  <Row title="PlayStation 2" games={emulated} />
+  <Row title="Recently added" games={recentlyAdded} placeholders={empty ? 8 : 0} onPlaceholder={addFolder} />
+  <Row title="PlayStation 2" games={emulated} placeholders={empty ? 8 : 0} onPlaceholder={addFolder} />
   {#if app.demo}
     <Row title="In your library, not installed" games={notInstalled} />
   {/if}
@@ -106,13 +125,24 @@
     height: calc(var(--hero-h) + 160px);
     z-index: -1;
     overflow: hidden;
-    mask-image: linear-gradient(180deg, #000 55%, transparent), linear-gradient(90deg, transparent 0, #000 45%);
+    z-index: 0;
+    -webkit-mask-image: linear-gradient(180deg, #000 58%, transparent),
+      linear-gradient(90deg, transparent 0, #000 42%);
+    mask-image: linear-gradient(180deg, #000 58%, transparent),
+      linear-gradient(90deg, transparent 0, #000 42%);
+    -webkit-mask-composite: source-in;
     mask-composite: intersect;
   }
   .hero-layer {
     position: absolute;
     inset: 0;
     animation: kenburns 24s ease-in-out infinite alternate;
+  }
+  .hero-cover {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
   }
   @keyframes kenburns {
     from {
@@ -123,6 +153,8 @@
     }
   }
   .hero {
+    position: relative;
+    z-index: 1;
     min-height: var(--hero-h);
     display: flex;
     align-items: flex-end;
@@ -167,10 +199,5 @@
     display: flex;
     gap: 10px;
     margin-top: 6px;
-  }
-  .empty-title {
-    margin: 0;
-    font-size: clamp(36px, 6vw, 72px);
-    letter-spacing: -0.04em;
   }
 </style>

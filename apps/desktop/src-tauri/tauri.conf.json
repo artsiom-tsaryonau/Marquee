@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "pnpm --dir .. dev",
-    "beforeBuildCommand": "pnpm --dir .. build"
+    "beforeDevCommand": "pnpm dev",
+    "beforeBuildCommand": "pnpm build"
   },
   "app": {
     "windows": [
@@ -15,14 +15,34 @@
         "label": "main",
         "title": "Marquee",
         "width": 1440,
-        "height": 900
+        "height": 900,
+        "theme": "Dark",
+        "backgroundColor": "#07070d"
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src ipc: http://ipc.localhost"
+      "csp": "default-src 'self'; img-src 'self' data: asset: http://asset.localhost https://asset.localhost; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src ipc: http://ipc.localhost",
+      "assetProtocol": {
+        "enable": true,
+        "scope": [
+          "$HOME/.cache/marquee/art/**",
+          "$HOME/.local/share/marquee/**",
+          "$CACHE/marquee/art/**",
+          "$HOME/**/cache/art/**",
+          "/tmp/**"
+        ]
+      }
     }
   },
   "bundle": {
-    "active": false
+    "active": false,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
   }
 }

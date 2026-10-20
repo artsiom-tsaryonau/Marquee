@@ -2,6 +2,7 @@ import { createApi, type LibraryApi } from './api';
 import { gamesFromSnapshot, pickRunner } from './api/map';
 import type { CoreEvent, LibraryRoot, LibrarySnapshot, Runner, ScanReport, Session } from './api/contracts';
 import { describeScan } from './format';
+import { installOption } from './install';
 import { downloads as seedDownloads, games, portGame, ports } from './mock';
 import type { Download, DownloadTarget, GameEntry, PortEntry } from './types';
 
@@ -46,6 +47,11 @@ class AppState {
   selectedRunner = $state<Runner | null>(null);
   lastScan = $state<ScanReport | null>(null);
   scanning = $state(false);
+  installingPcsx2 = $state(false);
+  installProgress = $state<string | null>(null);
+  installToolId = $state<string | null>(null);
+  installOptionId = $state<string | null>(null);
+  fetchingArt = $state(false);
   overlayDismissed = $state(false);
 
   games = $state<GameEntry[]>(this.demo ? games : []);
@@ -73,6 +79,7 @@ class AppState {
     if (this.demo) return;
     this.unlisten = this.api.subscribe((event) => this.onEvent(event));
     try {
+      await this.api.whenReady();
       const snap = await this.api.snapshot();
       this.applySnapshot(snap);
     } catch (err) {
@@ -137,6 +144,29 @@ class AppState {
     if (event.type === 'library_changed' || event.type === 'scan_finished') {
       void this.api.snapshot().then((snap) => this.applySnapshot(snap));
     }
+    if (event.type === 'tool_install_started') {
+      this.installingPcsx2 = true;
+      this.installProgress = `Installing PCSX2 (${event.channel})…`;
+    }
+    if (event.type === 'tool_install_progress') {
+      this.installProgress = event.message;
+    }
+    if (event.type === 'tool_install_finished') {
+      this.installingPcsx2 = false;
+      this.installProgress = 'PCSX2 is installed. Open setup to add your BIOS files.';
+      this.notify('PCSX2 is installed. Open setup to add your BIOS files — Marquee will not download them.');
+      void this.api.snapshot().then((snap) => this.applySnapshot(snap));
+    }
+    if (event.type === 'tool_install_failed') {
+      this.installingPcsx2 = false;
+      this.installProgress = null;
+      this.notify(event.message);
+    }
+    if (event.type === 'artwork_finished') {
+      this.fetchingArt = false;
+      this.notify(`Covers: ${event.fetched} fetched · ${event.skipped} skipped · ${event.failed} failed`);
+      void this.api.snapshot().then((snap) => this.applySnapshot(snap));
+    }
   }
 
   go(route: Route, gameId: string | null = route === 'game' ? this.gameId : null) {
@@ -160,7 +190,33 @@ class AppState {
     this.heroId = game.id;
   }
 
+  openInstall(toolId: string, optionId?: string) {
+    this.installToolId = toolId;
+    this.installOptionId = optionId ?? null;
+  }
+
+  closeInstall() {
+    this.installToolId = null;
+    if (!this.installingPcsx2) this.installOptionId = null;
+  }
+
+  async runInstall(toolId: string, optionId: string) {
+    const option = installOption(toolId, optionId);
+    if (!option) return;
+    this.installToolId = toolId;
+    this.installOptionId = optionId;
+    if (option.run.type === 'setup') {
+      await this.openSetup();
+      return;
+    }
+    await this.installPcsx2(option.run.channel);
+  }
+
   back() {
+    if (this.installToolId) {
+      this.closeInstall();
+      return;
+    }
     if (this.running || this.launching) {
       if (this.demo) return this.stop();
       return this.dismissOverlay();
@@ -263,6 +319,9 @@ class AppState {
       if (this.libraryStatus === 'empty' && report.skipped_unsupported && !report.added) {
         this.notify('Nothing imported. CHD/CUE/BIN/GZ/CSO are not supported yet — add a folder of .iso files.');
       }
+      if (report.added > 0) {
+        void this.refreshArtwork();
+      }
     } catch (err) {
       this.notify((err as { message?: string }).message ?? 'Could not add folder');
     } finally {
@@ -281,6 +340,9 @@ class AppState {
       this.lastScan = report;
       this.applySnapshot(await this.api.snapshot());
       this.notify(describeScan(report));
+      if (report.added > 0) {
+        void this.refreshArtwork();
+      }
     } catch (err) {
       this.notify((err as { message?: string }).message ?? 'Scan failed');
     } finally {
@@ -302,13 +364,43 @@ class AppState {
     if (this.demo) return;
     const runnerId = id ?? this.selectedRunner?.id;
     if (!runnerId) {
-      this.notify('Install PCSX2 first. See docs/PS2.md.');
+      this.notify('Install PCSX2 from Settings, then add your own BIOS files.');
       return;
     }
     try {
       await this.api.openSetup(runnerId);
     } catch (err) {
       this.notify((err as { message?: string }).message ?? 'Could not open PCSX2 setup');
+    }
+  }
+
+  async installPcsx2(channel = 'auto') {
+    if (this.demo) {
+      this.notify('Install PCSX2 in the desktop app');
+      return;
+    }
+    if (this.installingPcsx2) return;
+    this.installingPcsx2 = true;
+    this.installProgress = 'Starting PCSX2 install…';
+    try {
+      await this.api.installPcsx2(channel);
+      this.applySnapshot(await this.api.snapshot());
+    } catch (err) {
+      this.installingPcsx2 = false;
+      this.installProgress = null;
+      this.notify((err as { message?: string }).message ?? 'Could not install PCSX2');
+    }
+  }
+
+  async refreshArtwork(editionId?: string) {
+    if (this.demo) return;
+    if (this.fetchingArt) return;
+    this.fetchingArt = true;
+    try {
+      await this.api.refreshArtwork(editionId);
+    } catch (err) {
+      this.fetchingArt = false;
+      this.notify((err as { message?: string }).message ?? 'Could not fetch covers');
     }
   }
 

@@ -46,4 +46,11 @@ export const demoApi: LibraryApi = {
   subscribe() {
     return () => {};
   },
+  async whenReady() {},
+  async installPcsx2() {
+    throw { code: 'DEMO', message: 'Install PCSX2 in the desktop app' };
+  },
+  async refreshArtwork() {
+    return { fetched: 0, skipped: 0, failed: 0 };
+  },
 };

@@ -7,6 +7,7 @@
   import Logo from '../components/Logo.svelte';
   import Icon from '../components/Icon.svelte';
   import Row from '../components/Row.svelte';
+  import InstallMenu from '../components/InstallMenu.svelte';
   import ScoreStrip from '../components/ScoreStrip.svelte';
 
   const g = $derived(app.current ?? app.hero);
@@ -32,7 +33,17 @@
   );
 
   const playLabel = $derived(
-    !g ? 'Play' : g.setupState === 'missing' ? 'Open PCSX2 setup' : g.mediaMissing ? 'Disc missing' : g.installed ? 'Play' : app.demo ? 'Install' : 'Reconnect',
+    !g
+      ? 'Play'
+      : g.setupState === 'missing'
+        ? 'Open PCSX2 setup'
+        : g.mediaMissing
+          ? 'Disc missing'
+          : g.installed
+            ? 'Play'
+            : app.demo
+              ? 'Install'
+              : 'Reconnect',
   );
 </script>
 
@@ -46,7 +57,11 @@
 {:else}
 <article class="page" style="--accent-h:{g.art.hue2}">
   <div class="banner">
-    <Artwork art={g.art} />
+    {#if g.coverUrl}
+      <img class="banner-cover" src={g.coverUrl} alt="" />
+    {:else}
+      <Artwork art={g.art} />
+    {/if}
     <div class="fade"></div>
   </div>
 
@@ -59,16 +74,25 @@
     {/if}
     <p class="tagline">{g.tagline}</p>
     <div class="actions">
-      <button class="btn primary big" data-nav onclick={() => {
-        if (offline && g.setupState === 'missing') app.openSetup();
-        else if (g.installed) app.play(g);
-        else if (app.demo) app.install(g.title, { kind: 'game', id: g.id });
-      }}>
-        <Icon name={g.installed && g.setupState !== 'missing' ? 'play' : 'download'} />
-        {playLabel}
-      </button>
+      {#if offline && g.setupState === 'runner_missing'}
+        <InstallMenu tone="primary" size="big" />
+      {:else}
+        <button class="btn primary big" data-nav onclick={() => {
+          if (offline && g.setupState === 'missing') app.openSetup();
+          else if (g.installed) app.play(g);
+          else if (app.demo) app.install(g.title, { kind: 'game', id: g.id });
+        }}>
+          <Icon name={g.installed && g.setupState !== 'missing' ? 'play' : 'download'} />
+          {playLabel}
+        </button>
+      {/if}
       {#if offline && (g.setupState === 'unverified' || g.setupState === 'runner_missing' || g.setupState === 'missing')}
         <button class="btn glass" data-nav onclick={() => app.openSetup()}><Icon name="settings" /> Open PCSX2 setup</button>
+      {/if}
+      {#if offline && g.serial && !g.coverUrl}
+        <button class="btn glass" data-nav onclick={() => app.refreshArtwork(g.id)} disabled={app.fetchingArt}>
+          <Icon name="image" /> {app.fetchingArt ? 'Fetching cover…' : 'Fetch cover'}
+        </button>
       {/if}
       {#if g.portStatus === 'update'}
         <button class="btn glass" data-nav onclick={() => port && app.install(`${g.title} update`, { kind: 'port', id: port.id })}><Icon name="refresh" /> Update</button>
@@ -163,11 +187,17 @@
     z-index: -1;
     overflow: hidden;
   }
+  .banner-cover {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
   .fade {
     position: absolute;
     inset: 0;
     background:
-      linear-gradient(90deg, var(--bg) 0%, color-mix(in oklab, var(--bg) 40%, transparent) 45%, transparent 75%),
+      linear-gradient(90deg, var(--bg) 0%, color-mix(in srgb, var(--bg) 40%, transparent) 45%, transparent 75%),
       linear-gradient(180deg, transparent 40%, var(--bg));
   }
   .head {
@@ -195,6 +225,7 @@
     font-weight: 600;
     cursor: pointer;
     backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
   }
   .tagline {
     margin: 0;

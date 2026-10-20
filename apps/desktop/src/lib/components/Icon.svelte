@@ -25,6 +25,7 @@
     refresh: 'M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4v4h-4',
     x: 'M6 6l12 12M18 6 6 18',
     sparkle: 'M12 3c.6 4.6 2.4 6.4 7 7-4.6.6-6.4 2.4-7 7-.6-4.6-2.4-6.4-7-7 4.6-.6 6.4-2.4 7-7z',
+    chevron: 'M6 9l6 6 6-6',
   } as const;
   export type IconName = keyof typeof paths;
 </script>

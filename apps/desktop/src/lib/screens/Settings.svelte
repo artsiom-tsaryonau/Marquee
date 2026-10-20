@@ -1,6 +1,7 @@
 <script lang="ts">
   import { app } from '../state.svelte';
   import Icon from '../components/Icon.svelte';
+  import InstallMenu from '../components/InstallMenu.svelte';
 
   const sources = $state([
     { name: 'Lutris', detail: '~/.local/share/lutris/pga.db · read-only', on: true },
@@ -35,14 +36,28 @@
       <div>
         <strong>PCSX2</strong>
         <span>
-          {#if app.selectedRunner}
+          {#if app.installingPcsx2}
+            {app.installProgress ?? 'Installing…'}
+          {:else if app.selectedRunner?.available}
             {app.selectedRunner.display_name} · {app.selectedRunner.bios_state.replace('_', ' ')}
           {:else}
-            Not installed — see docs/PS2.md
+            Not installed. Marquee can install the official Flatpak (no BIOS or games).
           {/if}
         </span>
       </div>
-      <button class="btn glass small" data-nav onclick={() => app.openSetup()} disabled={!app.selectedRunner}>Open setup</button>
+      <div class="row-actions">
+        <InstallMenu tone="primary" size="small" />
+        <button class="btn glass small" data-nav onclick={() => app.openSetup()} disabled={!app.selectedRunner?.available}>Open setup</button>
+      </div>
+    </div>
+    <div class="item">
+      <div>
+        <strong>Box art</strong>
+        <span>Looks up covers by disc serial from the public PS2 cover set. Never downloads games.</span>
+      </div>
+      <button class="btn glass small" data-nav onclick={() => app.refreshArtwork()} disabled={app.fetchingArt || app.games.length === 0}>
+        {app.fetchingArt ? 'Fetching…' : 'Fetch covers'}
+      </button>
     </div>
     {#if app.runners.length > 1}
       <div class="item">
@@ -157,6 +172,11 @@
   }
   .item:last-of-type {
     border-bottom: 0;
+  }
+  .row-actions {
+    display: flex;
+    gap: 8px;
+    flex: none;
   }
   .item > div:first-child {
     display: grid;

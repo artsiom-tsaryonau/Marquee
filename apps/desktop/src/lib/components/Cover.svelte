@@ -62,9 +62,17 @@
     onclick={() => app.open(game)}
     aria-label={game.title}
   >
-    <div class="art"><Artwork art={game.art} grain={shape === 'wide'} /></div>
+    <div class="art">
+      {#if game.coverUrl}
+        <img class="cover-img" src={game.coverUrl} alt="" />
+      {:else}
+        <Artwork art={game.art} grain={shape === 'wide'} />
+      {/if}
+    </div>
     <div class="shade"></div>
-    <div class="logo"><Logo {game} size={shape === 'wide' ? 'md' : 'sm'} /></div>
+    {#if !game.coverUrl}
+      <div class="logo"><Logo {game} size={shape === 'wide' ? 'md' : 'sm'} /></div>
+    {/if}
     <span class="source">{sourceLabel[game.source]}</span>
     {#if game.favorite}<span class="fav"><Icon name="star" size={14} filled /></span>{/if}
     {#if status?.tone === 'dim'}
@@ -140,6 +148,12 @@
     inset: 0;
     transition: transform 400ms var(--ease);
   }
+  .cover-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
   .card:hover .art,
   .card:focus-visible .art {
     transform: scale(1.05);
@@ -167,6 +181,7 @@
     padding: 4px 8px;
     border-radius: 999px;
     backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
   }
   .source {
     left: 10px;

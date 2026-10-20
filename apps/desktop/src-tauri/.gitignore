@@ -1,3 +1,5 @@
 /target
 gen
 WixTools
+icons/android
+icons/ios

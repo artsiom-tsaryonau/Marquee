@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-pub const SCHEMA_VERSION: i64 = 1;
+pub const SCHEMA_VERSION: i64 = 2;
 pub const SYSTEM_PS2: &str = "ps2";
 pub const KIND_PS2_ISO: &str = "ps2_iso";
 pub const KIND_PS2_CUE: &str = "ps2_cue";
@@ -116,6 +116,7 @@ pub struct Edition {
     pub missing: bool,
     pub serial: Option<String>,
     pub region: Option<String>,
+    pub cover_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -259,11 +260,52 @@ pub struct LaunchEvent {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum CoreEvent {
-    ScanStarted { root_id: String },
-    ScanProgress { scanned: u32, added: u32 },
-    ScanFinished { report: ScanReport },
-    SessionStarted { session: Session },
-    SessionEnded { session: Session },
-    SessionFailed { session: Session },
+    ScanStarted {
+        root_id: String,
+    },
+    ScanProgress {
+        scanned: u32,
+        added: u32,
+    },
+    ScanFinished {
+        report: ScanReport,
+    },
+    SessionStarted {
+        session: Session,
+    },
+    SessionEnded {
+        session: Session,
+    },
+    SessionFailed {
+        session: Session,
+    },
     LibraryChanged,
+    ToolInstallStarted {
+        tool_id: String,
+        channel: String,
+    },
+    ToolInstallProgress {
+        tool_id: String,
+        message: String,
+    },
+    ToolInstallFinished {
+        tool_id: String,
+        runner_id: Option<String>,
+    },
+    ToolInstallFailed {
+        tool_id: String,
+        message: String,
+    },
+    ArtworkFinished {
+        fetched: u32,
+        skipped: u32,
+        failed: u32,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ArtworkReport {
+    pub fetched: u32,
+    pub skipped: u32,
+    pub failed: u32,
 }

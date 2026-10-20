@@ -259,7 +259,7 @@ fn fake_runner_session_records_duration_once_and_rejects_duplicates() {
     let dir = tempfile::tempdir().unwrap();
     let games = dir.path().join("games");
     write_iso(&games.join("Play.iso"), "BOOT2 = cdrom0:\\SLUS_209.63;1");
-    let core = Core::open(Some(dir.path().join("data")), true).unwrap();
+    let core = Core::open_isolated(Some(dir.path().join("data")), true).unwrap();
     core.select_runner("runner.fake").unwrap();
     let root = core.add_root(games, None).unwrap();
     core.scan(Some(&root.id), None).unwrap();
@@ -286,7 +286,7 @@ fn spawn_failed_and_missing_runner_are_typed() {
     let dir = tempfile::tempdir().unwrap();
     let games = dir.path().join("games");
     write_iso(&games.join("Play.iso"), "BOOT2 = cdrom0:\\SLUS_209.63;1");
-    let core = Core::open(Some(dir.path().join("data")), false).unwrap();
+    let core = Core::open_isolated(Some(dir.path().join("data")), false).unwrap();
     let root = core.add_root(games, None).unwrap();
     core.scan(Some(&root.id), None).unwrap();
     let edition_id = core.snapshot().unwrap().editions[0].id.clone();
@@ -295,7 +295,7 @@ fn spawn_failed_and_missing_runner_are_typed() {
         .unwrap_err();
     assert_eq!(err.code, "RUNNER_MISSING");
 
-    let core = Core::open(Some(dir.path().join("data2")), true).unwrap();
+    let core = Core::open_isolated(Some(dir.path().join("data2")), true).unwrap();
     let root = core.add_root(dir.path().join("games"), None).unwrap();
     core.scan(Some(&root.id), None).unwrap();
     let edition_id = core.snapshot().unwrap().editions[0].id.clone();
@@ -326,6 +326,65 @@ fn spawn_failed_and_missing_runner_are_typed() {
 }
 
 #[test]
+fn reopen_abandons_stale_running_session_without_playtime() {
+    let dir = tempfile::tempdir().unwrap();
+    let data = dir.path().join("data");
+    let games = dir.path().join("games");
+    write_iso(&games.join("Shadow.iso"), "BOOT2 = cdrom0:\\SLUS_209.63;1");
+    let edition_id = {
+        let core = Core::open_isolated(Some(data.clone()), true).unwrap();
+        let root = core.add_root(games, Some("PS2".into())).unwrap();
+        core.scan(Some(&root.id), None).unwrap();
+        let edition = core.snapshot().unwrap().editions.remove(0);
+        {
+            let db = core.db_arc();
+            let db = db.lock().unwrap();
+            db.insert_session(
+                "stale-session",
+                &edition.id,
+                "runner.fake",
+                "2026-01-01T00:00:00Z",
+                "running",
+            )
+            .unwrap();
+        }
+        edition.id
+    };
+    let core = Core::open_isolated(Some(data), true).unwrap();
+    core.select_runner("runner.fake").unwrap();
+    let snap = core.snapshot().unwrap();
+    let stale = snap
+        .sessions
+        .iter()
+        .find(|s| s.id == "stale-session")
+        .unwrap();
+    assert_eq!(stale.state, SessionState::Failed);
+    assert!(stale.error.as_deref().unwrap().contains("exited while"));
+    let edition = snap.editions.iter().find(|e| e.id == edition_id).unwrap();
+    assert_eq!(edition.playtime_seconds, 0);
+    let session = core.launch(&edition_id, &[], Arc::new(NoopSink)).unwrap();
+    let ended = wait_session(&core, &session.id);
+    assert_eq!(ended.state, SessionState::Ended);
+}
+
+#[test]
+fn schema_rejects_a_newer_library() {
+    let dir = tempfile::tempdir().unwrap();
+    let data = dir.path().join("data");
+    Core::open(Some(data.clone()), true).unwrap();
+    {
+        let conn = rusqlite::Connection::open(data.join("library.db")).unwrap();
+        conn.pragma_update(None, "user_version", 99).unwrap();
+    }
+    let err = match Core::open(Some(data), true) {
+        Ok(_) => panic!("newer schema should fail"),
+        Err(err) => err,
+    };
+    assert_eq!(err.code, "DB");
+    assert!(err.message.contains("newer"));
+}
+
+#[test]
 fn instance_lock_rejects_a_second_owner() {
     let dir = tempfile::tempdir().unwrap();
     let _core = Core::open(Some(dir.path().to_path_buf()), true).unwrap();
@@ -349,4 +408,60 @@ fn error_envelope_serializes_code() {
     let err = AppError::new("MEDIA_MISSING", "gone");
     let json = serde_json::to_value(&err).unwrap();
     assert_eq!(json["code"], "MEDIA_MISSING");
+}
+
+#[test]
+fn unpacked_tree_is_a_managed_runner_without_network() {
+    let dir = tempfile::tempdir().unwrap();
+    let data = dir.path().join("data");
+    let bin = data.join("runners/pcsx2/current/usr/bin/pcsx2-qt");
+    fs::create_dir_all(bin.parent().unwrap()).unwrap();
+    File::create(&bin)
+        .unwrap()
+        .write_all(b"#!/bin/sh\nexit 0\n")
+        .unwrap();
+    let mut perm = fs::metadata(&bin).unwrap().permissions();
+    perm.set_mode(0o755);
+    fs::set_permissions(&bin, perm).unwrap();
+    let core = Core::open_isolated(Some(data), true).unwrap();
+    let runners = core.install_pcsx2("auto", Arc::new(NoopSink)).unwrap();
+    assert!(
+        runners
+            .iter()
+            .any(|r| r.id == "runner.pcsx2.unpacked" && r.available),
+        "{runners:?}"
+    );
+}
+
+#[test]
+fn unknown_pcsx2_channel_is_rejected() {
+    let dir = tempfile::tempdir().unwrap();
+    let core = Core::open(Some(dir.path().join("data")), true).unwrap();
+    let err = core.install_pcsx2("steam", Arc::new(NoopSink)).unwrap_err();
+    assert_eq!(err.code, "RUNNER_MISSING");
+}
+
+#[test]
+fn artwork_refresh_on_empty_library_fetches_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let core = Core::open(Some(dir.path().join("data")), true).unwrap();
+    let report = core.refresh_artwork(None, None).unwrap();
+    assert_eq!(report.fetched, 0);
+    assert_eq!(report.failed, 0);
+}
+
+#[test]
+fn artwork_refresh_skips_unresolved_serial_without_network() {
+    let dir = tempfile::tempdir().unwrap();
+    let data = dir.path().join("data");
+    let games = dir.path().join("games");
+    write_iso(&games.join("unknown.iso"), "VER = 1.00");
+    let core = Core::open(Some(data), true).unwrap();
+    let root = core.add_root(games, Some("PS2".into())).unwrap();
+    core.scan(Some(&root.id), None).unwrap();
+    let report = core.refresh_artwork(None, None).unwrap();
+    assert_eq!(report.fetched, 0);
+    assert_eq!(report.failed, 0);
+    assert!(report.skipped >= 1);
+    assert!(core.snapshot().unwrap().editions[0].cover_path.is_none());
 }

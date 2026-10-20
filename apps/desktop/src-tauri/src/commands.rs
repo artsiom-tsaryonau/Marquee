@@ -1,6 +1,8 @@
 use crate::{event_sink, AppState};
 use marquee_core::error::{AppError, Result};
-use marquee_core::model::{LibraryRoot, LibrarySnapshot, Runner, ScanReport, Session};
+use marquee_core::model::{
+    ArtworkReport, LibraryRoot, LibrarySnapshot, Runner, ScanReport, Session,
+};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::{AppHandle, State};
@@ -20,15 +22,7 @@ async fn blocking<T: Send + 'static>(
 #[tauri::command]
 pub async fn health(state: State<'_, AppState>) -> Result<String> {
     let core = core(&state);
-    blocking(move || {
-        let snap = core.snapshot()?;
-        Ok(format!(
-            "ok:{}:{}",
-            snap.editions.len(),
-            core.paths.data_dir.display()
-        ))
-    })
-    .await
+    blocking(move || core.health()).await
 }
 
 #[tauri::command]
@@ -101,4 +95,27 @@ pub async fn set_display_title(
 ) -> Result<()> {
     let core = core(&state);
     blocking(move || core.set_display_title(&edition_id, &title)).await
+}
+
+#[tauri::command]
+pub async fn install_pcsx2(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    channel: Option<String>,
+) -> Result<Vec<Runner>> {
+    let core = core(&state);
+    let sink = event_sink(&app);
+    let channel = channel.unwrap_or_else(|| "auto".into());
+    blocking(move || core.install_pcsx2(&channel, sink)).await
+}
+
+#[tauri::command]
+pub async fn refresh_artwork(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    edition_id: Option<String>,
+) -> Result<ArtworkReport> {
+    let core = core(&state);
+    let sink = event_sink(&app);
+    blocking(move || core.refresh_artwork(edition_id.as_deref(), Some(sink))).await
 }

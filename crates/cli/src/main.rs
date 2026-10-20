@@ -1,7 +1,8 @@
 use clap::{Parser, Subcommand};
 use marquee_core::error::AppError;
+use marquee_core::model::CoreEvent;
 use marquee_core::model::SessionState;
-use marquee_core::{Core, NoopSink};
+use marquee_core::{Core, FnSink, NoopSink};
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -37,9 +38,12 @@ enum Command {
     },
     #[command(subcommand)]
     Runners(RunnersCmd),
+    #[command(subcommand)]
+    Artwork(ArtworkCmd),
     Launch {
         edition_id: String,
     },
+    Health,
 }
 
 #[derive(Subcommand)]
@@ -62,6 +66,18 @@ enum RunnersCmd {
     },
     Setup {
         runner_id: String,
+    },
+    Install {
+        #[arg(long, default_value = "auto")]
+        channel: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum ArtworkCmd {
+    Refresh {
+        #[arg(long)]
+        edition: Option<String>,
     },
 }
 
@@ -138,6 +154,27 @@ fn run() -> marquee_core::error::Result<()> {
         Command::Runners(RunnersCmd::Setup { runner_id }) => {
             core.open_setup(&runner_id)?;
             println!("opened setup for {runner_id}");
+        }
+        Command::Runners(RunnersCmd::Install { channel }) => {
+            let sink = Arc::new(FnSink(|event: CoreEvent| match event {
+                CoreEvent::ToolInstallProgress { message, .. } => println!("{message}"),
+                CoreEvent::ToolInstallFinished { runner_id, .. } => {
+                    println!("installed {}", runner_id.unwrap_or_else(|| "pcsx2".into()));
+                }
+                CoreEvent::ToolInstallFailed { message, .. } => {
+                    eprintln!("{message}");
+                }
+                _ => {}
+            }));
+            let runners = core.install_pcsx2(&channel, sink)?;
+            println!("{}", serde_json::to_string_pretty(&runners)?);
+        }
+        Command::Artwork(ArtworkCmd::Refresh { edition }) => {
+            let report = core.refresh_artwork(edition.as_deref(), None)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Command::Health => {
+            println!("{}", core.health()?);
         }
         Command::Launch { edition_id } => {
             let session = core.launch(&edition_id, &[], Arc::new(NoopSink))?;

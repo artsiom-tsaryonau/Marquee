@@ -2,9 +2,9 @@
 
 Prepared: 2026-10-20. Repository: `/home/atsaryonau/Projects/Marquee`.
 
-Do **not** start this ticket until the offline launch/exit gate is closed (real PCSX2 Play → quit → duration recorded, plus a compiled Tauri window), or the user explicitly reorders the work.
+Serial-based box art from xlenore/ps2-covers is **in the tree** (schema v2 `artwork` table, cached JPEG, Tauri asset protocol). See [PS2.md](PS2.md). This ticket is the remaining ScreenScraper match + SteamGridDB pipeline.
 
-As of 2026-10-20 the offline **code** exists, but that gate is still open: see [PS2.md](PS2.md). Starting metadata now would mix provider work with an unverified launcher.
+Do **not** treat xlenore JPEGs as ScreenScraper identity. The launch/exit gate is still the playtime proof; cover fetch is optional and nonfatal. **Do not start this ticket until that gate is closed**, unless the owner reorders.
 
 ## Release boundary
 
@@ -37,12 +37,14 @@ Serial extraction and content hashing also serve different jobs. The first miles
 
 ## Schema additions
 
+`artwork` already exists (schema v2) for serial covers: `(edition_id, kind)` → path, source (`xlenore`), fetched_at. **Extend that table** (attribution, local-override flag, provider id). Do not create a second artwork store.
+
 Add only when this ticket starts:
 
 | Entity | Minimum responsibility |
 | --- | --- |
 | Provider match | Local edition ID, provider ID, external ID, match confidence/state, fetched timestamp and user override. |
-| Artwork | Edition ID, kind, cached path, source attribution, fetched time and local-override flag. |
+| Artwork | Edition ID, kind, cached path, source attribution, fetched time and local-override flag (extend v2). |
 
 Keep user titles, favourites and local artwork overrides separate from refreshed provider values.
 
@@ -101,7 +103,7 @@ Fixture-based success, ambiguity, no match, 401/403, 429/backoff, timeout, malfo
 
 ## Definition of done
 
-- [ ] Offline import, launch and playtime still work with providers disabled or unreachable.
+- [ ] Offline import, launch and playtime still work with providers disabled or unreachable. *(Serial covers already skip/404 without blocking Play.)*
 - [ ] ScreenScraper matching exists with documented credentials, caching, attribution and failure handling.
 - [ ] SteamGridDB artwork exists; PS2 serials are not treated as SteamGridDB platform ids.
 - [ ] User title/favourite/artwork overrides survive refresh.

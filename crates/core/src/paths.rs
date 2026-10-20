@@ -44,6 +44,28 @@ impl Paths {
     pub fn instance_lock(&self) -> PathBuf {
         self.data_dir.join("instance.lock")
     }
+
+    /// Marquee-managed PCSX2 tree (downloaded AppImage + unpacked AppDir).
+    pub fn pcsx2_prefix(&self) -> PathBuf {
+        self.data_dir.join("runners").join("pcsx2")
+    }
+
+    pub fn pcsx2_unpacked_current(&self) -> PathBuf {
+        self.pcsx2_prefix().join("current")
+    }
+
+    pub fn pcsx2_appimage_path(&self) -> PathBuf {
+        self.pcsx2_prefix().join("pcsx2.AppImage")
+    }
+
+    /// Isolated `XDG_CONFIG_HOME` so PCSX2 writes under Marquee, not `~/.config/PCSX2`.
+    pub fn pcsx2_xdg_config(&self) -> PathBuf {
+        self.data_dir.join("pcsx2").join("xdg-config")
+    }
+
+    pub fn pcsx2_bios_dir(&self) -> PathBuf {
+        self.pcsx2_xdg_config().join("PCSX2").join("bios")
+    }
 }
 
 fn env_dir(var: &str) -> Option<PathBuf> {

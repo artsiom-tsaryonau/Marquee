@@ -8,6 +8,7 @@
   import Logo from './lib/components/Logo.svelte';
   import Artwork from './lib/components/Artwork.svelte';
   import AddWindowsApp from './lib/components/AddWindowsApp.svelte';
+  import InstallDialog from './lib/components/InstallDialog.svelte';
   import Home from './lib/screens/Home.svelte';
   import Library from './lib/screens/Library.svelte';
   import GamePage from './lib/screens/GamePage.svelte';
@@ -15,20 +16,13 @@
   import Downloads from './lib/screens/Downloads.svelte';
   import Settings from './lib/screens/Settings.svelte';
 
-  const demoNav: { route: Route; label: string; icon: IconName }[] = [
+  const nav: { route: Route; label: string; icon: IconName }[] = [
     { route: 'home', label: 'Home', icon: 'home' },
     { route: 'library', label: 'Library', icon: 'grid' },
     { route: 'ports', label: 'Ports', icon: 'puzzle' },
     { route: 'downloads', label: 'Downloads', icon: 'download' },
     { route: 'settings', label: 'Settings', icon: 'settings' },
   ];
-  const desktopNav: { route: Route; label: string; icon: IconName }[] = [
-    { route: 'home', label: 'Home', icon: 'home' },
-    { route: 'library', label: 'Library', icon: 'grid' },
-    { route: 'ps2', label: 'PS2', icon: 'grid' },
-    { route: 'settings', label: 'Settings', icon: 'settings' },
-  ];
-  const nav = $derived(app.demo ? demoNav : desktopNav);
 
   let adding = $state(false);
   let booting = $state(new URLSearchParams(location.search).get('splash') !== '0');
@@ -46,12 +40,19 @@
 
   onMount(() => {
     void app.boot();
-    // Dev shortcuts: ?route=library&mode=big&theme=light&splash=0
+    // Dev shortcuts: ?route=library&mode=big&theme=light&splash=0&empty=1
     const q = new URLSearchParams(location.search);
     const r = q.get('route') as Route | null;
     if (r) app.route = r;
     if (q.get('mode') === 'big' || q.get('mode') === 'desktop') app.mode = q.get('mode') as 'big' | 'desktop';
     if (q.get('theme') === 'light' || q.get('theme') === 'dark') app.theme = q.get('theme') as 'light' | 'dark';
+    if (q.get('empty') === '1') {
+      app.games = [];
+      app.ports = [];
+      app.downloads = [];
+      app.heroId = null;
+      app.libraryStatus = 'empty';
+    }
     if (q.get('game') && app.games.length) {
       app.open(app.games.find((g) => g.id.endsWith(q.get('game')!)) ?? app.games[0]);
     }
@@ -59,7 +60,8 @@
     if (q.get('motion') === '0') app.reduceMotion = true;
     const stop = startFocusEngine({
       back: () => {
-        if (adding) adding = false;
+        if (app.installToolId) app.closeInstall();
+        else if (adding) adding = false;
         else app.back();
       },
       onInput: (l) => (app.lastInput = l),
@@ -77,7 +79,7 @@
 
 <Backdrop blur={app.route !== 'game'} />
 
-<div class="shell" inert={!!(app.launching || app.running || adding)}>
+<div class="shell" inert={!!(app.launching || app.running || adding || app.installToolId)}>
   {#if app.mode === 'desktop'}
     <nav class="side glass-panel" aria-label="Main">
       <div class="brand"><span class="mark">M</span><span class="word">Marquee</span></div>
@@ -147,6 +149,10 @@
 
 {#if adding && app.demo}
   <AddWindowsApp onclose={() => (adding = false)} />
+{/if}
+
+{#if app.installToolId}
+  <InstallDialog />
 {/if}
 
 {#if app.launching || app.running}
@@ -278,7 +284,7 @@
   }
   .nav.on {
     color: var(--text);
-    background: color-mix(in oklab, var(--accent) 22%, transparent);
+    background: color-mix(in srgb, var(--accent) 22%, transparent);
   }
   .nav.on::before {
     content: '';
@@ -322,7 +328,7 @@
     align-items: center;
     justify-content: space-between;
     padding: 18px var(--gutter);
-    background: linear-gradient(180deg, color-mix(in oklab, var(--bg) 85%, transparent), transparent);
+    background: linear-gradient(180deg, color-mix(in srgb, var(--bg) 85%, transparent), transparent);
   }
   .tabs {
     display: flex;
@@ -331,6 +337,7 @@
     border-radius: 999px;
     background: var(--field);
     backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
   }
   .tab {
     border: 0;
@@ -376,7 +383,7 @@
     gap: 26px;
     padding: 16px var(--gutter);
     font-weight: 600;
-    background: linear-gradient(0deg, color-mix(in oklab, var(--bg) 90%, transparent), transparent);
+    background: linear-gradient(0deg, color-mix(in srgb, var(--bg) 90%, transparent), transparent);
     pointer-events: none;
   }
   .hints span {
@@ -503,7 +510,7 @@
     position: fixed;
     bottom: 28px;
     left: 50%;
-    translate: -50% 0;
+    transform: translate(-50%, 0);
     z-index: 60;
     padding: 12px 20px;
     border-radius: 14px;

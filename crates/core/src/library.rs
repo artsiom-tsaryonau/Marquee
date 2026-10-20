@@ -10,7 +10,7 @@ use serde_json::json;
 use std::collections::BTreeMap;
 use std::fs;
 use std::os::unix::fs::MetadataExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 pub fn add_root(db: &Db, path: &Path, label: Option<&str>) -> Result<LibraryRoot> {
@@ -239,6 +239,7 @@ pub fn snapshot_media(db: &Db) -> Result<Vec<MediaFile>> {
 
 pub fn snapshot_editions(db: &Db) -> Result<Vec<Edition>> {
     let media = snapshot_media(db)?;
+    let covers: BTreeMap<String, String> = db.list_cover_paths()?.into_iter().collect();
     db.list_editions()?
         .into_iter()
         .map(|row| {
@@ -255,6 +256,7 @@ pub fn snapshot_editions(db: &Db) -> Result<Vec<Edition>> {
                 .as_ref()
                 .and_then(|mid| media.iter().find(|m| &m.id == mid));
             Ok(Edition {
+                cover_path: covers.get(&row.id).map(PathBuf::from),
                 id: row.id,
                 system: row.system,
                 title: row

@@ -2,7 +2,7 @@
 
 Researched 2026-10-20. These are integration candidates and product proposals, not implemented adapters or locally tested compatibility claims. Follow the linked upstream documentation when implementing each adapter; releases, supported game revisions and Linux packaging change.
 
-**As of 2026-10-20:** a PS2/PCSX2 offline import-to-play slice is in the tree (ISO scan, CLI, Tauri commands). It is not a finished adapter: live launch/exit is unverified, and nothing else in this catalogue is implemented. Demo UI still runs in the browser with sample data. See [PS2.md](PS2.md).
+**As of 2026-10-20:** a PS2/PCSX2 offline slice is in the tree (ISO scan, CLI, Tauri window, **Marquee-managed PCSX2 unpack**, serial covers, console UI). It is not a finished adapter: live Play → quit → duration is unverified. Nothing else in this catalogue is implemented. Demo UI still uses sample data in the browser; desktop never does. See [PS2.md](PS2.md).
 
 ## Product direction
 
@@ -22,9 +22,9 @@ Priority labels below are Marquee implementation recommendations, not upstream c
 
 | System | Candidate | Marquee experience | Priority and requirements |
 | --- | --- | --- | --- |
-| PS1 | [DuckStation](https://github.com/stenzek/duckstation) | Disc-library scanning, multi-disc grouping, memory-card shortcuts, per-game launch options | First. Configure the BIOS and supported disc formats through the emulator. |
-| PS2 | [PCSX2](https://pcsx2.net/docs/setup/running/) | A PS2 shelf, per-game renderer/settings profiles, memory-card management, compatibility links | **First — slice started 2026-10-20** (ISO import, argv, sessions). Per-game PCSX2 settings, memory cards and compatibility links are not in that slice. [PCSX2 requires a BIOS](https://pcsx2.net/docs/setup/bios/); show missing prerequisites before Play. Live launch pending: [PS2.md](PS2.md). |
-| PSP | [PPSSPP](https://www.ppsspp.org/) | A portable-games shelf, upscale presets, controller mappings | First. Keep PSP separate from PS1 games distributed for PSP. |
+| PS1 | [DuckStation](https://github.com/stenzek/duckstation) | Disc-library scanning, multi-disc grouping, memory-card shortcuts, per-game launch options | First. Same install policy as PCSX2: unpack an official build into Marquee; BIOS user-supplied. |
+| PS2 | [PCSX2](https://pcsx2.net/docs/setup/running/) | A PS2 shelf, per-game renderer/settings profiles, memory-card management, compatibility links | **First — slice in tree 2026-10-20** (ISO import, **official AppImage unpacked into Marquee’s data dir**, optional Flatpak, argv, sessions, serial box art, console Home/Library). Per-game PCSX2 settings, memory cards, CUE/CHD play and compatibility links are **not** in that slice. [PCSX2 requires a BIOS](https://pcsx2.net/docs/setup/bios/) that the user supplies; Marquee never downloads it. Empty BIOS dir is unverified, not missing. Live Play pending: [PS2.md](PS2.md). |
+| PSP | [PPSSPP](https://www.ppsspp.org/) | A portable-games shelf, upscale presets, controller mappings | First. Unpack into Marquee like PCSX2. Keep PSP separate from PS1 games distributed for PSP. |
 | PS3 | [RPCS3](https://github.com/RPCS3/rpcs3) | Import installed game folders and IDs; show firmware/setup state, version-specific notes and a first-launch shader-compilation explanation | Next. Follow upstream setup and per-title compatibility; avoid universal performance promises. |
 | PS Vita | [Vita3K](https://vita3k.org/) | Import installed titles; expose emulator setup and per-game compatibility | Experimental. Offer only after testing the chosen release and title. |
 | PS4 | [shadPS4](https://github.com/shadps4-emu/shadPS4) | Discover installed games, retain CUSA IDs, use an explicit experimental badge, link the upstream compatibility report | Experimental. Upstream calls it early-stage. The emulator core and Qt launcher are separate; the adapter must distinguish them. |
@@ -106,7 +106,7 @@ For the first catalogue, prioritize Shipwright, Zelda64Recomp, OpenGOAL, Spaghet
 Treat “ROM” as a library source, not a file extension. The importer should understand the media structure, then ask the chosen runner whether it supports it.
 
 - **Cartridges:** system-specific extensions and content hashes. Preserve region and revision. Normalize N64 byte order for identification without silently replacing the user's original file.
-- **Disc images:** supported ISO, CUE/BIN, CHD and other formats belong in individual system/runner definitions. Never advertise CHD support globally. Index a CUE as a game rather than treating every referenced track as another title.
+- **Disc images:** supported ISO, CUE/BIN, CHD and other formats belong in individual system/runner definitions. Never advertise CHD support globally. Index a CUE as a game rather than treating every referenced track as another title. **PS2 slice today:** `.iso` only; `.cue/.bin/.chd/.gz/.cso` are counted and skipped.
 - **Multi-disc releases:** group disc files into a single library edition with an explicit disc chooser or playlist, if the selected runner supports it.
 - **Installed console games:** parse the runner's installation registry or title metadata. Do not list updates, DLC, firmware installers and game executables as unrelated games.
 - **Arcade sets:** record runner version, set identity, parent/clone dependencies and required disk assets. A ZIP is not enough information to declare an arcade game ready.
@@ -160,7 +160,7 @@ Shared collections should export IDs, filters and annotations, not game files, f
 
 For a first-run demo shelf, evaluate [Freedoom](https://freedoom.github.io/), games on [ScummVM's own download page](https://www.scummvm.org/games/), and [MAME's permission-based ROM download list](https://www.mamedev.org/roms/). Track the license and redistribution conditions for each exact item. A title being free to download does not automatically permit bundling it in Marquee.
 
-Commercial ROMs, BIOS images and proprietary game assets should be user-supplied inputs. The existing roadmap already makes Marquee a frontend over tools and excludes game-data downloads; a curated collection should primarily install recipes, metadata and runners.
+Commercial ROMs, BIOS images and proprietary game assets should be user-supplied inputs. The existing roadmap already makes Marquee a frontend over tools and excludes game-data downloads; a curated collection should primarily install recipes, metadata and **Marquee-managed runners** (unpack official builds; never BIOS).
 
 ## Data model and implementation plan
 
@@ -180,12 +180,12 @@ Expand the current narrow TypeScript `Platform` list when these real adapters ar
 
 Compatibility and installation are separate axes. Suggested readiness states are: missing runner, missing firmware, missing content, unsupported revision, offline volume, untested, ready, running and failed. Experimental is a property of a runner/profile, not a synonym for installed.
 
-When launching, pass an executable and argument array rather than constructing a shell command. Prefer the user's existing runner installations first, and make Marquee-managed installs explicit. Pin a known working version per profile and retain a rollback path before updating. Preserve the original data and back up settings that an adapter changes.
+When launching, pass an executable and argument array rather than constructing a shell command. **Marquee-managed unpack is the default for emulators** (PCSX2 proven: AppImage extract under `$XDG_DATA_HOME/marquee/runners/pcsx2/current`). Prefer that tree over a host Flatpak; keep host copies as optional extra runners. Pin a known working version per profile and retain a rollback path before updating. Preserve the original data and back up settings that an adapter changes. Never download BIOS or commercial games.
 
 Recommended sequence:
 
-1. **Real library foundation:** Tauri/core/CLI, Steam and Lutris discovery, explicit process tracking. Acceptance: imported entries launch and record actual playtime.
-2. **First console shelf:** DuckStation, PCSX2, PPSSPP, Dolphin and mGBA adapters. Acceptance: prerequisites, supported media, exit/return and save locations work for a tested title per system.
+1. **Real library foundation:** Tauri/core/CLI and explicit process tracking. **PS2 ISO path is in the tree** (DB, scan, **unpacked PCSX2**, covers, UI). Steam and Lutris discovery are **not started** (roadmap phase 1). Acceptance still open: a real PCSX2 launch that records actual playtime. See [PS2.md](PS2.md).
+2. **First console shelf:** DuckStation, PPSSPP, Dolphin and mGBA adapters using the same unpack-into-Marquee pattern as PCSX2. Acceptance: prerequisites, supported media, exit/return and save locations work for a tested title per system.
 3. **Native revival shelf:** the first ten port recipes listed above. Acceptance: correct input revisions, separate content readiness, reproducible installation and an actual launch.
 4. **Collections and editions:** system shelves, franchise grouping, favourites, multiple launch choices and the rescue queue. Acceptance: grouping never loses independent installs or saves.
 5. **Broader console generation:** RPCS3, DS/3DS, Wii U, Saturn, Dreamcast and original Xbox, with runner-specific setup.

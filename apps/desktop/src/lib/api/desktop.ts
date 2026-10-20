@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import type {
   AppError,
+  ArtworkReport,
   CoreEvent,
   LibraryApi,
   LibraryRoot,
@@ -36,6 +37,8 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> 
   }
 }
 
+let listenReady: Promise<void> = Promise.resolve();
+
 export const desktopApi: LibraryApi = {
   kind: 'desktop',
   snapshot: () => call<LibrarySnapshot>('library_snapshot'),
@@ -51,12 +54,19 @@ export const desktopApi: LibraryApi = {
   launch: (editionId) => call<Session>('launch_game', { editionId }),
   setFavourite: (editionId, favorite) => call<void>('set_favourite', { editionId, favorite }),
   setDisplayTitle: (editionId, title) => call<void>('set_display_title', { editionId, title }),
+  installPcsx2: (channel) => call<Runner[]>('install_pcsx2', { channel: channel ?? null }),
+  refreshArtwork: (editionId) => call<ArtworkReport>('refresh_artwork', { editionId: editionId ?? null }),
   subscribe(handler) {
     let stop = () => {};
-    void listen<CoreEvent>('core-event', (event) => handler(event.payload)).then((unlisten) => {
-      stop = unlisten;
-    });
+    listenReady = listen<CoreEvent>('core-event', (event) => handler(event.payload)).then(
+      (unlisten) => {
+        stop = unlisten;
+      },
+    );
     return () => stop();
+  },
+  whenReady() {
+    return listenReady;
   },
 };
 

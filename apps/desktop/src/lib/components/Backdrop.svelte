@@ -2,23 +2,21 @@
   // The focused game's art, blurred behind everything; cross-fades on change.
   import { fade } from 'svelte/transition';
   import { app } from '../state.svelte';
+  import { homeAtmosphere } from '../art';
   import Artwork from './Artwork.svelte';
 
   let { blur = true }: { blur?: boolean } = $props();
   const dur = $derived(app.reduceMotion ? 0 : 450);
+  const art = $derived(app.hero?.art ?? homeAtmosphere);
 </script>
 
 <div class="backdrop" class:sharp={!blur}>
-  {#if app.hero}
-  {#key app.hero.id}
+  {#key app.hero?.id ?? 'atmosphere'}
     <div class="layer" transition:fade={{ duration: dur }}>
-      <Artwork art={app.hero.art} grain={false} />
+      <Artwork {art} grain={false} />
     </div>
   {/key}
-  <div class="tint" style="--h:{app.hero.art.hue}"></div>
-  {:else}
-  <div class="tint" style="--h:260"></div>
-  {/if}
+  <div class="tint" style="--h:{art.hue}"></div>
 </div>
 
 <style>
@@ -44,6 +42,6 @@
     inset: 0;
     background:
       radial-gradient(120% 80% at 70% 0%, transparent, var(--bg) 85%),
-      linear-gradient(180deg, color-mix(in oklab, var(--bg) 20%, transparent), var(--bg) 92%);
+      linear-gradient(180deg, color-mix(in srgb, var(--bg) 20%, transparent), var(--bg) 92%);
   }
 </style>

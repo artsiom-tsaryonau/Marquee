@@ -53,6 +53,8 @@ export interface GameEntry {
   /** Ports only: requirement state shown on the card. */
   portStatus?: PortStatus;
   art: Art;
+  /** convertFileSrc URL for a cached cover, if one was fetched. */
+  coverUrl?: string;
 }
 
 export interface SteamInfo {

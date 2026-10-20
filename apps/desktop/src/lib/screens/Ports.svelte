@@ -5,6 +5,7 @@
   import Artwork from '../components/Artwork.svelte';
   import Logo from '../components/Logo.svelte';
   import Icon from '../components/Icon.svelte';
+  import { portsAtmosphere } from '../art';
 
   const statusLabel: Record<PortStatus, string> = {
     ready: 'Ready',
@@ -42,6 +43,7 @@
 </script>
 
 <div class="ports">
+  {#if featured}
   <section class="feature" style="--accent-h:{featured.art.hue2}">
     <div class="feature-art"><Artwork art={featured.art} /></div>
     <div class="feature-fade"></div>
@@ -55,6 +57,20 @@
       </button>
     </div>
   </section>
+  {:else}
+  <section class="feature" style="--accent-h:{portsAtmosphere.hue2}">
+    <div class="feature-art"><Artwork art={portsAtmosphere} /></div>
+    <div class="feature-fade"></div>
+    <div class="feature-text">
+      <span class="eyebrow">Native ports</span>
+      <Logo game={{ title: 'Ports', art: portsAtmosphere }} size="lg" />
+      <p>Native PC ports are not in this milestone. PS2 games stay in Library. You supply your own files.</p>
+      <button class="btn primary" data-nav onclick={() => app.go('library')}>
+        <Icon name="grid" /> Open library
+      </button>
+    </div>
+  </section>
+  {/if}
 
   <div class="filters" data-nav-row>
     {#each ['all', 'ready', 'update', 'needs-rom', 'needs-data', 'not-installed'] as const as f (f)}

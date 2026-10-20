@@ -96,12 +96,58 @@ impl Db {
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
                 );
+                CREATE TABLE artwork (
+                    edition_id TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    path TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    fetched_at TEXT NOT NULL,
+                    PRIMARY KEY (edition_id, kind)
+                );
+                ",
+            )?;
+            self.conn
+                .pragma_update(None, "user_version", SCHEMA_VERSION)?;
+        } else if version == 1 {
+            self.conn.execute_batch(
+                "
+                CREATE TABLE IF NOT EXISTS artwork (
+                    edition_id TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    path TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    fetched_at TEXT NOT NULL,
+                    PRIMARY KEY (edition_id, kind)
+                );
                 ",
             )?;
             self.conn
                 .pragma_update(None, "user_version", SCHEMA_VERSION)?;
         }
+        let version: i64 = self
+            .conn
+            .query_row("PRAGMA user_version", [], |r| r.get(0))?;
+        if version > SCHEMA_VERSION {
+            return Err(crate::error::AppError::new(
+                "DB",
+                format!("library schema {version} is newer than this Marquee ({SCHEMA_VERSION})"),
+            ));
+        }
         Ok(())
+    }
+
+    /// A `running` row after process exit is leftover; it must not block the next Play.
+    pub fn abandon_running_sessions(&self) -> Result<usize> {
+        let ended = now_rfc3339();
+        Ok(self.conn.execute(
+            "UPDATE sessions
+             SET ended_at = ?1,
+                 duration_seconds = COALESCE(duration_seconds, 0),
+                 state = 'failed',
+                 error = 'Marquee exited while this session was running'
+             WHERE state = 'running'",
+            params![ended],
+        )?)
     }
 
     pub fn get_setting(&self, key: &str) -> Result<Option<String>> {
@@ -527,6 +573,45 @@ impl Db {
                 |r| r.get(0),
             )
             .optional()?)
+    }
+
+    pub fn upsert_artwork(
+        &self,
+        edition_id: &str,
+        kind: &str,
+        path: &str,
+        source: &str,
+        fetched_at: &str,
+    ) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO artwork(edition_id, kind, path, source, fetched_at)
+             VALUES(?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(edition_id, kind) DO UPDATE SET
+                path = excluded.path,
+                source = excluded.source,
+                fetched_at = excluded.fetched_at",
+            params![edition_id, kind, path, source, fetched_at],
+        )?;
+        Ok(())
+    }
+
+    pub fn artwork_path(&self, edition_id: &str, kind: &str) -> Result<Option<String>> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT path FROM artwork WHERE edition_id = ?1 AND kind = ?2",
+                params![edition_id, kind],
+                |r| r.get(0),
+            )
+            .optional()?)
+    }
+
+    pub fn list_cover_paths(&self) -> Result<Vec<(String, String)>> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT edition_id, path FROM artwork WHERE kind = 'cover'")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 }
 

@@ -3,6 +3,7 @@ import { after, beforeEach, mock, test } from 'node:test';
 
 mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
 const { app } = await import('../src/lib/state.svelte');
+const { installOption, installables } = await import('../src/lib/install');
 const { games, ports } = await import('../src/lib/mock');
 const initialGames = structuredClone(games);
 const initialPorts = structuredClone(ports);
@@ -17,6 +18,8 @@ beforeEach(() => {
   app.heroId = app.games[0].id;
   app.launching = null;
   app.running = null;
+  app.installToolId = null;
+  app.installOptionId = null;
 });
 after(() => mock.timers.reset());
 
@@ -109,4 +112,23 @@ test('back cancels launching without changing the underlying route', () => {
   assert.equal(app.launching, null);
   assert.equal(app.running, null);
   assert.equal(app.route, 'library');
+});
+
+test('install dropdown options are executable actions', () => {
+  const pcsx2 = installables.find((tool) => tool.id === 'pcsx2');
+  assert.ok(pcsx2.options.length >= 3);
+  assert.equal(installOption('pcsx2', 'unpacked').run.channel, 'unpacked');
+  assert.equal(installOption('pcsx2', 'flatpak').run.channel, 'flatpak');
+  assert.equal(installOption('pcsx2', 'appimage').run.channel, 'appimage');
+  assert.equal(installOption('pcsx2', 'setup').run.type, 'setup');
+});
+
+test('back closes the install dialog before leaving the route', () => {
+  app.go('settings');
+  app.openInstall('pcsx2', 'auto');
+  assert.equal(app.installToolId, 'pcsx2');
+  assert.equal(app.installOptionId, 'auto');
+  app.back();
+  assert.equal(app.installToolId, null);
+  assert.equal(app.route, 'settings');
 });

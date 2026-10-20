@@ -102,14 +102,14 @@
   .fill {
     height: 100%;
     border-radius: inherit;
-    background: linear-gradient(90deg, var(--accent), color-mix(in oklab, var(--accent) 50%, #fff));
+    background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 50%, #fff));
     transition: width 400ms linear;
   }
   .fill.moving {
     background-size: 40px 100%;
     background-image:
       linear-gradient(135deg, rgb(255 255 255 / 0.2) 25%, transparent 25%, transparent 50%, rgb(255 255 255 / 0.2) 50%, rgb(255 255 255 / 0.2) 75%, transparent 75%),
-      linear-gradient(90deg, var(--accent), color-mix(in oklab, var(--accent) 50%, #fff));
+      linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 50%, #fff));
     animation: stripes 0.8s linear infinite;
   }
   @keyframes stripes {

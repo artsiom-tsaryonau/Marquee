@@ -100,6 +100,19 @@ pub fn normalize_serial(raw: &str) -> Option<String> {
     Some(format!("{prefix}_{body}.{tail}"))
 }
 
+/// PCSX2 / xlenore cover filename: `SLUS_209.63` → `SLUS-20963`.
+pub fn cover_serial(normalized: &str) -> Option<String> {
+    let cleaned: String = normalized
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .map(|c| c.to_ascii_uppercase())
+        .collect();
+    if cleaned.len() < 9 || !cleaned[..4].chars().all(|c| c.is_ascii_alphabetic()) {
+        return None;
+    }
+    Some(format!("{}-{}", &cleaned[..4], &cleaned[4..]))
+}
+
 fn region_from_serial(serial: &str) -> Option<&'static str> {
     match serial.get(..4)? {
         "SLUS" | "SCUS" => Some("NTSC-U"),
@@ -241,6 +254,8 @@ mod tests {
         let id = identity_from_system_cnf("BOOT2=cdrom0:\\SLES-12345;1");
         assert_eq!(id.serial.as_deref(), Some("SLES_123.45"));
         assert_eq!(identity_from_system_cnf("nope").serial, None);
+        assert_eq!(cover_serial("SLUS_209.63").as_deref(), Some("SLUS-20963"));
+        assert_eq!(cover_serial("SLES_123.45").as_deref(), Some("SLES-12345"));
     }
 
     #[test]

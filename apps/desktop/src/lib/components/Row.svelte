@@ -1,16 +1,32 @@
 <script lang="ts">
   import type { GameEntry } from '../types';
   import Cover from './Cover.svelte';
+  import GhostCover from './GhostCover.svelte';
 
-  let { title, games, shape = 'cover' }: { title: string; games: GameEntry[]; shape?: 'cover' | 'wide' } = $props();
+  let {
+    title,
+    games,
+    shape = 'cover',
+    placeholders = 0,
+    onPlaceholder,
+  }: {
+    title: string;
+    games: GameEntry[];
+    shape?: 'cover' | 'wide';
+    placeholders?: number;
+    onPlaceholder?: () => void;
+  } = $props();
 </script>
 
-{#if games.length}
+{#if games.length || placeholders}
   <section class="row">
-    <h2>{title} <span>{games.length}</span></h2>
+    <h2>{title} {#if games.length}<span>{games.length}</span>{/if}</h2>
     <div class="scroller" data-nav-row>
       {#each games as game (game.id)}
         <Cover {game} {shape} />
+      {/each}
+      {#each Array(placeholders) as _, i (i)}
+        <GhostCover {shape} onclick={i === 0 ? onPlaceholder : undefined} />
       {/each}
     </div>
   </section>
@@ -18,6 +34,8 @@
 
 <style>
   .row {
+    position: relative;
+    z-index: 1;
     margin-bottom: 18px;
   }
   h2 {
@@ -40,6 +58,7 @@
     padding: 16px var(--gutter) 22px;
     scroll-padding: 0 var(--gutter);
     scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 calc(var(--gutter) * 0.6), #000 calc(100% - var(--gutter) * 0.6), transparent);
     mask-image: linear-gradient(90deg, transparent 0, #000 calc(var(--gutter) * 0.6), #000 calc(100% - var(--gutter) * 0.6), transparent);
   }
   .scroller::-webkit-scrollbar {

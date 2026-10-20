@@ -6,11 +6,18 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 const FAKE_RUNNER_ID: &str = "runner.fake";
+const PCSX2_UNPACKED_ID: &str = "runner.pcsx2.unpacked";
 const PCSX2_APPIMAGE_ID: &str = "runner.pcsx2.appimage";
 const PCSX2_FLATPAK_ID: &str = "runner.pcsx2.flatpak";
-const FLATPAK_APP: &str = "net.pcsx2.PCSX2";
+pub(crate) const FLATPAK_APP: &str = "net.pcsx2.PCSX2";
 
-pub fn refresh(db: &Db, allow_fake: bool) -> Result<Vec<Runner>> {
+pub fn refresh(
+    db: &Db,
+    allow_fake: bool,
+    extra_appimages: &[PathBuf],
+    discover_host: bool,
+    marquee_bios: Option<&Path>,
+) -> Result<Vec<Runner>> {
     if allow_fake {
         db.upsert_runner(
             FAKE_RUNNER_ID,
@@ -22,8 +29,20 @@ pub fn refresh(db: &Db, allow_fake: bool) -> Result<Vec<Runner>> {
             "test",
         )?;
     }
-    if let Some(appimage) = find_pcsx2_appimage() {
-        let (state, hint) = probe_appimage_bios(&appimage);
+    if let Some(bin) = find_unpacked_pcsx2(extra_appimages) {
+        let (state, hint) = probe_appimage_bios(&bin, marquee_bios);
+        db.upsert_runner(
+            PCSX2_UNPACKED_ID,
+            RunnerKind::Pcsx2.as_str(),
+            "PCSX2 (Marquee)",
+            &[bin.to_string_lossy().into_owned()],
+            state,
+            hint.as_deref(),
+            "marquee",
+        )?;
+    }
+    if let Some(appimage) = find_pcsx2_appimage(extra_appimages, discover_host) {
+        let (state, hint) = probe_appimage_bios(&appimage, marquee_bios);
         db.upsert_runner(
             PCSX2_APPIMAGE_ID,
             RunnerKind::Pcsx2.as_str(),
@@ -34,7 +53,7 @@ pub fn refresh(db: &Db, allow_fake: bool) -> Result<Vec<Runner>> {
             "appimage",
         )?;
     }
-    if flatpak_pcsx2_installed() {
+    if discover_host && flatpak_pcsx2_installed() {
         let (state, hint) = probe_flatpak_bios();
         db.upsert_runner(
             PCSX2_FLATPAK_ID,
@@ -77,12 +96,21 @@ pub fn snapshot(db: &Db) -> Result<Vec<Runner>> {
 pub fn pick_default(runners: &[Runner]) -> Option<&Runner> {
     runners
         .iter()
-        .find(|r| r.kind == RunnerKind::Pcsx2 && r.available)
+        .find(|r| r.id == PCSX2_UNPACKED_ID && r.available)
+        .or_else(|| {
+            runners
+                .iter()
+                .find(|r| r.kind == RunnerKind::Pcsx2 && r.available)
+        })
         .or_else(|| {
             runners
                 .iter()
                 .find(|r| r.kind == RunnerKind::Fake && r.available)
         })
+}
+
+pub fn uses_marquee_prefix(runner: &Runner) -> bool {
+    runner.source == "marquee" || runner.id == PCSX2_UNPACKED_ID
 }
 
 pub fn launch_argv(runner: &Runner, iso: &Path, extra: &[String]) -> Result<Vec<String>> {
@@ -133,7 +161,7 @@ fn command_available(command: &[String]) -> bool {
     which(bin).is_some()
 }
 
-fn which(bin: &str) -> Option<PathBuf> {
+pub(crate) fn which(bin: &str) -> Option<PathBuf> {
     std::env::var_os("PATH").and_then(|paths| {
         std::env::split_paths(&paths).find_map(|dir| {
             let candidate = dir.join(bin);
@@ -142,7 +170,54 @@ fn which(bin: &str) -> Option<PathBuf> {
     })
 }
 
-fn find_pcsx2_appimage() -> Option<PathBuf> {
+pub fn find_extracted_bin(root: &Path) -> Option<PathBuf> {
+    for rel in ["usr/bin/pcsx2-qt", "usr/bin/pcsx2", "pcsx2-qt", "AppRun"] {
+        let candidate = root.join(rel);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
+fn find_unpacked_pcsx2(extra: &[PathBuf]) -> Option<PathBuf> {
+    for extra_path in extra {
+        if extra_path.is_file() {
+            continue;
+        }
+        if let Some(bin) = find_extracted_bin(extra_path) {
+            return Some(bin);
+        }
+        if let Some(bin) = find_extracted_bin(&extra_path.join("pcsx2").join("current")) {
+            return Some(bin);
+        }
+        if let Some(bin) = find_extracted_bin(&extra_path.join("current")) {
+            return Some(bin);
+        }
+    }
+    None
+}
+
+fn find_pcsx2_appimage(extra: &[PathBuf], discover_host: bool) -> Option<PathBuf> {
+    for extra_path in extra {
+        if extra_path.is_file() {
+            let name = extra_path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_ascii_lowercase();
+            if name.contains("pcsx2") {
+                return Some(extra_path.clone());
+            }
+        } else if extra_path.is_dir() {
+            if let Some(found) = scan_appimage_dir(extra_path) {
+                return Some(found);
+            }
+        }
+    }
+    if !discover_host {
+        return None;
+    }
     let home = PathBuf::from(std::env::var_os("HOME")?);
     let dirs = [
         home.join("Applications"),
@@ -150,17 +225,22 @@ fn find_pcsx2_appimage() -> Option<PathBuf> {
         PathBuf::from("/opt"),
     ];
     for dir in dirs {
-        let Ok(entries) = std::fs::read_dir(&dir) else {
-            continue;
-        };
-        for entry in entries.flatten() {
-            let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
-            if name.contains("pcsx2") && name.ends_with(".appimage") {
-                return Some(entry.path());
-            }
+        if let Some(found) = scan_appimage_dir(&dir) {
+            return Some(found);
         }
     }
     which("pcsx2-qt").or_else(|| which("pcsx2"))
+}
+
+fn scan_appimage_dir(dir: &Path) -> Option<PathBuf> {
+    let entries = std::fs::read_dir(dir).ok()?;
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
+        if name.contains("pcsx2") && name.ends_with(".appimage") {
+            return Some(entry.path());
+        }
+    }
+    None
 }
 
 fn flatpak_pcsx2_installed() -> bool {
@@ -171,22 +251,29 @@ fn flatpak_pcsx2_installed() -> bool {
         .unwrap_or(false)
 }
 
-fn probe_appimage_bios(bin: &Path) -> (BiosState, Option<String>) {
+fn probe_appimage_bios(bin: &Path, marquee_bios: Option<&Path>) -> (BiosState, Option<String>) {
     // Default BIOS folders are hints. An empty default dir is unverified, not missing.
     let home = std::env::var_os("HOME").map(PathBuf::from);
     let Some(home) = home else {
+        if let Some(dir) = marquee_bios {
+            if bios_dir_has_files(dir) {
+                return (BiosState::Unverified, Some(path_display(dir)));
+            }
+        }
         return (
             BiosState::Unverified,
             Some("HOME unset; BIOS path unresolved".into()),
         );
     };
-    let candidates = [
-        home.join(".config/PCSX2/bios"),
-        home.join(".var/app/net.pcsx2.PCSX2/config/PCSX2/bios"),
-        bin.parent()
-            .map(|p| p.join("bios"))
-            .unwrap_or_else(|| PathBuf::from("bios")),
-    ];
+    let mut candidates: Vec<PathBuf> = Vec::new();
+    if let Some(dir) = marquee_bios {
+        candidates.push(dir.to_path_buf());
+    }
+    candidates.push(home.join(".config/PCSX2/bios"));
+    candidates.push(home.join(".var/app/net.pcsx2.PCSX2/config/PCSX2/bios"));
+    if let Some(parent) = bin.parent() {
+        candidates.push(parent.join("bios"));
+    }
     for dir in candidates {
         if bios_dir_has_files(&dir) {
             return (BiosState::Unverified, Some(path_display(&dir)));
@@ -236,13 +323,10 @@ fn fake_command() -> Vec<String> {
     vec!["/bin/sleep".into(), "1".into()]
 }
 
-pub fn open_setup(db: &Db, runner_id: &str) -> Result<()> {
+pub fn open_setup(db: &Db, runner_id: &str, xdg_config: Option<&Path>) -> Result<()> {
     let runners = snapshot(db)?;
     let runner = runners.iter().find(|r| r.id == runner_id).ok_or_else(|| {
-        AppError::new(
-            "RUNNER_MISSING",
-            "PCSX2 is not installed. See docs/PS2.md.",
-        )
+        AppError::new("RUNNER_MISSING", "PCSX2 is not installed. See docs/PS2.md.")
     })?;
     if !runner.available || runner.command.is_empty() {
         return Err(AppError::new(
@@ -254,15 +338,19 @@ pub fn open_setup(db: &Db, runner_id: &str) -> Result<()> {
         .command
         .split_first()
         .ok_or_else(|| AppError::new("RUNNER_MISSING", "runner command is empty"))?;
-    std::process::Command::new(bin)
-        .args(args)
+    let mut cmd = std::process::Command::new(bin);
+    cmd.args(args)
         .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn()
-        .map_err(|err| {
-            AppError::new("SPAWN_FAILED", err.to_string())
-                .with_context(json!({ "argv": runner.command }))
-        })?;
+        .stderr(std::process::Stdio::null());
+    if uses_marquee_prefix(runner) {
+        if let Some(home) = xdg_config {
+            cmd.env("XDG_CONFIG_HOME", home);
+        }
+    }
+    cmd.spawn().map_err(|err| {
+        AppError::new("SPAWN_FAILED", err.to_string())
+            .with_context(json!({ "argv": runner.command }))
+    })?;
     Ok(())
 }
