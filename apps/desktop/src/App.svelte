@@ -15,13 +15,20 @@
   import Downloads from './lib/screens/Downloads.svelte';
   import Settings from './lib/screens/Settings.svelte';
 
-  const nav: { route: Route; label: string; icon: IconName }[] = [
+  const demoNav: { route: Route; label: string; icon: IconName }[] = [
     { route: 'home', label: 'Home', icon: 'home' },
     { route: 'library', label: 'Library', icon: 'grid' },
     { route: 'ports', label: 'Ports', icon: 'puzzle' },
     { route: 'downloads', label: 'Downloads', icon: 'download' },
     { route: 'settings', label: 'Settings', icon: 'settings' },
   ];
+  const desktopNav: { route: Route; label: string; icon: IconName }[] = [
+    { route: 'home', label: 'Home', icon: 'home' },
+    { route: 'library', label: 'Library', icon: 'grid' },
+    { route: 'ps2', label: 'PS2', icon: 'grid' },
+    { route: 'settings', label: 'Settings', icon: 'settings' },
+  ];
+  const nav = $derived(app.demo ? demoNav : desktopNav);
 
   let adding = $state(false);
   let booting = $state(new URLSearchParams(location.search).get('splash') !== '0');
@@ -38,13 +45,16 @@
   });
 
   onMount(() => {
+    void app.boot();
     // Dev shortcuts: ?route=library&mode=big&theme=light&splash=0
     const q = new URLSearchParams(location.search);
     const r = q.get('route') as Route | null;
     if (r) app.route = r;
     if (q.get('mode') === 'big' || q.get('mode') === 'desktop') app.mode = q.get('mode') as 'big' | 'desktop';
     if (q.get('theme') === 'light' || q.get('theme') === 'dark') app.theme = q.get('theme') as 'light' | 'dark';
-    if (q.get('game')) app.open(app.games.find((g) => g.id.endsWith(q.get('game')!)) ?? app.games[0]);
+    if (q.get('game') && app.games.length) {
+      app.open(app.games.find((g) => g.id.endsWith(q.get('game')!)) ?? app.games[0]);
+    }
     if (q.get('add')) adding = true;
     if (q.get('motion') === '0') app.reduceMotion = true;
     const stop = startFocusEngine({
@@ -79,9 +89,15 @@
         </button>
       {/each}
       <div class="spacer"></div>
-      <button class="nav add" data-nav onclick={() => (adding = true)}>
-        <Icon name="plus" size={22} /><span>Add Windows app</span>
-      </button>
+      {#if app.demo}
+        <button class="nav add" data-nav onclick={() => (adding = true)}>
+          <Icon name="plus" size={22} /><span>Add Windows app</span>
+        </button>
+      {:else}
+        <button class="nav add" data-nav onclick={() => app.addPs2Folder()}>
+          <Icon name="plus" size={22} /><span>Add PS2 folder</span>
+        </button>
+      {/if}
       <button class="nav" data-nav onclick={() => (app.mode = 'big')}>
         <Icon name="tv" size={22} /><span>Big Screen</span>
       </button>
@@ -95,7 +111,11 @@
         {/each}
       </div>
       <div class="status">
-        <button class="tab" data-nav onclick={() => (adding = true)} aria-label="Add Windows app"><Icon name="plus" size={20} /></button>
+        {#if app.demo}
+          <button class="tab" data-nav onclick={() => (adding = true)} aria-label="Add Windows app"><Icon name="plus" size={20} /></button>
+        {:else}
+          <button class="tab" data-nav onclick={() => app.addPs2Folder()} aria-label="Add PS2 folder"><Icon name="plus" size={20} /></button>
+        {/if}
         <button class="tab" data-nav onclick={() => (app.mode = 'desktop')} aria-label="Desktop mode"><Icon name="monitor" size={20} /></button>
         <span class="time">{time}</span>
       </div>
@@ -107,6 +127,7 @@
       <div class="screen" in:fly={{ y: 16, duration: dur, delay: dur / 3 }} out:fade={{ duration: dur / 2 }}>
         {#if app.route === 'home'}<Home />
         {:else if app.route === 'library'}<Library />
+        {:else if app.route === 'ps2'}<Library collection="ps2" />
         {:else if app.route === 'game'}<GamePage />
         {:else if app.route === 'ports'}<Ports />
         {:else if app.route === 'downloads'}<Downloads />
@@ -124,7 +145,7 @@
   {/if}
 </div>
 
-{#if adding}
+{#if adding && app.demo}
   <AddWindowsApp onclose={() => (adding = false)} />
 {/if}
 
@@ -136,10 +157,10 @@
       <Logo game={g} size="xl" />
       {#if app.launching}
         <div class="loader"><span></span></div>
-        <p>Starting via {g.source === 'steam' ? 'Steam' : g.source === 'port' ? 'native port' : g.source === 'rom' ? 'emulator' : 'Lutris'}…</p>
+        <p>Starting via {g.source === 'steam' ? 'Steam' : g.source === 'port' ? 'native port' : g.source === 'rom' ? 'PCSX2' : 'Lutris'}…</p>
       {:else}
         <p class="running"><span class="live"></span> Playing now</p>
-        <button class="btn glass" onclick={() => app.stop()}>Return to Marquee <kbd>Esc</kbd></button>
+        <button class="btn glass" onclick={() => (app.demo ? app.stop() : app.dismissOverlay())}>Return to Marquee <kbd>Esc</kbd></button>
       {/if}
     </div>
   </div>

@@ -1,6 +1,7 @@
 // Sample data only. Library titles are invented; port names are the planned
 // catalogue entries, with made-up versions and statuses.
 import type { Art, Download, GameEntry, Motif, Platform, PortEntry, Ratings, Source } from './types';
+export { platformLabel, sourceLabel } from './labels';
 
 const motifs: Motif[] = ['sun', 'rings', 'peaks', 'grid', 'waves', 'shards', 'orbit', 'monolith'];
 const logos: Art['logo'][] = ['wide', 'serif', 'mono', 'heavy'];
@@ -135,9 +136,8 @@ export const ports: PortEntry[] = (
   art: art(rng(i * 104729 + 3)),
 }));
 
-// Ready ports also show up in the library, like any other entry.
-for (const p of ports.filter((p) => p.status === 'ready' || p.status === 'update')) {
-  games.push({
+export function portGame(p: PortEntry): GameEntry {
+  return {
     id: `port:${p.id}`,
     title: p.name,
     tagline: `Native port of ${p.game}.`,
@@ -155,33 +155,18 @@ for (const p of ports.filter((p) => p.status === 'ready' || p.status === 'update
     achievements: null,
     portStatus: p.status,
     art: p.art,
-  });
+  };
+}
+
+// Ready ports also show up in the library, like any other entry.
+for (const p of ports.filter((p) => p.status === 'ready' || p.status === 'update')) {
+  games.push(portGame(p));
 }
 
 export const downloads: Download[] = [
-  { id: 'd1', name: 'Zelda64Recomp 1.3.0', progress: 0.64, speed: '18.2 MB/s', state: 'downloading' },
+  { id: 'd1', name: 'Zelda64Recomp 1.3.0', progress: 0.64, speed: '18.2 MB/s', state: 'downloading', target: { kind: 'port', id: 'zelda64recomp' } },
   { id: 'd2', name: 'GE-Proton 10-21', progress: 0.12, speed: '—', state: 'queued' },
-  { id: 'd3', name: 'Starward Drift', progress: 0.38, speed: '—', state: 'paused' },
+  { id: 'd3', name: 'Starward Drift', progress: 0.38, speed: '—', state: 'paused', target: { kind: 'game', id: 'steam:starward-drift' } },
   { id: 'd4', name: 'OpenMW 0.49', progress: 1, speed: '', state: 'done' },
 ];
 
-export const sourceLabel: Record<Source, string> = {
-  steam: 'Steam',
-  gog: 'GOG',
-  epic: 'Epic',
-  lutris: 'Lutris',
-  port: 'Port',
-  rom: 'Emulated',
-};
-
-export const platformLabel: Record<Platform, string> = {
-  'pc-linux': 'Linux',
-  'pc-windows': 'Windows',
-  nes: 'NES',
-  snes: 'SNES',
-  n64: 'Nintendo 64',
-  gamecube: 'GameCube',
-  ps1: 'PlayStation',
-  ps2: 'PlayStation 2',
-  gba: 'Game Boy Advance',
-};

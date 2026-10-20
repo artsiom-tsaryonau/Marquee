@@ -16,6 +16,48 @@
   <h1>Settings</h1>
 
   <section class="glass-panel">
+    <h2>PlayStation 2</h2>
+    <div class="item">
+      <div>
+        <strong>ISO folder</strong>
+        <span>{app.roots[0] ? `${app.roots[0].path} · ${app.roots[0].status}` : 'No folder selected'}</span>
+      </div>
+      <button class="btn glass small" data-nav onclick={() => app.addPs2Folder()}><Icon name="folder" size={16} /> Choose folder</button>
+    </div>
+    <div class="item">
+      <div>
+        <strong>Last import</strong>
+        <span>{app.lastScan ? `${app.lastScan.added} added · ${app.lastScan.skipped_unsupported} skipped` : 'Not scanned yet'}</span>
+      </div>
+      <button class="btn glass small" data-nav onclick={() => app.rescan()} disabled={app.scanning}><Icon name="refresh" size={16} /> {app.scanning ? 'Scanning…' : 'Rescan'}</button>
+    </div>
+    <div class="item">
+      <div>
+        <strong>PCSX2</strong>
+        <span>
+          {#if app.selectedRunner}
+            {app.selectedRunner.display_name} · {app.selectedRunner.bios_state.replace('_', ' ')}
+          {:else}
+            Not installed — see docs/PS2.md
+          {/if}
+        </span>
+      </div>
+      <button class="btn glass small" data-nav onclick={() => app.openSetup()} disabled={!app.selectedRunner}>Open setup</button>
+    </div>
+    {#if app.runners.length > 1}
+      <div class="item">
+        <div><strong>Installation</strong><span>Choose which PCSX2 Marquee launches</span></div>
+        <select data-nav value={app.selectedRunner?.id ?? ''} onchange={(e) => app.chooseRunner((e.currentTarget as HTMLSelectElement).value)}>
+          {#each app.runners as runner (runner.id)}
+            <option value={runner.id}>{runner.display_name}</option>
+          {/each}
+        </select>
+      </div>
+    {/if}
+  </section>
+
+  {#if app.demo}
+  <section class="glass-panel">
     <h2>Sources</h2>
     {#each sources as s (s.name)}
       <div class="item">
@@ -26,8 +68,9 @@
         <button class="switch" class:on={s.on} data-nav role="switch" aria-checked={s.on} aria-label={s.name} onclick={() => (s.on = !s.on)}><i></i></button>
       </div>
     {/each}
-    <button class="btn glass small" data-nav onclick={() => app.notify('Rescanning all sources…')}><Icon name="refresh" size={16} /> Rescan now</button>
+    <button class="btn glass small" data-nav onclick={() => app.rescan()}><Icon name="refresh" size={16} /> Rescan now</button>
   </section>
+  {/if}
 
   <section class="glass-panel">
     <h2>Look and feel</h2>
@@ -63,6 +106,7 @@
     </div>
   </section>
 
+  {#if app.demo}
   <section class="glass-panel">
     <h2>Windows games</h2>
     <div class="item">
@@ -74,6 +118,7 @@
       <span class="pill">7 prefixes</span>
     </div>
   </section>
+  {/if}
 </div>
 
 <style>

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { GameEntry } from '../types';
-  import { sourceLabel } from '../mock';
+  import { sourceLabel } from '../labels';
   import { app } from '../state.svelte';
   import Artwork from './Artwork.svelte';
   import Logo from './Logo.svelte';
@@ -35,9 +35,17 @@
       ? { label: 'Update', tone: 'warn' }
       : game.source === 'port'
         ? { label: 'Ready', tone: 'ok' }
-        : !game.installed
-          ? { label: 'Not installed', tone: 'dim' }
-          : null,
+        : game.rootOffline
+          ? { label: 'Drive offline', tone: 'dim' }
+          : game.mediaMissing
+            ? { label: 'Missing', tone: 'warn' }
+            : game.setupState === 'runner_missing'
+              ? { label: 'Needs PCSX2', tone: 'warn' }
+              : game.setupState === 'missing'
+                ? { label: 'Needs BIOS', tone: 'warn' }
+                : !game.installed
+                  ? { label: 'Not installed', tone: 'dim' }
+                  : null,
   );
 </script>
 

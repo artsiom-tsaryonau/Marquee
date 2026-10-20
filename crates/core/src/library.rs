@@ -1,0 +1,284 @@
+use crate::db::{now_rfc3339, Db};
+use crate::error::{path_display, AppError, Result};
+use crate::iso::identify_ps2_iso;
+use crate::model::{
+    Edition, LibraryRoot, LibrarySnapshot, MediaFile, MediaKind, RootKind, RootStatus, ScanReport,
+    SkipCount, SYSTEM_PS2,
+};
+use crate::runners;
+use serde_json::json;
+use std::collections::BTreeMap;
+use std::fs;
+use std::os::unix::fs::MetadataExt;
+use std::path::Path;
+use uuid::Uuid;
+
+pub fn add_root(db: &Db, path: &Path, label: Option<&str>) -> Result<LibraryRoot> {
+    let canonical = fs::canonicalize(path).map_err(|_| {
+        AppError::new(
+            "ROOT_OFFLINE",
+            format!("folder not found: {}", path_display(path)),
+        )
+        .with_context(json!({ "path": path_display(path) }))
+    })?;
+    if !canonical.is_dir() {
+        return Err(AppError::new(
+            "ROOT_OFFLINE",
+            format!("not a folder: {}", path_display(&canonical)),
+        ));
+    }
+    if let Some((id, _)) = db.root_by_path(&canonical)? {
+        let roots = snapshot_roots(db)?;
+        return roots
+            .into_iter()
+            .find(|r| r.id == id)
+            .ok_or_else(|| AppError::new("DB", "root vanished"));
+    }
+    let id = Uuid::new_v4().to_string();
+    db.upsert_root(&id, &canonical, "folder", label)?;
+    Ok(LibraryRoot {
+        id,
+        path: canonical,
+        kind: RootKind::Folder,
+        label: label.map(str::to_string),
+        status: RootStatus::Online,
+        last_scan_at: None,
+    })
+}
+
+pub fn scan_root(db: &Db, root_id: Option<&str>) -> Result<ScanReport> {
+    let roots = snapshot_roots(db)?;
+    let selected: Vec<LibraryRoot> = match root_id {
+        Some(id) => roots.into_iter().filter(|r| r.id == id).collect(),
+        None => roots,
+    };
+    if selected.is_empty() {
+        return Err(AppError::new(
+            "ROOT_OFFLINE",
+            "no library folder configured",
+        ));
+    }
+    let mut report = ScanReport::default();
+    let mut skip_map: BTreeMap<String, u32> = BTreeMap::new();
+    for root in &selected {
+        if !root.path.is_dir() {
+            return Err(AppError::new(
+                "ROOT_OFFLINE",
+                format!(
+                    "library folder is not available: {}",
+                    path_display(&root.path)
+                ),
+            )
+            .with_context(json!({ "root_id": root.id, "path": path_display(&root.path) })));
+        }
+        walk_dir(db, &root.path, &mut report, &mut skip_map)?;
+        db.update_scan_time(&root.id, &now_rfc3339())?;
+    }
+    report.skipped_by_kind = skip_map
+        .into_iter()
+        .map(|(kind, count)| SkipCount { kind, count })
+        .collect();
+    report.skipped_unsupported = report.skipped_by_kind.iter().map(|s| s.count).sum();
+    report.missing = snapshot_media(db)?.iter().filter(|m| !m.available).count() as u32;
+    Ok(report)
+}
+
+fn walk_dir(
+    db: &Db,
+    dir: &Path,
+    report: &mut ScanReport,
+    skip_map: &mut BTreeMap<String, u32>,
+) -> Result<()> {
+    let entries = match fs::read_dir(dir) {
+        Ok(e) => e,
+        Err(_) => return Ok(()),
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let meta = match entry.metadata() {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        if meta.is_dir() {
+            walk_dir(db, &path, report, skip_map)?;
+            continue;
+        }
+        if !meta.is_file() {
+            continue;
+        }
+        let ext = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_ascii_lowercase();
+        let Some(kind) = MediaKind::from_extension(&ext) else {
+            continue;
+        };
+        report.scanned += 1;
+        if !kind.is_supported() {
+            *skip_map.entry(kind.as_str().to_string()).or_default() += 1;
+            continue;
+        }
+        ingest_iso(db, &path, &meta, report)?;
+    }
+    Ok(())
+}
+
+fn ingest_iso(db: &Db, path: &Path, meta: &fs::Metadata, report: &mut ScanReport) -> Result<()> {
+    let mtime = meta.mtime();
+    let size = meta.len() as i64;
+    let existing = db.media_by_path(path)?;
+    let unchanged = existing
+        .as_ref()
+        .map(|row| row.size_bytes == size && row.mtime == mtime)
+        .unwrap_or(false);
+    if unchanged {
+        report.updated += 1;
+        return Ok(());
+    }
+    let identity = identify_ps2_iso(path)?;
+    if identity.serial.is_none() {
+        report.unresolved_serial += 1;
+    }
+    let edition_id = match existing.as_ref() {
+        Some(row) => row.edition_id.clone(),
+        None => Uuid::new_v4().to_string(),
+    };
+    let media_id = match existing.as_ref() {
+        Some(row) => row.id.clone(),
+        None => Uuid::new_v4().to_string(),
+    };
+    let title = title_from_filename(path);
+    db.upsert_edition(
+        &edition_id,
+        SYSTEM_PS2,
+        &title,
+        Some(&media_id),
+        &now_rfc3339(),
+    )?;
+    db.upsert_media(
+        &media_id,
+        &edition_id,
+        MediaKind::Ps2Iso.as_str(),
+        path,
+        size,
+        mtime,
+        identity.serial.as_deref(),
+        identity.serial_raw.as_deref(),
+        identity.region.as_deref(),
+        None,
+    )?;
+    if existing.is_some() {
+        report.updated += 1;
+    } else {
+        report.added += 1;
+    }
+    Ok(())
+}
+
+fn title_from_filename(path: &Path) -> String {
+    path.file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "Unknown".to_string())
+}
+
+pub fn snapshot(db: &Db) -> Result<LibrarySnapshot> {
+    Ok(LibrarySnapshot {
+        roots: snapshot_roots(db)?,
+        editions: snapshot_editions(db)?,
+        media: snapshot_media(db)?,
+        runners: runners::snapshot(db)?,
+        sessions: crate::sessions::list(db)?,
+        settings: db.load_settings()?,
+    })
+}
+
+pub fn snapshot_roots(db: &Db) -> Result<Vec<LibraryRoot>> {
+    db.list_roots()?
+        .into_iter()
+        .map(|row| {
+            let status = if row.path.is_dir() {
+                RootStatus::Online
+            } else {
+                RootStatus::Offline
+            };
+            Ok(LibraryRoot {
+                id: row.id,
+                path: row.path,
+                kind: RootKind::Folder,
+                label: row.label,
+                status,
+                last_scan_at: row.last_scan_at,
+            })
+        })
+        .collect()
+}
+
+pub fn snapshot_media(db: &Db) -> Result<Vec<MediaFile>> {
+    db.list_media()?
+        .into_iter()
+        .map(|row| {
+            let kind = MediaKind::parse(&row.kind).unwrap_or(MediaKind::Ps2Iso);
+            Ok(MediaFile {
+                id: row.id,
+                edition_id: row.edition_id,
+                kind,
+                available: row.path.is_file(),
+                path: row.path,
+                size_bytes: row.size_bytes as u64,
+                mtime: row.mtime,
+                serial: row.serial,
+                serial_raw: row.serial_raw,
+                region: row.region,
+                skip_reason: row.skip_reason,
+            })
+        })
+        .collect()
+}
+
+pub fn snapshot_editions(db: &Db) -> Result<Vec<Edition>> {
+    let media = snapshot_media(db)?;
+    db.list_editions()?
+        .into_iter()
+        .map(|row| {
+            let media_missing = match &row.media_id {
+                Some(mid) => media
+                    .iter()
+                    .find(|m| &m.id == mid)
+                    .map(|m| !m.available || m.skip_reason.is_some())
+                    .unwrap_or(true),
+                None => true,
+            };
+            let attached = row
+                .media_id
+                .as_ref()
+                .and_then(|mid| media.iter().find(|m| &m.id == mid));
+            Ok(Edition {
+                id: row.id,
+                system: row.system,
+                title: row
+                    .display_title
+                    .clone()
+                    .unwrap_or_else(|| row.scan_title.clone()),
+                scan_title: row.scan_title,
+                display_title: row.display_title,
+                favorite: row.favorite,
+                media_id: row.media_id,
+                last_played_at: row.last_played_at,
+                playtime_seconds: row.playtime_seconds,
+                play_count: row.play_count,
+                imported_at: row.imported_at,
+                missing: media_missing,
+                serial: attached.and_then(|m| m.serial.clone()),
+                region: attached.and_then(|m| m.region.clone()),
+            })
+        })
+        .collect()
+}
+
+pub fn find_media_for_edition(db: &Db, edition_id: &str) -> Result<Option<MediaFile>> {
+    Ok(snapshot_media(db)?
+        .into_iter()
+        .find(|m| m.edition_id == edition_id))
+}

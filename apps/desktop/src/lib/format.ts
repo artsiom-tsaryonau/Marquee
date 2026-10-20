@@ -1,7 +1,31 @@
 export function hours(min: number) {
-  if (min < 60) return `${min} min`;
+  if (min > 0 && min < 1) return `${Math.max(1, Math.round(min * 60))} s`;
+  if (min < 60) return `${Math.round(min)} min`;
   const h = min / 60;
   return `${h < 10 ? h.toFixed(1) : Math.round(h)} h`;
+}
+
+export function describeScan(report: {
+  added: number;
+  updated: number;
+  skipped_unsupported: number;
+  skipped_by_kind: { kind: string; count: number }[];
+  unresolved_serial: number;
+  missing: number;
+}) {
+  const skipped = report.skipped_by_kind
+    .map((s) => `${s.count} ${s.kind.replace('ps2_', '').toUpperCase()}`)
+    .join(', ');
+  const parts = [
+    `Imported ${report.added} ISO file${report.added === 1 ? '' : 's'}`,
+    report.updated ? `${report.updated} unchanged` : '',
+    report.skipped_unsupported
+      ? `skipped ${report.skipped_unsupported} unsupported file${report.skipped_unsupported === 1 ? '' : 's'}${skipped ? ` (${skipped})` : ''} because those formats are not supported yet`
+      : '',
+    report.unresolved_serial ? `${report.unresolved_serial} without a serial` : '',
+    report.missing ? `${report.missing} missing` : '',
+  ].filter(Boolean);
+  return parts.join(' · ');
 }
 
 export function ago(iso: string) {

@@ -9,12 +9,16 @@
 </script>
 
 <div class="backdrop" class:sharp={!blur}>
+  {#if app.hero}
   {#key app.hero.id}
     <div class="layer" transition:fade={{ duration: dur }}>
       <Artwork art={app.hero.art} grain={false} />
     </div>
   {/key}
   <div class="tint" style="--h:{app.hero.art.hue}"></div>
+  {:else}
+  <div class="tint" style="--h:260"></div>
+  {/if}
 </div>
 
 <style>

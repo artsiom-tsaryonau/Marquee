@@ -1,6 +1,12 @@
 # Marquee — Game Launcher Roadmap
 
-Status: phase 0 (foundations). Last updated 2026-10-20.
+Status: phase 0 in progress, plus an **out-of-sequence PS2 slice** coded on 2026-10-20. Last updated 2026-10-20.
+
+This roadmap is still the long-term plan (Lutris/Steam first in phase 1). Work actually landed is tracked in [PS2.md](PS2.md). Do not start Steam/Lutris adapters or [PS2_METADATA_FOLLOWUP.md](PS2_METADATA_FOLLOWUP.md) until the PCSX2 launch/exit gate there is closed.
+
+**Current implementation milestone (ahead of phase 1):** offline PS2 import-to-play. Code is in the tree; live emulator verification is pending. See [PS2.md](PS2.md).
+
+Integration candidates and detailed collection proposals: [EXPANSION_CATALOGUE.md](EXPANSION_CATALOGUE.md).
 
 ## Vision and scope
 
@@ -37,17 +43,17 @@ One public repo holds the app, the core, the CLI and the port catalogue. The cat
 marquee/
   apps/desktop/          Tauri 2 + Svelte 5 + TypeScript (the UI)
     src/                 routes, components, focus engine, theme tokens
-    src-tauri/           Tauri shell: commands, gamepad thread, updater (not yet added)
-  crates/core/           marquee-core: library DB, sources, launcher, ports, artwork
+    src-tauri/           Tauri shell (commands, dialog, single-instance; gamepad/`gilrs` and updater not added)
+  crates/core/           marquee-core: library DB, PS2 scan, PCSX2 launch, sessions (Lutris/Steam/ports not added)
   crates/cli/            `marquee` CLI over the same core (scripting, tests, debugging)
   catalog/
-    ports/               shipwright.yml, zelda64recomp.yml, ...
-    systems/             n64.yml, gamecube.yml, ...
+    ports/               (planned) shipwright.yml, zelda64recomp.yml, ...
+    systems/             ps2.json (built-in; other systems planned)
     windows/             launcher recipes
     schema/              port.schema.json, system.schema.json
   tools/build-index      validates every catalogue file, checks upstream repos exist, writes index.json
   packaging/             rpm spec, flatpak manifest, .desktop file, icons
-  docs/                  ROADMAP.md (this plan), ARCHITECTURE.md, CONTRIBUTING.md
+  docs/                  PS2.md (current slice), ROADMAP.md (this plan), EXPANSION_CATALOGUE.md, PS2_METADATA_FOLLOWUP.md
   scripts/               check.sh, release.sh (run locally; no hosted CI)
 ```
 
@@ -55,7 +61,7 @@ marquee/
 
 **Checks and releases (local, no GitHub Actions)**
 
-- **`scripts/check.sh`:** `cargo fmt --check`, `cargo clippy`, `cargo test`, `pnpm check`, `pnpm build`. Run it before every push; agents run it too.
+- **`scripts/check.sh`:** `cargo fmt --all --check`, clippy/tests for core+CLI (desktop crate excluded until WebKit is present), optional `cargo check -p marquee-desktop` (prints `BLOCKED` if native deps are missing), then `pnpm check`, `pnpm test`, `pnpm build`. Run it before every push; agents run it too.
 - **`scripts/release.sh <version>`:** builds AppImage + RPM with `cargo tauri build`, signs the updater bundle, writes `latest.json`, tags, and publishes a GitHub Release with `gh release create`.
 - **Releases:** the app's updater reads `latest.json` from the newest release, so updates are one click and need no server.
 - **Issues:** templates for "Broken port", "Missing artwork" and "Bug"; the app's "Report a problem" button opens a pre-filled issue URL, so no token is needed.
@@ -423,11 +429,12 @@ Svelte 5 + TypeScript + Vite inside Tauri 2; TanStack Virtual for the grid; plai
 
 ## Roadmap
 
-Eight phases; each ends in something you can use, and phase 1 alone already gives you one library of every game you own. Sizes assume evenings and weekends: S = 1 week, M = 2-3 weeks, L = 4+ weeks.
+Eight numbered phases plus an out-of-sequence **PS2 slice** inserted after phase 0 (see [PS2.md](PS2.md)). Each numbered phase ends in something you can use; phase 1 alone would still be “one library of every Lutris/Steam game you own.” That phase has not started. Sizes assume evenings and weekends: S = 1 week, M = 2–3 weeks, L = 4+ weeks.
 
 ```mermaid
 flowchart LR
-  P0["0 Foundations (S)<br/>themed window, checks green"] --> P1["1 Unified library (M)<br/>Lutris + Steam games with covers"]
+  P0["0 Foundations (S)<br/>themed window, checks green"] --> PS2["PS2 slice (ahead of P1)<br/>import ISO, launch PCSX2"]
+  PS2 --> P1["1 Unified library (M)<br/>Lutris + Steam games with covers"]
   P1 --> P2["2 Look + Big Screen (M)<br/>couch-browsable at 60 fps"]
   P2 --> P3["3 Ports manager (L)<br/>Fallout 2 CE installs and runs"]
   P3 --> P4["4 Emulation (L)<br/>ROM dump shows and launches"]
@@ -442,11 +449,13 @@ Each box's second line is the gate that closes the phase; the details and checkl
 
 - [x] Create the GitHub repo, this roadmap as `docs/ROADMAP.md`
 - [ ] Pick the license (GPL-3.0 or MIT) and add `LICENSE`; catalogue data CC0
-- [ ] Scaffold Tauri 2 + Svelte 5 app and the `core` / `cli` crates in one Cargo workspace
-- [ ] `scripts/check.sh` green: fmt, clippy, tests, UI type check and build
+- [x] Scaffold Tauri 2 + Svelte 5 app and the `core` / `cli` crates in one Cargo workspace (native window compile still blocked on this host; see [PS2.md](PS2.md))
+- [ ] `scripts/check.sh` fully green including `cargo check -p marquee-desktop` (core/CLI/frontend pass; desktop compile blocked without WebKit/DBus devel)
 - [x] Clickable mock-up of Home, Library and Game page with sample data (`apps/desktop`, runs in a browser); fonts, colours, card size still to settle
 
-**Done when:** `pnpm tauri dev` opens the themed UI in a native window and `scripts/check.sh` passes.
+**Done when:** `pnpm tauri dev` opens the themed UI in a native window and `scripts/check.sh` passes, including the desktop compile.
+
+**PS2 slice (coded 2026-10-20, ahead of phase 1):** persistent ISO library, CLI, Tauri commands, empty-library UI. Live PCSX2 launch/exit is **not** the phase 0 gate and is **not** closed. Details: [PS2.md](PS2.md).
 
 ### Phase 1 — Unified library, read-only (M)
 
@@ -540,18 +549,20 @@ The biggest risk is scope: keep each phase shippable and resist adding stores or
 
 - [x] Name and owner: `Marquee`, at github.com/artsiom-tsaryonau/Marquee
 - [ ] OpenCritic and MobyGames: worth a licence or user-supplied key, or link-outs only?
-- [ ] Svelte or React for the UI
+- [x] Svelte or React for the UI — Svelte 5 (implemented)
 - [ ] GPL-3.0 or MIT for the app
 - [ ] Whether Big Screen mode should also run as a Gamescope session from the login screen
 
 ## First week
 
-By the end of the week you should have the repo, a running themed Tauri window, and a CLI that prints your Lutris + Steam library. Commands are for Fedora 44; check Tauri's prerequisites page if a package name has changed.
+Superseded in practice by the 2026-10-20 PS2 slice: the workspace, CLI and Tauri shell exist, but they talk to a PS2 library, not Lutris/Steam. Closing phase 0 still needs the native window (`webkit2gtk4.1-devel`, `dbus-devel`). Lutris/Steam CLI listing remains phase 1.
+
+Original first-week notes (Fedora 44; check Tauri's prerequisites page if a package name has changed):
 
 1. Install the toolchain:
 
    ```bash
-   sudo dnf install webkit2gtk4.1-devel openssl-devel curl wget file \
+   sudo dnf install webkit2gtk4.1-devel dbus-devel openssl-devel curl wget file \
      libappindicator-gtk3-devel librsvg2-devel libxdo-devel
    sudo dnf group install c-development
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -559,9 +570,9 @@ By the end of the week you should have the repo, a running themed Tauri window, 
    curl -fsSL https://get.pnpm.io/install.sh | sh -
    ```
 2. ~~Create the repo~~ (done).
-3. Add the Tauri shell to the existing UI: `pnpm tauri init` inside `apps/desktop/` (creates `src-tauri/`).
-4. Turn the repo into a Cargo workspace with members `apps/desktop/src-tauri`, `crates/core`, `crates/cli`; add `rusqlite`, `serde`, `steamlocate`, `notify`, `keyring`, `reqwest`, `tokio` to `core`.
-5. Write the Lutris adapter first: open `~/.local/share/lutris/pga.db` read-only and print `service_games` grouped by service. Then the Steam `.acf` reader.
+3. ~~Add the Tauri shell to the existing UI~~ (done 2026-10-20 as `apps/desktop/src-tauri/`; window compile still needs WebKit/DBus devel).
+4. ~~Turn the repo into a Cargo workspace~~ (done: `apps/desktop/src-tauri`, `crates/core`, `crates/cli`). Core has rusqlite/serde for PS2; `steamlocate` / Lutris / keyring / reqwest are still phase 1+.
+5. Write the Lutris adapter first: open `~/.local/share/lutris/pga.db` read-only and print `service_games` grouped by service. Then the Steam `.acf` reader. **Not started** — PS2 slice was built instead.
 6. Add `scripts/check.sh` (fmt, clippy, test, `pnpm check`, `pnpm build`), run it, push to main.
 7. Get a SteamGridDB API key and store it with `secret-tool store --label=marquee service marquee key steamgriddb`; same for IGDB (Twitch client id + secret) and RAWG when phase 2 starts.
 8. Make the HTML mock-up of Home, Library and Game page and settle the look.

@@ -4,36 +4,46 @@ One console-style launcher for Fedora that shows every game you own (Steam, GOG,
 
 Marquee is a front end over existing tools. Lutris, Steam, Legendary, umu-launcher/Proton and the emulators keep doing installs and compatibility; Marquee owns the library, the look, artwork, the ports catalogue and launching. Windows launchers install from recipes, so there is no manual Wine setup. Game pages pull scores, time to beat and achievements from IGDB, Steam reviews, RAWG, ScreenScraper, RetroAchievements and PCGamingWiki, with link-outs to SteamDB, Metacritic and HowLongToBeat.
 
-**Status:** phase 0. The UI runs in a browser with sample data; nothing reads your real library yet. Plan and phases: [docs/ROADMAP.md](docs/ROADMAP.md).
+**Status (2026-10-20):** the offline PS2 slice is **in the tree** (core, CLI, Tauri shell, Svelte desktop/demo split). The browser `pnpm dev` demo still uses sample data. **A real PCSX2 launch/exit has not been verified** on the implementation host, and the Tauri window has not been compiled here (`webkit2gtk4.1-devel` / `dbus-devel` missing). Steam/Lutris adapters are not started.
 
-## Run the UI mock-up
+PS2 slice (status, setup, verification): [docs/PS2.md](docs/PS2.md). Long-term plan: [docs/ROADMAP.md](docs/ROADMAP.md). Other systems: [expansion catalogue](docs/EXPANSION_CATALOGUE.md).
 
-Needs Node 22+ and pnpm (`corepack enable pnpm`).
+Do not start Steam/Lutris or [metadata/artwork](docs/PS2_METADATA_FOLLOWUP.md) until the PCSX2 launch/exit gate in [docs/PS2.md](docs/PS2.md) is closed.
+
+## Run
+
+Needs Node 22+, pnpm (`corepack enable pnpm`), and Rust for the desktop/CLI.
 
 ```bash
 cd apps/desktop
 pnpm install
-pnpm dev          # http://localhost:1420
+pnpm dev          # browser demo with sample data · http://localhost:1420
+pnpm tauri dev    # real library (empty until you add a PS2 ISO folder)
 ```
 
-What to try:
+CLI (same core; use `--data-dir` for an isolated database):
 
-- Arrow keys move focus like a D-pad, Enter selects, Esc goes back. A connected gamepad works too (A/B, D-pad, left stick).
-- On Library, start typing anywhere to search.
-- Settings → Mode → Big Screen for the couch layout; Theme → Light.
-- The **+** in the sidebar opens "Add a Windows app" (the recipe flow that replaces manual Wine setup).
-- Dev URL params: `?route=library`, `?mode=big`, `?theme=light`, `?game=<id suffix>`, `?add=1`, `?splash=0`, `?motion=0`.
+```bash
+cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev library add-root --system ps2 ~/Games/ps2
+```
 
-All artwork is generated on the fly (`src/lib/components/Artwork.svelte`); library titles are invented.
+**Demo (`pnpm dev`)** still uses invented titles and simulated playtime. Controller input in the browser is not evidence for the Tauri window.
 
-Before pushing, run `scripts/check.sh` (there is no hosted CI).
+**Desktop (`pnpm tauri dev`)** starts with an empty library. Add a PS2 `.iso` folder from Settings or the sidebar. Artwork is procedural until the metadata follow-up. “Add a Windows app”, Ports and Downloads are demo-only.
+
+Dev URL params (demo): `?route=library`, `?mode=big`, `?theme=light`, `?game=<id suffix>`, `?add=1`, `?splash=0`, `?motion=0`.
+
+Before pushing, run `scripts/check.sh` (there is no hosted CI). It formats and tests the Rust core/CLI, attempts a desktop compile (prints `BLOCKED` if WebKit/DBus devel are missing), then `pnpm check` / `pnpm test` / `pnpm build`. Frontend-only: `pnpm test` inside `apps/desktop/`.
 
 ## Layout
 
 ```
-apps/desktop/   Svelte 5 + TypeScript + Vite UI (Tauri shell comes next)
+apps/desktop/   Svelte 5 + TypeScript + Vite UI and Tauri 2 shell
+crates/core/    library DB, ISO scan, PCSX2 argv, sessions
+crates/cli/     `marquee` diagnostics over the same core
+catalog/        built-in PS2 system descriptor
 scripts/        check.sh: local checks before every push
-docs/           ROADMAP.md
+docs/           PS2.md, ROADMAP.md, EXPANSION_CATALOGUE.md, PS2_METADATA_FOLLOWUP.md
 ```
 
 ## License

@@ -1,0 +1,8 @@
+{
+  "id": "ps2",
+  "display_name": "PlayStation 2",
+  "supported_extensions": ["iso"],
+  "skipped_extensions": ["cue", "bin", "chd", "gz", "cso"],
+  "runner_kind": "pcsx2",
+  "notes": "Built-in registry only. This file is not a shell command source."
+}

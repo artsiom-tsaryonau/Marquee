@@ -1,7 +1,7 @@
 <script lang="ts">
   import { fade, fly } from 'svelte/transition';
   import { app } from '../state.svelte';
-  import { platformLabel, sourceLabel } from '../mock';
+  import { platformLabel, sourceLabel } from '../labels';
   import { ago, hours } from '../format';
   import Row from '../components/Row.svelte';
   import Logo from '../components/Logo.svelte';
@@ -23,24 +23,41 @@
 
   const g = $derived(app.hero);
   const dur = $derived(app.reduceMotion ? 0 : 320);
+  const empty = $derived(!g);
 </script>
 
 <div class="home">
+  {#if g}
   <div class="hero-art" aria-hidden="true">
     {#key g.id}
       <div class="hero-layer" transition:fade={{ duration: dur * 1.4 }}><Artwork art={g.art} /></div>
     {/key}
   </div>
+  {/if}
   <header class="hero">
+    {#if empty}
+      <div class="info">
+        <p class="eyebrow"><span class="pill">PlayStation 2</span></p>
+        <h1 class="empty-title">Your library is empty</h1>
+        <p class="tagline">Choose a folder of PS2 .iso files. Marquee will not download games or BIOS files.</p>
+        {#if app.libraryStatus === 'failed'}
+          <p class="tagline">{app.loadError}</p>
+        {/if}
+        <div class="actions">
+          <button class="btn primary" data-nav onclick={() => app.addPs2Folder()}>
+            <Icon name="plus" /> Add PS2 folder
+          </button>
+          <button class="btn glass" data-nav onclick={() => app.go('settings')}>Settings</button>
+        </div>
+      </div>
+    {:else if g}
     {#key g.id}
       <div class="info" in:fly={{ y: 14, duration: dur, opacity: 0 }}>
         <div class="eyebrow">
           <span class="pill">{sourceLabel[g.source]}</span>
           <span>{platformLabel[g.platform]}</span>
-          <span class="dot">•</span>
-          <span>{g.genre}</span>
-          <span class="dot">•</span>
-          <span>{g.year}</span>
+          {#if g.genre}<span class="dot">•</span><span>{g.genre}</span>{/if}
+          {#if g.year}<span class="dot">•</span><span>{g.year}</span>{/if}
         </div>
         <Logo game={g} size="xl" />
         <p class="tagline">{g.tagline}</p>
@@ -49,9 +66,9 @@
           {#if g.lastPlayed}<span>Last played {ago(g.lastPlayed)}</span>{/if}
         </div>
         <div class="actions">
-          <button class="btn primary" data-nav style="--accent-h:{g.art.hue2}" onclick={() => (g.installed ? app.play(g) : app.install(g.title))}>
+          <button class="btn primary" data-nav style="--accent-h:{g.art.hue2}" onclick={() => (g.installed ? app.play(g) : app.demo ? app.install(g.title, { kind: 'game', id: g.id }) : app.addPs2Folder())}>
             <Icon name={g.installed ? 'play' : 'download'} />
-            {g.installed ? 'Play' : 'Install'}
+            {g.installed ? 'Play' : app.demo ? 'Install' : 'Reconnect'}
           </button>
           <button class="btn glass" data-nav onclick={() => app.open(g)}>Details</button>
           <button class="btn glass icon" data-nav aria-label="Favourite" onclick={() => app.toggleFavorite(g)}>
@@ -60,16 +77,23 @@
         </div>
       </div>
     {/key}
+    {/if}
   </header>
 
   <Row title="Continue playing" games={continuePlaying} shape="wide" />
-  <Row title="Ports ready to play" games={portsReady} />
-  <Row title="Hidden gems in your backlog" games={hiddenGems} />
+  {#if app.demo}
+    <Row title="Ports ready to play" games={portsReady} />
+    <Row title="Hidden gems in your backlog" games={hiddenGems} />
+  {/if}
   <Row title="Favourites" games={favorites} />
-  <Row title="Quick wins · under 6 hours" games={quickWins} />
+  {#if app.demo}
+    <Row title="Quick wins · under 6 hours" games={quickWins} />
+  {/if}
   <Row title="Recently added" games={recentlyAdded} />
-  <Row title="Emulated classics" games={emulated} />
-  <Row title="In your library, not installed" games={notInstalled} />
+  <Row title="PlayStation 2" games={emulated} />
+  {#if app.demo}
+    <Row title="In your library, not installed" games={notInstalled} />
+  {/if}
 </div>
 
 <style>
@@ -143,5 +167,10 @@
     display: flex;
     gap: 10px;
     margin-top: 6px;
+  }
+  .empty-title {
+    margin: 0;
+    font-size: clamp(36px, 6vw, 72px);
+    letter-spacing: -0.04em;
   }
 </style>

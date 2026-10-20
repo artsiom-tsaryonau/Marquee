@@ -57,14 +57,18 @@ const keyDir: Record<string, Dir> = { ArrowUp: 'up', ArrowDown: 'down', ArrowLef
 
 export function startFocusEngine(opts: { back: () => void; onInput: (label: string) => void }) {
   const onKey = (e: KeyboardEvent) => {
+    if (e.defaultPrevented || e.isComposing) return;
     const t = e.target as HTMLElement;
     const typing = t.tagName === 'INPUT' && (t as HTMLInputElement).type !== 'checkbox';
+    const multiline = t.tagName === 'TEXTAREA' || t.isContentEditable;
+    const nativeArrows = t.tagName === 'SELECT' || multiline ||
+      (typing && ['number', 'range', 'date', 'time', 'datetime-local', 'month', 'week'].includes((t as HTMLInputElement).type));
     const dir = keyDir[e.key];
-    if (dir && !(typing && horizontalKeyInText(e))) {
+    if (dir && !(nativeArrows || (typing && horizontalKeyInText(e)))) {
       e.preventDefault();
       opts.onInput(`Key ${e.key}`);
       move(dir);
-    } else if (e.key === 'Escape' || (e.key === 'Backspace' && !typing)) {
+    } else if (e.key === 'Escape' || (e.key === 'Backspace' && !typing && !multiline && t.tagName !== 'SELECT')) {
       opts.onInput(`Key ${e.key}`);
       opts.back();
     }
@@ -72,11 +76,15 @@ export function startFocusEngine(opts: { back: () => void; onInput: (label: stri
   window.addEventListener('keydown', onKey);
 
   // Browser Gamepad API: standard mapping, A=0 B=1 X=2 Y=3, D-pad 12-15.
-  const held = new Set<string>();
+  const heldByPad = new Map<number, Set<string>>();
   let raf = 0;
   const poll = () => {
+    const connected = new Set<number>();
     for (const pad of navigator.getGamepads?.() ?? []) {
       if (!pad) continue;
+      connected.add(pad.index);
+      let held = heldByPad.get(pad.index);
+      if (!held) heldByPad.set(pad.index, (held = new Set()));
       const pressed = (i: number) => pad.buttons[i]?.pressed;
       const ax = pad.axes[0] ?? 0;
       const ay = pad.axes[1] ?? 0;
@@ -97,6 +105,9 @@ export function startFocusEngine(opts: { back: () => void; onInput: (label: stri
           else move(k as Dir);
         } else if (!on) held.delete(k);
       }
+    }
+    for (const index of heldByPad.keys()) {
+      if (!connected.has(index)) heldByPad.delete(index);
     }
     raf = requestAnimationFrame(poll);
   };

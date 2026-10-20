@@ -1,0 +1,21 @@
+[package]
+name = "marquee-desktop"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Tauri shell for Marquee"
+
+[lib]
+name = "marquee_desktop_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+marquee-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-single-instance = "2"

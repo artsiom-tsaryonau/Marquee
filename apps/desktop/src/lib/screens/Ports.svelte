@@ -1,6 +1,6 @@
 <script lang="ts">
   import { app } from '../state.svelte';
-  import { platformLabel } from '../mock';
+  import { platformLabel } from '../labels';
   import type { PortEntry, PortStatus } from '../types';
   import Artwork from '../components/Artwork.svelte';
   import Logo from '../components/Logo.svelte';
@@ -33,7 +33,7 @@
     } else if (p.status === 'needs-rom' || p.status === 'needs-data') {
       app.notify(`Pick your ${p.status === 'needs-rom' ? 'ROM' : 'game folder'} for ${p.game}`);
     } else {
-      app.install(`${p.name} ${p.version}`);
+      app.install(`${p.name} ${p.version}`, { kind: 'port', id: p.id });
     }
   }
 

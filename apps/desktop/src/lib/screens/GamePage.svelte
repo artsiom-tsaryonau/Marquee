@@ -1,7 +1,7 @@
 <script lang="ts">
   import { fly } from 'svelte/transition';
   import { app } from '../state.svelte';
-  import { platformLabel, sourceLabel } from '../mock';
+  import { platformLabel, sourceLabel } from '../labels';
   import { ago, hours } from '../format';
   import Artwork from '../components/Artwork.svelte';
   import Logo from '../components/Logo.svelte';
@@ -10,23 +10,40 @@
   import ScoreStrip from '../components/ScoreStrip.svelte';
 
   const g = $derived(app.current ?? app.hero);
-  const port = $derived(g.source === 'port' ? app.ports.find((p) => `port:${p.id}` === g.id) : undefined);
-  const shots = $derived([0, 1, 2, 3].map((i) => ({ ...g.art, hue: (g.art.hue + i * 24) % 360, motif: (['peaks', 'waves', 'grid', 'orbit'] as const)[(i + g.art.hue) % 4] })));
-  const similar = $derived(app.games.filter((x) => x.id !== g.id && (x.genre === g.genre || x.source === g.source)).slice(0, 10));
+  const port = $derived(g?.source === 'port' ? app.ports.find((p) => `port:${p.id}` === g.id) : undefined);
+  const shots = $derived(g ? [0, 1, 2, 3].map((i) => ({ ...g.art, hue: (g.art.hue + i * 24) % 360, motif: (['peaks', 'waves', 'grid', 'orbit'] as const)[(i + g.art.hue) % 4] })) : []);
+  const similar = $derived(g ? app.games.filter((x) => x.id !== g.id && (x.genre === g.genre || x.source === g.source)).slice(0, 10) : []);
   const dur = $derived(app.reduceMotion ? 0 : 360);
+  const offline = $derived(!!g && !app.demo && g.platform === 'ps2');
+  let editing = $state(false);
+  let titleDraft = $state('');
 
   const launchVia = $derived(
-    {
-      steam: 'Steam · steam://rungameid',
-      gog: 'Lutris · GOG',
-      epic: 'Legendary',
-      lutris: 'Lutris · umu-launcher + GE-Proton',
-      port: 'Native port binary',
-      rom: 'Emulator (Flatpak)',
-    }[g.source],
+    g
+      ? {
+          steam: 'Steam · steam://rungameid',
+          gog: 'Lutris · GOG',
+          epic: 'Legendary',
+          lutris: 'Lutris · umu-launcher + GE-Proton',
+          port: 'Native port binary',
+          rom: offline ? (app.selectedRunner?.display_name ?? 'PCSX2') : 'Emulator (Flatpak)',
+        }[g.source]
+      : '',
+  );
+
+  const playLabel = $derived(
+    !g ? 'Play' : g.setupState === 'missing' ? 'Open PCSX2 setup' : g.mediaMissing ? 'Disc missing' : g.installed ? 'Play' : app.demo ? 'Install' : 'Reconnect',
   );
 </script>
 
+{#if !g}
+  <article class="page">
+    <div class="head">
+      <button class="back" data-nav onclick={() => app.back()}><Icon name="back" size={18} /> Back</button>
+      <p class="tagline">Select a game from the library.</p>
+    </div>
+  </article>
+{:else}
 <article class="page" style="--accent-h:{g.art.hue2}">
   <div class="banner">
     <Artwork art={g.art} />
@@ -35,27 +52,43 @@
 
   <div class="head" in:fly={{ y: 20, duration: dur }}>
     <button class="back" data-nav onclick={() => app.back()}><Icon name="back" size={18} /> Back</button>
-    <Logo game={g} size="lg" />
+    {#if editing && offline}
+      <input class="rename" data-nav bind:value={titleDraft} onkeydown={(e) => { if (e.key === 'Enter') { void app.rename(g, titleDraft); editing = false; } if (e.key === 'Escape') editing = false; }} />
+    {:else}
+      <Logo game={g} size="lg" />
+    {/if}
     <p class="tagline">{g.tagline}</p>
     <div class="actions">
-      <button class="btn primary big" data-nav onclick={() => (g.installed ? app.play(g) : app.install(g.title))}>
-        <Icon name={g.installed ? 'play' : 'download'} />
-        {g.installed ? 'Play' : 'Install'}
+      <button class="btn primary big" data-nav onclick={() => {
+        if (offline && g.setupState === 'missing') app.openSetup();
+        else if (g.installed) app.play(g);
+        else if (app.demo) app.install(g.title, { kind: 'game', id: g.id });
+      }}>
+        <Icon name={g.installed && g.setupState !== 'missing' ? 'play' : 'download'} />
+        {playLabel}
       </button>
+      {#if offline && (g.setupState === 'unverified' || g.setupState === 'runner_missing' || g.setupState === 'missing')}
+        <button class="btn glass" data-nav onclick={() => app.openSetup()}><Icon name="settings" /> Open PCSX2 setup</button>
+      {/if}
       {#if g.portStatus === 'update'}
-        <button class="btn glass" data-nav onclick={() => app.install(`${g.title} update`)}><Icon name="refresh" /> Update</button>
+        <button class="btn glass" data-nav onclick={() => port && app.install(`${g.title} update`, { kind: 'port', id: port.id })}><Icon name="refresh" /> Update</button>
       {/if}
       <button class="btn glass icon" data-nav aria-label="Favourite" onclick={() => app.toggleFavorite(g)}>
         <Icon name="star" filled={g.favorite} />
       </button>
-      <button class="btn glass" data-nav onclick={() => app.notify('Opened install folder')}><Icon name="folder" /> Folder</button>
-      <button class="btn glass" data-nav onclick={() => app.notify('Drop an image to replace the artwork')}><Icon name="image" /> Artwork</button>
-      <button class="btn glass" data-nav onclick={() => app.notify(`${g.title} added to Steam (restart Steam)`)}><Icon name="plus" /> Add to Steam</button>
+      {#if offline}
+        <button class="btn glass" data-nav onclick={() => { titleDraft = g.title; editing = true; }}><Icon name="image" /> Rename</button>
+      {:else}
+        <button class="btn glass" data-nav onclick={() => app.notify('Opened install folder')}><Icon name="folder" /> Folder</button>
+        <button class="btn glass" data-nav onclick={() => app.notify('Drop an image to replace the artwork')}><Icon name="image" /> Artwork</button>
+        <button class="btn glass" data-nav onclick={() => app.notify(`${g.title} added to Steam (restart Steam)`)}><Icon name="plus" /> Add to Steam</button>
+      {/if}
     </div>
   </div>
 
   <div class="body">
     <div class="main">
+      {#if !offline}
       <h3>Ratings and facts</h3>
       <div class="scores"><ScoreStrip game={g} /></div>
       <h3>Screenshots</h3>
@@ -65,6 +98,7 @@
         {/each}
       </div>
 
+      {/if}
       {#if port}
         <h3>Requirements</h3>
         <ul class="reqs glass-panel">
@@ -88,8 +122,16 @@
         <dt>Last played</dt>
         <dd>{g.lastPlayed ? ago(g.lastPlayed) : '—'}</dd>
         <dt>Genre</dt>
-        <dd>{g.genre} · {g.year}</dd>
-        {#if g.steam}
+        <dd>{g.genre}{g.year ? ` · ${g.year}` : ''}</dd>
+        {#if g.serial}
+          <dt>Serial</dt>
+          <dd>{g.serial}{g.region ? ` · ${g.region}` : ''}</dd>
+        {/if}
+        {#if g.setupState}
+          <dt>PCSX2</dt>
+          <dd>{g.setupState.replace('_', ' ')}</dd>
+        {/if}
+        {#if g.steam && !offline}
           <dt>Players now</dt>
           <dd><span class="live-dot"></span>{g.steam.playersNow.toLocaleString()}</dd>
           <dt>Last update</dt>
@@ -97,7 +139,7 @@
           <dt>Steam Deck</dt>
           <dd><span class="badge deck-{g.steam.deck}">{g.steam.deck[0].toUpperCase() + g.steam.deck.slice(1)}</span></dd>
         {/if}
-        {#if g.platform === 'pc-windows' && g.source !== 'steam'}
+        {#if !offline && g.platform === 'pc-windows' && g.source !== 'steam'}
           <dt>Compatibility</dt>
           <dd><span class="badge gold">ProtonDB Gold</span> <span class="badge ok">No anti-cheat</span></dd>
         {/if}
@@ -107,6 +149,7 @@
 
   <Row title="More like this" games={similar} />
 </article>
+{/if}
 
 <style>
   .page {
@@ -157,6 +200,17 @@
     margin: 0;
     font-size: var(--tagline);
     color: var(--text-soft);
+  }
+  .rename {
+    font: inherit;
+    font-size: clamp(28px, 4vw, 48px);
+    font-weight: 800;
+    background: var(--field);
+    color: var(--text);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 8px 12px;
+    max-width: 16ch;
   }
   .actions {
     display: flex;

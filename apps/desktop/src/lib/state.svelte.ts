@@ -1,7 +1,12 @@
-import { downloads as seedDownloads, games, ports } from './mock';
-import type { Download, GameEntry, PortEntry } from './types';
+import { createApi, type LibraryApi } from './api';
+import { gamesFromSnapshot, pickRunner } from './api/map';
+import type { CoreEvent, LibraryRoot, LibrarySnapshot, Runner, ScanReport, Session } from './api/contracts';
+import { describeScan } from './format';
+import { downloads as seedDownloads, games, portGame, ports } from './mock';
+import type { Download, DownloadTarget, GameEntry, PortEntry } from './types';
 
-export type Route = 'home' | 'library' | 'game' | 'ports' | 'downloads' | 'settings';
+export type Route = 'home' | 'library' | 'game' | 'ports' | 'downloads' | 'settings' | 'ps2';
+export type LibraryStatus = 'demo' | 'loading' | 'empty' | 'loaded' | 'failed';
 
 function load<T>(key: string, fallback: T): T {
   try {
@@ -22,26 +27,37 @@ function save(key: string, value: unknown) {
 
 class AppState {
   route = $state<Route>('home');
-  history: Route[] = [];
+  history: { route: Route; gameId: string | null; heroId: string | null }[] = [];
   gameId = $state<string | null>(null);
   /** The entry whose art fills the backdrop. */
-  heroId = $state<string>(games[0].id);
+  heroId = $state<string | null>(games[0]?.id ?? null);
 
   mode = $state<'desktop' | 'big'>(load('mode', 'desktop'));
   theme = $state<'dark' | 'light'>(load('theme', 'dark'));
   reduceMotion = $state<boolean>(load('reduceMotion', false));
   sounds = $state<boolean>(load('sounds', false));
 
-  games = $state<GameEntry[]>(games);
-  ports = $state<PortEntry[]>(ports);
-  downloads = $state<Download[]>(seedDownloads);
+  api: LibraryApi = createApi();
+  demo = this.api.kind === 'demo';
+  libraryStatus = $state<LibraryStatus>(this.api.kind === 'demo' ? 'demo' : 'loading');
+  loadError = $state<string | null>(null);
+  roots = $state<LibraryRoot[]>([]);
+  runners = $state<Runner[]>([]);
+  selectedRunner = $state<Runner | null>(null);
+  lastScan = $state<ScanReport | null>(null);
+  scanning = $state(false);
+  overlayDismissed = $state(false);
+
+  games = $state<GameEntry[]>(this.demo ? games : []);
+  ports = $state<PortEntry[]>(this.demo ? ports : []);
+  downloads = $state<Download[]>(this.demo ? seedDownloads : []);
 
   launching = $state<GameEntry | null>(null);
   running = $state<GameEntry | null>(null);
   toast = $state<string | null>(null);
   lastInput = $state<string>('—');
 
-  hero = $derived(this.games.find((g) => g.id === this.heroId) ?? this.games[0]);
+  hero = $derived(this.games.find((g) => g.id === this.heroId) ?? this.games[0] ?? null);
   current = $derived(this.games.find((g) => g.id === this.gameId) ?? null);
 
   constructor() {
@@ -53,10 +69,81 @@ class AppState {
     });
   }
 
-  go(route: Route) {
-    if (route === this.route) return;
-    this.history.push(this.route);
+  async boot() {
+    if (this.demo) return;
+    this.unlisten = this.api.subscribe((event) => this.onEvent(event));
+    try {
+      const snap = await this.api.snapshot();
+      this.applySnapshot(snap);
+    } catch (err) {
+      this.libraryStatus = 'failed';
+      this.loadError = err instanceof Error ? err.message : String((err as { message?: string }).message ?? err);
+    }
+  }
+
+  private unlisten: (() => void) | undefined;
+
+  applySnapshot(snap: LibrarySnapshot) {
+    this.roots = snap.roots;
+    this.runners = snap.runners;
+    this.selectedRunner = pickRunner(snap);
+    this.games = gamesFromSnapshot(snap);
+    this.libraryStatus = this.games.length ? 'loaded' : 'empty';
+    this.loadError = null;
+    if (this.heroId && !this.games.some((g) => g.id === this.heroId)) {
+      this.heroId = this.games[0]?.id ?? null;
+    } else if (!this.heroId) {
+      this.heroId = this.games[0]?.id ?? null;
+    }
+    const active = snap.sessions.find((s: Session) => s.state === 'running');
+    if (active) {
+      const game = this.games.find((g) => g.id === active.edition_id) ?? null;
+      this.launching = null;
+      if (!this.overlayDismissed) this.running = game;
+    } else if (!this.launching) {
+      this.running = null;
+      this.overlayDismissed = false;
+    }
+  }
+
+  onEvent(event: CoreEvent) {
+    if (event.type === 'scan_finished') this.lastScan = event.report;
+    if (event.type === 'session_started') {
+      const game = this.games.find((g) => g.id === event.session.edition_id);
+      this.launching = null;
+      this.running = game ?? this.running;
+    }
+    if (event.type === 'session_ended' || event.type === 'session_failed') {
+      const ended = event.session;
+      this.launching = null;
+      this.running = null;
+      this.overlayDismissed = false;
+      void this.api.snapshot().then((snap) => {
+        this.applySnapshot(snap);
+        const game = this.games.find((g) => g.id === ended.edition_id);
+        if (game) {
+          this.gameId = game.id;
+          this.heroId = game.id;
+          this.route = 'game';
+        }
+        const seconds = ended.duration_seconds ?? 0;
+        if (event.type === 'session_ended') {
+          this.notify(`${game?.title ?? 'Game'} closed · ${Math.max(seconds, 0)}s played`);
+        } else {
+          this.notify(ended.error ?? 'Launch failed');
+        }
+      });
+    }
+    if (event.type === 'library_changed' || event.type === 'scan_finished') {
+      void this.api.snapshot().then((snap) => this.applySnapshot(snap));
+    }
+  }
+
+  go(route: Route, gameId: string | null = route === 'game' ? this.gameId : null) {
+    if (route === this.route && gameId === this.gameId) return;
+    this.history.push({ route: this.route, gameId: this.gameId, heroId: this.heroId });
     this.route = route;
+    this.gameId = gameId;
   }
 
   private previewTimer: ReturnType<typeof setTimeout> | undefined;
@@ -68,25 +155,56 @@ class AppState {
   }
 
   open(game: GameEntry) {
-    this.gameId = game.id;
+    clearTimeout(this.previewTimer);
+    this.go('game', game.id);
     this.heroId = game.id;
-    this.go('game');
   }
 
   back() {
-    if (this.running) return this.stop();
+    if (this.running || this.launching) {
+      if (this.demo) return this.stop();
+      return this.dismissOverlay();
+    }
     const prev = this.history.pop();
-    if (prev) this.route = prev;
+    if (prev) {
+      clearTimeout(this.previewTimer);
+      this.route = prev.route;
+      this.gameId = prev.gameId;
+      this.heroId = prev.heroId;
+    }
   }
 
   play(game: GameEntry) {
     this.heroId = game.id;
+    if (!this.demo) {
+      void this.playDesktop(game);
+      return;
+    }
     this.launching = game;
     setTimeout(() => {
       if (this.launching?.id !== game.id) return;
       this.launching = null;
       this.running = game;
     }, 2200);
+  }
+
+  private async playDesktop(game: GameEntry) {
+    this.overlayDismissed = false;
+    this.launching = game;
+    try {
+      await this.api.launch(game.id);
+    } catch (err) {
+      this.launching = null;
+      this.running = null;
+      const message = (err as { message?: string }).message ?? 'Launch failed';
+      this.notify(message);
+    }
+  }
+
+  dismissOverlay() {
+    this.overlayDismissed = true;
+    this.launching = null;
+    this.running = null;
   }
 
   stop() {
@@ -105,13 +223,130 @@ class AppState {
 
   toggleFavorite(game: GameEntry) {
     const entry = this.games.find((x) => x.id === game.id);
-    if (entry) entry.favorite = !entry.favorite;
+    if (!entry) return;
+    entry.favorite = !entry.favorite;
+    if (!this.demo) {
+      void this.api.setFavourite(entry.id, entry.favorite).catch((err) => {
+        entry.favorite = !entry.favorite;
+        this.notify((err as { message?: string }).message ?? 'Could not save favourite');
+      });
+    }
   }
 
-  install(name: string) {
-    if (this.downloads.some((d) => d.name === name && d.state !== 'done')) return;
-    this.downloads.unshift({ id: crypto.randomUUID(), name, progress: 0, speed: '0 MB/s', state: 'downloading' });
+  async rename(game: GameEntry, title: string) {
+    const entry = this.games.find((x) => x.id === game.id);
+    if (!entry || this.demo) return;
+    const previous = entry.title;
+    entry.title = title;
+    try {
+      await this.api.setDisplayTitle(entry.id, title);
+    } catch (err) {
+      entry.title = previous;
+      this.notify((err as { message?: string }).message ?? 'Could not rename');
+    }
+  }
+
+  async addPs2Folder() {
+    if (this.demo) {
+      this.notify('Add a PS2 folder in the desktop app');
+      return;
+    }
+    const path = await this.api.pickRoot();
+    if (!path) return;
+    this.scanning = true;
+    try {
+      const root = await this.api.addRoot(path);
+      const report = await this.api.scan(root.id);
+      this.lastScan = report;
+      this.applySnapshot(await this.api.snapshot());
+      this.notify(describeScan(report));
+      if (this.libraryStatus === 'empty' && report.skipped_unsupported && !report.added) {
+        this.notify('Nothing imported. CHD/CUE/BIN/GZ/CSO are not supported yet — add a folder of .iso files.');
+      }
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? 'Could not add folder');
+    } finally {
+      this.scanning = false;
+    }
+  }
+
+  async rescan() {
+    if (this.demo) {
+      this.notify('Rescanning all sources…');
+      return;
+    }
+    this.scanning = true;
+    try {
+      const report = await this.api.scan();
+      this.lastScan = report;
+      this.applySnapshot(await this.api.snapshot());
+      this.notify(describeScan(report));
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? 'Scan failed');
+    } finally {
+      this.scanning = false;
+    }
+  }
+
+  async chooseRunner(id: string) {
+    if (this.demo) return;
+    try {
+      await this.api.selectRunner(id);
+      this.applySnapshot(await this.api.snapshot());
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? 'Could not select runner');
+    }
+  }
+
+  async openSetup(id?: string) {
+    if (this.demo) return;
+    const runnerId = id ?? this.selectedRunner?.id;
+    if (!runnerId) {
+      this.notify('Install PCSX2 first. See docs/PS2.md.');
+      return;
+    }
+    try {
+      await this.api.openSetup(runnerId);
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? 'Could not open PCSX2 setup');
+    }
+  }
+
+  install(name: string, target?: DownloadTarget) {
+    if (!this.demo) {
+      this.notify('Downloads are demo-only in this milestone');
+      return;
+    }
+    if (this.downloads.some((d) => d.state !== 'done' && (target
+      ? d.target?.kind === target.kind && d.target.id === target.id
+      : !d.target && d.name === name))) return;
+    this.downloads.unshift({ id: crypto.randomUUID(), name, target, progress: 0, speed: '0 MB/s', state: 'downloading' });
     this.notify(`${name} added to downloads`);
+  }
+
+  completeDownload(download: Download) {
+    download.progress = 1;
+    download.state = 'done';
+    download.speed = '';
+    const target = download.target;
+    if (target?.kind === 'game') {
+      const game = this.games.find((g) => g.id === target.id);
+      if (game) game.installed = true;
+    } else if (target?.kind === 'port') {
+      const port = this.ports.find((p) => p.id === target.id);
+      if (port) {
+        port.status = 'ready';
+        const game = this.games.find((g) => g.id === `port:${port.id}`);
+        if (game) {
+          game.installed = true;
+          game.portStatus = 'ready';
+        } else {
+          const entry = portGame(port);
+          this.games.unshift({ ...entry, playtimeMin: 0, lastPlayed: null, addedAt: new Date().toISOString() });
+        }
+      }
+    }
+    this.notify(`${download.name} installed`);
   }
 
   notify(msg: string) {
@@ -125,24 +360,22 @@ class AppState {
 
 export const app = new AppState();
 
-// Fake download progress so the Downloads screen moves.
-setInterval(() => {
-  let active = 0;
-  for (const d of app.downloads) {
-    if (d.state !== 'downloading') continue;
-    active++;
-    d.progress = Math.min(1, d.progress + 0.01 + Math.random() * 0.02);
-    d.speed = `${(12 + Math.random() * 14).toFixed(1)} MB/s`;
-    if (d.progress >= 1) {
-      d.state = 'done';
-      d.speed = '';
-      const port = app.ports.find((p) => d.name.startsWith(p.name));
-      if (port) port.status = 'ready';
-      app.notify(`${d.name} installed`);
+if (app.demo) {
+  // Fake download progress so the Downloads screen moves.
+  setInterval(() => {
+    let active = 0;
+    for (const d of app.downloads) {
+      if (d.state !== 'downloading') continue;
+      active++;
+      d.progress = Math.min(1, d.progress + 0.01 + Math.random() * 0.02);
+      d.speed = `${(12 + Math.random() * 14).toFixed(1)} MB/s`;
+      if (d.progress >= 1) {
+        app.completeDownload(d);
+      }
     }
-  }
-  if (active === 0) {
-    const next = app.downloads.find((d) => d.state === 'queued');
-    if (next) next.state = 'downloading';
-  }
-}, 400);
+    if (active === 0) {
+      const next = app.downloads.find((d) => d.state === 'queued');
+      if (next) next.state = 'downloading';
+    }
+  }, 400);
+}

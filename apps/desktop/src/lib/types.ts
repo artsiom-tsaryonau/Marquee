@@ -24,6 +24,8 @@ export interface Art {
   logo: 'wide' | 'serif' | 'mono' | 'heavy';
 }
 
+export type SetupState = 'runner_missing' | 'missing' | 'unverified' | 'launch_tested';
+
 export interface GameEntry {
   id: string;
   title: string;
@@ -37,6 +39,11 @@ export interface GameEntry {
   lastPlayed: string | null;
   addedAt: string;
   favorite: boolean;
+  serial?: string;
+  region?: string;
+  mediaMissing?: boolean;
+  rootOffline?: boolean;
+  setupState?: SetupState;
   ratings: Ratings;
   /** Hours: main story, main + extras, completionist (IGDB). */
   timeToBeat: [number, number, number] | null;
@@ -78,10 +85,14 @@ export interface PortEntry {
   art: Art;
 }
 
+export type DownloadTarget = { kind: 'game'; id: string } | { kind: 'port'; id: string };
+
 export interface Download {
   id: string;
   name: string;
   progress: number;
   speed: string;
   state: 'downloading' | 'queued' | 'paused' | 'done';
+  /** Stable identity of the entry to update; tool downloads have no library target. */
+  target?: DownloadTarget;
 }
