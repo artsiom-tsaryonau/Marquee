@@ -101,10 +101,18 @@ fn walk_dir(
     };
     for entry in entries.flatten() {
         let path = entry.path();
-        let meta = match entry.metadata() {
+        let mut meta = match entry.metadata() {
             Ok(m) => m,
             Err(_) => continue,
         };
+        // Symlinked disc images are common (one folder pointing at another drive).
+        // Follow links to files only; linked folders stay skipped so a loop cannot recurse forever.
+        if meta.file_type().is_symlink() {
+            match fs::metadata(&path) {
+                Ok(target) if target.is_file() => meta = target,
+                _ => continue,
+            }
+        }
         if meta.is_dir() {
             walk_dir(db, &path, descriptor, report, skip_map)?;
             continue;
