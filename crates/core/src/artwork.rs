@@ -9,7 +9,14 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 const COVER_KIND: &str = "cover";
-const COVER_BASE: &str = "https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/default";
+
+/// xlenore cover sets, one repository per system. Filenames are the disc serial
+/// with the underscore swapped for a dash (`SLUS_209.63` → `SLUS-20963.jpg`);
+/// both sets follow that convention.
+const PS2_COVER_BASE: &str =
+    "https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/default";
+const PS1_COVER_BASE: &str =
+    "https://raw.githubusercontent.com/xlenore/psx-covers/main/covers/default";
 
 pub struct CoverJob {
     pub edition_id: String,
@@ -17,8 +24,21 @@ pub struct CoverJob {
     pub dest: PathBuf,
 }
 
+pub fn cover_base(system: &str) -> &'static str {
+    match system {
+        crate::model::SYSTEM_PS1 => PS1_COVER_BASE,
+        _ => PS2_COVER_BASE,
+    }
+}
+
+/// Cover URL for a system. Kept as `cover_url` for the PS2 path so existing
+/// callers and tests stay valid.
+pub fn cover_url_for(system: &str, normalized_serial: &str) -> Option<String> {
+    cover_serial(normalized_serial).map(|id| format!("{}/{}.jpg", cover_base(system), id))
+}
+
 pub fn cover_url(normalized_serial: &str) -> Option<String> {
-    cover_serial(normalized_serial).map(|id| format!("{COVER_BASE}/{id}.jpg"))
+    cover_url_for(crate::model::SYSTEM_PS2, normalized_serial)
 }
 
 pub fn pending_jobs(
@@ -47,7 +67,7 @@ pub fn pending_jobs(
             skipped += 1;
             continue;
         };
-        let Some(url) = cover_url(serial) else {
+        let Some(url) = cover_url_for(&edition.system, serial) else {
             skipped += 1;
             continue;
         };
@@ -70,11 +90,17 @@ pub fn store_jpeg(db: &Db, job: &CoverJob, bytes: &[u8]) -> Result<()> {
     let tmp = job.dest.with_extension("jpg.part");
     fs::write(&tmp, bytes)?;
     fs::rename(&tmp, &job.dest)?;
+    // The source label records which cover set the file came from.
+    let source = if job.url.contains("psx-covers") {
+        "xlenore/psx-covers"
+    } else {
+        "xlenore/ps2-covers"
+    };
     db.upsert_artwork(
         &job.edition_id,
         COVER_KIND,
         &job.dest.to_string_lossy(),
-        "xlenore/ps2-covers",
+        source,
         &now_rfc3339(),
     )?;
     Ok(())
@@ -106,6 +132,22 @@ mod tests {
         assert_eq!(
             cover_url("SLUS_209.63").as_deref(),
             Some("https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/default/SLUS-20963.jpg")
+        );
+    }
+
+    #[test]
+    fn ps1_covers_use_the_psx_covers_set() {
+        assert_eq!(
+            cover_url_for("ps1", "SLUS_005.94").as_deref(),
+            Some("https://raw.githubusercontent.com/xlenore/psx-covers/main/covers/default/SLUS-00594.jpg")
+        );
+        assert_eq!(
+            cover_base("ps1"),
+            "https://raw.githubusercontent.com/xlenore/psx-covers/main/covers/default"
+        );
+        assert_eq!(
+            cover_base("ps2"),
+            "https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/default"
         );
     }
 

@@ -1,5 +1,6 @@
 // Sample data only. Library titles are invented; port names are the planned
 // catalogue entries, with made-up versions and statuses.
+import { jakExample, enrichIdentity, nativePortGame } from './unified';
 import type { Art, Download, GameEntry, Motif, Platform, PortEntry, Ratings, Source } from './types';
 export { platformLabel, sourceLabel } from './labels';
 
@@ -137,7 +138,7 @@ export const ports: PortEntry[] = (
 }));
 
 export function portGame(p: PortEntry): GameEntry {
-  return {
+  return enrichIdentity({
     id: `port:${p.id}`,
     title: p.name,
     tagline: `Native port of ${p.game}.`,
@@ -155,13 +156,15 @@ export function portGame(p: PortEntry): GameEntry {
     achievements: null,
     portStatus: p.status,
     art: p.art,
-  };
+  });
 }
 
 // Ready ports also show up in the library, like any other entry.
 for (const p of ports.filter((p) => p.status === 'ready' || p.status === 'update')) {
   games.push(portGame(p));
 }
+
+games.unshift(jakExample, nativePortGame(ports.find((p) => p.id === 'opengoal')!));
 
 export const downloads: Download[] = [
   { id: 'd1', name: 'Zelda64Recomp 1.3.0', progress: 0.64, speed: '18.2 MB/s', state: 'downloading', target: { kind: 'port', id: 'zelda64recomp' } },

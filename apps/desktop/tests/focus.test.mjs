@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
-import { startFocusEngine } from '../src/lib/focus';
+import { startFocusEngine, move } from '../src/lib/focus';
 
 let keydown, frame, pads, clicks, backCalls, stop, listeners;
 const originals = new Map(['window', 'document', 'navigator', 'requestAnimationFrame', 'cancelAnimationFrame']
@@ -118,4 +118,19 @@ test('no controller means no polling loop at all', () => {
   pads = [null];
   next();
   assert.equal(frame, undefined, 'polling stops once the controller is gone');
+});
+
+
+test('spatial navigation skips disabled launcher controls', () => {
+  let focused = '';
+  const button = (id, disabled) => ({
+    closest: () => null,
+    matches: () => disabled,
+    getAttribute: () => null,
+    getBoundingClientRect: () => ({ width: 100, height: 40 }),
+    focus: () => { focused = id; },
+  });
+  document.querySelectorAll = () => [button('disabled', true), button('enabled', false)];
+  move('down');
+  assert.equal(focused, 'enabled');
 });

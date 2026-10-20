@@ -1,3 +1,5 @@
+import { launcherTemplates } from '../launchers';
+import type { LauncherConfig, LauncherInfo, LutrisConfig } from './contracts';
 import { games } from '../mock';
 import type { KeyInfo, LibraryApi, LibrarySnapshot, ScanReport } from './contracts';
 
@@ -32,6 +34,7 @@ function demoKeys(): KeyInfo[] {
   });
 }
 
+let demoLaunchers: LauncherInfo[] = launcherTemplates.slice(0, 3).map((l) => ({ ...l, id: `detected.${l.executable}`, pinned: false, available: false, configured: false, status: 'Demo preview · connect in the desktop app' }));
 export const demoApi: LibraryApi = {
   kind: 'demo',
   async snapshot() {
@@ -80,6 +83,27 @@ export const demoApi: LibraryApi = {
   async webUrl() {
     return null;
   },
+  async lutrisLibrary() { return { config: { enabled: false, include_owned: false, database_path: null, launcher_id: 'detected.lutris' }, detected_paths: [], database_path: null, games: [], cached_by_service: {}, configured_count: 0, installed_count: 0, warnings: [] }; },
+  async configureLutris(_config: LutrisConfig) { throw { code: 'DEMO', message: 'Connect your Lutris library in the desktop app' }; },
+  async openLutrisGame() { throw { code: 'DEMO', message: 'Opening Lutris games requires the desktop app' }; },
+  async purpleStatus() { return { installed: false, ready: false, busy: false, running: false, message: 'Install Purple in the desktop app.', error: null, prefix: '', log_path: '', runtime: null, aion2_verified: false }; },
+  async installPurple() { throw { code: 'DEMO', message: 'Purple setup requires the desktop app.' }; },
+  async cancelPurple() { throw { code: 'DEMO', message: 'Purple setup requires the desktop app.' }; },
+  async openPurple() { throw { code: 'DEMO', message: 'Opening Purple requires the desktop app.' }; },
+  async listLaunchers() { return structuredClone(demoLaunchers); },
+  async saveLauncher(launcher: LauncherConfig) {
+    const info: LauncherInfo = { ...structuredClone(launcher), available: false, configured: true, status: 'Demo configuration · opening requires the desktop app' };
+    demoLaunchers = [...demoLaunchers.filter((l) => l.id !== info.id), info].sort((a,b) => Number(b.pinned)-Number(a.pinned) || a.name.localeCompare(b.name));
+    return structuredClone(demoLaunchers);
+  },
+  async removeLauncher(id: string) {
+    demoLaunchers = demoLaunchers.filter((l) => l.id !== id);
+    const template = launcherTemplates.slice(0, 3).find((l) => `detected.${l.executable}` === id);
+    if (template) demoLaunchers.push({ ...template, id, pinned: false, available: false, configured: false, status: 'Demo preview · connect in the desktop app' });
+    return structuredClone(demoLaunchers);
+  },
+  async openLauncher() { throw { code: 'DEMO', message: 'Opening applications requires the desktop app' }; },
+  async pickExecutable() { return null; },
   async listPorts() {
     return [];
   },

@@ -21,6 +21,10 @@ export const desktopApi: LibraryApi = {
     const selected = await open({ directory: true, multiple: false, title: 'Choose a PS2 ISO folder' });
     return typeof selected === 'string' ? selected : null;
   },
+  async pickExecutable() {
+    const selected = await open({ directory: false, multiple: false, title: 'Choose a launcher executable or AppImage' });
+    return typeof selected === 'string' ? selected : null;
+  },
   webUrl: () => invoke<string | null>('web_url'),
   subscribe(handler) {
     let stop = () => {};

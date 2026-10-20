@@ -14,11 +14,13 @@
   import GamePage from './lib/screens/GamePage.svelte';
   import Ports from './lib/screens/Ports.svelte';
   import Downloads from './lib/screens/Downloads.svelte';
+  import Tools from './lib/screens/Tools.svelte';
   import Settings from './lib/screens/Settings.svelte';
 
   const nav: { route: Route; label: string; icon: IconName }[] = [
     { route: 'home', label: 'Home', icon: 'home' },
     { route: 'library', label: 'Library', icon: 'grid' },
+    { route: 'tools', label: 'Tools', icon: 'settings' },
     { route: 'ports', label: 'Ports', icon: 'puzzle' },
     { route: 'downloads', label: 'Downloads', icon: 'download' },
     { route: 'settings', label: 'Settings', icon: 'settings' },
@@ -82,11 +84,18 @@
       },
       onInput: (l) => (app.lastInput = l),
     });
+    const refreshSources = () => {
+      if (!app.demo && !document.hidden && document.hasFocus() && app.lutrisSource?.config.enabled && !app.lutrisLoading) void app.loadLutris();
+    };
+    window.addEventListener('focus', refreshSources);
+    const sourcePoll = setInterval(refreshSources, 60000);
     const clock = setInterval(() => (now = new Date()), 15000);
     if (booting) setTimeout(() => (booting = false), app.reduceMotion ? 0 : 1500);
     return () => {
       stop();
       clearInterval(clock);
+      clearInterval(sourcePoll);
+      window.removeEventListener('focus', refreshSources);
     };
   });
 
@@ -147,6 +156,7 @@
         {:else if app.route === 'library'}<Library />
         {:else if app.route === 'ps2'}<Library collection="ps2" />
         {:else if app.route === 'game'}<GamePage />
+        {:else if app.route === 'tools'}<Tools />
         {:else if app.route === 'ports'}<Ports />
         {:else if app.route === 'downloads'}<Downloads />
         {:else}<Settings />{/if}

@@ -1,0 +1,14 @@
+{
+  "id": "ps1",
+  "display_name": "PlayStation",
+  "supported_extensions": ["iso", "chd", "cue"],
+  "skipped_extensions": ["bin", "gz", "cso", "pbp"],
+  "runner_kind": "duckstation",
+  "install": {
+    "default": "unpacked",
+    "flatpak": "org.duckstation.DuckStation",
+    "github": "stenzek/duckstation"
+  },
+  "covers": "https://raw.githubusercontent.com/xlenore/psx-covers/main/covers/default/${serial}.jpg",
+  "notes": "Classic PS1 discs are usually raw 2352-byte-sector images; the reader finds the ISO9660 System Area at the common sector strides. BOOT (PS1) and BOOT2 (PS2) are both accepted."
+}

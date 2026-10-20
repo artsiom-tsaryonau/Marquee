@@ -67,6 +67,9 @@ export const httpApi: LibraryApi = {
     const path = window.prompt('Folder on the Marquee machine that holds your PS2 .iso files');
     return path && path.trim() ? path.trim() : null;
   },
+  async pickExecutable() {
+    return window.prompt('Absolute executable path on the Marquee machine');
+  },
   webUrl: async () => null,
   subscribe(handler) {
     let stopped = false;

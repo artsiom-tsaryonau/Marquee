@@ -106,8 +106,7 @@ impl Db {
                 );
                 ",
             )?;
-            self.conn
-                .pragma_update(None, "user_version", SCHEMA_VERSION)?;
+            self.conn.pragma_update(None, "user_version", 2)?;
         } else if version == 1 {
             self.conn.execute_batch(
                 "
@@ -121,12 +120,31 @@ impl Db {
                 );
                 ",
             )?;
-            self.conn
-                .pragma_update(None, "user_version", SCHEMA_VERSION)?;
+            self.conn.pragma_update(None, "user_version", 2)?;
         }
         let version: i64 = self
             .conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))?;
+        if version == 2 && !column_exists(&self.conn, "sessions", "process_identity")? {
+            self.conn.execute_batch(
+                "BEGIN IMMEDIATE;
+                ALTER TABLE sessions ADD COLUMN process_identity TEXT;
+                DELETE FROM launch_profiles;
+                PRAGMA user_version = 3;
+                COMMIT;",
+            )?;
+        }
+        let version: i64 = self
+            .conn
+            .query_row("PRAGMA user_version", [], |r| r.get(0))?;
+        if version == 3 && !column_exists(&self.conn, "library_roots", "system")? {
+            self.conn.execute_batch(
+                "BEGIN IMMEDIATE;
+                ALTER TABLE library_roots ADD COLUMN system TEXT NOT NULL DEFAULT 'ps2';
+                PRAGMA user_version = 4;
+                COMMIT;",
+            )?;
+        }
         if version > SCHEMA_VERSION {
             return Err(crate::error::AppError::new(
                 "DB",
@@ -136,18 +154,48 @@ impl Db {
         Ok(())
     }
 
-    /// A `running` row after process exit is leftover; it must not block the next Play.
-    pub fn abandon_running_sessions(&self) -> Result<usize> {
-        let ended = now_rfc3339();
-        Ok(self.conn.execute(
-            "UPDATE sessions
-             SET ended_at = ?1,
-                 duration_seconds = COALESCE(duration_seconds, 0),
-                 state = 'failed',
-                 error = 'Marquee exited while this session was running'
-             WHERE state = 'running'",
-            params![ended],
+    pub fn session_process(&self, id: &str) -> Result<Option<String>> {
+        Ok(self.conn.query_row(
+            "SELECT process_identity FROM sessions WHERE id=?1",
+            [id],
+            |r| r.get(0),
         )?)
+    }
+
+    pub fn bind_process(&self, id: &str, identity: &str) -> Result<()> {
+        self.conn.execute(
+            "UPDATE sessions SET process_identity=?2 WHERE id=?1 AND state='running'",
+            params![id, identity],
+        )?;
+        Ok(())
+    }
+
+    pub fn checkpoint_session(&self, id: &str, seconds: i64) -> Result<()> {
+        self.conn.execute(
+            "UPDATE sessions SET duration_seconds=?2 WHERE id=?1 AND state='running'",
+            params![id, seconds],
+        )?;
+        Ok(())
+    }
+
+    /// End and credit a session atomically, once, including time spent before a crash.
+    pub fn complete_session(
+        &self,
+        id: &str,
+        seconds: i64,
+        code: Option<i32>,
+        state: &str,
+        error: Option<&str>,
+        credit: bool,
+    ) -> Result<()> {
+        let tx = self.conn.unchecked_transaction()?;
+        let ended = now_rfc3339();
+        let changed = tx.execute("UPDATE sessions SET ended_at=?2, duration_seconds=?3, exit_code=?4, state=?5, error=?6 WHERE id=?1 AND state='running'", params![id, ended, seconds.max(0), code, state, error])?;
+        if changed > 0 && credit {
+            tx.execute("UPDATE editions SET playtime_seconds=playtime_seconds+?2, play_count=play_count+1, last_played_at=?3 WHERE id=(SELECT edition_id FROM sessions WHERE id=?1)", params![id, seconds.max(0), ended])?;
+        }
+        tx.commit()?;
+        Ok(())
     }
 
     pub fn get_setting(&self, key: &str) -> Result<Option<String>> {
@@ -182,13 +230,16 @@ impl Db {
         id: &str,
         path: &std::path::Path,
         kind: &str,
+        system: &str,
         label: Option<&str>,
     ) -> Result<()> {
         self.conn.execute(
-            "INSERT INTO library_roots(id, path, kind, label)
-             VALUES(?1, ?2, ?3, ?4)
-             ON CONFLICT(path) DO UPDATE SET label = COALESCE(excluded.label, library_roots.label)",
-            params![id, path_bytes(path), kind, label],
+            "INSERT INTO library_roots(id, path, kind, system, label)
+             VALUES(?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(path) DO UPDATE SET
+                label = COALESCE(excluded.label, library_roots.label),
+                system = excluded.system",
+            params![id, path_bytes(path), kind, system, label],
         )?;
         Ok(())
     }
@@ -214,7 +265,7 @@ impl Db {
 
     pub fn list_roots(&self) -> Result<Vec<RootRow>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, path, kind, label, last_scan_at FROM library_roots ORDER BY label, id",
+            "SELECT id, path, kind, label, last_scan_at, system FROM library_roots ORDER BY label, id",
         )?;
         let rows = stmt.query_map([], |r| {
             Ok(RootRow {
@@ -223,6 +274,7 @@ impl Db {
                 kind: r.get(2)?,
                 label: r.get(3)?,
                 last_scan_at: r.get(4)?,
+                system: r.get(5)?,
             })
         })?;
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
@@ -615,12 +667,27 @@ impl Db {
     }
 }
 
+/// True when `table` already has `column`. Used to keep migrations idempotent:
+/// the v0 schema is created in full, so a database stamped v2 already carries
+/// columns that a later step would otherwise try to add again.
+fn column_exists(conn: &rusqlite::Connection, table: &str, column: &str) -> Result<bool> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
+    let mut rows = stmt.query([])?;
+    while let Some(row) = rows.next()? {
+        if row.get::<_, String>(1)? == column {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 pub struct RootRow {
     pub id: String,
     pub path: PathBuf,
     pub kind: String,
     pub label: Option<String>,
     pub last_scan_at: Option<String>,
+    pub system: String,
 }
 
 pub struct MediaKey {

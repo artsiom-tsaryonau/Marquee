@@ -3,9 +3,12 @@ import type {
   ArtworkReport,
   KeyInfo,
   LibraryApi,
+  LauncherInfo,
+  LutrisSnapshot,
   LibraryRoot,
   LibrarySnapshot,
   PortInfo,
+  PurpleStatus,
   Runner,
   ScanReport,
   Session,
@@ -30,10 +33,10 @@ export function asError(err: unknown): AppError {
 }
 
 /** The commands are identical on every surface; only the transport (`call`) differs. */
-export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl'> {
+export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable'> {
   return {
     snapshot: () => call<LibrarySnapshot>('library_snapshot'),
-    addRoot: (path) => call<LibraryRoot>('add_library_root', { path }),
+    addRoot: (path, system) => call<LibraryRoot>('add_library_root', { path, system }),
     scan: (rootId) => call<ScanReport>('scan_library_root', { root_id: rootId ?? null }),
     listRunners: () => call<Runner[]>('list_runners'),
     selectRunner: (runnerId) => call<void>('select_runner', { runner_id: runnerId }),
@@ -46,6 +49,17 @@ export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'su
     listKeys: () => call<KeyInfo[]>('list_keys'),
     setKey: (id, value) => call<KeyInfo[]>('set_key', { id, value }),
     clearKey: (id) => call<KeyInfo[]>('clear_key', { id }),
+    lutrisLibrary: () => call<LutrisSnapshot>('lutris_library'),
+    configureLutris: (config) => call<LutrisSnapshot>('configure_lutris', { config }),
+    openLutrisGame: (id) => call<void>('open_lutris_game', { id }),
+    listLaunchers: () => call<LauncherInfo[]>('list_launchers'),
+    saveLauncher: (launcher) => call<LauncherInfo[]>('save_launcher', { launcher }),
+    removeLauncher: (id) => call<LauncherInfo[]>('remove_launcher', { id }),
+    openLauncher: (id) => call<void>('open_launcher', { id }),
+    purpleStatus: () => call<PurpleStatus>('purple_status'),
+    installPurple: () => call<PurpleStatus>('install_purple'),
+    cancelPurple: () => call<PurpleStatus>('cancel_purple'),
+    openPurple: () => call<void>('open_purple'),
     listPorts: () => call<PortInfo[]>('list_ports'),
     checkPortUpdates: () => call<PortInfo[]>('check_port_updates'),
     installPort: (portId) => call<PortInfo[]>('install_port', { port_id: portId }),

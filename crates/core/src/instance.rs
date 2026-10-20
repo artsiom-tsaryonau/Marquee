@@ -29,3 +29,14 @@ impl InstanceLock {
         Ok(Self { _file: file })
     }
 }
+
+impl Drop for InstanceLock {
+    fn drop(&mut self) {
+        // Explicitly unlock: a concurrent fork may briefly inherit this open file
+        // description before exec closes it. That child must not extend our lease.
+        // SAFETY: this fd remains valid until the File field is dropped next.
+        unsafe {
+            libc::flock(self._file.as_raw_fd(), libc::LOCK_UN);
+        }
+    }
+}

@@ -34,7 +34,7 @@
     game.portStatus === 'update'
       ? { label: 'Update', tone: 'warn' }
       : game.source === 'port'
-        ? { label: 'Ready', tone: 'ok' }
+        ? { label: game.installed ? 'Native port' : 'Not installed', tone: game.installed ? 'ok' : 'dim' }
         : game.rootOffline
           ? { label: 'Drive offline', tone: 'dim' }
           : game.mediaMissing

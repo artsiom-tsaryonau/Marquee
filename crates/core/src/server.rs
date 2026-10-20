@@ -85,6 +85,8 @@ fn mime_for(path: &Path) -> &'static str {
         Some("json") => "application/json",
         Some("svg") => "image/svg+xml",
         Some("png") => "image/png",
+        Some("webp") => "image/webp",
+        Some("avif") => "image/avif",
         Some("jpg") | Some("jpeg") => "image/jpeg",
         Some("woff2") => "font/woff2",
         Some("ico") => "image/x-icon",

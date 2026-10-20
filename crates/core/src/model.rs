@@ -1,14 +1,13 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-pub const SCHEMA_VERSION: i64 = 2;
+pub const SCHEMA_VERSION: i64 = 4;
 pub const SYSTEM_PS2: &str = "ps2";
+pub const SYSTEM_PS1: &str = "ps1";
 pub const KIND_PS2_ISO: &str = "ps2_iso";
-pub const KIND_PS2_CUE: &str = "ps2_cue";
-pub const KIND_PS2_BIN: &str = "ps2_bin";
-pub const KIND_PS2_CHD: &str = "ps2_chd";
-pub const KIND_PS2_GZ: &str = "ps2_gz";
-pub const KIND_PS2_CSO: &str = "ps2_cso";
+pub const KIND_PS1_ISO: &str = "ps1_iso";
+pub const KIND_PS1_CHD: &str = "ps1_chd";
+pub const KIND_PS1_CUE: &str = "ps1_cue";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -28,6 +27,8 @@ pub struct LibraryRoot {
     pub id: String,
     pub path: PathBuf,
     pub kind: RootKind,
+    /// System id this folder holds images for (`ps2`, `ps1`).
+    pub system: String,
     pub label: Option<String>,
     pub status: RootStatus,
     pub last_scan_at: Option<String>,
@@ -36,52 +37,62 @@ pub struct LibraryRoot {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum MediaKind {
-    Ps2Iso,
-    Ps2Cue,
-    Ps2Bin,
-    Ps2Chd,
-    Ps2Gz,
-    Ps2Cso,
+    /// `.iso` (PS2 and, for now, the catch-all for discs whose system has no
+    /// own kind yet).
+    Iso,
+    /// `.iso` bound to a PS1 root.
+    Ps1Iso,
+    /// `.chd` bound to a PS1 root (DuckStation reads CHD directly).
+    Ps1Chd,
+    /// `.cue` sheet bound to a PS1 root. The sheet names a `.bin` track next to
+    /// it; the emulator is handed the sheet, the serial is read from the track.
+    Ps1Cue,
 }
 
 impl MediaKind {
     pub fn as_str(&self) -> &'static str {
         match self {
-            Self::Ps2Iso => KIND_PS2_ISO,
-            Self::Ps2Cue => KIND_PS2_CUE,
-            Self::Ps2Bin => KIND_PS2_BIN,
-            Self::Ps2Chd => KIND_PS2_CHD,
-            Self::Ps2Gz => KIND_PS2_GZ,
-            Self::Ps2Cso => KIND_PS2_CSO,
+            Self::Iso => KIND_PS2_ISO,
+            Self::Ps1Iso => KIND_PS1_ISO,
+            Self::Ps1Chd => KIND_PS1_CHD,
+            Self::Ps1Cue => KIND_PS1_CUE,
         }
     }
 
     pub fn parse(s: &str) -> Option<Self> {
         match s {
-            KIND_PS2_ISO => Some(Self::Ps2Iso),
-            KIND_PS2_CUE => Some(Self::Ps2Cue),
-            KIND_PS2_BIN => Some(Self::Ps2Bin),
-            KIND_PS2_CHD => Some(Self::Ps2Chd),
-            KIND_PS2_GZ => Some(Self::Ps2Gz),
-            KIND_PS2_CSO => Some(Self::Ps2Cso),
+            KIND_PS2_ISO => Some(Self::Iso),
+            KIND_PS1_ISO => Some(Self::Ps1Iso),
+            KIND_PS1_CHD => Some(Self::Ps1Chd),
+            KIND_PS1_CUE => Some(Self::Ps1Cue),
             _ => None,
         }
     }
 
-    pub fn from_extension(ext: &str) -> Option<Self> {
+    /// True when the file itself is ISO9660 and can be read for a serial. `.cue`
+    /// points at a sibling track and `.chd` is compressed, so both resolve their
+    /// serial another way.
+    pub fn is_readable_image(&self) -> bool {
+        matches!(self, Self::Iso | Self::Ps1Iso)
+    }
+
+    /// Extension-to-kind within a known system. `.iso` is a supported image for
+    /// every system Marquee ships; `.chd` and `.cue` only for systems whose
+    /// runner reads them (PS1/DuckStation).
+    ///
+    /// A `.bin` track is deliberately *not* a kind: it is part of a `.cue` pair
+    /// and importing it separately would double-count one disc.
+    pub fn for_system_extension(system: &str, ext: &str) -> Option<Self> {
         match ext.to_ascii_lowercase().as_str() {
-            "iso" => Some(Self::Ps2Iso),
-            "cue" => Some(Self::Ps2Cue),
-            "bin" => Some(Self::Ps2Bin),
-            "chd" => Some(Self::Ps2Chd),
-            "gz" => Some(Self::Ps2Gz),
-            "cso" => Some(Self::Ps2Cso),
+            "iso" => Some(if system == SYSTEM_PS1 {
+                Self::Ps1Iso
+            } else {
+                Self::Iso
+            }),
+            "chd" if system == SYSTEM_PS1 => Some(Self::Ps1Chd),
+            "cue" if system == SYSTEM_PS1 => Some(Self::Ps1Cue),
             _ => None,
         }
-    }
-
-    pub fn is_supported(&self) -> bool {
-        matches!(self, Self::Ps2Iso)
     }
 }
 
@@ -123,6 +134,7 @@ pub struct Edition {
 #[serde(rename_all = "snake_case")]
 pub enum RunnerKind {
     Pcsx2,
+    Duckstation,
     Fake,
 }
 
@@ -130,8 +142,23 @@ impl RunnerKind {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Pcsx2 => "pcsx2",
+            Self::Duckstation => "duckstation",
             Self::Fake => "fake",
         }
+    }
+
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "duckstation" => Self::Duckstation,
+            "fake" => Self::Fake,
+            _ => Self::Pcsx2,
+        }
+    }
+
+    /// True for emulators that boot from a BIOS, which is what `bios_state`
+    /// tracks. The fake test runner never is.
+    pub fn needs_bios(&self) -> bool {
+        matches!(self, Self::Pcsx2 | Self::Duckstation)
     }
 }
 
@@ -220,6 +247,7 @@ pub struct ScanReport {
     pub skipped_by_kind: Vec<SkipCount>,
     pub unresolved_serial: u32,
     pub missing: u32,
+    pub warnings: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -280,6 +308,8 @@ pub enum CoreEvent {
         session: Session,
     },
     LibraryChanged,
+    LaunchersChanged,
+    LutrisChanged,
     ToolInstallStarted {
         tool_id: String,
         channel: String,

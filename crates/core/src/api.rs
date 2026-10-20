@@ -1,6 +1,7 @@
 //! The single command surface. The Tauri window and the local HTTP server both
 //! call `dispatch`, so a browser tab and the native app can never drift apart.
 
+use crate::catalog;
 use crate::error::{AppError, Result};
 use crate::sessions::EventSink;
 use crate::Core;
@@ -31,7 +32,9 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
         "library_snapshot" => out(core.snapshot()?),
         "add_library_root" => {
             let path = PathBuf::from(text(&args, "path")?);
-            out(core.add_root(path, Some("PlayStation 2".into()))?)
+            let system = maybe(&args, "system").unwrap_or_else(|| "ps2".into());
+            let label = catalog::by_id(&system)?.display_name;
+            out(core.add_root(&system, path, Some(label))?)
         }
         "scan_library_root" => {
             let root = maybe(&args, "root_id");
@@ -62,6 +65,28 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
         "list_keys" => out(core.list_keys()?),
         "set_key" => out(core.set_key(&text(&args, "id")?, &text(&args, "value")?)?),
         "clear_key" => out(core.clear_key(&text(&args, "id")?)?),
+        "lutris_library" => out(core.lutris_library()?),
+        "configure_lutris" => {
+            let config = serde_json::from_value(args.get("config").cloned().unwrap_or(Value::Null))
+                .map_err(|e| {
+                    AppError::new("BAD_REQUEST", format!("Invalid Lutris configuration: {e}"))
+                })?;
+            out(core.configure_lutris(config)?)
+        }
+        "open_lutris_game" => out(core.open_lutris_game(&text(&args, "id")?)?),
+        "list_launchers" => out(core.list_launchers()?),
+        "purple_status" => out(core.purple.status()?),
+        "install_purple" => out(core.purple.start(Arc::clone(core))?),
+        "cancel_purple" => out(core.purple.cancel()?),
+        "open_purple" => out(core.purple.open(Arc::clone(core))?),
+        "save_launcher" => {
+            let launcher =
+                serde_json::from_value(args.get("launcher").cloned().unwrap_or(Value::Null))
+                    .map_err(|e| AppError::new("BAD_REQUEST", format!("Invalid launcher: {e}")))?;
+            out(core.save_launcher(launcher)?)
+        }
+        "remove_launcher" => out(core.remove_launcher(&text(&args, "id")?)?),
+        "open_launcher" => out(core.open_launcher(&text(&args, "id")?)?),
         "list_ports" => out(core.list_ports()?),
         "check_port_updates" => out(core.check_port_updates()?),
         "install_port" => out(core.install_port(&text(&args, "port_id")?, sink)?),

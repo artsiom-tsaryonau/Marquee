@@ -2,6 +2,7 @@
   import { fly } from 'svelte/transition';
   import { app } from '../state.svelte';
   import { platformLabel, sourceLabel } from '../labels';
+  import { canonicalId, editionKey, editionLabel, launchMethod, methodLabel } from '../unified';
   import { ago, hours } from '../format';
   import Artwork from '../components/Artwork.svelte';
   import Logo from '../components/Logo.svelte';
@@ -11,16 +12,20 @@
   import ScoreStrip from '../components/ScoreStrip.svelte';
 
   const g = $derived(app.current ?? app.hero);
+  const variants = $derived(g ? app.games.filter((x) => canonicalId(x) === canonicalId(g)) : []);
+  const editions = $derived([...new Map(variants.map((x) => [editionKey(x), x])).values()]);
+  const choices = $derived(g ? variants.filter((x) => editionKey(x) === editionKey(g)) : []);
+  function choose(id: string) { app.chooseVariant(id); }
   const port = $derived(g?.source === 'port' ? app.ports.find((p) => `port:${p.id}` === g.id) : undefined);
   const shots = $derived(g ? [0, 1, 2, 3].map((i) => ({ ...g.art, hue: (g.art.hue + i * 24) % 360, motif: (['peaks', 'waves', 'grid', 'orbit'] as const)[(i + g.art.hue) % 4] })) : []);
-  const similar = $derived(g ? app.games.filter((x) => x.id !== g.id && (x.genre === g.genre || x.source === g.source)).slice(0, 10) : []);
+  const similar = $derived(g ? app.games.filter((x) => canonicalId(x) !== canonicalId(g) && (x.genre === g.genre || x.source === g.source)).slice(0, 10) : []);
   const dur = $derived(app.reduceMotion ? 0 : 360);
   const offline = $derived(!!g && !app.demo && g.platform === 'ps2');
   let editing = $state(false);
   let titleDraft = $state('');
 
   const launchVia = $derived(
-    g
+    g?.lutris ? `Lutris · ${g.lutris.runner ?? 'store installer'}` : g
       ? {
           steam: 'Steam · steam://rungameid',
           gog: 'Lutris · GOG',
@@ -35,6 +40,7 @@
   const playLabel = $derived(
     !g
       ? 'Play'
+      : g.lutris ? (g.mediaMissing ? 'Files unavailable' : g.installed ? 'Play via Lutris' : 'Install in Lutris')
       : g.setupState === 'missing'
         ? 'Open PCSX2 setup'
         : g.mediaMissing
@@ -57,8 +63,8 @@
 {:else}
 <article class="page" style="--accent-h:{g.art.hue2}">
   <div class="banner">
-    {#if g.coverUrl}
-      <img class="banner-cover" src={g.coverUrl} alt="" />
+    {#if g.heroUrl || g.coverUrl}
+      <img class="banner-cover" src={g.heroUrl ?? g.coverUrl} alt="" />
     {:else}
       <Artwork art={g.art} />
     {/if}
@@ -73,12 +79,28 @@
       <Logo game={g} size="lg" />
     {/if}
     <p class="tagline">{g.tagline}</p>
+    {#if variants.length > 1 || g.editionLabel}
+      <div class="variant-picker glass-panel">
+        <label>Edition
+          <select data-nav value={editionKey(g)} onchange={(e) => { const first = variants.find((x) => editionKey(x) === e.currentTarget.value); if (first) choose(first.id); }}>
+            {#each editions as edition}<option value={editionKey(edition)}>{editionLabel(edition)}</option>{/each}
+          </select>
+        </label>
+        <label>Run with
+          <select data-nav value={g.id} onchange={(e) => choose(e.currentTarget.value)}>
+            {#each choices as choice}<option value={choice.id}>{methodLabel[launchMethod(choice)]} · {choice.source === 'port' ? 'OpenGOAL' : platformLabel[choice.platform]}{choice.installed ? '' : ' · not installed'}</option>{/each}
+          </select>
+        </label>
+        <span>Your choice is remembered. Playtime and saves belong to this installation.</span>
+      </div>
+    {/if}
     <div class="actions">
       {#if offline && g.setupState === 'runner_missing'}
         <InstallMenu tone="primary" size="big" />
       {:else}
-        <button class="btn primary big" data-nav onclick={() => {
-          if (offline && g.setupState === 'missing') app.openSetup();
+        <button class="btn primary big" data-nav disabled={!!g.lutris && g.mediaMissing} onclick={() => {
+          if (g.lutris) void app.openLutrisGame(g);
+          else if (offline && g.setupState === 'missing') app.openSetup();
           else if (g.installed) app.play(g);
           else if (app.demo) app.install(g.title, { kind: 'game', id: g.id });
         }}>
@@ -97,11 +119,15 @@
       {#if g.portStatus === 'update'}
         <button class="btn glass" data-nav onclick={() => port && app.install(`${g.title} update`, { kind: 'port', id: port.id })}><Icon name="refresh" /> Update</button>
       {/if}
-      <button class="btn glass icon" data-nav aria-label="Favourite" onclick={() => app.toggleFavorite(g)}>
+      <button class="btn glass icon" data-nav aria-label="Favourite" disabled={!app.demo && (g.source === 'port' || !!g.lutris)} onclick={() => app.toggleFavorite(g)}>
         <Icon name="star" filled={g.favorite} />
       </button>
       {#if offline}
         <button class="btn glass" data-nav onclick={() => { titleDraft = g.title; editing = true; }}><Icon name="image" /> Rename</button>
+      {:else if !app.demo && g.lutris}
+        <button class="btn glass" data-nav onclick={() => app.go('tools')}><Icon name="settings" /> Lutris connection</button>
+      {:else if !app.demo && port}
+        <button class="btn glass" data-nav onclick={() => app.openPortFolder(port)}><Icon name="folder" /> Folder</button>
       {:else}
         <button class="btn glass" data-nav onclick={() => app.notify('Opened install folder')}><Icon name="folder" /> Folder</button>
         <button class="btn glass" data-nav onclick={() => app.notify('Drop an image to replace the artwork')}><Icon name="image" /> Artwork</button>
@@ -112,7 +138,13 @@
 
   <div class="body">
     <div class="main">
-      {#if !offline}
+      {#if g.screenshots?.length}
+      <h3>Screenshots · OpenGOAL</h3>
+      <div class="shots" data-nav-row>
+        {#each g.screenshots as shot}<a class="shot" href={shot.url} target="_blank" rel="noreferrer" data-nav aria-label={shot.caption}><img src={shot.url} alt={shot.caption} loading="lazy" /></a>{/each}
+      </div>
+      <p class="media-credit">{g.mediaCredit} <a href={g.mediaSource} target="_blank" rel="noreferrer" data-nav>Source gallery</a></p>
+      {:else if !offline && app.demo}
       <h3>Ratings and facts</h3>
       <div class="scores"><ScoreStrip game={g} /></div>
       <h3>Screenshots</h3>
@@ -123,12 +155,15 @@
       </div>
 
       {/if}
+      {#if g.lutris}
+        <h3>Managed by Lutris</h3>
+        <p>Lutris owns installation, compatibility settings, and playtime. Store listings come from its last local sync. Refresh the connection in Tools after an installation or play session.</p>
+      {/if}
       {#if port}
         <h3>Requirements</h3>
         <ul class="reqs glass-panel">
-          <li class="ok"><Icon name="check" size={18} /> {port.name} {port.version} installed from {port.upstream}</li>
-          <li class="ok"><Icon name="check" size={18} /> {port.requirement}</li>
-          <li class="ok"><Icon name="check" size={18} /> Controller profile applied</li>
+          <li>{port.name}{port.version ? ` · ${port.version}` : ''} · {port.status === 'not-installed' ? 'Not installed' : 'Installed'} · {port.upstream}</li>
+          <li>{port.requirement}</li>
         </ul>
       {/if}
     </div>
@@ -142,9 +177,10 @@
         <dt>Launches with</dt>
         <dd>{launchVia}</dd>
         <dt>Playtime</dt>
-        <dd>{g.playtimeMin ? hours(g.playtimeMin) : 'Not played yet'}</dd>
+        <dd>{!app.demo && port ? 'Tracking not available yet' : g.playtimeMin ? hours(g.playtimeMin) : 'Not played yet'}</dd>
         <dt>Last played</dt>
         <dd>{g.lastPlayed ? ago(g.lastPlayed) : '—'}</dd>
+        {#if g.lutris}<dt>Library provider</dt><dd>Lutris · {g.installed ? 'configured installation' : 'cached store listing'}</dd>{/if}
         <dt>Genre</dt>
         <dd>{g.genre}{g.year ? ` · ${g.year}` : ''}</dd>
         {#if g.serial}
@@ -176,6 +212,11 @@
 {/if}
 
 <style>
+  .variant-picker { display:flex; flex-wrap:wrap; gap:18px; padding:16px; border-radius:14px; margin:16px 0; align-items:end; }
+  .variant-picker label { display:grid; gap:8px; font-size:12px; color:var(--text-soft); }
+  .variant-picker select { max-width:100%; color:var(--text); background:var(--field); border:1px solid var(--line); border-radius:8px; padding:10px; font:inherit; }
+  .variant-picker span, .media-credit { font-size:12px; color:var(--text-dim); }
+  .shot img { width:100%; height:100%; object-fit:cover; }
   .page {
     position: relative;
     padding-bottom: 40px;
@@ -300,9 +341,6 @@
     display: flex;
     gap: 10px;
     align-items: center;
-  }
-  .reqs .ok :global(svg) {
-    color: var(--ok);
   }
   .facts {
     border-radius: 18px;

@@ -10,6 +10,8 @@ const PCSX2_UNPACKED_ID: &str = "runner.pcsx2.unpacked";
 const PCSX2_APPIMAGE_ID: &str = "runner.pcsx2.appimage";
 const PCSX2_FLATPAK_ID: &str = "runner.pcsx2.flatpak";
 pub(crate) const FLATPAK_APP: &str = "net.pcsx2.PCSX2";
+const DUCKSTATION_FLATPAK_ID: &str = "runner.duckstation.flatpak";
+pub(crate) const DUCKSTATION_FLATPAK_APP: &str = "org.duckstation.DuckStation";
 
 pub fn refresh(
     db: &Db,
@@ -65,6 +67,23 @@ pub fn refresh(
             "flatpak",
         )?;
     }
+    if discover_host && flatpak_installed(DUCKSTATION_FLATPAK_APP) {
+        let (state, hint) =
+            probe_flatpak_bios_for(".var/app/org.duckstation.DuckStation/config/duckstation");
+        db.upsert_runner(
+            DUCKSTATION_FLATPAK_ID,
+            RunnerKind::Duckstation.as_str(),
+            "DuckStation (Flatpak)",
+            &[
+                "flatpak".into(),
+                "run".into(),
+                DUCKSTATION_FLATPAK_APP.into(),
+            ],
+            state,
+            hint.as_deref(),
+            "flatpak",
+        )?;
+    }
     snapshot(db)
 }
 
@@ -73,11 +92,7 @@ pub fn snapshot(db: &Db) -> Result<Vec<Runner>> {
         .into_iter()
         .map(|row| {
             let command: Vec<String> = serde_json::from_str(&row.command_json).unwrap_or_default();
-            let kind = if row.kind == "fake" {
-                RunnerKind::Fake
-            } else {
-                RunnerKind::Pcsx2
-            };
+            let kind = RunnerKind::parse(&row.kind);
             let available = command_available(&command);
             Ok(Runner {
                 id: row.id,
@@ -105,15 +120,60 @@ pub fn pick_default(runners: &[Runner]) -> Option<&Runner> {
         .or_else(|| {
             runners
                 .iter()
+                .find(|r| r.kind == RunnerKind::Duckstation && r.available)
+        })
+        .or_else(|| {
+            runners
+                .iter()
                 .find(|r| r.kind == RunnerKind::Fake && r.available)
         })
+}
+
+/// Preferred runner for a system: emulator kind first, then the fake test runner
+/// so an explicit `--allow-fake` launch still works in tests.
+pub fn preferred_kind(system: &str) -> RunnerKind {
+    match system {
+        crate::model::SYSTEM_PS1 => RunnerKind::Duckstation,
+        _ => RunnerKind::Pcsx2,
+    }
+}
+
+pub fn pick_for_system<'a>(runners: &'a [Runner], system: &str) -> Option<&'a Runner> {
+    let wanted = preferred_kind(system);
+    runners
+        .iter()
+        .find(|r| r.kind == wanted && r.available)
+        .or_else(|| {
+            runners
+                .iter()
+                .find(|r| r.kind == RunnerKind::Fake && r.available)
+        })
+}
+
+/// Honour a stored runner selection only when it belongs to this system's
+/// emulator family. Otherwise a PCSX2 pin left by a PS2 session hijacks a PS1
+/// launch (and vice versa), booting the wrong emulator.
+///
+/// The fake runner is deliberately system-agnostic: it is the explicit test
+/// stand-in (`--allow-fake`) and never boots a real disc.
+pub fn selection_for<'a>(
+    runners: &'a [Runner],
+    selected: Option<&str>,
+    system: &str,
+) -> Option<&'a str> {
+    let id = selected?;
+    let wanted = preferred_kind(system);
+    runners
+        .iter()
+        .find(|r| r.id == id && (r.kind == wanted || r.kind == RunnerKind::Fake))
+        .map(|r| r.id.as_str())
 }
 
 pub fn uses_marquee_prefix(runner: &Runner) -> bool {
     runner.source == "marquee" || runner.id == PCSX2_UNPACKED_ID
 }
 
-pub fn launch_argv(runner: &Runner, iso: &Path, extra: &[String]) -> Result<Vec<String>> {
+pub fn launch_argv(runner: &Runner, img: &Path, extra: &[String]) -> Result<Vec<String>> {
     if runner.command.is_empty() {
         return Err(AppError::new("RUNNER_MISSING", "runner command is empty"));
     }
@@ -121,10 +181,18 @@ pub fn launch_argv(runner: &Runner, iso: &Path, extra: &[String]) -> Result<Vec<
     if runner.kind == RunnerKind::Fake {
         return Ok(argv);
     }
-    argv.extend(["-batch".into(), "-fullscreen".into()]);
-    argv.extend(extra.iter().cloned());
-    argv.push("--".into());
-    argv.push(iso.to_string_lossy().into_owned());
+    if runner.kind == RunnerKind::Pcsx2 {
+        argv.extend(["-batch".into(), "-fullscreen".into()]);
+        argv.extend(extra.iter().cloned());
+        argv.push("--".into());
+    } else {
+        // DuckStation: `-batch` boots without the UI, `-fullscreen` fills the
+        // screen, and `-nogui` keeps it from offering a console UI for disc
+        // images. The image itself is a positional argument.
+        argv.extend(["-batch".into(), "-fullscreen".into(), "-nogui".into()]);
+        argv.extend(extra.iter().cloned());
+    }
+    argv.push(img.to_string_lossy().into_owned());
     Ok(argv)
 }
 
@@ -136,15 +204,19 @@ pub fn require_launchable(runner: &Runner) -> Result<()> {
         )
         .with_context(json!({ "runner_id": runner.id })));
     }
-    match runner.bios_state {
-        BiosState::Missing => Err(AppError::new(
+    // Unverified must not block an explicit launch; only a confirmed-empty BIOS
+    // directory (Missing) does.
+    if runner.kind.needs_bios() && runner.bios_state == BiosState::Missing {
+        return Err(AppError::new(
             "SETUP_MISSING",
-            "PCSX2 BIOS files are not present. See docs/PS2.md.",
+            format!("{} BIOS files are not present.", runner.display_name),
         )
-        .with_context(json!({ "runner_id": runner.id, "hint": runner.bios_hint }))),
-        // Unverified must not block an explicit launch; only a confirmed-empty BIOS dir does.
-        BiosState::Unverified | BiosState::LaunchTested => Ok(()),
+        .with_context(json!({
+            "runner_id": runner.id,
+            "hint": runner.bios_hint,
+        })));
     }
+    Ok(())
 }
 
 pub fn mark_launch_tested(db: &Db, runner_id: &str) -> Result<()> {
@@ -244,8 +316,12 @@ fn scan_appimage_dir(dir: &Path) -> Option<PathBuf> {
 }
 
 fn flatpak_pcsx2_installed() -> bool {
+    flatpak_installed(FLATPAK_APP)
+}
+
+fn flatpak_installed(app_id: &str) -> bool {
     Command::new("flatpak")
-        .args(["info", FLATPAK_APP])
+        .args(["info", app_id])
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false)
@@ -286,6 +362,10 @@ fn probe_appimage_bios(bin: &Path, marquee_bios: Option<&Path>) -> (BiosState, O
 }
 
 fn probe_flatpak_bios() -> (BiosState, Option<String>) {
+    probe_flatpak_bios_for(".var/app/net.pcsx2.PCSX2/config/PCSX2/bios")
+}
+
+fn probe_flatpak_bios_for(relative: &str) -> (BiosState, Option<String>) {
     let home = match std::env::var_os("HOME") {
         Some(h) => PathBuf::from(h),
         None => {
@@ -295,13 +375,13 @@ fn probe_flatpak_bios() -> (BiosState, Option<String>) {
             )
         }
     };
-    let dir = home.join(".var/app/net.pcsx2.PCSX2/config/PCSX2/bios");
+    let dir = home.join(relative);
     if bios_dir_has_files(&dir) {
         (BiosState::Unverified, Some(path_display(&dir)))
     } else {
         (
             BiosState::Unverified,
-            Some("Flatpak BIOS path not confirmed from PCSX2 config; open setup to confirm".into()),
+            Some("Flatpak BIOS path not confirmed; open setup to confirm".into()),
         )
     }
 }

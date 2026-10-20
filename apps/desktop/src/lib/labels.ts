@@ -10,6 +10,7 @@ export const sourceLabel: Record<Source, string> = {
 };
 
 export const platformLabel: Record<Platform, string> = {
+  unknown: 'Platform unknown',
   'pc-linux': 'Linux',
   'pc-windows': 'Windows',
   nes: 'NES',

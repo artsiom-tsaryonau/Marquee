@@ -1,9 +1,10 @@
+use crate::catalog;
 use crate::db::{now_rfc3339, Db};
 use crate::error::{path_display, AppError, Result};
-use crate::iso::identify_ps2_iso;
+use crate::iso::identify_disc_iso;
 use crate::model::{
     Edition, LibraryRoot, LibrarySnapshot, MediaFile, MediaKind, RootKind, RootStatus, ScanReport,
-    SkipCount, SYSTEM_PS2,
+    SkipCount,
 };
 use crate::runners;
 use serde_json::json;
@@ -13,7 +14,9 @@ use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
-pub fn add_root(db: &Db, path: &Path, label: Option<&str>) -> Result<LibraryRoot> {
+pub fn add_root(db: &Db, path: &Path, system: &str, label: Option<&str>) -> Result<LibraryRoot> {
+    // Validates the system id against the shipped descriptors.
+    let descriptor = catalog::by_id(system)?;
     let canonical = fs::canonicalize(path).map_err(|_| {
         AppError::new(
             "ROOT_OFFLINE",
@@ -35,11 +38,12 @@ pub fn add_root(db: &Db, path: &Path, label: Option<&str>) -> Result<LibraryRoot
             .ok_or_else(|| AppError::new("DB", "root vanished"));
     }
     let id = Uuid::new_v4().to_string();
-    db.upsert_root(&id, &canonical, "folder", label)?;
+    db.upsert_root(&id, &canonical, "folder", &descriptor.id, label)?;
     Ok(LibraryRoot {
         id,
         path: canonical,
         kind: RootKind::Folder,
+        system: descriptor.id,
         label: label.map(str::to_string),
         status: RootStatus::Online,
         last_scan_at: None,
@@ -71,7 +75,8 @@ pub fn scan_root(db: &Db, root_id: Option<&str>) -> Result<ScanReport> {
             )
             .with_context(json!({ "root_id": root.id, "path": path_display(&root.path) })));
         }
-        walk_dir(db, &root.path, &mut report, &mut skip_map)?;
+        let descriptor = catalog::by_id(&root.system)?;
+        walk_dir(db, &root.path, &descriptor, &mut report, &mut skip_map)?;
         db.update_scan_time(&root.id, &now_rfc3339())?;
     }
     report.skipped_by_kind = skip_map
@@ -86,6 +91,7 @@ pub fn scan_root(db: &Db, root_id: Option<&str>) -> Result<ScanReport> {
 fn walk_dir(
     db: &Db,
     dir: &Path,
+    descriptor: &catalog::SystemDescriptor,
     report: &mut ScanReport,
     skip_map: &mut BTreeMap<String, u32>,
 ) -> Result<()> {
@@ -100,7 +106,7 @@ fn walk_dir(
             Err(_) => continue,
         };
         if meta.is_dir() {
-            walk_dir(db, &path, report, skip_map)?;
+            walk_dir(db, &path, descriptor, report, skip_map)?;
             continue;
         }
         if !meta.is_file() {
@@ -111,20 +117,36 @@ fn walk_dir(
             .and_then(|e| e.to_str())
             .unwrap_or("")
             .to_ascii_lowercase();
-        let Some(kind) = MediaKind::from_extension(&ext) else {
-            continue;
-        };
-        report.scanned += 1;
-        if !kind.is_supported() {
-            *skip_map.entry(kind.as_str().to_string()).or_default() += 1;
+        // Only extensions this system knows about count toward the report, so a
+        // stray README or cover PNG is silent rather than "unsupported".
+        if !descriptor.supports_extension(&ext) && !descriptor.skips_extension(&ext) {
             continue;
         }
-        ingest_iso(db, &path, &meta, report)?;
+        report.scanned += 1;
+        let Some(kind) = MediaKind::for_system_extension(&descriptor.id, &ext) else {
+            *skip_map.entry(ext).or_default() += 1;
+            continue;
+        };
+        if let Err(err) = ingest_disc(db, &path, &meta, descriptor, kind, report) {
+            if err.code == "DB" {
+                return Err(err);
+            }
+            report
+                .warnings
+                .push(format!("{}: {}", path_display(&path), err.message));
+        }
     }
     Ok(())
 }
 
-fn ingest_iso(db: &Db, path: &Path, meta: &fs::Metadata, report: &mut ScanReport) -> Result<()> {
+fn ingest_disc(
+    db: &Db,
+    path: &Path,
+    meta: &fs::Metadata,
+    descriptor: &catalog::SystemDescriptor,
+    kind: MediaKind,
+    report: &mut ScanReport,
+) -> Result<()> {
     let mtime = meta.mtime();
     let size = meta.len() as i64;
     let existing = db.media_by_path(path)?;
@@ -136,7 +158,13 @@ fn ingest_iso(db: &Db, path: &Path, meta: &fs::Metadata, report: &mut ScanReport
         report.updated += 1;
         return Ok(());
     }
-    let identity = identify_ps2_iso(path)?;
+    // `.chd` is compressed and not ISO9660 on disk, so it carries no serial.
+    // `.cue` is a sheet; its data track holds the filesystem.
+    let identity = match kind {
+        MediaKind::Ps1Cue => crate::cue::identify_cue(path)?,
+        MediaKind::Ps1Chd => crate::iso::unresolved(),
+        _ => identify_disc_iso(path)?,
+    };
     if identity.serial.is_none() {
         report.unresolved_serial += 1;
     }
@@ -151,7 +179,7 @@ fn ingest_iso(db: &Db, path: &Path, meta: &fs::Metadata, report: &mut ScanReport
     let title = title_from_filename(path);
     db.upsert_edition(
         &edition_id,
-        SYSTEM_PS2,
+        &descriptor.id,
         &title,
         Some(&media_id),
         &now_rfc3339(),
@@ -159,7 +187,7 @@ fn ingest_iso(db: &Db, path: &Path, meta: &fs::Metadata, report: &mut ScanReport
     db.upsert_media(
         &media_id,
         &edition_id,
-        MediaKind::Ps2Iso.as_str(),
+        kind.as_str(),
         path,
         size,
         mtime,
@@ -207,6 +235,7 @@ pub fn snapshot_roots(db: &Db) -> Result<Vec<LibraryRoot>> {
                 id: row.id,
                 path: row.path,
                 kind: RootKind::Folder,
+                system: row.system,
                 label: row.label,
                 status,
                 last_scan_at: row.last_scan_at,
@@ -219,7 +248,7 @@ pub fn snapshot_media(db: &Db) -> Result<Vec<MediaFile>> {
     db.list_media()?
         .into_iter()
         .map(|row| {
-            let kind = MediaKind::parse(&row.kind).unwrap_or(MediaKind::Ps2Iso);
+            let kind = MediaKind::parse(&row.kind).unwrap_or(MediaKind::Iso);
             Ok(MediaFile {
                 id: row.id,
                 edition_id: row.edition_id,

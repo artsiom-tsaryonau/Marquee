@@ -31,6 +31,7 @@
   let step = $state(-1);
 
   function start(r: (typeof recipes)[number]) {
+    if (r.id === 'purple') { onclose(); app.go('tools'); return; }
     picked = r;
     step = 0;
     const tick = () => {
@@ -79,7 +80,7 @@
   <header>
     <div>
       <h2>Add a Windows app</h2>
-      <p>Pick a launcher. Marquee sets up Proton, the prefix and the fixes. You only click through the installer.</p>
+      <p>Purple setup is available in Tools. Other launchers below preview a future workflow; their installs are simulated.</p>
     </div>
     <button class="close" data-nav onclick={onclose} aria-label="Close"><Icon name="x" /></button>
   </header>

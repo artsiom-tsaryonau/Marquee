@@ -1,6 +1,7 @@
 pub mod api;
 pub mod artwork;
 pub mod catalog;
+pub mod cue;
 pub mod db;
 pub mod error;
 pub mod http;
@@ -8,10 +9,13 @@ pub mod hub;
 pub mod instance;
 pub mod iso;
 pub mod keys;
+pub mod launchers;
 pub mod library;
+pub mod lutris;
 pub mod model;
 pub mod paths;
 pub mod ports;
+pub mod purple;
 pub mod runners;
 pub mod server;
 pub mod sessions;
@@ -31,13 +35,14 @@ use std::sync::{Arc, Mutex};
 pub struct Core {
     pub paths: Paths,
     db: Arc<Mutex<Db>>,
-    _lock: InstanceLock,
+    _lock: Arc<InstanceLock>,
     allow_fake: bool,
     discover_host: bool,
     installing: Mutex<bool>,
     installing_ports: Mutex<std::collections::HashSet<String>>,
     events: Arc<hub::EventHub>,
     keys: keys::KeyStore,
+    pub purple: Arc<purple::Manager>,
 }
 
 impl Core {
@@ -56,11 +61,11 @@ impl Core {
         let keys = keys::KeyStore::new(&paths.config_dir);
         let lock = InstanceLock::acquire(&paths.instance_lock())?;
         let db = Db::open(&paths)?;
-        db.abandon_running_sessions()?;
         let core = Self {
+            purple: Arc::new(purple::Manager::new(&paths)),
             paths,
             db: Arc::new(Mutex::new(db)),
-            _lock: lock,
+            _lock: Arc::new(lock),
             allow_fake,
             discover_host,
             installing: Mutex::new(false),
@@ -68,6 +73,11 @@ impl Core {
             events: Arc::new(hub::EventHub::new()),
             keys,
         };
+        sessions::recover(
+            Arc::clone(&core.db),
+            core.events.clone(),
+            core._lock.clone(),
+        )?;
         core.refresh_runners()?;
         Ok(core)
     }
@@ -91,8 +101,15 @@ impl Core {
         ))
     }
 
-    pub fn add_root(&self, path: PathBuf, label: Option<String>) -> Result<LibraryRoot> {
-        self.with_db(|db| library::add_root(db, &path, label.as_deref()))
+    pub fn add_root(
+        &self,
+        system: &str,
+        path: PathBuf,
+        label: Option<String>,
+    ) -> Result<LibraryRoot> {
+        let root = self.with_db(|db| library::add_root(db, &path, system, label.as_deref()))?;
+        self.events.emit(CoreEvent::LibraryChanged);
+        Ok(root)
     }
 
     pub fn scan(
@@ -242,6 +259,7 @@ impl Core {
             extra_args,
             sink,
             Some(self.paths.pcsx2_xdg_config()),
+            self._lock.clone(),
         )
     }
 
@@ -257,7 +275,9 @@ impl Core {
                 format!("runner not found: {runner_id}"),
             ));
         }
-        self.set_setting("selected_runner_id", runner_id)
+        self.set_setting("selected_runner_id", runner_id)?;
+        self.events.emit(CoreEvent::LibraryChanged);
+        Ok(())
     }
 
     pub fn set_display_title(&self, edition_id: &str, title: &str) -> Result<()> {
@@ -272,6 +292,7 @@ impl Core {
                 "title is not in the library",
             ));
         }
+        self.events.emit(CoreEvent::LibraryChanged);
         Ok(())
     }
 
@@ -283,6 +304,7 @@ impl Core {
                 "title is not in the library",
             ));
         }
+        self.events.emit(CoreEvent::LibraryChanged);
         Ok(())
     }
 
@@ -386,6 +408,81 @@ impl Core {
     pub fn open_setup(&self, runner_id: &str) -> Result<()> {
         let home = self.paths.pcsx2_xdg_config();
         self.with_db(|db| runners::open_setup(db, runner_id, Some(&home)))
+    }
+
+    pub fn lutris_library(&self) -> Result<lutris::Snapshot> {
+        let detected = if self.discover_host {
+            lutris::discover()
+        } else {
+            vec![]
+        };
+        let config = self
+            .with_db(|db| db.get_setting(lutris::CONFIG_KEY))?
+            .map(|value| serde_json::from_str(&value))
+            .transpose()?
+            .unwrap_or_else(|| lutris::automatic_config(&detected));
+        lutris::snapshot(config, detected)
+    }
+    pub fn configure_lutris(&self, config: lutris::Config) -> Result<lutris::Snapshot> {
+        let snapshot = lutris::snapshot(
+            config.clone(),
+            if self.discover_host {
+                lutris::discover()
+            } else {
+                vec![]
+            },
+        )?;
+        self.with_db(|db| db.set_setting(lutris::CONFIG_KEY, &serde_json::to_string(&config)?))?;
+        self.events.emit(CoreEvent::LutrisChanged);
+        Ok(snapshot)
+    }
+    pub fn open_lutris_game(&self, id: &str) -> Result<()> {
+        let snapshot = self.lutris_library()?;
+        let game = snapshot.games.iter().find(|g| g.id == id).ok_or_else(|| {
+            AppError::new(
+                "MEDIA_MISSING",
+                "Entry is no longer in the connected Lutris library",
+            )
+        })?;
+        let uri = lutris::uri(game)?;
+        let mut launcher = self
+            .list_launchers()?
+            .into_iter()
+            .find(|l| l.launcher.id == snapshot.config.launcher_id)
+            .ok_or_else(|| {
+                AppError::new("LAUNCHER_MISSING", "Configure a Lutris launcher in Tools")
+            })?
+            .launcher;
+        launcher.args.push(uri);
+        launchers::launch(&launcher)
+    }
+
+    /// External application configurations and their current readiness.
+    pub fn list_launchers(&self) -> Result<Vec<launchers::LauncherInfo>> {
+        self.with_db(|db| launchers::list(db, self.discover_host))
+    }
+    pub fn save_launcher(
+        &self,
+        launcher: launchers::Launcher,
+    ) -> Result<Vec<launchers::LauncherInfo>> {
+        self.with_db(|db| launchers::save(db, launcher))?;
+        self.events.emit(CoreEvent::LaunchersChanged);
+        self.list_launchers()
+    }
+    pub fn remove_launcher(&self, id: &str) -> Result<Vec<launchers::LauncherInfo>> {
+        self.with_db(|db| launchers::remove(db, id))?;
+        self.events.emit(CoreEvent::LaunchersChanged);
+        self.list_launchers()
+    }
+    pub fn open_launcher(&self, id: &str) -> Result<()> {
+        let info = self
+            .list_launchers()?
+            .into_iter()
+            .find(|l| l.launcher.id == id)
+            .ok_or_else(|| {
+                AppError::new("LAUNCHER_MISSING", "Launcher configuration was not found")
+            })?;
+        launchers::launch(&info.launcher)
     }
 
     /// Known API keys and where each comes from. Never contains a secret value.

@@ -1,14 +1,14 @@
 # PlayStation 2 (offline slice)
 
-Last updated: 2026-10-20.
+Slice notes from 2026-10-20; work-order clarification updated 2026-10-21.
 
-This is the only document for the current milestone: **what exists**, **how to run it**, **what was verified**, and **what is next**. Long-term phases: [ROADMAP.md](ROADMAP.md). Other systems: [EXPANSION_CATALOGUE.md](EXPANSION_CATALOGUE.md). Next ticket (not started): [PS2_METADATA_FOLLOWUP.md](PS2_METADATA_FOLLOWUP.md).
+This document records the PS2 slice: **what exists**, **how to run it**, **what was verified**, and **what is next**. Long-term phases: [ROADMAP.md](ROADMAP.md). Other systems: [EXPANSION_CATALOGUE.md](EXPANSION_CATALOGUE.md). Next ticket (not started): [PS2_METADATA_FOLLOWUP.md](PS2_METADATA_FOLLOWUP.md).
 
 Release boundary:
 
 > A persistent, offline PS2 library that launches through an existing PCSX2 installation, observes its exit, and records actual session duration.
 
-That gate is **not closed**. Core, CLI, and desktop UI are in the tree; a real PCSX2 Play → quit → duration has not been observed on the implementation host. Do not start Steam/Lutris or ScreenScraper until it is, unless the owner reorders.
+That gate is **not closed**. Core, CLI, and desktop UI are in the tree; a real PCSX2 Play → quit → duration has not been observed on the implementation host. The owner has reordered work: direct Steam → Epic/Legendary → GOG/gogdl may proceed while this live gate remains open. ScreenScraper remains its own follow-up; Lutris is not a core dependency. See [ROADMAP.md](ROADMAP.md).
 
 Marquee does not download BIOS files or commercial games.
 
@@ -21,7 +21,7 @@ Marquee does not download BIOS files or commercial games.
 | Browser demo (`pnpm dev`) | **Works.** Sample games, simulated launch, fictional playtime. Home/Library/Ports/Downloads/Settings chrome. `?empty=1` shows the empty desktop look without sample titles. |
 | CLI (`marquee`) | **Works** without GTK. Same core as desktop. Use `--data-dir` for isolation. |
 | Desktop (`./scripts/tauri-dev.sh` / `pnpm tauri dev`) | **Window opens** with the same chrome as the frontend (hero, cover rows, nav). Empty library uses procedural art and ghost shelves — never sample games. NVIDIA Wayland needs `WEBKIT_DISABLE_DMABUF_RENDERER=1`. Native folder-picker / Play clicks are **not live-tested**. |
-| Persistent library | SQLite schema **v2** at `$XDG_DATA_HOME/marquee/library.db` (or `--data-dir` / `MARQUEE_DATA_DIR`). `artwork` table + migrate v1→2. Newer `user_version` is rejected. |
+| Persistent library | SQLite schema **v4** after the shared PS1 root-system work (artwork v2, session recovery v3) at `$XDG_DATA_HOME/marquee/library.db` (or `--data-dir` / `MARQUEE_DATA_DIR`). `artwork` table + migrate v1→2. Newer `user_version` is rejected. |
 | In-app PCSX2 install | **Built.** Recommended path unpacks the official AppImage into `$XDG_DATA_HOME/marquee/runners/pcsx2/current` (no wizard, no Flatpak). Host Flatpak is optional and does not skip unpack. Tests isolate host PCSX2 (`Core::open_isolated`). |
 | Serial covers | **Built.** xlenore/ps2-covers JPEG cache, `convertFileSrc` + asset protocol. ScreenScraper/SteamGridDB still [follow-up](PS2_METADATA_FOLLOWUP.md). |
 | Real PCSX2 Play → quit → duration | **Pending.** Fake runner `/bin/sleep` records duration in tests. That is not the gate. |
@@ -121,7 +121,7 @@ Flatpak may hide the library folder from PCSX2. Grant that folder, not the whole
 
 ## What landed (2026-10-20)
 
-PS2 vertical slice ahead of roadmap phase 1. Metadata matching (ScreenScraper) was cut after review; serial JPEG covers stayed in this slice.
+PS2 vertical slice implemented before the direct-store milestones. Metadata matching (ScreenScraper) was cut after review; serial JPEG covers stayed in this slice.
 
 **On `origin/main`**
 
@@ -159,7 +159,7 @@ Host while building: Fedora Wayland, rustc 1.96.1, Node 24.18.0, pnpm 12.14.0. W
 | One PCSX2 variant launched end-to-end | **Pending.** Discovery + argv implemented (unpacked preferred). Host may already have Flatpak PCSX2; tests must not launch it. |
 | BIOS missing / unverified / launch-tested | **Done** in core. Open-setup not live-tested. |
 | Supervised duration persisted once | Fake runner **yes**. Real PCSX2 **no**. |
-| Reload / duplicate launch / interrupted sessions | **Done** in core: duplicate launch blocked; a `running` row left after process exit is abandoned on the next open (no playtime). Desktop UI reload still live-pending. |
+| Reload / duplicate launch / interrupted sessions | **Done** in core: duplicate launch blocked; matching live processes are recovered; already-dead interrupted sessions retain checkpointed time. See [CORRECTION_PASS.md](CORRECTION_PASS.md). Desktop UI reload still live-pending. |
 | PS2 collection + keyboard; controller in Tauri | Library filter + keyboard in demo/desktop. **Controller (`gilrs`) pending.** |
 | Offline, no provider credentials | **Done.** Covers are optional; Play does not need them. |
 | CLI same core, session ownership | **Done.** |
@@ -216,7 +216,7 @@ Fake-runner tests do **not** close the real-emulator gate.
 
 ## Next
 
-**Current goal: solidify the PS2 backend and desktop app.** Ports, the shared web/desktop surface and the idle-GPU cleanup landed on 2026-10-20 at the owner's request, ahead of this gate; see the roadmap for the new order (Steam installed games next). ScreenScraper, other systems and controller work still wait for this slice to be live-complete.
+**PS2 acceptance remains open.** Preserve this gate and the existing implementation while proceeding with the owner-authorized direct-store order: Steam, then Epic/Legendary with managed compatibility, then GOG/gogdl. Lutris is not required. [ROADMAP.md](ROADMAP.md) owns cross-project priority; this slice does not gate all other work.
 
 1. Restart the desktop window (`./scripts/tauri-dev.sh` on this NVIDIA Wayland host) so the look, install, covers, and session reclaim are in the binary.
 2. **Add a PS2 `.iso` folder** (native picker). Confirm no sample games, skipped-format summary if needed, covers after import.
@@ -224,7 +224,7 @@ Fake-runner tests do **not** close the real-emulator gate.
 4. **Play → quit emulator → duration once → selection restored.** Relaunch without stale busy. This is the release gate.
 5. Keep `scripts/check.sh` green.
 
-Then: [PS2_METADATA_FOLLOWUP.md](PS2_METADATA_FOLLOWUP.md). After that, roadmap phase 1 (Lutris/Steam).
+PS2 metadata follow-up: [PS2_METADATA_FOLLOWUP.md](PS2_METADATA_FOLLOWUP.md). In parallel, the next product increment is [direct installed Steam import](STORE_INTEGRATION.md#s1a-installed-steam-games--first-implementation-task); Epic and GOG follow in the roadmap. Do not insert a Lutris milestone.
 
 ### On-demand PCSX2 install (built)
 

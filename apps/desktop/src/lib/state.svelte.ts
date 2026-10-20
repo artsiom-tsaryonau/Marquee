@@ -1,13 +1,15 @@
 import { createApi, type LibraryApi } from './api';
 import { gamesFromSnapshot, pickRunner } from './api/map';
-import type { CoreEvent, KeyInfo, LibraryRoot, LibrarySnapshot, PortInfo, Runner, ScanReport, Session } from './api/contracts';
+import type { CoreEvent, KeyInfo, LauncherConfig, LauncherInfo, LutrisConfig, LutrisSnapshot, LibraryRoot, LibrarySnapshot, PortInfo, Runner, ScanReport, Session } from './api/contracts';
+import { nativePortGame, canonicalId } from './unified';
+import { lutrisToGame } from './lutris';
 import { artFromSeed } from './art';
 import { describeScan } from './format';
 import { installOption } from './install';
 import { downloads as seedDownloads, games, portGame, ports } from './mock';
 import type { Download, DownloadTarget, GameEntry, PortEntry } from './types';
 
-export type Route = 'home' | 'library' | 'game' | 'ports' | 'downloads' | 'settings' | 'ps2';
+export type Route = 'home' | 'library' | 'game' | 'ports' | 'downloads' | 'settings' | 'ps2' | 'tools';
 export type LibraryStatus = 'demo' | 'loading' | 'empty' | 'loaded' | 'failed';
 
 function load<T>(key: string, fallback: T): T {
@@ -37,12 +39,24 @@ class AppState {
   mode = $state<'desktop' | 'big'>(load('mode', 'desktop'));
   theme = $state<'dark' | 'light'>(load('theme', 'dark'));
   reduceMotion = $state<boolean>(load('reduceMotion', false));
+  variantPreferences = $state<Record<string, string>>(load('variantPreferences', {}));
+  toolSections = $state<string[]>(load('toolSections', ['emulators', 'ports', 'launchers']));
   sounds = $state<boolean>(load('sounds', false));
 
   api: LibraryApi = createApi();
   demo = this.api.kind === 'demo';
   webUrl = $state<string | null>(null);
   keys = $state<KeyInfo[]>([]);
+  launchers = $state<LauncherInfo[]>([]);
+  lutrisSource = $state<LutrisSnapshot | null>(null);
+  lutrisError = $state<string | null>(null);
+  lutrisLoading = $state(false);
+  private lutrisRequest = 0;
+  launcherError = $state<string | null>(null);
+  launchersLoading = $state(false);
+  closeLauncherEditor: (() => void) | null = null;
+  private launcherRequest = 0;
+  openingLaunchers = $state<string[]>([]);
   libraryStatus = $state<LibraryStatus>(this.api.kind === 'demo' ? 'demo' : 'loading');
   loadError = $state<string | null>(null);
   roots = $state<LibraryRoot[]>([]);
@@ -77,17 +91,19 @@ class AppState {
       $effect(() => save('theme', this.theme));
       $effect(() => save('reduceMotion', this.reduceMotion));
       $effect(() => save('sounds', this.sounds));
+      $effect(() => save('toolSections', this.toolSections));
+      $effect(() => save('variantPreferences', this.variantPreferences));
     });
   }
 
   async boot() {
-    if (this.demo) return;
+    if (this.demo) { await this.loadLaunchers(); return; }
     this.unlisten = this.api.subscribe((event) => this.onEvent(event));
     try {
       await this.api.whenReady();
       const snap = await this.api.snapshot();
       this.applySnapshot(snap);
-      await this.loadPorts();
+      await Promise.all([this.loadPorts(), this.loadLaunchers(), this.loadLutris()]);
       this.webUrl = await this.api.webUrl().catch(() => null);
     } catch (err) {
       this.libraryStatus = 'failed';
@@ -101,7 +117,7 @@ class AppState {
     this.roots = snap.roots;
     this.runners = snap.runners;
     this.selectedRunner = pickRunner(snap);
-    this.games = gamesFromSnapshot(snap);
+    this.games = [...gamesFromSnapshot(snap), ...this.games.filter((g) => g.source === 'port' || !!g.lutris)];
     this.libraryStatus = this.games.length ? 'loaded' : 'empty';
     this.loadError = null;
     if (this.heroId && !this.games.some((g) => g.id === this.heroId)) {
@@ -121,6 +137,8 @@ class AppState {
   }
 
   onEvent(event: CoreEvent) {
+    if (event.type === 'lutris_changed') void this.loadLutris();
+    if (event.type === 'launchers_changed') void this.loadLaunchers();
     if (event.type === 'scan_finished') this.lastScan = event.report;
     if (event.type === 'session_started') {
       const game = this.games.find((g) => g.id === event.session.edition_id);
@@ -149,22 +167,23 @@ class AppState {
       });
     }
     if (event.type === 'library_changed' || event.type === 'scan_finished') {
-      void this.api.snapshot().then((snap) => this.applySnapshot(snap));
+      void this.api.snapshot().then((snap) => this.applySnapshot(snap)).catch(() => {});
+      void this.api.listPorts().then((list) => this.applyPorts(list)).catch(() => {});
     }
-    if (event.type === 'tool_install_started') {
+    if (event.type === 'tool_install_started' && event.tool_id === 'pcsx2') {
       this.installingPcsx2 = true;
       this.installProgress = `Installing PCSX2 (${event.channel})…`;
     }
-    if (event.type === 'tool_install_progress') {
+    if (event.type === 'tool_install_progress' && event.tool_id === 'pcsx2') {
       this.installProgress = event.message;
     }
-    if (event.type === 'tool_install_finished') {
+    if (event.type === 'tool_install_finished' && event.tool_id === 'pcsx2') {
       this.installingPcsx2 = false;
       this.installProgress = 'PCSX2 is installed. Open setup to add your BIOS files.';
       this.notify('PCSX2 is installed. Open setup to add your BIOS files — Marquee will not download them.');
       void this.api.snapshot().then((snap) => this.applySnapshot(snap));
     }
-    if (event.type === 'tool_install_failed') {
+    if (event.type === 'tool_install_failed' && event.tool_id === 'pcsx2') {
       this.installingPcsx2 = false;
       this.installProgress = null;
       this.notify(event.message);
@@ -200,6 +219,14 @@ class AppState {
     this.heroId = game.id;
   }
 
+  chooseVariant(id: string) {
+    const chosen = this.games.find((g) => g.id === id);
+    if (!chosen || !this.current || canonicalId(chosen) !== canonicalId(this.current)) return;
+    this.variantPreferences = { ...this.variantPreferences, [canonicalId(chosen)]: id };
+    this.gameId = id;
+    this.heroId = id;
+  }
+
   openInstall(toolId: string, optionId?: string) {
     this.installToolId = toolId;
     this.installOptionId = optionId ?? null;
@@ -223,6 +250,7 @@ class AppState {
   }
 
   back() {
+    if (this.closeLauncherEditor) { this.closeLauncherEditor(); return; }
     if (this.installToolId) {
       this.closeInstall();
       return;
@@ -243,6 +271,12 @@ class AppState {
   play(game: GameEntry) {
     this.heroId = game.id;
     if (!this.demo) {
+      if (game.lutris) { void this.openLutrisGame(game); return; }
+      if (game.source === 'port') {
+        const port = this.ports.find((p) => `port:${p.id}` === game.id);
+        if (port) void this.launchPort(port);
+        return;
+      }
       void this.playDesktop(game);
       return;
     }
@@ -290,6 +324,7 @@ class AppState {
   toggleFavorite(game: GameEntry) {
     const entry = this.games.find((x) => x.id === game.id);
     if (!entry) return;
+    if (!this.demo && (entry.source === 'port' || entry.lutris)) return;
     entry.favorite = !entry.favorite;
     if (!this.demo) {
       void this.api.setFavourite(entry.id, entry.favorite).catch((err) => {
@@ -313,21 +348,30 @@ class AppState {
   }
 
   async addPs2Folder() {
+    return this.addSystemFolder('ps2');
+  }
+
+  /** Pick a folder and import it for a specific system (`ps1`/`ps2`). */
+  async addSystemFolder(system: string) {
     if (this.demo) {
-      this.notify('Add a PS2 folder in the desktop app');
+      this.notify(`Add a ${system.toUpperCase()} folder in the desktop app`);
       return;
     }
     const path = await this.api.pickRoot();
     if (!path) return;
     this.scanning = true;
     try {
-      const root = await this.api.addRoot(path);
+      const root = await this.api.addRoot(path, system);
       const report = await this.api.scan(root.id);
       this.lastScan = report;
       this.applySnapshot(await this.api.snapshot());
       this.notify(describeScan(report));
       if (this.libraryStatus === 'empty' && report.skipped_unsupported && !report.added) {
-        this.notify('Nothing imported. CHD/CUE/BIN/GZ/CSO are not supported yet — add a folder of .iso files.');
+        this.notify(
+          system === 'ps1'
+            ? 'Nothing imported. PS1 folders import .iso and .chd; .cue/.bin still need converting.'
+            : 'Nothing imported. CHD/CUE/BIN/GZ/CSO are not supported yet — add a folder of .iso files.'
+        );
       }
       if (report.added > 0) {
         void this.refreshArtwork();
@@ -430,6 +474,72 @@ class AppState {
           : p.requirement,
       art: artFromSeed(`port:${p.id}`),
     }));
+    this.games = [...this.games.filter((g) => g.source !== 'port'), ...this.ports.filter((p) => p.status !== 'not-installed').map(nativePortGame)];
+    this.libraryStatus = this.games.length ? 'loaded' : 'empty';
+  }
+
+  private applyLutris(snapshot: LutrisSnapshot) {
+    this.lutrisSource = snapshot;
+    this.games = [...this.games.filter((g) => !g.lutris), ...snapshot.games.map(lutrisToGame)];
+    if (this.gameId?.startsWith('lutris:') && !this.games.some((g) => g.id === this.gameId)) {
+      this.gameId = null;
+      if (this.route === 'game') this.route = 'library';
+    }
+    if (!this.games.some((g) => g.id === this.heroId)) this.heroId = this.games[0]?.id ?? null;
+    this.libraryStatus = this.games.length ? 'loaded' : 'empty';
+  }
+  async loadLutris() {
+    if (this.demo) return;
+    const request = ++this.lutrisRequest;
+    this.lutrisLoading = true; this.lutrisError = null;
+    try { const snapshot = await this.api.lutrisLibrary(); if (request === this.lutrisRequest) this.applyLutris(snapshot); }
+    catch (err) { if (request === this.lutrisRequest) this.lutrisError = (err as { message?: string }).message ?? 'Could not read Lutris library'; }
+    finally { if (request === this.lutrisRequest) this.lutrisLoading = false; }
+  }
+  async configureLutris(config: LutrisConfig) {
+    const snapshot = await this.api.configureLutris(config);
+    ++this.lutrisRequest; this.lutrisLoading = false; this.lutrisError = null;
+    this.applyLutris(snapshot);
+  }
+  async openLutrisGame(game: GameEntry) {
+    try { await this.api.openLutrisGame(game.id); this.notify(game.installed ? `Handed ${game.title} to Lutris` : `Opened Lutris installer for ${game.title}`); }
+    catch (err) { this.notify((err as { message?: string }).message ?? 'Could not open Lutris game'); }
+  }
+
+  async loadLaunchers() {
+    const request = ++this.launcherRequest;
+    this.launchersLoading = true;
+    this.launcherError = null;
+    try { const list = await this.api.listLaunchers(); if (request === this.launcherRequest) this.launchers = list; }
+    catch (err) { if (request === this.launcherRequest) this.launcherError = (err as { message?: string }).message ?? 'Could not load launchers'; }
+    finally { if (request === this.launcherRequest) this.launchersLoading = false; }
+  }
+
+  async saveLauncher(config: LauncherConfig): Promise<boolean> {
+    try {
+      const list = await this.api.saveLauncher(config);
+      ++this.launcherRequest;
+      this.launchersLoading = false;
+      this.launcherError = null;
+      this.launchers = list;
+      this.notify('Launcher configuration saved');
+      return true;
+    } catch (err) { throw new Error((err as { message?: string }).message ?? 'Could not save launcher'); }
+  }
+
+  async removeLauncher(id: string) {
+    try { const list = await this.api.removeLauncher(id); ++this.launcherRequest; this.launchersLoading = false; this.launchers = list; this.notify('Launcher configuration removed'); }
+    catch (err) { this.notify((err as { message?: string }).message ?? 'Could not remove launcher'); }
+  }
+
+  async openLauncher(id: string) {
+    if (this.openingLaunchers.includes(id)) return;
+    this.openingLaunchers = [...this.openingLaunchers, id];
+    try {
+      await this.api.openLauncher(id);
+      this.notify(`Opened ${this.launchers.find((l) => l.id === id)?.name ?? 'launcher'}`);
+    } catch (err) { this.notify((err as { message?: string }).message ?? 'Could not open launcher'); }
+    finally { this.openingLaunchers = this.openingLaunchers.filter((x) => x !== id); }
   }
 
   async loadKeys() {

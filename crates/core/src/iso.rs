@@ -4,9 +4,40 @@ use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
 
 const SECTOR: u64 = 2048;
-const PVD_OFFSET: u64 = 16 * SECTOR;
 const MAX_DIR: usize = 64 * 1024;
 const MAX_CNF: usize = 8 * 1024;
+
+/// A physical disc layout: how far apart logical 2048-byte blocks sit on disk,
+/// and where the user data starts inside each raw sector.
+///
+/// `.iso` rips are 2048-byte user-data-only images. PS1 discs are usually ripped
+/// raw at 2352 bytes per sector (12-byte sync + 4-byte header + data, plus an
+/// 8-byte Mode 2 subheader). 2336-byte rips drop the sync. Marquee probes all of
+/// them so a classic PS1 dump resolves without conversion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Probe {
+    stride: u64,
+    data_offset: u64,
+}
+
+const PROBES: [Probe; 4] = [
+    Probe {
+        stride: 2048,
+        data_offset: 0,
+    },
+    Probe {
+        stride: 2352,
+        data_offset: 16,
+    }, // Mode 1 raw
+    Probe {
+        stride: 2352,
+        data_offset: 24,
+    }, // Mode 2 Form 1 raw
+    Probe {
+        stride: 2336,
+        data_offset: 12,
+    }, // Mode 2 without sync
+];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiscIdentity {
@@ -15,16 +46,29 @@ pub struct DiscIdentity {
     pub region: Option<String>,
 }
 
-pub fn identify_ps2_iso(path: &Path) -> Result<DiscIdentity> {
+/// An identity with nothing resolved.
+pub fn unresolved() -> DiscIdentity {
+    DiscIdentity {
+        serial: None,
+        serial_raw: None,
+        region: None,
+    }
+}
+
+/// Read a disc's `SYSTEM.CNF` regardless of rip layout. Works for both PS1
+/// (`BOOT`) and PS2 (`BOOT2`) discs.
+pub fn identify_disc_iso(path: &Path) -> Result<DiscIdentity> {
     let mut file = File::open(path)?;
-    let Some(cnf) = read_system_cnf(&mut file)? else {
-        return Ok(DiscIdentity {
-            serial: None,
-            serial_raw: None,
-            region: None,
-        });
-    };
-    Ok(identity_from_system_cnf(&cnf))
+    for probe in PROBES {
+        if let Some(cnf) = read_system_cnf(&mut file, probe)? {
+            return Ok(identity_from_system_cnf(&cnf));
+        }
+    }
+    Ok(unresolved())
+}
+
+pub fn identify_ps2_iso(path: &Path) -> Result<DiscIdentity> {
+    identify_disc_iso(path)
 }
 
 pub fn identity_from_system_cnf(text: &str) -> DiscIdentity {
@@ -122,9 +166,14 @@ fn region_from_serial(serial: &str) -> Option<&'static str> {
     }
 }
 
-fn read_system_cnf(file: &mut File) -> Result<Option<String>> {
+/// Byte offset of logical block `block`'s user data for a given layout.
+fn block_offset(probe: Probe, block: u64) -> u64 {
+    block * probe.stride + probe.data_offset
+}
+
+fn read_system_cnf(file: &mut File, probe: Probe) -> Result<Option<String>> {
     let mut pvd = [0u8; SECTOR as usize];
-    file.seek(SeekFrom::Start(PVD_OFFSET))?;
+    file.seek(SeekFrom::Start(block_offset(probe, 16)))?;
     if file.read(&mut pvd)? < SECTOR as usize {
         return Ok(None);
     }
@@ -142,8 +191,14 @@ fn read_system_cnf(file: &mut File) -> Result<Option<String>> {
     if extent == 0 || size == 0 || size > MAX_DIR {
         return Ok(None);
     }
+    // `extent` counts `block`-byte logical blocks; normalise to 2048-byte units.
+    let root_block = if block == SECTOR {
+        extent
+    } else {
+        extent * block / SECTOR
+    };
     let mut dir = vec![0u8; size];
-    file.seek(SeekFrom::Start(extent * block))?;
+    file.seek(SeekFrom::Start(block_offset(probe, root_block)))?;
     file.read_exact(&mut dir)?;
     let Some((file_extent, file_size)) = find_cnf(&dir) else {
         return Ok(None);
@@ -152,7 +207,7 @@ fn read_system_cnf(file: &mut File) -> Result<Option<String>> {
         return Ok(None);
     }
     let mut buf = vec![0u8; file_size as usize];
-    file.seek(SeekFrom::Start(u64::from(file_extent) * block))?;
+    file.seek(SeekFrom::Start(block_offset(probe, u64::from(file_extent))))?;
     file.read_exact(&mut buf)?;
     Ok(Some(String::from_utf8_lossy(&buf).into_owned()))
 }
@@ -206,7 +261,8 @@ pub fn build_test_iso(files: &[(&str, &[u8])]) -> Vec<u8> {
     let dir_start = 19 * SECTOR as usize;
     image[dir_start..dir_start + records.len()].copy_from_slice(&records);
 
-    let pvd = &mut image[PVD_OFFSET as usize..PVD_OFFSET as usize + SECTOR as usize];
+    let pvd_at = (16 * SECTOR) as usize;
+    let pvd = &mut image[pvd_at..pvd_at + SECTOR as usize];
     pvd[0] = 1;
     pvd[1..6].copy_from_slice(b"CD001");
     pvd[6] = 1;
@@ -270,6 +326,46 @@ mod tests {
         let id = identify_ps2_iso(&path).unwrap();
         assert_eq!(id.serial.as_deref(), Some("SCES_503.82"));
         assert_eq!(id.region.as_deref(), Some("PAL"));
+    }
+
+    /// Re-lay a 2048-byte `.iso` as a raw 2352-byte-sector Mode 1 disc, the way
+    /// a classic PS1 dump is stored. Sync pattern + header + the user data.
+    fn raw_2352(bytes: &[u8]) -> Vec<u8> {
+        const RAW: usize = 2352;
+        const DATA: usize = 2048;
+        assert_eq!(bytes.len() % DATA, 0);
+        let sectors = bytes.len() / DATA;
+        let mut out = Vec::with_capacity(sectors * RAW);
+        for i in 0..sectors {
+            let mut sector = vec![0u8; RAW];
+            sector[0] = 0x00;
+            sector[1..11].copy_from_slice(&[0xFF; 10]);
+            sector[11] = 0x00;
+            // minute / second / sector (BCD), Mode 1.
+            sector[15] = 0x01;
+            // Mode 1: 16 bytes of sync/header, then 2048 bytes of user data,
+            // then 288 bytes of EDC/ECC that the reader never looks at.
+            sector[16..16 + DATA].copy_from_slice(&bytes[i * DATA..(i + 1) * DATA]);
+            out.extend_from_slice(&sector);
+        }
+        out
+    }
+
+    #[test]
+    fn reads_serial_from_raw_2352_ps1_disc() {
+        let iso = build_test_iso(&[(
+            "SYSTEM.CNF",
+            b"BOOT = cdrom:\\SLUS_005.94;1\nTCB = 4\nEVENT = 10\nSTACK = 801FFF00\n",
+        )]);
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("PS1GAME.BIN");
+        File::create(&path)
+            .unwrap()
+            .write_all(&raw_2352(&iso))
+            .unwrap();
+        let id = identify_disc_iso(&path).unwrap();
+        assert_eq!(id.serial.as_deref(), Some("SLUS_005.94"));
+        assert_eq!(id.region.as_deref(), Some("NTSC-U"));
     }
 
     #[test]

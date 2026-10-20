@@ -121,13 +121,9 @@ fn run() -> marquee_core::error::Result<()> {
     let core = Arc::new(Core::open(args.data_dir, args.allow_fake)?);
     match args.command {
         Command::Library(LibraryCmd::AddRoot { system, path }) => {
-            if system != "ps2" {
-                return Err(AppError::new(
-                    "ROOT_OFFLINE",
-                    "only --system ps2 is supported in this milestone",
-                ));
-            }
-            let root = core.add_root(path, None)?;
+            // Validates against the shipped descriptors (ps2, ps1).
+            let label = marquee_core::catalog::by_id(&system)?.display_name;
+            let root = core.add_root(&system, path, Some(label))?;
             println!("{}", serde_json::to_string_pretty(&root)?);
         }
         Command::Scan { root } => {

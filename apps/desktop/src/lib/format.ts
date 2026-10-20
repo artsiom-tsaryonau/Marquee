@@ -12,6 +12,7 @@ export function describeScan(report: {
   skipped_by_kind: { kind: string; count: number }[];
   unresolved_serial: number;
   missing: number;
+  warnings?: string[];
 }) {
   const skipped = report.skipped_by_kind
     .map((s) => `${s.count} ${s.kind.replace('ps2_', '').toUpperCase()}`)
@@ -24,6 +25,7 @@ export function describeScan(report: {
       : '',
     report.unresolved_serial ? `${report.unresolved_serial} without a serial` : '',
     report.missing ? `${report.missing} missing` : '',
+    report.warnings?.length ? `${report.warnings.length} file warning(s): ${report.warnings[0]}` : '',
   ].filter(Boolean);
   return parts.join(' · ');
 }

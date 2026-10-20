@@ -4,6 +4,19 @@ export interface AppError {
   context?: unknown;
 }
 
+export interface PurpleStatus {
+  installed: boolean;
+  ready: boolean;
+  busy: boolean;
+  running: boolean;
+  message: string;
+  error: string | null;
+  prefix: string;
+  log_path: string;
+  runtime: string | null;
+  aion2_verified: boolean;
+}
+
 export interface LibraryRoot {
   id: string;
   path: string;
@@ -81,6 +94,7 @@ export interface ScanReport {
   skipped_by_kind: SkipCount[];
   unresolved_serial: number;
   missing: number;
+  warnings?: string[];
 }
 
 export interface Settings {
@@ -107,6 +121,8 @@ export type CoreEvent =
   | { type: 'session_ended'; session: Session }
   | { type: 'session_failed'; session: Session }
   | { type: 'library_changed' }
+  | { type: 'launchers_changed' }
+  | { type: 'lutris_changed' }
   | { type: 'tool_install_started'; tool_id: string; channel: string }
   | { type: 'tool_install_progress'; tool_id: string; message: string }
   | { type: 'tool_install_finished'; tool_id: string; runner_id: string | null }
@@ -143,11 +159,47 @@ export interface KeyInfo {
   preview: string | null;
 }
 
+export interface LutrisConfig {
+  enabled: boolean;
+  include_owned: boolean;
+  database_path: string | null;
+  launcher_id: string;
+}
+export interface LutrisGame {
+  id: string; name: string; service: string; store_id: string | null;
+  lutris_id: number | null; runner: string | null; platform: string;
+  installed: boolean; available: boolean; playtime_minutes: number;
+}
+export interface LutrisSnapshot {
+  config: LutrisConfig;
+  detected_paths: string[];
+  database_path: string | null;
+  games: LutrisGame[];
+  cached_by_service: Record<string, number>;
+  configured_count: number;
+  installed_count: number;
+  warnings: string[];
+}
+
+export interface LauncherConfig {
+  id: string;
+  name: string;
+  executable: string;
+  args: string[];
+  working_directory: string | null;
+  pinned: boolean;
+}
+export interface LauncherInfo extends LauncherConfig {
+  configured: boolean;
+  available: boolean;
+  status: string;
+}
+
 export interface LibraryApi {
   /** `desktop` = native window, `web` = browser attached to a running Marquee, `demo` = invented data. */
   kind: 'demo' | 'desktop' | 'web';
   snapshot(): Promise<LibrarySnapshot>;
-  addRoot(path: string): Promise<LibraryRoot>;
+  addRoot(path: string, system?: string): Promise<LibraryRoot>;
   pickRoot(): Promise<string | null>;
   scan(rootId?: string): Promise<ScanReport>;
   listRunners(): Promise<Runner[]>;
@@ -165,6 +217,18 @@ export interface LibraryApi {
   listKeys(): Promise<KeyInfo[]>;
   setKey(id: string, value: string): Promise<KeyInfo[]>;
   clearKey(id: string): Promise<KeyInfo[]>;
+  lutrisLibrary(): Promise<LutrisSnapshot>;
+  configureLutris(config: LutrisConfig): Promise<LutrisSnapshot>;
+  openLutrisGame(id: string): Promise<void>;
+  listLaunchers(): Promise<LauncherInfo[]>;
+  saveLauncher(launcher: LauncherConfig): Promise<LauncherInfo[]>;
+  removeLauncher(id: string): Promise<LauncherInfo[]>;
+  openLauncher(id: string): Promise<void>;
+  purpleStatus(): Promise<PurpleStatus>;
+  installPurple(): Promise<PurpleStatus>;
+  cancelPurple(): Promise<PurpleStatus>;
+  openPurple(): Promise<void>;
+  pickExecutable(): Promise<string | null>;
   listPorts(): Promise<PortInfo[]>;
   checkPortUpdates(): Promise<PortInfo[]>;
   installPort(portId: string): Promise<PortInfo[]>;

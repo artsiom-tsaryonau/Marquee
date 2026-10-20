@@ -1,8 +1,8 @@
 //! Native ports and decomps (Ship of Harkinian, Zelda64Recomp, ...).
 //!
 //! Each port is one JSON file in `catalog/ports/`. Install downloads the latest
-//! GitHub release asset (no key needed), extracts it **in place** so the user's
-//! own ROMs and game data survive updates, and records the release tag.
+//! GitHub release asset (no key needed), stages and validates it before replacing
+//! the installation, preserves user files, and records the release tag.
 //! Marquee never downloads game data.
 
 use crate::error::{AppError, Result};
@@ -205,9 +205,16 @@ pub fn install_latest(
             });
         }
     }
-    fs::create_dir_all(&dir)?;
-    let part = dir.join(".download");
-    let _ = fs::remove_file(&part);
+    let parent = dir
+        .parent()
+        .ok_or_else(|| AppError::new("IO", "invalid port directory"))?;
+    fs::create_dir_all(parent)?;
+    let stage = tempfile::Builder::new()
+        .prefix(".port-stage-")
+        .tempdir_in(parent)?;
+    let release_dir = stage.path().join("release");
+    fs::create_dir(&release_dir)?;
+    let part = stage.path().join("download");
     progress(
         sink,
         &def.id,
@@ -249,26 +256,38 @@ pub fn install_latest(
     let name = release.asset.name.to_ascii_lowercase();
     let result = if name.ends_with(".zip") {
         progress(sink, &def.id, "Unpacking…");
-        extract_zip(&part, &dir)
+        extract_zip(&part, &release_dir)
     } else if name.ends_with(".tar.gz") || name.ends_with(".tgz") {
         progress(sink, &def.id, "Unpacking…");
-        extract_tar_gz(&part, &dir)
+        extract_tar_gz(&part, &release_dir)
     } else {
         // AppImage or another single executable.
-        let target = dir.join(&release.asset.name);
+        let name = Path::new(&release.asset.name);
+        if name.components().count() != 1
+            || !matches!(
+                name.components().next(),
+                Some(std::path::Component::Normal(_))
+            )
+        {
+            return Err(AppError::new(
+                "PORT_BROKEN",
+                "invalid release asset filename",
+            ));
+        }
+        let target = release_dir.join(name);
         fs::rename(&part, &target).map_err(AppError::from)
     };
     let _ = fs::remove_file(&part);
     result?;
 
     // Some releases wrap a tarball in a zip (Zelda64Recomp): unpack it when the executable is absent.
-    if def.binary.is_some() && locate_binary(&dir, def).is_none() {
-        unpack_nested_tarballs(&dir)?;
+    if def.binary.is_some() && locate_binary(&release_dir, def).is_none() {
+        unpack_nested_tarballs(&release_dir)?;
     }
 
     let bin = match &def.binary {
-        None => dir.join(&release.asset.name),
-        Some(_) => locate_binary(&dir, def).ok_or_else(|| {
+        None => release_dir.join(&release.asset.name),
+        Some(_) => locate_binary(&release_dir, def).ok_or_else(|| {
             AppError::new(
                 "PORT_BROKEN",
                 format!("{} was unpacked but its executable was not found", def.name),
@@ -276,10 +295,99 @@ pub fn install_latest(
         })?,
     };
     make_executable(&bin)?;
-    Ok(InstalledPort {
+    let installed = InstalledPort {
         tag: release.tag,
-        bin: rel(&dir, &bin),
-    })
+        bin: rel(&release_dir, &bin),
+    };
+    promote_installation(&release_dir, &dir)?;
+    Ok(installed)
+}
+
+/// Only promote validated release files. A failed copy/extraction leaves the
+/// previous installation untouched, including files symlinked into another library.
+fn promote_installation(stage: &Path, dest: &Path) -> Result<()> {
+    if let Ok(meta) = fs::symlink_metadata(dest) {
+        if meta.file_type().is_symlink() || !meta.is_dir() {
+            return Err(AppError::new(
+                "IO",
+                "port destination is not a regular directory",
+            ));
+        }
+        preserve_user_files(dest, stage)?;
+    }
+    let backup = dest.with_extension(format!("backup-{}", uuid::Uuid::new_v4()));
+    let had_previous = dest.exists();
+    if had_previous {
+        fs::rename(dest, &backup)?;
+    }
+    if let Err(err) = fs::rename(stage, dest) {
+        if had_previous {
+            fs::rename(&backup, dest)?;
+        }
+        return Err(err.into());
+    }
+    if had_previous {
+        let _ = fs::remove_dir_all(backup);
+    }
+    Ok(())
+}
+
+fn preserve_user_files(old: &Path, stage: &Path) -> Result<()> {
+    for entry in fs::read_dir(old)? {
+        let entry = entry?;
+        let from = entry.path();
+        let to = stage.join(entry.file_name());
+        let kind = entry.file_type()?;
+        if fs::symlink_metadata(&to).is_ok() {
+            if kind.is_symlink() {
+                return Err(AppError::new(
+                    "IO",
+                    format!("release conflicts with user symlink: {}", from.display()),
+                ));
+            }
+            if kind.is_dir() != to.is_dir() {
+                return Err(AppError::new(
+                    "IO",
+                    "release conflicts with a user directory",
+                ));
+            }
+            if kind.is_dir() && to.is_dir() {
+                preserve_user_files(&from, &to)?;
+            }
+            continue;
+        }
+        if kind.is_symlink() {
+            std::os::unix::fs::symlink(fs::read_link(&from)?, &to)?;
+        } else if kind.is_dir() {
+            fs::create_dir(&to)?;
+            preserve_user_files(&from, &to)?;
+        } else if kind.is_file() {
+            fs::copy(&from, &to)?;
+        }
+    }
+    Ok(())
+}
+
+fn reject_symlink_path(dest: &Path, relative: &Path) -> Result<()> {
+    let mut path = dest.to_path_buf();
+    for component in std::iter::once(None).chain(relative.components().map(Some)) {
+        if let Some(component) = component {
+            if !matches!(
+                component,
+                std::path::Component::Normal(_) | std::path::Component::CurDir
+            ) {
+                return Err(AppError::new("IO", "archive path escapes destination"));
+            }
+            path.push(component);
+        }
+        if fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_symlink()) {
+            return Err(AppError::new(
+                "IO",
+                "archive path traverses an existing symlink",
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn unpack_nested_tarballs(dir: &Path) -> Result<()> {
@@ -340,10 +448,13 @@ pub(crate) fn extract_zip(archive: &Path, dest: &Path) -> Result<()> {
         .map_err(|e| AppError::new("IO", format!("not a valid zip: {e}")))?;
     let mut total = 0u64;
     for i in 0..zip.len() {
-        total += zip
-            .by_index(i)
-            .map_err(|e| AppError::new("IO", e.to_string()))?
-            .size();
+        total = total
+            .checked_add(
+                zip.by_index(i)
+                    .map_err(|e| AppError::new("IO", e.to_string()))?
+                    .size(),
+            )
+            .ok_or_else(|| AppError::new("IO", "archive size overflow"))?;
     }
     if total > MAX_EXTRACTED_BYTES {
         return Err(AppError::new("IO", "archive is unreasonably large"));
@@ -356,6 +467,7 @@ pub(crate) fn extract_zip(archive: &Path, dest: &Path) -> Result<()> {
         let Some(rel) = entry.enclosed_name() else {
             continue;
         };
+        reject_symlink_path(dest, &rel)?;
         let out = dest.join(rel);
         if entry.is_dir() {
             fs::create_dir_all(&out)?;
@@ -382,10 +494,29 @@ pub(crate) fn extract_zip(archive: &Path, dest: &Path) -> Result<()> {
 pub(crate) fn extract_tar_gz(archive: &Path, dest: &Path) -> Result<()> {
     let gz = flate2::read::GzDecoder::new(File::open(archive)?);
     let mut tar = tar::Archive::new(gz);
-    tar.set_overwrite(true);
-    // `unpack` refuses entries that would land outside `dest`.
-    tar.unpack(dest)
-        .map_err(|e| AppError::new("IO", format!("could not unpack archive: {e}")))
+    let mut total = 0u64;
+    for entry in tar.entries()? {
+        let mut entry = entry?;
+        let path = entry.path()?.into_owned();
+        reject_symlink_path(dest, &path)?;
+        let kind = entry.header().entry_type();
+        if !kind.is_file() && !kind.is_dir() {
+            return Err(AppError::new(
+                "IO",
+                "archive links and special files are not supported",
+            ));
+        }
+        total = total
+            .checked_add(entry.size())
+            .ok_or_else(|| AppError::new("IO", "archive size overflow"))?;
+        if total > MAX_EXTRACTED_BYTES {
+            return Err(AppError::new("IO", "archive is unreasonably large"));
+        }
+        if !entry.unpack_in(dest)? {
+            return Err(AppError::new("IO", "archive path escapes destination"));
+        }
+    }
+    Ok(())
 }
 
 /// Start the port from its own folder (many ports read data beside the binary).
@@ -534,5 +665,102 @@ mod tests {
         extract_zip(&archive, &dest).unwrap();
         assert_eq!(fs::read(dest.join("game")).unwrap(), b"v2");
         assert_eq!(fs::read(dest.join("baserom.us.z64")).unwrap(), b"mine");
+    }
+}
+
+#[cfg(test)]
+mod correction_tests {
+    use super::*;
+    use std::io::Write;
+    #[test]
+    fn archive_cannot_follow_an_existing_directory_symlink() {
+        let t = tempfile::tempdir().unwrap();
+        let outside = t.path().join("outside");
+        fs::create_dir(&outside).unwrap();
+        fs::write(outside.join("save"), b"mine").unwrap();
+        let dest = t.path().join("dest");
+        fs::create_dir(&dest).unwrap();
+        std::os::unix::fs::symlink(&outside, dest.join("data")).unwrap();
+        let archive = t.path().join("a.zip");
+        let mut zip = zip::ZipWriter::new(File::create(&archive).unwrap());
+        zip.start_file("data/save", zip::write::SimpleFileOptions::default())
+            .unwrap();
+        zip.write_all(b"replacement").unwrap();
+        zip.finish().unwrap();
+        assert!(extract_zip(&archive, &dest).is_err());
+        assert_eq!(fs::read(outside.join("save")).unwrap(), b"mine");
+    }
+    #[test]
+    fn staged_release_preserves_data_and_refuses_symlink_conflicts() {
+        let t = tempfile::tempdir().unwrap();
+        let dest = t.path().join("installed");
+        let stage = t.path().join("stage");
+        fs::create_dir(&dest).unwrap();
+        fs::create_dir(&stage).unwrap();
+        fs::write(dest.join("game"), b"v1").unwrap();
+        fs::write(dest.join("save"), b"mine").unwrap();
+        fs::write(stage.join("game"), b"v2").unwrap();
+        promote_installation(&stage, &dest).unwrap();
+        assert_eq!(fs::read(dest.join("game")).unwrap(), b"v2");
+        assert_eq!(fs::read(dest.join("save")).unwrap(), b"mine");
+        fs::create_dir(&stage).unwrap();
+        fs::create_dir(stage.join("data")).unwrap();
+        std::os::unix::fs::symlink(t.path(), dest.join("data")).unwrap();
+        assert!(promote_installation(&stage, &dest).is_err());
+        assert_eq!(fs::read(dest.join("game")).unwrap(), b"v2");
+    }
+    #[test]
+    fn failed_extraction_never_changes_the_installed_binary() {
+        let t = tempfile::tempdir().unwrap();
+        let dest = t.path().join("installed");
+        let stage = t.path().join("stage");
+        fs::create_dir(&dest).unwrap();
+        fs::create_dir(&stage).unwrap();
+        fs::write(dest.join("game"), b"v1").unwrap();
+        let archive = t.path().join("a.zip");
+        let mut zip = zip::ZipWriter::new(File::create(&archive).unwrap());
+        zip.start_file(
+            "game",
+            zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored),
+        )
+        .unwrap();
+        zip.write_all(b"unique-v2-content").unwrap();
+        zip.finish().unwrap();
+        let mut bytes = fs::read(&archive).unwrap();
+        let i = bytes
+            .windows(17)
+            .position(|b| b == b"unique-v2-content")
+            .unwrap();
+        bytes[i] ^= 1;
+        fs::write(&archive, bytes).unwrap();
+        assert!(extract_zip(&archive, &stage).is_err());
+        assert_eq!(fs::read(dest.join("game")).unwrap(), b"v1");
+    }
+    #[test]
+    fn nested_tar_update_uses_new_binary_in_fresh_stage() {
+        let t = tempfile::tempdir().unwrap();
+        let old = t.path().join("old");
+        let stage = t.path().join("stage");
+        fs::create_dir(&old).unwrap();
+        fs::create_dir(&stage).unwrap();
+        let def = find("zelda64recomp").unwrap();
+        let name = def.binary.as_deref().unwrap();
+        fs::write(old.join(name), b"v1").unwrap();
+        let gz = flate2::write::GzEncoder::new(
+            File::create(stage.join("release.tar.gz")).unwrap(),
+            flate2::Compression::default(),
+        );
+        let mut tar = tar::Builder::new(gz);
+        let mut header = tar::Header::new_gnu();
+        header.set_size(2);
+        header.set_mode(0o755);
+        header.set_cksum();
+        tar.append_data(&mut header, name, &b"v2"[..]).unwrap();
+        tar.into_inner().unwrap().finish().unwrap();
+        assert!(locate_binary(&stage, &def).is_none());
+        unpack_nested_tarballs(&stage).unwrap();
+        promote_installation(&stage, &old).unwrap();
+        assert_eq!(fs::read(old.join(name)).unwrap(), b"v2");
     }
 }

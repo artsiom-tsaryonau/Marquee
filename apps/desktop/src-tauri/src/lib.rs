@@ -69,6 +69,15 @@ pub fn run() {
                     let (seq, events) = hub.wait_after(after, Duration::from_secs(30));
                     after = seq;
                     for event in events {
+                        if matches!(
+                            &event,
+                            marquee_core::model::CoreEvent::SessionEnded { .. }
+                                | marquee_core::model::CoreEvent::SessionFailed { .. }
+                        ) {
+                            if let Some(window) = app_handle.get_webview_window("main") {
+                                let _ = window.show();
+                            }
+                        }
                         let _ = app_handle.emit("core-event", event);
                     }
                 }
@@ -76,6 +85,20 @@ pub fn run() {
 
             app.manage(AppState { core, web_url });
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if let Some(state) = window.app_handle().try_state::<AppState>() {
+                    if state.core.snapshot().is_ok_and(|s| {
+                        s.sessions
+                            .iter()
+                            .any(|s| s.state == marquee_core::model::SessionState::Running)
+                    }) {
+                        api.prevent_close();
+                        let _ = window.hide();
+                    }
+                }
+            }
         })
         .invoke_handler(tauri::generate_handler![
             commands::core_call,

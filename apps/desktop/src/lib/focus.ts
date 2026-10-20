@@ -6,7 +6,7 @@ type Dir = 'up' | 'down' | 'left' | 'right';
 
 function candidates(): HTMLElement[] {
   return [...document.querySelectorAll<HTMLElement>('[data-nav]')].filter((el) => {
-    if (el.closest('[inert]')) return false;
+    if (el.closest('[inert]') || el.matches(':disabled') || el.getAttribute('aria-disabled') === 'true') return false;
     const r = el.getBoundingClientRect();
     return r.width > 0 && r.height > 0;
   });

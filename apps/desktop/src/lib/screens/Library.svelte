@@ -4,33 +4,39 @@
   import { app } from '../state.svelte';
   import { platformLabel, sourceLabel } from '../labels';
   import { fuzzy } from '../format';
-  import type { Source } from '../types';
+  import { groupGames, launchMethod, matchesVariant, methodLabel, type LaunchMethod } from '../unified';
+  import type { Source, Platform } from '../types';
   import Cover from '../components/Cover.svelte';
   import GhostCover from '../components/GhostCover.svelte';
   import Icon from '../components/Icon.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
 
   let { collection = null }: { collection?: 'ps2' | null } = $props();
+  let visibleCount = $state(48);
   let query = $state('');
+  let platform = $state<Platform | ''>('');
+  let method = $state<LaunchMethod | ''>('');
+  const platforms = $derived([...new Set(app.games.map((g) => g.platform))]);
   let sources = $state<Set<Source>>(new Set());
   let installedOnly = $state(false);
   let favOnly = $state(false);
   let sort = $state<'title' | 'recent' | 'playtime' | 'added' | 'critic' | 'short'>('title');
   let search: HTMLInputElement;
 
-  const allSources = Object.keys(sourceLabel) as Source[];
+  const allSources = $derived([...new Set(app.games.map((g) => g.source))]);
 
   const shown = $derived.by(() => {
     let list = app.games.filter(
       (g) =>
         (!collection || g.platform === collection) &&
+        matchesVariant(g, platform, method) &&
         (!sources.size || sources.has(g.source)) &&
         (!installedOnly || g.installed) &&
         (!favOnly || g.favorite),
     );
     if (query.trim()) {
       return list
-        .map((g) => ({ g, s: Math.max(fuzzy(query, g.title), fuzzy(query, `${g.genre} ${platformLabel[g.platform]}`) - 5) }))
+        .map((g) => ({ g, s: Math.max(fuzzy(query, g.title), fuzzy(query, `${g.genre} ${g.editionLabel ?? ""} ${platformLabel[g.platform]} ${methodLabel[launchMethod(g)]}`) - 5) }))
         .filter((x) => x.s >= 0)
         .sort((a, b) => b.s - a.s)
         .map((x) => x.g);
@@ -56,17 +62,23 @@
   // Typing anywhere jumps into search, like a console launcher.
   function onKey(e: KeyboardEvent) {
     if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && document.activeElement !== search) {
-      if ((document.activeElement as HTMLElement)?.tagName === 'INPUT') return;
+      if (!e.key.trim() || (e.target instanceof HTMLElement && e.target.closest('input, textarea, select, [contenteditable=true]'))) return;
       search.focus();
     }
   }
 
+  $effect(() => { JSON.stringify([query, platform, method, [...sources], installedOnly, favOnly, sort, collection]); visibleCount = 48; });
+  const grouped = $derived(groupGames(shown, app.variantPreferences));
+
+  const filtering = $derived(!!query || !!platform || !!method || sources.size > 0 || installedOnly || favOnly);
+  function clearFilters() { query = ''; platform = ''; method = ''; sources = new Set(); installedOnly = false; favOnly = false; }
   const dur = $derived(app.reduceMotion ? 0 : 260);
 </script>
 
 <svelte:window onkeydown={onKey} />
 
 <div class="library">
+  <header class="library-heading"><div><span class="eyebrow">Your collection</span><h1>{collection === 'ps2' ? 'PlayStation 2' : 'Library'}</h1><p>Choose a game, then choose how you play.</p></div><div class="heading-actions"><button class="btn glass small" data-nav onclick={() => app.go('tools')}><Icon name="controller" size={16} /> Tools & launchers</button><button class="btn glass small" data-nav onclick={() => app.addSystemFolder('ps1')}><Icon name="plus" size={16} /> Add PS1 folder</button><button class="btn primary small" data-nav onclick={() => app.addPs2Folder()}><Icon name="plus" size={16} /> Add PS2 folder</button></div></header>
   <div class="bar glass-panel">
     <label class="search">
       <Icon name="search" size={18} />
@@ -81,6 +93,14 @@
       <button class="chip" class:on={installedOnly} data-nav onclick={() => (installedOnly = !installedOnly)}>Installed</button>
       <button class="chip" class:on={favOnly} data-nav onclick={() => (favOnly = !favOnly)}><Icon name="star" size={14} filled={favOnly} /> Favourites</button>
     </div>
+    <select bind:value={platform} data-nav aria-label="Platform">
+      <option value="">All platforms</option>
+      {#each platforms as p}<option value={p}>{platformLabel[p]}</option>{/each}
+    </select>
+    <select bind:value={method} data-nav aria-label="Run method">
+      <option value="">All run methods</option>
+      {#each Object.entries(methodLabel) as [key, label]}<option value={key}>{label}</option>{/each}
+    </select>
     <select bind:value={sort} data-nav aria-label="Sort">
       <option value="title">A → Z</option>
       <option value="recent">Recently played</option>
@@ -91,7 +111,7 @@
     </select>
   </div>
 
-  <p class="count">{shown.length} {shown.length === 1 ? 'game' : 'games'}</p>
+  <div class="results"><p class="count" aria-live="polite">{grouped.length} {grouped.length === 1 ? 'game' : 'games'}{shown.length !== grouped.length ? ` · ${shown.length} play options` : ''}</p>{#if filtering}<button class="reset" data-nav onclick={clearFilters}>Clear filters</button>{/if}</div>
 
   {#if !shown.length && (app.libraryStatus === 'loading' || app.libraryStatus === 'failed' || query || app.games.length)}
     <div class="empty-banner">
@@ -100,7 +120,7 @@
       {:else if app.libraryStatus === 'failed'}
         <p>{app.loadError ?? 'Could not open the library.'}</p>
       {:else}
-        <p>Nothing matches “{query}”.</p>
+        <p>{query ? `No games match “${query}” and these filters.` : 'No games match these filters.'}</p><button class="btn glass small" data-nav onclick={clearFilters}>Clear filters</button>
       {/if}
     </div>
   {:else if !shown.length && !query && app.games.length === 0}
@@ -114,10 +134,12 @@
     </div>
   {/if}
 
+  {#if app.lutrisError}<div class="empty-banner"><p>Lutris refresh failed. Previously imported entries may be out of date.</p><button class="btn glass small" data-nav onclick={() => app.go('tools')}>Check connection</button></div>{/if}
   <div class="grid">
-    {#each shown as game (game.id)}
+    {#each grouped.slice(0, visibleCount) as group (group.game.id)}
       <div animate:flip={{ duration: dur }} in:scale={{ start: 0.92, duration: dur }}>
-        <Cover {game} showTitle />
+        <Cover game={group.game} showTitle />
+        {#if group.entries.length > 1}<span class="variants">{group.entries.length} play options</span>{/if}
       </div>
     {:else}
       {#if !query && app.games.length === 0 && app.libraryStatus !== 'loading' && app.libraryStatus !== 'failed'}
@@ -127,9 +149,17 @@
       {/if}
     {/each}
   </div>
+  {#if grouped.length > visibleCount}<div class="load-more"><button class="btn glass" data-nav onclick={() => (visibleCount += 48)}>Show more games · {Math.min(visibleCount, grouped.length)} of {grouped.length}</button></div>{/if}
 </div>
 
 <style>
+  .load-more { display:flex; justify-content:center; margin-top:28px; }
+  .library-heading { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:18px; margin:4px 0 26px; }
+  .library-heading h1 { font-size:34px; margin:5px 0 8px; letter-spacing:-.8px; }
+  .library-heading p { margin:0; font-size:14px; color:var(--text-dim); }
+  .heading-actions { display:flex; flex-wrap:wrap; gap:8px; }
+  .results { display:flex; justify-content:space-between; align-items:center; margin-top:10px; }
+  .reset { color:var(--text-soft); border:0; background:none; padding:10px; font:inherit; font-size:12px; cursor:pointer; }
   .library {
     padding: 28px var(--gutter) 40px;
   }
@@ -196,6 +226,7 @@
     font: inherit;
     padding: 0 10px;
   }
+  .variants { font-size: 12px; color: var(--text-dim); }
   .count {
     margin: 18px 2px 4px;
     color: var(--text-dim);

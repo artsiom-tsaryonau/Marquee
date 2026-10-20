@@ -3,6 +3,7 @@
 export type Source = 'steam' | 'gog' | 'epic' | 'lutris' | 'port' | 'rom';
 
 export type Platform =
+  | 'unknown'
   | 'pc-linux'
   | 'pc-windows'
   | 'nes'
@@ -28,6 +29,15 @@ export type SetupState = 'runner_missing' | 'missing' | 'unverified' | 'launch_t
 
 export interface GameEntry {
   id: string;
+  /** Explicit catalogue identity, independent of a concrete installation ID. */
+  canonicalId?: string;
+  editionKey?: string;
+  editionLabel?: string;
+  launchMethod?: import('./unified').LaunchMethod;
+  heroUrl?: string;
+  screenshots?: { url: string; caption: string }[];
+  mediaCredit?: string;
+  mediaSource?: string;
   title: string;
   tagline: string;
   platform: Platform;
@@ -50,6 +60,7 @@ export interface GameEntry {
   achievements: { unlocked: number; total: number } | null;
   /** Steam games: PICS app info + Web API (see roadmap, "Steam data the way SteamDB gets it"). */
   steam?: SteamInfo;
+  lutris?: { service: string; storeId: string | null; runner: string | null };
   /** Ports only: requirement state shown on the card. */
   portStatus?: PortStatus;
   art: Art;

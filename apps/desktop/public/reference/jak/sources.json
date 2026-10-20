@@ -1,0 +1,63 @@
+{
+  "retrieved": "2026-10-20",
+  "upstream_revision": "b524162109d4dcd777814196ee01a15df6b82781",
+  "rights": "Third-party artwork and screenshots retain their respective owners rights; reference/demo use. The project code license does not relicense these assets.",
+  "assets": [
+    {
+      "file": "cover.jpg",
+      "url": "https://raw.githubusercontent.com/xlenore/ps2-covers/main/covers/default/SCUS-97124.jpg",
+      "caption": "PS2 US retail cover; SCUS-97124",
+      "sha256": "271c6e1c56212287bf130642bc5388a687c1ba8d6655b1c80ccc68193a644001",
+      "bytes": 203855
+    },
+    {
+      "file": "hero.webp",
+      "url": "https://raw.githubusercontent.com/open-goal/open-goal.github.io/b524162109d4dcd777814196ee01a15df6b82781/static/img/home/jak1/12pm.webp",
+      "caption": "OpenGOAL Jak 1 home page scene, midday",
+      "sha256": "90458a29c4ae345753c8defcee1f62e6050faca92d6247789df183939a83c6ff",
+      "bytes": 170242
+    },
+    {
+      "file": "sunset.webp",
+      "url": "https://raw.githubusercontent.com/open-goal/open-goal.github.io/b524162109d4dcd777814196ee01a15df6b82781/static/img/home/jak1/6pm.webp",
+      "caption": "OpenGOAL Jak 1 home page scene, evening",
+      "sha256": "0d47450b6ac334425f5603194f1d78a42bf0dce5108ba22c010e96e1e4e2a511",
+      "bytes": 70136
+    },
+    {
+      "file": "night.webp",
+      "url": "https://raw.githubusercontent.com/open-goal/open-goal.github.io/b524162109d4dcd777814196ee01a15df6b82781/static/img/home/jak1/11pm.webp",
+      "caption": "OpenGOAL Jak 1 home page scene, night",
+      "sha256": "53aa7b7b1b9458c317ceb72d2425d622914b569e4f42ca07114a09f36bbec49d",
+      "bytes": 99452
+    },
+    {
+      "file": "opengoal-logo.png",
+      "url": "https://raw.githubusercontent.com/open-goal/open-goal.github.io/b524162109d4dcd777814196ee01a15df6b82781/static/img/logo.png",
+      "caption": "OpenGOAL project logo",
+      "sha256": "d48eb0587a2eeb8ed788f6fbe58c22ef640bf44476dd0c1d3ba542cf82cc8228",
+      "bytes": 9248
+    },
+    {
+      "file": "misty-island.avif",
+      "url": "https://raw.githubusercontent.com/open-goal/open-goal.github.io/b524162109d4dcd777814196ee01a15df6b82781/static/gallery/jak1/promo/promo-box4.avif",
+      "caption": "Misty Island ambush (NTSC-U box image recreation)",
+      "sha256": "5ca3a14708319b276687a641b71b57be61e70d950ea6dbed5b83a69c6f6e8517",
+      "bytes": 2775720
+    },
+    {
+      "file": "geyser-rock.avif",
+      "url": "https://raw.githubusercontent.com/open-goal/open-goal.github.io/b524162109d4dcd777814196ee01a15df6b82781/static/gallery/jak1/promo/promo-box2.avif",
+      "caption": "Punching in Geyser Rock (NTSC-U box image recreation)",
+      "sha256": "a1880c433ff69bcb2a9a21d0238ae54cc68218fc4ac6d54dcc12bfa53aaa5bd5",
+      "bytes": 3649347
+    },
+    {
+      "file": "subtitles.avif",
+      "url": "https://raw.githubusercontent.com/open-goal/open-goal.github.io/b524162109d4dcd777814196ee01a15df6b82781/static/gallery/jak1/promo/promoE1.avif",
+      "caption": "OpenGOAL subtitle support for in-game hints",
+      "sha256": "c88515311be9a6d97bc5754116ea23c8c20994a6e49715a07268f7c4cd59f4e9",
+      "bytes": 4759123
+    }
+  ]
+}

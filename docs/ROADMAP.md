@@ -1,609 +1,186 @@
-# Marquee — Game Launcher Roadmap
+# Marquee roadmap
 
-Status: **phase 0 closed** (native window, MIT license), plus three **out-of-sequence slices** landed 2026-10-20: the offline PS2 library, the first **ports manager** (phase 3, five ports), and the **shared web/desktop surface**. Last updated 2026-10-20.
+Updated 2026-10-21. This is the authoritative product direction and implementation order. The direct-store decision supersedes earlier Lutris-first plans and numbered phase ordering.
 
-This roadmap is still the long-term plan. Work actually landed is tracked in [PS2.md](PS2.md). The owner reordered it on 2026-10-20: ports and the shared surface first, **Steam installed games next**, then Lutris import, then real artwork. [PS2_METADATA_FOLLOWUP.md](PS2_METADATA_FOLLOWUP.md) still waits for the PCSX2 launch/exit gate, which is a manual check.
+## Product decision
 
-**Next up, in order**
-1. Run the PCSX2 gate by hand (BIOS + own ISO): Play → quit → duration → no stale "busy".
-2. PS2 serial → title lookup (PCSX2 `GameIndex.yaml`, Redump or libretro DATs; none need a login). Today titles come from file names.
-3. Steam installed games: library folders and `appmanifest_*.acf`, covers from Steam's CDN, launch with `steam://rungameid/<id>`. No key and no login handled by Marquee.
-4. Lutris import (keep existing Wine entries), then SteamGridDB covers (keys are managed in Settings → API keys; see `crates/core/src/keys.rs`).
-5. Steam extras, all optional: owned-but-not-installed (user's own Web API key + SteamID), news (`ISteamNews`, no key), wishlist and sales (store endpoints, undocumented, best-effort).
-6. Controller support and Big Screen; replace the heaviest blur/backdrop effects if GPU load is still high.
+Marquee is the user's single game launcher: connect Steam, Epic, and GOG, see owned games together, install, update, and play. The user should not need to install or configure Lutris, Heroic, Wine prefixes, or helper commands themselves for the supported normal flow.
 
-**Current implementation milestone (ahead of phase 1):** solidify the offline PS2 core and desktop app (library, **Marquee-managed PCSX2 unpack**, covers, sessions, UI chrome). **Live PCSX2 Play → quit → duration is pending.** See [PS2.md](PS2.md).
+Marquee owns the interface, library, store-connection workflow, installation jobs, compatibility policy, runtime selection, prefixes, and per-game settings. Existing components supply store protocols and game execution. Lutris is not a product dependency or the authority for the user's store ownership. The existing Lutris bridge is legacy optional functionality; improving it is not on the critical path.
 
-Integration candidates and detailed collection proposals: [EXPANSION_CATALOGUE.md](EXPANSION_CATALOGUE.md).
+| Responsibility | Chosen direction |
+| --- | --- |
+| Steam | Direct Steam adapter; official Steam client performs login, installation, updates, and execution, including Proton |
+| Epic | Direct Epic adapter driven by a tested Legendary backend |
+| GOG | Direct GOG adapter; gogdl for supported authentication/download/update/launch operations, plus explicit library integration where needed |
+| Windows games outside Steam | Marquee-managed umu/Proton, isolated prefixes, dependency recipes, and per-game fixes |
+| Native games and ports | Direct executable/adaptor launch; no compatibility layer when a supported native build is chosen |
+| Emulation | Per-system adapters and managed supported emulator builds; system/game data prerequisites remain explicit |
+| Lutris/Heroic | Optional legacy imports or exceptional fallback, never required for connecting Steam/Epic/GOG |
 
-## Vision and scope
+Wine is an execution component. It does not provide owned-library sync, store authentication, game downloads, or patch management. Marquee must implement those workflows through store adapters. Helper reuse reduces protocol/runtime work; it does not make Marquee's orchestration automatic without implementation.
 
-Marquee (working name) is one console-style launcher for Fedora that shows every game you own — Steam, GOG, Epic, Lutris/Wine apps, emulated games and native decomp/recomp ports — in a single library that looks as good as Steam Big Picture and is driven by mouse or controller.
+## Current implementation versus target
 
-It is a **front end over existing engines**, not a replacement for them: Lutris, Steam and Legendary keep doing installs, Wine/Proton and compatibility. **Emulator binaries are Marquee-managed** (official builds unpacked into the data dir; PCSX2 is the first). BIOS, firmware and game files stay user-supplied. Marquee owns the library, the look, artwork, the ports catalogue and launching.
+These are working-tree capabilities, not a claim that every live acceptance gate has passed.
 
-**Goals**
+| Area | Current state |
+| --- | --- |
+| Core and surfaces | Rust core/CLI, Tauri/Svelte desktop, shared authenticated loopback browser surface, event hub, MIT application license |
+| Disc library | PS2 import/PCSX2 support; PS1 ISO/CHD and DuckStation slice added in the shared tree; live emulator acceptance remains tracked separately in [PS2](PS2.md) and [PS1](PS1.md) |
+| Sessions and corrections | Persistent sessions, recovery/checkpoint work, staged port updates, mutation invalidation, and per-file scan warnings; see [correction report](CORRECTION_PASS.md) |
+| Native ports | Five managed recipes; binary installation is not proof that required game data is ready |
+| Unified library UI | Platform/run-method/source filters, explicit grouping, edition/run selectors, Jak/OpenGOAL reference assets; persistent normalized backend remains planned |
+| Tools | Persisted external shortcuts, readiness checks, pinning, detected command presets, structured executable/arguments/cwd; see [Tools](LAUNCHERS.md) |
+| Legacy Lutris bridge | Local read-only installed/cache projection and handoffs exist. Current code auto-discovers an existing database. Moving this behind an optional legacy integration is planned; documentation changes do not disable it |
+| Direct Steam/Epic/GOG | Not implemented as end-to-end native store integrations. Command shortcuts and Lutris cache entries do not count as direct integrations |
+| Compatibility automation | umu/Proton lifecycle, automatic prefix/dependency setup, and real Windows-app installation remain planned; the Windows-app wizard is a demo |
+| Metadata and packaging | Serial covers exist; broader metadata, native gamepad integration, packaged updates, and release verification remain separate work |
 
-- One library: every store game Lutris and Steam already know about, plus ports and ROMs, with unified search, filters and favourites.
-- Beautiful by default: hero art, logos, blurred backdrops and smooth transitions, pulled automatically for every entry.
-- Two modes from one app: Desktop (window, mouse) and Big Screen (fullscreen, controller, 10-foot UI).
-- Ports manager: install, update and verify decomp/recomp ports from a catalogue, and check the game files each needs.
-- Zero manual setup for things Lutris and Steam already know.
+## Work order
 
-**Non-goals**
+1. **S1 — Direct Steam:** installed library first, then authorized owned-library sync, installation handoff, and live launch/return evidence.
+2. **C1 + E1 — Managed compatibility and Epic:** establish the minimum Windows runtime/prefix/job infrastructure needed by the first supported Epic game, then ship the Legendary-backed account/library/install/play flow.
+3. **G1 — Direct GOG:** account/library integration, gogdl jobs, native-versus-Windows build selection, and the same lifecycle/UI contracts.
+4. **U1 — Unified-library completion:** progressively persist shared identity/edition/installation/profile data as stores land; finish linking, defaults, saves, and controller-first polish.
+5. Continue native-port and emulation expansion through [the catalogue](EXPANSION_CATALOGUE.md) and [Jak/OpenGOAL track](UNIFIED_LIBRARY.md), after the direct-store critical path unless explicitly reprioritized.
+6. Packaging, distribution, updater, optional enrichment, and advanced collections.
 
-- No ROM or game-data downloads. The catalogue points to official port releases only; you supply your own game files.
-- Not a Lutris fork: no Wine management, no store login code where Lutris or Legendary already handle it.
-- Not cross-platform in v1: Fedora/Linux first; Windows/macOS only if it falls out for free.
+Existing PS2/PS1 live gates remain open until actual evidence closes them. They remain acceptance requirements for those features; the owner has authorized direct-store work to proceed without waiting for them. Metadata providers, extra emulator generations, torrent integration, and legacy-launcher imports do not block S1/E1/G1.
 
-## Repository
-
-One public repo holds the app, the core, the CLI and the port catalogue. The catalogue lives in `catalog/` and is published as its own signed `index.json` release asset, so it can update without a new app release. Split it into a separate `marquee-catalog` repo only if it ever needs its own contributors or release cadence.
-
-| Part | Holds | Releases |
-| --- | --- | --- |
-| App | Tauri app, Rust core crate, CLI, docs, packaging | Tagged app releases: AppImage, RPM, later Flatpak, plus `latest.json` for the auto-updater |
-| `catalog/` | One YAML file per port, system definitions for emulators, JSON schema, validator | A signed `index.json`, rebuilt by `tools/build-index` and uploaded as a release asset |
-
-**Layout**
-
-```
-marquee/
-  apps/desktop/          Tauri 2 + Svelte 5 + TypeScript (the UI)
-    src/                 routes, components, focus engine, theme tokens
-    src-tauri/           Tauri shell (commands, dialog, single-instance, asset protocol; gamepad/`gilrs` and updater not added)
-  crates/core/           marquee-core: library DB, PS2 scan, PCSX2 unpack/launch, serial covers, sessions (Lutris/Steam/ports not added)
-  crates/cli/            `marquee` CLI over the same core (scripting, tests, debugging)
-  catalog/
-    ports/               (planned) shipwright.yml, zelda64recomp.yml, ...
-    systems/             ps2.json (built-in; other systems planned)
-    windows/             (planned) launcher recipes
-    schema/              (planned) port.schema.json, system.schema.json
-  tools/build-index      (planned) validates every catalogue file, checks upstream repos exist, writes index.json
-  packaging/             (planned) rpm spec, flatpak manifest, .desktop file
-  docs/                  PS2.md (current slice), ROADMAP.md (this plan), EXPANSION_CATALOGUE.md, PS2_METADATA_FOLLOWUP.md
-  scripts/               fedora-deps.sh, bootstrap.sh, check.sh, tauri-dev.sh, make-icon.py (run locally; no hosted CI)
-```
-
-**License:** MIT (decided 2026-10-20). Marquee only calls Lutris's CLI and reads its database, so GPL was a choice, not an obligation. Catalogue data: CC0 so anyone can reuse it.
-
-**Checks and releases (local, no GitHub Actions)**
-
-- **`scripts/fedora-deps.sh`:** Fedora WebKit/DBus/Tauri devel packages (`sudo dnf` only for what is missing). **`scripts/bootstrap.sh`:** that plus rustc/node/pnpm checks. **`scripts/tauri-dev.sh`:** `pnpm tauri dev` with `WEBKIT_DISABLE_DMABUF_RENDERER=1` (NVIDIA Wayland).
-- **`scripts/check.sh`:** `cargo fmt --all --check`, clippy/tests for core+CLI (desktop crate still excluded from clippy/test), `cargo check -p marquee-desktop` (prints `BLOCKED` if WebKit/DBus devel are missing; **exits 1** if they are present and compile fails), then `pnpm check`, `pnpm test`, `pnpm build`. Run it before every push; agents run it too.
-- **`scripts/release.sh <version>`:** builds AppImage + RPM with `cargo tauri build`, signs the updater bundle, writes `latest.json`, tags, and publishes a GitHub Release with `gh release create`.
-- **Releases:** the app's updater reads `latest.json` from the newest release, so updates are one click and need no server.
-- **Issues:** templates for "Broken port", "Missing artwork" and "Bug"; the app's "Report a problem" button opens a pre-filled issue URL, so no token is needed.
-- **Dependencies:** `cargo update` and `pnpm update` by hand or by an agent, then `scripts/check.sh`.
-- **Site (later):** a small page with screenshots and install instructions.
-
-Workflow: commit straight to main (sole contributor); `scripts/release.sh` makes the tags and releases.
+Detailed implementation handoff: [Direct store integration](STORE_INTEGRATION.md). That document owns step-by-step store/runtime tasks and acceptance scenarios.
 
 ## Architecture
 
-**Key management is built (2026-10-20).** `crates/core/src/keys.rs` holds the registry of known keys; values resolve saved-in-Marquee, then environment, then `.env`; saved values go in `<config dir>/keys.json` (mode 600) and secrets are never sent to the UI or over HTTP, only a masked preview. The system keyring is still the stated goal for the packaged app; the store is isolated behind `KeyStore`, so swapping it in is local to that file.
-
-**One app, two surfaces (built 2026-10-20).** The native window and a browser tab are the same application. `crates/core/src/api.rs` is the single command layer (`dispatch(command, args)`); the Tauri window calls it through one `core_call` command, and `server.rs` exposes it over HTTP on `127.0.0.1` (default port 47820, `MARQUEE_PORT`). `hub.rs` is the one event stream both read, so a scan or install started in either surface shows up in both. The browser needs the token from `<data dir>/server.token` (every API and cover request, loopback only, foreign `Host` rejected); the UI picks its connection at startup: native window, browser with a token, or the invented demo as a fallback (`?demo=1`). `marquee serve` runs the same server headless. Remote (non-loopback) access is deliberately not built.
-
-Three layers: a Svelte UI that only draws, a Rust core that knows every source, and the existing tools that actually run games. The UI talks to the core through Tauri commands and events; the CLI uses the same core, so every feature can be tested without the UI.
-
 ```mermaid
 flowchart TB
-  subgraph UI["apps/desktop — Svelte UI (draws only)"]
-    Home & Library & Game[Game page] & Ports & Settings
-  end
-  CLI["crates/cli — marquee CLI"]
-  subgraph Core["crates/core — marquee-core"]
-    library & sources & artwork & ports_m[ports] & emulation & runner & secrets & settings
-  end
-  subgraph Tools["Existing tools and data (never replaced)"]
-    Lutris & Steam & Legendary & umu["umu-launcher / Proton"] & Emulators["Emulators (Marquee unpack)"] & GitHub["GitHub Releases / optional Flathub"] & SGDB[SteamGridDB]
-  end
-  UI -- "Tauri commands + events" --> Core
-  CLI --> Core
-  Core --> Tools
+  UI[Marquee desktop and browser] --> Core[Shared Rust core and CLI]
+  Core --> Library[Games / editions / store products / installations / profiles]
+  Core --> Jobs[Persistent jobs and lifecycle events]
+  Core --> Stores[Direct store adapters]
+  Stores --> Steam[Official Steam client]
+  Stores --> Epic[Legendary backend]
+  Stores --> GOG[GOG adapter and gogdl]
+  Core --> Runtime[Managed umu / Proton and dependency recipes]
+  Core --> Native[Native ports and emulator adapters]
+  Core -. optional legacy integration .-> Legacy[Lutris / Heroic]
 ```
 
-The app and the CLI share one core; only the bottom layer touches stores, files and emulators.
+Separate **where a game was acquired**, **where its files are installed**, and **how it runs**. A GOG purchase remains a GOG product when launched through Proton. Two stores' releases of the same title can share a canonical game while retaining separate entitlements, editions, files, saves, and launch profiles. Never merge by title alone.
 
-**Core modules (`marquee-core`)**
-
-| Module | Job |
+| Contract | Owns |
 | --- | --- |
-| `library` | SQLite database of unified game entries, search index, favourites, collections, playtime |
-| `sources` | One adapter per source behind a `Source` trait: `scan()`, `launch()`, optional `install()` / `uninstall()` |
-| `artwork` | Fetch, cache and resize cover, hero, logo and icon images; extract an accent colour per game |
-| `metadata` | Match each entry to IGDB and other databases; fetch and cache scores, reviews summary, time to beat, achievements, compatibility notes |
-| `ports` | Read the catalogue index, install/update ports from GitHub Releases or Flathub, verify game files |
-| `emulation` | System definitions, ROM folder scan, hash identification, emulator argv. PCSX2 launch is already in `runners`; this module is the multi-system expansion. |
-| `tools` | Detect, install, update and remove launchers and helpers. **PCSX2 already unpacks the official AppImage into Marquee’s data dir** (cx-script-style, no distro wizard). Steam/Lutris/Heroic/Proton/other emulators are still phase 3. |
-| `runner` | Start a game, track its process for playtime, report "running" / "exited" to the UI |
-| `secrets` | API keys and tokens in the system keyring (GNOME Keyring via Secret Service), never in files |
-| `settings` | ROM folders, enabled sources, theme, controller mapping |
-
-**Unified game entry**
-
-| Field | Example |
-| --- | --- |
-| `id` | `steam:1623730`, `gog:1207658924`, `lutris:purple`, `port:shipwright`, `rom:n64/<sha1>` |
-| `title`, `sort_title` | Palworld |
-| `platform` | pc-linux, pc-windows, n64, gamecube, ... |
-| `source` | steam, gog, epic, lutris, port, rom |
-| `installed`, `install_path` | true, `~/Games/ports/shipwright` |
-| `launch` | `{kind: "uri", target: "steam://rungameid/1623730"}` or `{kind: "exec", argv: [...]}` |
-| `artwork` | local paths for cover, hero, logo, icon + accent colour |
-| `ratings` | per-source scores with fetch date, e.g. `{steam_reviews: 94, igdb_critic: 88, opencritic: null}` |
-| `time_to_beat` | main / main + extras / completionist hours, from IGDB |
-| `playtime_min`, `last_played` | from Steam/Lutris, or tracked by `runner` |
-| `tags`, `favorite`, `hidden` | user data, never overwritten by a rescan |
-
-The same game from two sources (for example Fallout on both GOG and Steam) stays two entries, grouped under one title on its game page.
+| Store adapter | Discovery, connection/authentication orchestration, owned-library sync, product/build/DLC identity, supported install/update/verify/remove operations |
+| Runtime adapter | Compatible runtime detection/acquisition, version selection, prefix, dependencies, environment, executable/argv construction |
+| Installation/job service | Destination selection, storage checks, progress/cancel/retry, readiness validation, recovery, safe update promotion |
+| Session service | Verified actual game lifecycle, exit/return events, exactly-once time accounting; client handoff alone is not a game session |
+| Library service | Stable identities, user titles/favorites/defaults, cached metadata, provider provenance, offline state |
+| Tools service | Supported helper versions, health, acquisition/update/rollback, managed/external state; paths and argv stay advanced |
+| Credential service | Backend-owned or OS-keyring credentials; redaction, expiry/reconnect, disconnect policy |
 
-**Storage (XDG paths)**
+Extend the existing `api::dispatch` and event hub; browser, desktop, and CLI must share behavior. API contracts must report capability support rather than assuming all stores offer every action. Keep external-database reads read-only; use store clients/helpers for supported managed operations.
 
-- Database: `~/.local/share/marquee/library.db`
-- Artwork cache: `~/.cache/marquee/art/<id>/` (JPEG covers now; WebP later)
-- Managed runners: `~/.local/share/marquee/runners/<id>/` (PCSX2 unpack: `runners/pcsx2/current`)
-- Isolated emulator config: `~/.local/share/marquee/pcsx2/xdg-config/` (empty `PCSX2/bios/` created; user drops BIOS)
-- Installed ports: `~/Games/ports/<port-id>/` (planned)
-- Config: `~/.config/marquee/config.toml` (planned; `--data-dir` / `MARQUEE_DATA_DIR` override the data root)
-
-Sources are read-only by default: Marquee never writes to Lutris's or Steam's files, except for the optional Steam-shortcut export in phase 7.
+## S1 — Steam
 
-## Integrations
-
-Every source is an adapter that reads what an existing tool already knows; Marquee only adds a store connection where no tool on the machine has one. Order of work: Lutris and Steam first (they already hold most libraries), then ports, emulation, Epic, GOG installs.
-
-| Source | Library from | Launch with | Needs from you | Phase |
-| --- | --- | --- | --- | --- |
-| Lutris | `~/.local/share/lutris/pga.db` (tables `games`, `service_games`) read-only, plus `lutris --list-games --json` | `lutris lutris:rungame/<slug>` | Nothing | 1 |
-| Steam (installed) | `steamapps/libraryfolders.vdf` + `appmanifest_<appid>.acf` (crate `steamlocate`) | `steam steam://rungameid/<appid>` | Nothing | 1 |
-| Steam (owned) | Lutris `service_games` now; Steam Web API `GetOwnedGames` later | Install: `steam steam://install/<appid>` | Web API key + SteamID64 (phase 5) | 1 / 5 |
-| GOG | Lutris `service_games` | Installed: via Lutris entry; not installed: `lutris lutris:install/<slug>` | Nothing | 1 |
-| Ports | catalogue index + `~/Games/ports/` | The port's own binary, AppImage or `flatpak run <id>` | Your game files (ROM, GOG/Steam data) | 3 |
-| ROMs | Folders `~/ROMs/<system>/` | Marquee-unpacked emulator argv (PCSX2 pattern); optional Flatpak | Your own dumps | 4 (PS2 ISO slice already) |
-| Epic | Legendary: `legendary list --json`, `legendary list-installed --json` | `legendary launch <app>` | One-time `legendary auth` login | 5 |
-| Windows apps and launchers (Purple, EA App, ...) | Marquee's own prefixes + imported Lutris Wine entries | `umu-run` with GE-Proton in the app's prefix | The installer, or a recipe that downloads it | 5 |
-| Heroic (optional) | Heroic's JSON library files under `~/.config/heroic/` | `heroic://launch/...` | Nothing | 5 |
-| RomM (optional) | RomM REST API on a self-hosted server | Download ROM, then launch locally | RomM URL + API token | 7 |
-
-Paths for Flatpak installs differ (`~/.var/app/com.valvesoftware.Steam/...`, `~/.var/app/net.lutris.Lutris/...`); every adapter checks both. Verify each command against the tool's current docs when implementing it.
-
-### Steam
-
-> **Steam Web API terms** ([steamcommunity.com/dev/apiterms](https://steamcommunity.com/dev/apiterms), checked 2026-10-20): the key is personal and secret, so every user brings their own and Marquee never bundles one; apps must not intercept or store a Steam password, so login stays in the Steam client and Marquee launches through it; fetch only the signed-in user's own data and say what is stored; at most 100,000 calls a day; never imply Valve endorses Marquee. News (`ISteamNews/GetNewsForApp`) and wishlist work without a key. Prices, specials and new releases come from the store's undocumented endpoints (`appdetails`, `featuredcategories`): optional, cached, and hidden when they fail.
-
-- Find Steam with `steamlocate` (native and Flatpak), then read every library folder's `appmanifest_*.acf` for name, size, install state and path.
-- Artwork comes free from Steam's CDN per appid: `library_600x900.jpg` (cover), `library_hero.jpg` (hero), `logo.png` (logo), all under `https://cdn.cloudflare.steamstatic.com/steam/apps/<appid>/`. Fall back to SteamGridDB when one is missing.
-- Playtime: phase 1 reads Lutris's copy; phase 5 uses `GetOwnedGames` (`playtime_forever`, `rtime_last_played`).
-- Steam must already be running for `steam://` URIs to be instant; start it minimised (`steam -silent`) on Marquee launch if the user enables that.
-
-### Lutris
-
-- Open `pga.db` read-only (`?mode=ro`) and watch the file with the `notify` crate, so new Lutris games appear without a restart.
-- `games` = entries set up in Lutris (installed or not); `service_games` = full store libraries (GOG, Steam, EGS once synced). Join on `service` + `appid` to mark what is installed.
-- Lutris keeps its own playtime and cover art (`~/.local/share/lutris/coverart/`, `banners/`); use them as a fallback.
-- If Lutris's Epic source has no synced games, either sync it in Lutris or use Legendary.
-
-### Epic and GOG
-
-- Epic has no public API. Legendary (open source, Python) already handles login, library, install and launch, so Marquee calls it as a subprocess and parses its JSON output.
-- Login flow: the app opens Epic's login page in a Tauri window, catches the authorisation code, and passes it to `legendary auth --code <code>`.
-- GOG installs stay in Lutris for v1. Native gogdl support (Heroic's downloader) is a later option.
-
-### Windows games and launchers
-
-Marquee replaces the manual Wine setup launchers such as Purple need today: it picks the runtime, prepares the prefix from a recipe, runs the installer, and finds the installed program itself. It cannot fix anti-cheat that blocks Linux; it says so before you try.
-
-**Runtime choice, per game, automatic**
-
-1. Windows game bought on Steam → launch through Steam; Valve picks the Proton version.
-2. Native Linux build exists (Baldur's Gate EE, Neverwinter Nights EE, ...) → use it.
-3. Everything else → `umu-launcher` with GE-Proton or umu-proton. umu runs Proton outside Steam the way Steam does and applies protonfixes: per-game community fixes looked up by store id in the umu database.
-
-**"Add a Windows app" flow**
-
-1. Pick a known launcher from the recipe list (Purple, EA App, Ubisoft Connect, Battle.net, Rockstar, Amazon Games) or choose any `setup.exe`.
-2. Marquee creates `~/Games/<id>/`, picks the Proton version, installs the recipe's winetricks packages (often `corefonts`, `vcrun2022`) and sets its environment variables.
-3. The installer runs; you click through its normal setup window. This is the only manual step.
-4. Marquee reads the Start Menu shortcuts the installer created inside the prefix (`.lnk` files under `ProgramData/Microsoft/Windows/Start Menu/Programs` and the user's AppData Start Menu) and lists them: tick the one to add.
-5. Icon is extracted from the `.exe`; cover and hero art come from SteamGridDB by name.
-
-Where Lutris already has a community install script (EA App, Battle.net, Ubisoft Connect), Marquee can call `lutris lutris:install/<slug>` instead of its own recipe.
-
-**Recipe (in `catalog/windows/`)**
-
-```yaml
-id: ncsoft-purple
-name: NCSOFT Purple
-kind: windows-launcher
-installer: { url: <official download URL>, sha256: <optional> }
-proton: GE-Proton            # or a pinned version known to work
-winetricks: [corefonts, vcrun2022]
-env: {}
-launch_shortcut: "Purple"    # Start Menu shortcut to add
-notes: "Embedded-browser login; anti-cheat depends on the game"
-```
-
-**Before launch and after a failure**
-
-- Badges on the game page: ProtonDB tier, anti-cheat status (from the areweanticheatyet.com database), "Needs its own launcher".
-- Proton version updates are downloaded in the background; nobody picks Wine versions by hand.
-- On a crash: the Proton log is captured and a dialog offers "Try another Proton version", "Reset prefix", "Open ProtonDB", "Report a problem". A version that works is saved for that game.
-- Existing Lutris Wine entries (Purple, EA App, Epic launcher) are imported as they are: Marquee reads the prefix and `exe` from `~/.local/share/lutris/games/<slug>.yml`, so nothing is reinstalled.
-
-### Launchers and tools on demand
-
-Marquee can install the launchers and helpers it builds on, so a fresh Fedora install needs nothing set up by hand. **Policy (decided 2026-10-20, proven on PCSX2):** Marquee manages runner binaries itself, the same way `cx-script` keeps `//DEPS` under `.cx/` instead of a distro wizard. Download an official build, verify a digest, unpack into `$XDG_DATA_HOME/marquee/…`, launch argv with no shell. Flatpak and RPM stay optional channels, not the default for emulators.
-
-Each later tool is one YAML file in `catalog/tools/` (not started except the built-in PS2/PCSX2 path). Settings → **Launchers & tools** will list status (Installed · version, Update available, Not installed) and Install / Update / Remove. PCSX2 already uses the Install dropdown: Recommended unpacks; Flathub is optional.
-
-**How tools get installed, in order of preference**
-
-1. **Marquee-managed unpack (default for emulators and single-file tools):** GitHub Releases (or equivalent official asset), sha256, extract into `$XDG_DATA_HOME/marquee/runners/<id>/`. PCSX2: official `linux-appimage-x64-Qt.AppImage` → `--appimage-extract` → `runners/pcsx2/current/usr/bin/pcsx2-qt`. Isolated `XDG_CONFIG_HOME` under `marquee/pcsx2/`. No FUSE, no Flatpak, no installer wizard. BIOS/firmware stay user-supplied.
-2. **Keep as AppImage:** save the file and run it (may need FUSE). Optional.
-3. **Flathub, user scope** (`flatpak install --user --noninteractive flathub <id>`): optional sandbox for Steam, Lutris, Heroic, RetroArch, or when the user prefers it. Never the default for PCSX2; a host Flatpak must not skip a Marquee unpack.
-4. **Fedora packages through PackageKit:** host tools a sandbox can't replace (MangoHud, Gamescope, GameMode, `steam-devices`). One polkit prompt. Not used for PCSX2.
-5. **GitHub Releases into a well-known home path:** Proton builds into Steam's `compatibilitytools.d/`, Legendary into `~/.local/share/marquee/bin/`.
-
-**Tool file (`catalog/tools/lutris.yml`)**
-
-```yaml
-id: lutris
-name: Lutris
-kind: launcher
-detect:
-  - { flatpak: net.lutris.Lutris }
-  - { command: lutris }
-install:
-  - { kind: flathub, id: net.lutris.Lutris }       # stores/launchers that have no portable tree
-  - { kind: packagekit, package: lutris }
-provides: [library-source, wine-runner]
-# Emulators (PCSX2 pattern) use kind: github-appimage-extract into
-# $XDG_DATA_HOME/marquee/runners/<id>/ instead of Flathub as the default.
-```
-
-**First-run setup**
-
-- On first start Marquee checks what is already installed and shows one screen: "Found Steam and Lutris. Add Heroic for Epic and GOG? Add GE-Proton for Windows games?" with everything ticked that the user's library needs. *(Not built. PCSX2 already installs in place from the empty library / Settings, without that screen.)*
-- When a feature needs a missing tool, the UI says so in place. For example, a PS2 game shows Install PCSX2 (unpack into Marquee), an Epic game shows "Install Legendary to play", a later ROM shows "Install Dolphin". One click installs and continues. BIOS/firmware are never downloaded.
-- Tools Marquee installed are tracked, so "Remove" cleans up only what Marquee added and never a tool the user installed themselves.
-
-**Limits**
-
-- For emulators, the Marquee-unpacked tree is preferred even if a host Flatpak/RPM exists. For store launchers (Steam, Lutris), if both a Flatpak and an RPM exist, Marquee uses the one with the library and doesn't install a second one. Source adapters already read both paths.
-- Marquee never installs drivers, kernel modules, BIOS, or commercial games; it links to Fedora/RPM Fusion docs for NVIDIA instead.
-- If Marquee itself runs as a Flatpak, installs go through `flatpak-spawn --host`; the RPM/AppImage builds call them directly.
-
-### Ports catalogue
-
-Each port is one YAML file in `catalog/`; the app downloads the signed `index.json` built from them.
-
-```yaml
-id: shipwright
-name: Ship of Harkinian
-game: The Legend of Zelda: Ocarina of Time
-platform: n64
-upstream: { github: HarbourMasters/Shipwright }
-install:
-  kind: github-release        # or: flatpak, tarball, appimage
-  asset: "(?i)linux.*\\.zip$"   # regex picked against release assets
-  run: soh.appimage
-requires:
-  - kind: rom
-    sha1: [<accepted ROM hashes from the port's docs>]
-    place: "oot.z64 next to the binary, or pick it in the port's first-run dialog"
-artwork: { steamgriddb: <game id> }
-license: CC0-1.0                # the data file; the port keeps its own license
-```
-
-- Install: GitHub Releases API `GET /repos/{owner}/{repo}/releases/latest`, pick the asset by regex, download into `~/Games/ports/<id>/`, record tag + SHA-256.
-- Update check: compare the stored tag with the latest release, using ETags so checks are free; unauthenticated GitHub allows 60 requests per hour, which is plenty with caching.
-- Requirements: hash the ROM or look for the GOG/Steam install, and show "Ready", "Needs your ROM" or "Needs GOG data" on the card.
-- First catalogue entries (verify each repo path when adding): Ship of Harkinian, 2Ship2Harkinian, Starship, SpaghettiKart, Zelda64Recomp, sm64coopdx, OpenGOAL, UnleashedRecomp, fallout1-ce, fallout2-ce, OpenJKDF2, UZDoom, OpenMW.
-
-### Port families and install adapters
-
-Most ports come from a few shared frameworks, so Marquee needs one handler per family, not per port. Each family also handles game data the same way, which is what the requirement check has to automate.
-
-| Family | Shared framework | Ports | How your game data gets in |
-| --- | --- | --- | --- |
-| HarbourMasters | libultraship (LUS) + Torch asset extractor | Ship of Harkinian, 2Ship2Harkinian, Starship, SpaghettiKart | First run asks for the ROM and extracts it into an `.o2r` archive beside the binary |
-| N64 recomps | N64Recomp + N64ModernRuntime + RT64 renderer | Zelda64Recomp and newer recomps built on it | Pick the ROM on first launch; mods are `.nrm` files |
-| Xbox 360 recomps | XenonRecomp (code) + XenosRecomp (shaders) | UnleashedRecomp | Its installer copies data from your own game files |
-| SM64 ports | n64decomp/sm64 decompilation | sm64coopdx, sm64ex, Render96 | ROM extracted at first run or build time |
-| OpenGOAL | jak-project (GOAL compiler) | Jak and Daxter, Jak II | Its own launcher extracts your disc image |
-| RSDK decomps | Retro Engine v3/v4/v5 | Sonic 1, 2, CD, Mania | `Data.rsdk` from the mobile or Steam versions |
-| Engine rewrites | one engine each | fallout1-ce, fallout2-ce, OpenJKDF2, OpenMW, DevilutionX, UZDoom | Point at your GOG or Steam install folder |
-| Decomp-only projects | zeldaret/oot, zeldaret/mm, pret/pokeemerald, papermario | none — they rebuild the original ROM | Not playable ports; listed only once a port exists |
-
-**Install adapters (`install.kind` in a port file)**
-
-| Adapter | Used for | What it does |
-| --- | --- | --- |
-| `github-release` | Most ports | Releases API, picks the asset by regex, unpacks zip/tar, marks AppImages executable, records tag + SHA-256 |
-| `github-appimage-extract` | Emulators (PCSX2 done) | Same Releases API, then `--appimage-extract` into `$XDG_DATA_HOME/marquee/runners/<id>/current`. Not a port adapter; this is the emulator default. |
-| `flathub` | Ports (and emulators only if the user picks that channel) | `flatpak install --user flathub <id>`; updates with `flatpak update` |
-| `archive-url` | Projects outside GitHub (e.g. OldUnreal) | Direct URL + SHA-256 from the catalogue |
-| `self-managed` | OpenGOAL | Installs the project's own launcher and lets it manage versions and extraction |
-| `build-from-source` | Ports with no binaries (zelda3, sm) | Builds in a Podman container with the toolchain, output into `~/Games/ports/<id>/` |
-| `github-nightly` (later) | Ports that only publish CI builds | Downloads the port's own GitHub Actions artifacts; needs a token, so optional |
-
-**Data-step handlers (`requires` in a port file)**
-
-- `rom`: hash-check a picked file against the port's accepted versions (ports often support only specific ROM revisions), then copy or link it where the port expects it.
-- `store-install`: find the GOG/Steam install of the original game through Lutris or Steam and pass its folder to the port.
-- `first-run`: the port extracts data itself (LUS, Zelda64Recomp, OpenGOAL); Marquee just tells you what to pick.
-
-**GitHub adapter details**
-
-- One client for all GitHub calls: ETag caching, a 60 requests/hour budget unauthenticated, 5,000 with an optional token from the keyring.
-- Follows renamed or transferred repos (GitHub redirects) and flags archived ones in the UI.
-- `tools/build-index --check-upstream` checks that every port's latest release still matches its asset regex; run it before publishing a new catalogue.
-
-Mods (later, phase 7): Thunderstore for N64 recomp mods and GameBanana for HarbourMasters ports are the usual sources; verify each before integrating.
-
-### Emulation
-
-- System definitions live in the catalogue too: extensions, default emulator, GitHub/AppImage unpack recipe, optional Flatpak id, and argv (never a shell string). PCSX2 is the template: unpack first, Flatpak optional.
-- Scan `~/ROMs/<system>/`, hash each file, and match against libretro-database (MIT-licensed, has No-Intro/Redump hashes) for the correct title.
-- Metadata and screenshots: ScreenScraper or IGDB (each needs a free account/API key); artwork from SteamGridDB. PS2 serial JPEG covers are already in the current slice.
-
-### Artwork
-
-- SteamGridDB API (free key) covers everything Steam's CDN does not: grids (600x900), heroes (1920x620), logos (transparent PNG), icons.
-- Pipeline: download once, convert to WebP with the `image` crate, store per game, serve to the UI via Tauri's asset protocol; extract an accent colour for each hero image.
-- User override: drop an image on a game page to replace any artwork.
-
-### Ratings, reviews and game info
-
-Every game page gets a strip of scores and facts from several sites, so old and obscure games get as much context as new Steam releases. Each value is cached with its fetch date, credited by name and links to its source page. Marquee only uses official or documented APIs. Sites without one get a link-out button and are never scraped.
-
-| Site | What Marquee shows | Access | Best for | Phase |
-| --- | --- | --- | --- | --- |
-| Steam Store reviews | User review summary, e.g. "Very Positive · 94% of 120k" | `store.steampowered.com/appreviews/<appid>?json=1&num_per_page=0` (`query_summary`); no key | Steam games | 2 |
-| IGDB | Summary, genres, release date, critic score (`aggregated_rating` + count), user rating, time to beat, cross-store ids | Twitch client id + secret, free (Twitch account with 2FA); about 4 requests/s | Matching every entry to one canonical game; old games | 2 |
-| RAWG | Fallback summary, user ratings and its Metacritic score field | Free API key; requires a visible "data from RAWG" link | Gaps in IGDB | 2 |
-| Steam Web API | Achievements, your unlock progress, global unlock % | `GetSchemaForGame`, `GetPlayerAchievements`, `GetGlobalAchievementPercentagesForApp`; Web API key | Steam games | 5 |
-| ScreenScraper | Ratings, synopsis, media for ROMs, matched by hash | Free account; daily per-user quota | Emulated games | 4 |
-| RetroAchievements | Achievement sets and your progress for emulated games | Free Web API key from your account | Emulated games (RetroArch cores) | 4 |
-| PCGamingWiki | Known fixes, widescreen/ultrawide, controller support, save locations | Open MediaWiki/Cargo API, no key | Windows games, ports | 5 |
-| ProtonDB | Compatibility tier | Community summary JSON per appid (unofficial, keep it optional) | Windows games | 5 |
-| AreWeAntiCheatYet | Anti-cheat status | Open dataset on GitHub | Online Windows games | 5 |
-| OpenCritic | Top Critic Average, % recommended | Licensed API, not public; ask before integrating | Releases since about 2015 | Optional |
-| MobyGames | Critic and user scores, credits, release variants | API key, paid since September 2024; 360 requests/hour | DOS-era and retro games | Optional, user brings a key |
-| SteamDB, Metacritic, HowLongToBeat | Link-out buttons only (SteamDB's data comes from Steam directly; see below) | No public API; SteamDB's FAQ forbids scraping its site | Deep dives | 2 |
-
-#### Steam data the way SteamDB gets it
-
-SteamDB's FAQ says its data comes from Steam itself: the Steam network through SteamKit (PICS, the Product Info Cache Server the Steam client uses; `app_info_print <appid>` in the Steam console shows the same data), Steam's Web APIs, and store pages. Marquee reads those sources directly and never requests steamdb.info.
-
-| Data | Where Marquee gets it | Needs | Phase |
-| --- | --- | --- | --- |
-| App info: developer/publisher, release date, supported OS, controller support, Steam Deck compatibility, store tags, review score, Metacritic score, current build and last update per branch | The Steam client's local cache `appcache/appinfo.vdf` (PICS data), parsed read-only; newer clients write a newer binary layout, so support both | Nothing; covers the apps your Steam client knows | 1 |
-| The same for games not on this machine (wishlist, IGDB matches) | Anonymous PICS request over the Steam network: a SteamKit-style Rust client (e.g. the `steam-vent` crate; check how mature it is) or `steamcmd +login anonymous +app_info_print <appid> +quit` as a fallback | Nothing; anonymous login | 5 |
-| "Updated 3 days ago" badge and patch notes | Build id/time changes in PICS, plus `ISteamNews/GetNewsForApp` | No key | 2 |
-| Players right now | `ISteamUserStats/GetNumberOfCurrentPlayers`, the same Valve number SteamDB charts | No key | 2 |
-| Player-count history | Marquee samples while it runs and keeps a local graph. A full SteamDB-style history needs a server polling around the clock, so this stays small | Nothing | 7 |
-| Current price and discount | Store `appdetails` (`price_overview`, per country) | No key | 7 |
-| Price history and historical low | IsThereAnyDeal API (SteamDB credits it for older Steam prices) | Free key | 7 |
-| Achievement icons and global unlock % | Steam Web API (row above) | Web API key for your own progress | 5 |
-| Depots and manifests | Out of scope: needs ownership and is for downloading, which Steam already does | — | — |
-
-Rules: anonymous wherever possible, never the user's Steam password (the Steam client stays the only thing logged in), batched PICS requests, per-app caching, gentle polling.
-
-**Matching:** store ids first (IGDB's `external_games` maps Steam, GOG and Epic ids), then title + year + platform; ROMs by hash through libretro-database, then IGDB/ScreenScraper. A "Wrong game?" action on the game page lets you pick the right match, and the choice is saved.
-
-**Caching and limits:** results live in the library DB with a per-source TTL (reviews 7 days, static facts 30 days); one queue per site respects its rate limit, and everything shown works offline from cache. API keys go in the keyring through `secrets`.
-
-**What the scores unlock in the UI:**
+- [ ] Move the current Lutris bridge behind an explicit optional legacy setting, preserving saved configurations and external data; remove it from default onboarding.
+- [ ] Detect native and Flatpak Steam plus all library folders; no hardcoded single-root scan.
+- [ ] Read manifests with a proper parser, stable app IDs, install states, missing/offline paths, and duplicate-root handling.
+- [ ] Persist Steam products/installations without overwriting existing disc/port entries or user edits.
+- [ ] Render real imported games in Library and game pages; artwork lookup cannot gate Play.
+- [ ] Launch through the selected Steam installation; Steam owns its compatibility/runtime settings.
+- [ ] Expose Install/Open in Steam for uninstalled products, then reconcile the actual installed state. Do not display a handoff as a completed download.
+- [ ] Add a supported authorized owned-library path, with explicit credential/privacy prerequisites and cached/offline/error states. Installed games must work without a Marquee API key.
+- [ ] Test real launch, return, rescan, restart, native/Flatpak selection, and missing-client behavior. Do not fabricate playtime from the Steam URI helper's process lifetime.
 
-- Game page: score strip (critics, users, Steam reviews), time to beat, achievements progress, ProtonDB/anti-cheat badges, PCGamingWiki fixes.
-- Library: sort by critic score, user score or time to beat; filters "Short (< 5 h)" and "Highly rated".
-- Home: a "Hidden gems in your backlog" row (owned, never played, critic score 80+) and "Quick wins" (under 5 h to beat).
-
-### GitHub
-
-- App updates: Tauri updater plugin reading `latest.json` from the newest GitHub Release (signed).
-- Catalogue updates: download the catalogue `index.json` release asset on startup at most once a day; verify its minisign signature.
-- Feedback: "Report a problem" opens `https://github.com/<owner>/marquee/issues/new?template=broken-port.yml&title=...` pre-filled with port id, version and log tail.
-- Optional token in the keyring raises the API limit to 5,000 requests per hour.
-
-## Visual design
+**First usable increment:** locally installed Steam games appear and launch from Marquee without Lutris.
 
-The look is art-led and dark-first: each game's own hero image fills the screen, blurred behind the UI, and its extracted accent colour tints buttons and focus glows. The clickable Svelte mock-up (`pnpm dev`) **is** the desktop UI. Empty desktop uses the same chrome with procedural art and ghost shelves; it never invents sample games. Extracted accents from downloaded heroes, Steam CDN, and `gilrs` are still later phases.
-
-**Screens**
-
-| Screen | What it shows | Key interactions |
-| --- | --- | --- |
-| Home | Full-bleed hero of the selected game with its logo; rows: Continue playing, Recently added, Ports ready to play, Hidden gems in your backlog, by platform | Left/right moves along a row and swaps the hero; A = play, Y = game page |
-| Library | Virtualised cover grid of every entry, sticky filter bar (source, platform, installed, favourites), instant fuzzy search | Type or press a key to search; grid stays 60 fps at 1,000+ covers |
-| Game page | Hero banner, logo, Play/Install button, source badge, score strip, time to beat, playtime, last played, screenshots, achievements; ports also show requirement status | Play, Install, Update, Open folder, Change artwork, Add to Steam |
-| Ports | Store-like catalogue of ports with "Ready", "Needs your ROM", "Update available" badges | Install with progress; a requirements checklist with file pickers |
-| Downloads | Queue of port installs and updates with progress and logs | Pause, retry, view log |
-| Settings | Connected sources, ROM folders, emulator choices, API keys, theme, controller test; **Launchers & tools** tab with install status of Steam, Lutris, Heroic, Proton builds, emulators and helpers | Connect/disconnect a source; rescan; install / update / remove a tool |
-
-**Visual language**
+**Full S1 acceptance:** the authorized account's owned and installed games appear with truthful states; installation handoff is explicit; installed titles launch; restart preserves IDs and user preferences; missing credentials never break local Play. Unsupported private-library access is reported, not represented as an empty owned library.
 
-- Theme tokens on `:root` (background, surface, text, accent), dark by default with a light theme.
-- Backdrop: the selected hero image at 40-60 px blur behind a dark gradient; cross-fades in 250 ms when focus moves.
-- Cards: 2:3 covers, 12 px radius, scale to 1.06 and glow in the accent colour on focus.
-- Glass panels for overlays (`backdrop-filter: blur`), used sparingly: WebKitGTK renders them on the GPU but heavy stacks drop frames.
-- Type: one bundled variable font (Inter or Manrope), large sizes in Big Screen mode; no fonts loaded from the internet.
-- Motion: Svelte transitions, every animation under 300 ms, and a "Reduce motion" setting that respects the system preference.
-- Optional UI sounds (move, select, back) with a mute toggle.
+## C1 — Compatibility owned by Marquee
 
-**Two modes, one codebase**
-
-- Desktop: windowed, mouse and keyboard, denser grid, sidebar navigation.
-- Big Screen: fullscreen, controller-first, larger covers and text, no hover states; launched with `marquee --big-screen` or from a Gamescope session.
-- Both use the same components with a mode-specific spacing and size scale.
-
-**Controller navigation**
+Build the minimum needed alongside Epic, then reuse it for GOG and later standalone Windows apps.
 
-- Read gamepads in Rust with the `gilrs` crate and send events to the UI; don't rely on the browser Gamepad API, which WebKitGTK builds may not enable.
-- A small focus engine in the UI (about 200 lines): every focusable element registers its row/column; D-pad and stick move focus spatially, A/B/X/Y map to select/back/context/details.
-- Button glyphs switch between Xbox, PlayStation and generic prompts based on the connected controller.
-- When a game is running, Marquee hides; a Guide-button chord brings it back.
+- [ ] Detect compatible existing umu/Proton components; acquire supported official builds when missing.
+- [ ] Maintain helper/runtime version records, integrity evidence, installation health, rollback, and profile pinning. Never update a runtime underneath a running game.
+- [ ] Create an isolated prefix per supported installation/profile; record executable, arguments, cwd, environment, runtime, and recipe version.
+- [ ] Apply tested dependency/protonfix recipes with idempotent steps and useful errors. Windows installer/first-run prompts may still require interaction.
+- [ ] Prefer a verified suitable native build when selected. Do not silently change build, language, save context, or mods.
+- [ ] Track the game process/lifecycle through the chosen wrapper; expose diagnostics and repair. Prefix reset must not silently delete saves.
 
-**Front-end stack**
+**Acceptance:** a supported non-Steam Windows game installs and runs from Marquee on a clean supported setup without the user configuring Lutris, Wine, prefixes, or shell commands. This is per-tested-game support, not a promise of universal Windows compatibility.
 
-Svelte 5 + TypeScript + Vite inside Tauri 2; TanStack Virtual for the grid; plain CSS with tokens (or Tailwind if preferred). React with Norigin spatial navigation is the alternative if you prefer React.
+## E1 — Epic through Legendary
 
-## Roadmap
+- [ ] Pin and health-check a tested Legendary backend; make upstream/fork selection explicit in the implementation record.
+- [ ] Present Epic connect/reconnect/disconnect in Marquee and support required browser sign-in/MFA without exposing tokens to the UI.
+- [ ] Sync the user's owned library and installation records directly from the selected backend; no Lutris cache dependency.
+- [ ] Implement install, progress, cancellation, retry/resume, update/verify, DLC/build options, and failure recovery for supported capabilities.
+- [ ] Integrate C1 and pass required game authentication through the store backend.
+- [ ] Handle saves/cloud conflicts only through verified capabilities; installation and runtime settings persist across restarts.
 
-Eight numbered phases plus an out-of-sequence **PS2 slice** inserted after phase 0 (see [PS2.md](PS2.md)). Each numbered phase ends in something you can use; phase 1 alone would still be “one library of every Lutris/Steam game you own.” Phase 1 has **not** started. The PS2 slice is coded; its live Play gate is open. Sizes assume evenings and weekends: S = 1 week, M = 2–3 weeks, L = 4+ weeks.
+**Acceptance:** on a machine without Lutris or Heroic, connect Epic → select an owned game → install with progress → play via the managed runtime → quit/return → restart and play again. Refresh, authentication expiry, offline cache, cancellation, and interrupted-job recovery remain truthful.
 
-```mermaid
-flowchart LR
-  P0["0 Foundations (S)<br/>themed window, checks green"] --> PS2["PS2 slice (ahead of P1)<br/>ISO + unpack PCSX2 + covers; live Play pending"]
-  PS2 --> P1["1 Unified library (M)<br/>Lutris + Steam games with covers"]
-  P1 --> P2["2 Look + Big Screen (M)<br/>couch-browsable at 60 fps"]
-  P2 --> P3["3 Ports manager (L)<br/>Fallout 2 CE installs and runs"]
-  P3 --> P4["4 Emulation (L)<br/>ROM dump shows and launches"]
-  P4 --> P5["5 More stores + Windows apps (L)<br/>launcher recipe, Epic via Legendary"]
-  P5 --> P6["6 Packaging (M)<br/>v0.1.0 via dnf, self-updating"]
-  P6 --> P7["7 Extras (ongoing)"]
-```
+## G1 — GOG through a direct adapter and gogdl
 
-Each box's second line is the gate that closes the phase; the details and checklists follow.
+- [ ] Pin and health-check gogdl; verify exactly which auth/library/download/install/update/verify/launch/save operations the selected version supports.
+- [ ] Implement the account and owned-library adapter without assuming gogdl exposes a complete library-list command. Reuse verified backend operations; fill adapter gaps explicitly.
+- [ ] Surface GOG sign-in/reconnect/disconnect in Marquee; keep tokens backend-side.
+- [ ] Choose a supported native or Windows build, language, edition, DLC, and extras with clear defaults and storage impact.
+- [ ] Reuse persistent jobs and C1 for Windows builds; launch native builds directly.
+- [ ] Preserve installation/version/save records and implement offline behavior where the selected game/backend supports it.
 
-### Phase 0 — Foundations (S)
+**Acceptance:** without Lutris, Heroic, or GOG Galaxy, connect GOG → see owned games → install a supported title → play → update/verify where supported → restart/offline replay with honest prerequisites. Test native and Windows paths where both builds are supported.
 
-- [x] Create the GitHub repo, this roadmap as `docs/ROADMAP.md`
-- [x] License: MIT, `LICENSE` added; catalogue data CC0
-- [x] Scaffold Tauri 2 + Svelte 5 app and the `core` / `cli` crates in one Cargo workspace
-- [x] Native window compiles and opens on this host (`./scripts/fedora-deps.sh` + `./scripts/tauri-dev.sh`; NVIDIA Wayland needs `WEBKIT_DISABLE_DMABUF_RENDERER=1`)
-- [x] `scripts/check.sh` green on this host (core/CLI/frontend + `cargo check -p marquee-desktop`). Missing WebKit on another machine still prints `BLOCKED` and continues.
-- [x] Clickable mock-up of Home, Library, Game page, Ports, Downloads, Settings (`pnpm dev`); desktop uses the same chrome
+## U1 — Library and UI completion
 
-**Done when:** `pnpm tauri dev` opens the themed UI in a native window and `scripts/check.sh` passes, including the desktop compile. **Met on this host**.
-
-**PS2 slice (coded 2026-10-20, ahead of phase 1):** persistent ISO library, CLI, Tauri commands, **Marquee-managed PCSX2 unpack** (official AppImage into the data dir; Flatpak optional), serial covers, empty-library UI that matches the frontend. Live PCSX2 launch/exit is **not** the phase 0 gate and is **not** closed. Details: [PS2.md](PS2.md).
-
-### Phase 1 — Unified library, read-only (M)
-
-- [ ] Library DB + `Source` trait; Lutris adapter (`games` + `service_games`); Steam adapter (installed via `.acf`)
-- [ ] Launch through `lutris:rungame/` and `steam://rungameid/`
-- [ ] Artwork: Steam CDN for Steam games, Lutris cover art, SteamGridDB for the rest
-- [ ] Library grid with search and filters; game page with Play (PS2-only grid exists; Steam/Lutris sources do not)
-- [x] `marquee scan` and `marquee list --json` in the CLI *(PS2 ISO library. Lutris/Steam listing is still unchecked above.)*
+The normalized data model is shared infrastructure, implemented incrementally when S1 needs it rather than a separate store-blocking rewrite. Use the next available schema version; schema v4 is already allocated to PS1 root systems. Preserve legacy IDs through explicit mappings.
 
-**Done when:** every GOG + Steam game Lutris knows appears with a cover; a Steam game launches via Steam and a Wine app via Lutris from Marquee.
+- Games → content editions → store products/entitlements → installations → launch profiles; project those into one canonical game page.
+- Keep provider/product IDs even when accounts disconnect or builds are unavailable. Define hide/remove/cache policies independently of uninstalling files.
+- Persist game favorites, titles, hidden status, preferred edition/install/profile, and independent histories. Missing defaults must offer alternatives explicitly.
+- Keep store, platform, runtime, and install-state filters separate. Filters must match the same concrete installation.
+- Normal first run: detect existing installations, offer Steam/Epic/GOG connections, show the real library. No required Tools/Add launcher/database-path step.
+- Game page: truthful Install/Play/Update/Verify/Repair actions, edition/run choice, data readiness, screenshots with provenance, and visible errors.
+- Downloads: persistent installation jobs, progress, cancellation, retries, and recovery across desktop/browser. Unsupported delegated progress is labeled as a handoff.
+- Tools: automatically managed components and health; custom commands/paths are advanced overrides.
+- Validate large libraries and keyboard/controller focus. Native Tauri gamepad support and visual/performance testing remain explicit gates.
 
-### Phase 2 — Look and Big Screen (M)
+## Native ports, emulation, and enrichment
 
-Svelte Home (hero + rows), Library grid, Game page, Big Screen scale, reduce-motion, and a browser Gamepad focus engine **already exist** in `apps/desktop`. That is the mock-up / PS2 shell, not this phase closing. Still to do here: real artwork pipeline, `gilrs` in the WebView, and metadata.
-
-- [ ] Home screen driven by real covers/heroes (Steam CDN / SGDB), not only procedural art *(PS2 covers already show; the hero stretches a small cover into a sharp backdrop, which needs a proper treatment)*
-- [x] Idle GPU load: no endless hero zoom, decorative animation pauses when hidden, unfocused or a game is running, gamepads polled only while connected. *Not measured on the NVIDIA Wayland host; the 56px backdrop blur and glass panels remain, and `WEBKIT_DISABLE_DMABUF_RENDERER=1` forces a slower WebKitGTK path.*
-- [ ] `gilrs` gamepad thread feeding the existing focus engine; full controller navigation in the Tauri WebView
-- [ ] Big Screen as a dedicated launch (`marquee --big-screen` / Gamescope); button glyphs; UI sounds that actually play
-- [ ] Playtime and last-played on cards from the core (PS2 sessions already persist; Steam/Lutris not wired)
-- [ ] Favourites persist (PS2: **done** in core); hidden flag still missing
-- [ ] `metadata` module: IGDB matching, Steam review summaries, RAWG fallback, link-outs to SteamDB / Metacritic / HowLongToBeat
-- [ ] Steam app info from local `appinfo.vdf`; players-now and "Updated N days ago" with patch notes
-- [ ] Score strip and time to beat on the game page; score sorts and filters; "Hidden gems" and "Quick wins" rows (demo-only today)
-
-**Done when:** you can browse and launch any game from the couch without touching a mouse, at a steady 60 fps, and 9 in 10 library entries show at least one score.
-
-### Phase 3 — Ports manager (L)
-
-- [ ] Catalogue schema + validator + signed `index.json` built from `catalog/` *(PS2 `catalog/systems/ps2.json` exists; it is not this index.)*
-- [x] First 5 ports: Ship of Harkinian, Zelda64Recomp, sm64coopdx, fallout2-ce, UZDoom (`catalog/ports/*.json`, `crates/core/src/ports.rs`; installed and update-checked from GitHub Releases on 2026-10-20; Play needs your own game files and has not been run on a real session)
-- [ ] Install, update, uninstall from GitHub Releases and Flathub; downloads screen *(install and update from GitHub Releases done; uninstall deliberately not built because the port folder holds your ROMs and data)*
-- [ ] Requirement checks: ROM hash, GOG/Steam install detection, file pickers *(today each card only states what you must supply, and Open folder opens the port folder; nothing is hash-checked yet)*
-- [ ] `tools` module + `catalog/tools/`: detect and install Steam, Lutris, Heroic, RetroArch from Flathub (user scope); PackageKit installs for MangoHud, Gamescope, GameMode, `steam-devices`; Launchers & tools tab. *(PCSX2 is already Marquee-managed: official AppImage unpacked under the data dir, like cx-script deps. This phase generalizes that to other tools.)*
-
-**Done when:** Fallout 2 CE installs, finds your GOG Fallout 2 data, and launches from its card; updates show a badge; Lutris installs from the Launchers & tools tab without a terminal.
-
-### Phase 4 — Emulation (L)
-
-- [ ] System definitions for NES, SNES, N64, GB/GBC/GBA, DS, GameCube/Wii, PS1, PSP. PS2 ISO + PCSX2 is the current slice (`catalog/systems/ps2.json`); this phase adds CUE/CHD and the rest of the family.
-- [ ] ROM folder scan, libretro-database identification, per-system emulator choice
-- [ ] Launch via Marquee-unpacked emulators first (PCSX2 pattern), optional Flatpak / RetroArch cores; per-game emulator override
-- [ ] ScreenScraper ratings and synopsis for ROMs; RetroAchievements sets and progress
-
-**Done when:** dropping a dump into `~/ROMs/n64/` shows it with the right title and art and it launches in the chosen emulator.
-
-### Phase 5 — More stores and Windows apps (L)
-
-- [ ] Epic via Legendary: login window, library, install, launch
-- [ ] Steam Web API: owned-but-not-installed games, playtime, achievements *(optional; the user's own key, stored in the keyring)*
-- [ ] PCGamingWiki fixes and settings notes on Windows game pages
-- [ ] umu-launcher runtime: background GE-Proton updates, protonfixes, one prefix per game
-- [ ] "Add a Windows app" flow: recipes, winetricks, Start Menu shortcut detection, icon extraction
-- [ ] Import existing Lutris Wine entries (Purple, EA App) without reinstalling
-- [ ] ProtonDB and anti-cheat badges; crash dialog with Proton switch and prefix reset
-- [ ] Optional Heroic import
-
-**Done when:** Purple installs from its recipe with no manual Wine steps, and an Epic game installs and launches without the Epic launcher.
-
-### Phase 6 — Packaging and updates (M)
-
-- [ ] `scripts/release.sh`: AppImage + RPM, signed updater bundle, GitHub Release via `gh`
-- [ ] In-app update prompt; catalogue auto-refresh
-- [ ] First-run setup screen: detect installed launchers, offer the missing ones the library needs
-- [ ] RPM repo on Fedora Copr; Flatpak manifest (host access through `flatpak-spawn --host`)
-
-**Done when:** tagging `v0.1.0` produces a release you install with `dnf` and that updates itself.
-
-### Phase 7 — Extras (ongoing)
-
-- [ ] Export any entry to Steam (`shortcuts.vdf`, Steam closed) with its artwork
-- [ ] Gamescope session entry so Fedora boots straight into Big Screen
-- [ ] Save backups through Ludusavi's CLI
-- [ ] RomM connector for a self-hosted ROM library
-- [ ] Collections, achievements display, per-game notes
-
-## Risks and open decisions
-
-The biggest risk is scope: keep each phase shippable and resist adding stores or features before phase 2 feels great.
-
-| Risk | Impact | Mitigation |
-| --- | --- | --- |
-| WebKitGTK drops frames with heavy blur and large grids | Fancy look stutters on the TV | Prototype the hero backdrop + 1,000-cover grid in phase 0; virtualise; one blur layer; "Reduce effects" switch |
-| Lutris database schema changes between versions | Library scan breaks after a Lutris update | Read-only, tolerant column lookup; prefer `lutris --list-games --json` where it has the field; test against the installed version (0.5.22) |
-| Epic login or API changes | Epic library disappears | Depend on Legendary and update it, never reimplement Epic's API |
-| Anti-cheat blocks Linux for a game or MMO | Game installs but never runs | Check the anti-cheat database before install and show "Doesn't run on Linux"; no workarounds |
-| Launcher installer URLs or setups change | Windows-app recipe fails | Recipe check in `tools/build-index` like ports; fall back to "choose setup.exe" |
-| Port release asset names change | Install picks the wrong file or none | Asset regex per port; `tools/build-index --check-upstream` before each catalogue release |
-| GitHub API rate limit (60/hour unauthenticated) | Update checks fail | ETag caching, one catalogue fetch per day, optional token |
-| Installing launchers needs root or a repo the user doesn't have (Steam RPM needs RPM Fusion) | Tool install fails or surprises the user | Emulators unpack into Marquee’s data dir (PCSX2 proven). Flathub/PackageKit only when the user picks them or the tool has no portable build; say before enabling any repo |
-| Flatpak sandbox blocks launching host apps | Flatpak build can't start Steam/Lutris | Ship RPM/AppImage first; Flatpak uses `flatpak-spawn --host` |
-| Legal: catalogue mistaken for a ROM source | Takedowns, bad reputation | Catalogue links only to official port releases; every port lists its game-file requirement; no download links for game data |
-
-**Open decisions**
-
-- [x] Name and owner: `Marquee`, at github.com/artsiom-tsaryonau/Marquee
-- [ ] OpenCritic and MobyGames: worth a licence or user-supplied key, or link-outs only?
-- [x] Svelte or React for the UI — Svelte 5 (implemented)
-- [x] Emulator install: Marquee unpacks official builds into its data dir (cx-script-style). Flatpak/RPM optional. PCSX2 is the first instance.
-- [x] GPL-3.0 or MIT for the app — MIT
-- [ ] Whether Big Screen mode should also run as a Gamescope session from the login screen
-
-## First week
-
-Superseded by the 2026-10-20 PS2 slice: the workspace, CLI, Tauri window, and console UI exist, but they talk to a PS2 library, not Lutris/Steam. Lutris/Steam CLI listing remains phase 1.
-
-Original first-week notes (Fedora 44; package names live in `scripts/fedora-deps.sh`):
-
-1. ~~Install the toolchain~~ (`./scripts/bootstrap.sh` on this host).
-2. ~~Create the repo~~.
-3. ~~Add the Tauri shell~~ (`apps/desktop/src-tauri/`). Window: `./scripts/fedora-deps.sh` then `./scripts/tauri-dev.sh`.
-4. ~~Cargo workspace~~ (`apps/desktop/src-tauri`, `crates/core`, `crates/cli`). Core has rusqlite for PS2 plus `ureq`/`sha2` for install and covers; `steamlocate` / Lutris / keyring / reqwest are still phase 1+.
-5. Write the Lutris adapter first: open `~/.local/share/lutris/pga.db` read-only and print `service_games` grouped by service. Then the Steam `.acf` reader. **Not started** — PS2 slice was built instead.
-6. ~~`scripts/check.sh`~~ (green on this host when WebKit is present).
-7. Get a SteamGridDB API key and store it with `secret-tool store --label=marquee service marquee key steamgriddb`; same for IGDB (Twitch client id + secret) and RAWG when phase 2 starts. **Not started** (serial covers do not use a key).
-8. ~~HTML mock-up of Home, Library and Game page~~ — desktop now uses that look.
-
-- [x] Toolchain installed (this host)
-- [x] Repo on GitHub
-- [x] `pnpm tauri dev` / `./scripts/tauri-dev.sh` opens the window
-- [x] `cargo run -p marquee-cli -- --data-dir … list` prints PS2 editions (not Lutris/Steam)
-- [x] `scripts/check.sh` green on this host
-- [x] Mock-up in use (desktop chrome matches `pnpm dev`)
-- [x] Marquee-managed PCSX2 unpack (official AppImage → data dir; no wizard)
-- [x] LICENSE chosen (MIT)
-- [ ] Live PCSX2 Play → quit → duration (PS2 slice gate, not phase 1)
+Preserve existing work and correctness gates:
+
+- [PS2 slice](PS2.md): PCSX2 setup, user-owned ISO/BIOS, live launch/exit/time evidence.
+- [PS1 slice](PS1.md): DuckStation, per-system roots, supported ISO/CHD, separate live gate.
+- [Expansion catalogue](EXPANSION_CATALOGUE.md): prioritized platforms, port families, legitimate game-data requirements, shelves, streaming, and adapter limits.
+- [Unified-library/OpenGOAL track](UNIFIED_LIBRARY.md): explicit editions/run methods, reference assets, managed Jak extraction and runtime support.
+- [Metadata follow-up](PS2_METADATA_FOLLOWUP.md): ScreenScraper prerequisites and SteamGridDB matching. Broader [metadata and UI enrichment](ENRICHMENT.md) is optional background work and never gates Play.
+- Port installers keep staged extraction, bounded archives, integrity checks, user-data preservation, and rollback. “Binary installed” and “game data ready” remain separate.
+- Port data discovery consumes direct Steam/GOG installation records. A Lutris database is not a prerequisite.
+- BIOS, firmware, original ROM/disc assets, and native-port extraction inputs remain user-supplied. Store-authorized downloads of owned Steam/Epic/GOG games are in scope; the earlier blanket “no game downloads” wording is superseded.
+
+## Packaging and later work
+
+- AppImage/RPM first; packaged helper/runtime acquisition, version pinning, notices, and update recovery.
+- Signed application/catalogue updates and a documented release process. Do not claim a helper is bundled, signed, licensed for a distribution arrangement, or supported before verifying that arrangement.
+- First-run setup must install/configure supported dependencies within Marquee's flow; explain unavoidable OS package or store prompts when they actually occur.
+- Optional later work: save backup/restore, Steam shortcut export, Gamescope sessions, remote-play adapters, collections, metadata enrichment, additional stores and standalone Windows-app recipes.
+- Lutris/Heroic import/fallback remains optional legacy work. No additional Lutris installation/onboarding milestone is required to ship S1/E1/G1.
+- Torrent/tracker integration is deferred outside the current UI/store/runtime scope.
+
+## Verification and handoff rules
+
+For each increment, record the build/helper version, supported environment, tests, actual live scenarios, and unresolved limits. Fake runners, browser demos, installer handoffs, and cached account listings are not evidence of real game launch or successful installation.
+
+Run checks appropriate to the changed code (`scripts/check.sh` for implementation work); document shared-tree/concurrent-change blockers instead of resetting another contributor's work. Documentation-only edits need consistency, link, and whitespace checks rather than unrelated runtime tests.
+
+Retain open emulator acceptance items while proceeding with the owner-authorized store order. No blanket metadata-completeness or compatibility percentage is required to close a store slice. The gate is a verified user-owned game workflow with honest failure/offline states.
+
+## Technical sources
+
+These describe external capabilities, not implementation completion in Marquee:
+
+- [Steam Web API](https://steamcommunity.com/dev), [Steam authentication](https://partner.steamgames.com/doc/features/auth), [owned-game API](https://partner.steamgames.com/doc/webapi/IPlayerService).
+- [Legendary](https://github.com/legendary-gl/legendary): Epic authentication, downloads, updates, launch authentication, and supported save operations.
+- [gogdl](https://github.com/Heroic-Games-Launcher/heroic-gogdl): helper intended for another application to drive; verify library/auth/CLI boundaries before implementation.
+- [umu-launcher](https://github.com/Open-Wine-Components/umu-launcher): Proton runtime execution outside Steam.
+- [Heroic](https://github.com/Heroic-Games-Launcher/HeroicGamesLauncher): reference architecture using Legendary, gogdl, and runtime components. Heroic itself is not required.
