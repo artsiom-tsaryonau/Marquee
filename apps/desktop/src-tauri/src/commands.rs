@@ -3,6 +3,7 @@ use marquee_core::error::{AppError, Result};
 use marquee_core::model::{
     ArtworkReport, LibraryRoot, LibrarySnapshot, Runner, ScanReport, Session,
 };
+use marquee_core::ports::PortInfo;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::{AppHandle, State};
@@ -118,4 +119,39 @@ pub async fn refresh_artwork(
     let core = core(&state);
     let sink = event_sink(&app);
     blocking(move || core.refresh_artwork(edition_id.as_deref(), Some(sink))).await
+}
+
+#[tauri::command]
+pub async fn list_ports(state: State<'_, AppState>) -> Result<Vec<PortInfo>> {
+    let core = core(&state);
+    blocking(move || core.list_ports()).await
+}
+
+#[tauri::command]
+pub async fn check_port_updates(state: State<'_, AppState>) -> Result<Vec<PortInfo>> {
+    let core = core(&state);
+    blocking(move || core.check_port_updates()).await
+}
+
+#[tauri::command]
+pub async fn install_port(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    port_id: String,
+) -> Result<Vec<PortInfo>> {
+    let core = core(&state);
+    let sink = event_sink(&app);
+    blocking(move || core.install_port(&port_id, sink)).await
+}
+
+#[tauri::command]
+pub async fn launch_port(state: State<'_, AppState>, port_id: String) -> Result<()> {
+    let core = core(&state);
+    blocking(move || core.launch_port(&port_id)).await
+}
+
+#[tauri::command]
+pub async fn open_port_folder(state: State<'_, AppState>, port_id: String) -> Result<()> {
+    let core = core(&state);
+    blocking(move || core.open_port_folder(&port_id)).await
 }

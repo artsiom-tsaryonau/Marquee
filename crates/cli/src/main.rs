@@ -40,10 +40,24 @@ enum Command {
     Runners(RunnersCmd),
     #[command(subcommand)]
     Artwork(ArtworkCmd),
+    #[command(subcommand)]
+    Ports(PortsCmd),
     Launch {
         edition_id: String,
     },
     Health,
+}
+
+#[derive(Subcommand)]
+enum PortsCmd {
+    /// Catalogue and install state (offline)
+    List,
+    /// Ask GitHub whether installed ports have a newer release
+    Check,
+    /// Install or update a port from its official GitHub release
+    Install { id: String },
+    /// Start an installed port
+    Launch { id: String },
 }
 
 #[derive(Subcommand)]
@@ -168,6 +182,26 @@ fn run() -> marquee_core::error::Result<()> {
             }));
             let runners = core.install_pcsx2(&channel, sink)?;
             println!("{}", serde_json::to_string_pretty(&runners)?);
+        }
+        Command::Ports(cmd) => {
+            let list = match cmd {
+                PortsCmd::List => core.list_ports()?,
+                PortsCmd::Check => core.check_port_updates()?,
+                PortsCmd::Install { id } => {
+                    let sink = Arc::new(FnSink(|event: CoreEvent| {
+                        if let CoreEvent::PortProgress { message, .. } = event {
+                            println!("{message}");
+                        }
+                    }));
+                    core.install_port(&id, sink)?
+                }
+                PortsCmd::Launch { id } => {
+                    core.launch_port(&id)?;
+                    println!("started {id}");
+                    return Ok(());
+                }
+            };
+            println!("{}", serde_json::to_string_pretty(&list)?);
         }
         Command::Artwork(ArtworkCmd::Refresh { edition }) => {
             let report = core.refresh_artwork(edition.as_deref(), None)?;

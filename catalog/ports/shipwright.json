@@ -1,0 +1,12 @@
+{
+  "id": "shipwright",
+  "name": "Ship of Harkinian",
+  "game": "The Legend of Zelda: Ocarina of Time",
+  "family": "HarbourMasters",
+  "platform": "n64",
+  "github": "HarbourMasters/Shipwright",
+  "asset_suffix": ".appimage",
+  "asset_excludes": ["mac", "win"],
+  "binary": null,
+  "requirement": "Asks for your own Ocarina of Time ROM on first launch"
+}

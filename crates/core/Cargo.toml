@@ -7,12 +7,15 @@ description = "Library, scan, runner and session core for Marquee"
 
 [dependencies]
 libc = "0.2"
+flate2.workspace = true
 rusqlite.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+tar.workspace = true
 ureq.workspace = true
 uuid.workspace = true
+zip.workspace = true
 
 [dev-dependencies]
 tempfile = "3"

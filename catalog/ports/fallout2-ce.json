@@ -1,0 +1,12 @@
+{
+  "id": "fallout2-ce",
+  "name": "Fallout 2 CE",
+  "game": "Fallout 2",
+  "family": "Engine rewrites",
+  "platform": "pc-windows",
+  "github": "alexbatalov/fallout2-ce",
+  "asset_suffix": "-linux-x64.tar.gz",
+  "asset_excludes": [],
+  "binary": "fallout2-ce",
+  "requirement": "Needs master.dat, critter.dat and the patch/data folders from your own GOG or Steam install in the port folder (Open folder)"
+}

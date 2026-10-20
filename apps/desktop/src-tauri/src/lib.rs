@@ -60,6 +60,11 @@ pub fn run() {
             commands::set_display_title,
             commands::install_pcsx2,
             commands::refresh_artwork,
+            commands::list_ports,
+            commands::check_port_updates,
+            commands::install_port,
+            commands::launch_port,
+            commands::open_port_folder,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Marquee");

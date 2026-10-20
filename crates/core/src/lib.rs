@@ -8,6 +8,7 @@ pub mod iso;
 pub mod library;
 pub mod model;
 pub mod paths;
+pub mod ports;
 pub mod runners;
 pub mod sessions;
 pub mod tools;
@@ -30,6 +31,7 @@ pub struct Core {
     allow_fake: bool,
     discover_host: bool,
     installing: Mutex<bool>,
+    installing_ports: Mutex<std::collections::HashSet<String>>,
 }
 
 impl Core {
@@ -55,16 +57,15 @@ impl Core {
             allow_fake,
             discover_host,
             installing: Mutex::new(false),
+            installing_ports: Mutex::new(std::collections::HashSet::new()),
         };
         core.refresh_runners()?;
         Ok(core)
     }
 
     fn with_db<T>(&self, f: impl FnOnce(&Db) -> Result<T>) -> Result<T> {
-        let db = self
-            .db
-            .lock()
-            .map_err(|_| AppError::new("DB", "database lock poisoned"))?;
+        // A panic in another thread must not brick the library; SQLite state is still consistent.
+        let db = self.db.lock().unwrap_or_else(|e| e.into_inner());
         f(&db)
     }
 
@@ -274,6 +275,103 @@ impl Core {
             ));
         }
         Ok(())
+    }
+
+    fn installed_port(&self, id: &str) -> Result<Option<ports::InstalledPort>> {
+        Ok(self
+            .with_db(|db| db.get_setting(&ports::setting_key(id)))?
+            .and_then(|raw| serde_json::from_str(&raw).ok()))
+    }
+
+    /// Catalogue plus install state. Offline: "update" shows only after `check_port_updates`.
+    pub fn list_ports(&self) -> Result<Vec<ports::PortInfo>> {
+        ports::catalogue()?
+            .iter()
+            .map(|def| {
+                let installed = self.installed_port(&def.id)?;
+                let latest = self.with_db(|db| db.get_setting(&ports::latest_key(&def.id)))?;
+                Ok(ports::info(
+                    &self.paths,
+                    def,
+                    installed.as_ref(),
+                    latest.as_deref(),
+                ))
+            })
+            .collect()
+    }
+
+    /// Ask GitHub for the newest release of each installed port. A port that fails to
+    /// answer keeps its previous state.
+    pub fn check_port_updates(&self) -> Result<Vec<ports::PortInfo>> {
+        for def in ports::catalogue()? {
+            if self.installed_port(&def.id)?.is_none() {
+                continue;
+            }
+            let Ok(release) = ports::latest_release(&def).and_then(|r| ports::pick_asset(&def, &r))
+            else {
+                continue;
+            };
+            self.set_setting(&ports::latest_key(&def.id), &release.tag)?;
+        }
+        self.list_ports()
+    }
+
+    /// Install a port, or update it to the newest release. User files in the folder are kept.
+    pub fn install_port(&self, id: &str, sink: Arc<dyn EventSink>) -> Result<Vec<ports::PortInfo>> {
+        let def = ports::find(id)?;
+        {
+            let mut busy = self
+                .installing_ports
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            if !busy.insert(def.id.clone()) {
+                return Err(AppError::new(
+                    "INSTALL_BUSY",
+                    format!("{} is already installing", def.name),
+                ));
+            }
+        }
+        struct Done<'a>(&'a Mutex<std::collections::HashSet<String>>, String);
+        impl Drop for Done<'_> {
+            fn drop(&mut self) {
+                self.0
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .remove(&self.1);
+            }
+        }
+        let _done = Done(&self.installing_ports, def.id.clone());
+
+        let current = self.installed_port(&def.id)?;
+        let installed = ports::install_latest(
+            &self.paths,
+            &def,
+            current.as_ref().map(|c| c.tag.as_str()),
+            &sink,
+        )?;
+        self.set_setting(
+            &ports::setting_key(&def.id),
+            &serde_json::to_string(&installed)?,
+        )?;
+        self.set_setting(&ports::latest_key(&def.id), &installed.tag)?;
+        sink.emit(CoreEvent::LibraryChanged);
+        self.list_ports()
+    }
+
+    pub fn launch_port(&self, id: &str) -> Result<()> {
+        let def = ports::find(id)?;
+        let installed = self.installed_port(id)?.ok_or_else(|| {
+            AppError::new(
+                "PORT_NOT_INSTALLED",
+                format!("{} is not installed", def.name),
+            )
+        })?;
+        ports::launch(&self.paths, &def, &installed)
+    }
+
+    pub fn open_port_folder(&self, id: &str) -> Result<()> {
+        ports::find(id)?;
+        ports::open_folder(&self.paths, id)
     }
 
     pub fn open_setup(&self, runner_id: &str) -> Result<()> {

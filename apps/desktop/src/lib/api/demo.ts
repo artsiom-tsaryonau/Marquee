@@ -50,6 +50,21 @@ export const demoApi: LibraryApi = {
   async installPcsx2() {
     throw { code: 'DEMO', message: 'Install PCSX2 in the desktop app' };
   },
+  async listPorts() {
+    return [];
+  },
+  async checkPortUpdates() {
+    return [];
+  },
+  async installPort() {
+    throw { code: 'DEMO', message: 'Install ports in the desktop app' };
+  },
+  async launchPort() {
+    throw { code: 'DEMO', message: 'Launch ports in the desktop app' };
+  },
+  async openPortFolder() {
+    throw { code: 'DEMO', message: 'Open port folders in the desktop app' };
+  },
   async refreshArtwork() {
     return { fetched: 0, skipped: 0, failed: 0 };
   },

@@ -1,6 +1,6 @@
 # Marquee — Game Launcher Roadmap
 
-Status: **phase 0 mostly closed** (native window opens; LICENSE still open), plus an **out-of-sequence PS2 slice** coded 2026-10-20. Last updated 2026-10-20.
+Status: **phase 0 mostly closed** (native window opens; MIT license added), plus an **out-of-sequence PS2 slice** coded 2026-10-20. Last updated 2026-10-20.
 
 This roadmap is still the long-term plan (Lutris/Steam first in phase 1). Work actually landed is tracked in [PS2.md](PS2.md). Do not start Steam/Lutris adapters or [PS2_METADATA_FOLLOWUP.md](PS2_METADATA_FOLLOWUP.md) until the PCSX2 launch/exit gate there is closed.
 
@@ -57,7 +57,7 @@ marquee/
   scripts/               fedora-deps.sh, bootstrap.sh, check.sh, tauri-dev.sh, make-icon.py (run locally; no hosted CI)
 ```
 
-**License:** GPL-3.0-or-later, matching Lutris and Heroic. Marquee only calls Lutris's CLI and reads its database, so this is a choice, not an obligation; MIT also works. Catalogue data: CC0 so anyone can reuse it.
+**License:** MIT (decided 2026-10-20). Marquee only calls Lutris's CLI and reads its database, so GPL was a choice, not an obligation. Catalogue data: CC0 so anyone can reuse it.
 
 **Checks and releases (local, no GitHub Actions)**
 
@@ -458,13 +458,13 @@ Each box's second line is the gate that closes the phase; the details and checkl
 ### Phase 0 — Foundations (S)
 
 - [x] Create the GitHub repo, this roadmap as `docs/ROADMAP.md`
-- [ ] Pick the license (GPL-3.0 or MIT) and add `LICENSE`; catalogue data CC0
+- [x] License: MIT, `LICENSE` added; catalogue data CC0
 - [x] Scaffold Tauri 2 + Svelte 5 app and the `core` / `cli` crates in one Cargo workspace
 - [x] Native window compiles and opens on this host (`./scripts/fedora-deps.sh` + `./scripts/tauri-dev.sh`; NVIDIA Wayland needs `WEBKIT_DISABLE_DMABUF_RENDERER=1`)
 - [x] `scripts/check.sh` green on this host (core/CLI/frontend + `cargo check -p marquee-desktop`). Missing WebKit on another machine still prints `BLOCKED` and continues.
 - [x] Clickable mock-up of Home, Library, Game page, Ports, Downloads, Settings (`pnpm dev`); desktop uses the same chrome
 
-**Done when:** `pnpm tauri dev` opens the themed UI in a native window and `scripts/check.sh` passes, including the desktop compile. **Met on this host**, except LICENSE.
+**Done when:** `pnpm tauri dev` opens the themed UI in a native window and `scripts/check.sh` passes, including the desktop compile. **Met on this host**.
 
 **PS2 slice (coded 2026-10-20, ahead of phase 1):** persistent ISO library, CLI, Tauri commands, **Marquee-managed PCSX2 unpack** (official AppImage into the data dir; Flatpak optional), serial covers, empty-library UI that matches the frontend. Live PCSX2 launch/exit is **not** the phase 0 gate and is **not** closed. Details: [PS2.md](PS2.md).
 
@@ -496,8 +496,8 @@ Svelte Home (hero + rows), Library grid, Game page, Big Screen scale, reduce-mot
 ### Phase 3 — Ports manager (L)
 
 - [ ] Catalogue schema + validator + signed `index.json` built from `catalog/` *(PS2 `catalog/systems/ps2.json` exists; it is not this index.)*
-- [ ] First 5 ports: Ship of Harkinian, Zelda64Recomp, sm64coopdx, fallout2-ce, UZDoom
-- [ ] Install, update, uninstall from GitHub Releases and Flathub; downloads screen
+- [x] First 5 ports: Ship of Harkinian, Zelda64Recomp, sm64coopdx, fallout2-ce, UZDoom (`catalog/ports/*.json`, `crates/core/src/ports.rs`; installed and update-checked from GitHub Releases on 2026-10-20; Play needs your own game files and has not been run on a real session)
+- [ ] Install, update, uninstall from GitHub Releases and Flathub; downloads screen *(install and update from GitHub Releases done; uninstall deliberately not built because the port folder holds your ROMs and data)*
 - [ ] Requirement checks: ROM hash, GOG/Steam install detection, file pickers
 - [ ] `tools` module + `catalog/tools/`: detect and install Steam, Lutris, Heroic, RetroArch from Flathub (user scope); PackageKit installs for MangoHud, Gamescope, GameMode, `steam-devices`; Launchers & tools tab. *(PCSX2 is already Marquee-managed: official AppImage unpacked under the data dir, like cx-script deps. This phase generalizes that to other tools.)*
 
@@ -565,7 +565,7 @@ The biggest risk is scope: keep each phase shippable and resist adding stores or
 - [ ] OpenCritic and MobyGames: worth a licence or user-supplied key, or link-outs only?
 - [x] Svelte or React for the UI — Svelte 5 (implemented)
 - [x] Emulator install: Marquee unpacks official builds into its data dir (cx-script-style). Flatpak/RPM optional. PCSX2 is the first instance.
-- [ ] GPL-3.0 or MIT for the app
+- [x] GPL-3.0 or MIT for the app — MIT
 - [ ] Whether Big Screen mode should also run as a Gamescope session from the login screen
 
 ## First week
@@ -590,5 +590,5 @@ Original first-week notes (Fedora 44; package names live in `scripts/fedora-deps
 - [x] `scripts/check.sh` green on this host
 - [x] Mock-up in use (desktop chrome matches `pnpm dev`)
 - [x] Marquee-managed PCSX2 unpack (official AppImage → data dir; no wizard)
-- [ ] LICENSE chosen
+- [x] LICENSE chosen (MIT)
 - [ ] Live PCSX2 Play → quit → duration (PS2 slice gate, not phase 1)

@@ -1,0 +1,12 @@
+{
+  "id": "uzdoom",
+  "name": "UZDoom",
+  "game": "Doom / Doom II",
+  "family": "Engine rewrites",
+  "platform": "pc-windows",
+  "github": "UZDoom/UZDoom",
+  "asset_suffix": "x86_64.appimage",
+  "asset_excludes": ["zsync", "mac", "windows"],
+  "binary": null,
+  "requirement": "Needs a Doom WAD: your own, or the free Freedoom"
+}

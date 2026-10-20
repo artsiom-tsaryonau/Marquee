@@ -1,6 +1,7 @@
 import { createApi, type LibraryApi } from './api';
 import { gamesFromSnapshot, pickRunner } from './api/map';
-import type { CoreEvent, LibraryRoot, LibrarySnapshot, Runner, ScanReport, Session } from './api/contracts';
+import type { CoreEvent, LibraryRoot, LibrarySnapshot, PortInfo, Runner, ScanReport, Session } from './api/contracts';
+import { artFromSeed } from './art';
 import { describeScan } from './format';
 import { installOption } from './install';
 import { downloads as seedDownloads, games, portGame, ports } from './mock';
@@ -57,6 +58,8 @@ class AppState {
   games = $state<GameEntry[]>(this.demo ? games : []);
   ports = $state<PortEntry[]>(this.demo ? ports : []);
   downloads = $state<Download[]>(this.demo ? seedDownloads : []);
+  /** Port id → latest progress line while it installs (desktop only). */
+  portBusy = $state<Record<string, string>>({});
 
   launching = $state<GameEntry | null>(null);
   running = $state<GameEntry | null>(null);
@@ -82,6 +85,7 @@ class AppState {
       await this.api.whenReady();
       const snap = await this.api.snapshot();
       this.applySnapshot(snap);
+      await this.loadPorts();
     } catch (err) {
       this.libraryStatus = 'failed';
       this.loadError = err instanceof Error ? err.message : String((err as { message?: string }).message ?? err);
@@ -161,6 +165,9 @@ class AppState {
       this.installingPcsx2 = false;
       this.installProgress = null;
       this.notify(event.message);
+    }
+    if (event.type === 'port_progress') {
+      if (event.port_id in this.portBusy) this.portBusy[event.port_id] = event.message;
     }
     if (event.type === 'artwork_finished') {
       this.fetchingArt = false;
@@ -401,6 +408,68 @@ class AppState {
     } catch (err) {
       this.fetchingArt = false;
       this.notify((err as { message?: string }).message ?? 'Could not fetch covers');
+    }
+  }
+
+  private applyPorts(list: PortInfo[]) {
+    this.ports = list.map((p) => ({
+      id: p.id,
+      name: p.name,
+      game: p.game,
+      family: p.family,
+      platform: p.platform as PortEntry['platform'],
+      upstream: p.upstream,
+      version: p.installed_version ?? p.latest_version ?? '',
+      status: p.status === 'not_installed' ? 'not-installed' : p.status,
+      requirement:
+        p.status === 'update' && p.latest_version
+          ? `Update ${p.installed_version} → ${p.latest_version}. ${p.requirement}`
+          : p.requirement,
+      art: artFromSeed(`port:${p.id}`),
+    }));
+  }
+
+  async loadPorts() {
+    if (this.demo) return;
+    try {
+      this.applyPorts(await this.api.listPorts());
+      // Update check is a handful of GitHub calls; failures keep the offline state.
+      void this.api
+        .checkPortUpdates()
+        .then((list) => this.applyPorts(list))
+        .catch(() => {});
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? 'Could not load ports');
+    }
+  }
+
+  async installPort(port: PortEntry) {
+    if (this.demo || port.id in this.portBusy) return;
+    this.portBusy[port.id] = `Installing ${port.name}…`;
+    try {
+      this.applyPorts(await this.api.installPort(port.id));
+      this.notify(`${port.name} is installed. ${port.requirement}`);
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? `Could not install ${port.name}`);
+    } finally {
+      delete this.portBusy[port.id];
+    }
+  }
+
+  async launchPort(port: PortEntry) {
+    try {
+      await this.api.launchPort(port.id);
+      this.notify(`Starting ${port.name}…`);
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? `Could not start ${port.name}`);
+    }
+  }
+
+  async openPortFolder(port: PortEntry) {
+    try {
+      await this.api.openPortFolder(port.id);
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? 'Could not open the folder');
     }
   }
 

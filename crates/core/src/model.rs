@@ -296,6 +296,10 @@ pub enum CoreEvent {
         tool_id: String,
         message: String,
     },
+    PortProgress {
+        port_id: String,
+        message: String,
+    },
     ArtworkFinished {
         fetched: u32,
         skipped: u32,

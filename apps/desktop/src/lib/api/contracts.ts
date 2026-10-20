@@ -111,7 +111,22 @@ export type CoreEvent =
   | { type: 'tool_install_progress'; tool_id: string; message: string }
   | { type: 'tool_install_finished'; tool_id: string; runner_id: string | null }
   | { type: 'tool_install_failed'; tool_id: string; message: string }
+  | { type: 'port_progress'; port_id: string; message: string }
   | { type: 'artwork_finished'; fetched: number; skipped: number; failed: number };
+
+export interface PortInfo {
+  id: string;
+  name: string;
+  game: string;
+  family: string;
+  platform: string;
+  upstream: string;
+  requirement: string;
+  installed_version: string | null;
+  latest_version: string | null;
+  status: 'not_installed' | 'ready' | 'update';
+  folder: string | null;
+}
 
 export interface LibraryApi {
   kind: 'demo' | 'desktop';
@@ -129,6 +144,11 @@ export interface LibraryApi {
   whenReady(): Promise<void>;
   installPcsx2(channel?: string): Promise<Runner[]>;
   refreshArtwork(editionId?: string): Promise<ArtworkReport>;
+  listPorts(): Promise<PortInfo[]>;
+  checkPortUpdates(): Promise<PortInfo[]>;
+  installPort(portId: string): Promise<PortInfo[]>;
+  launchPort(portId: string): Promise<void>;
+  openPortFolder(portId: string): Promise<void>;
 }
 
 export interface ArtworkReport {

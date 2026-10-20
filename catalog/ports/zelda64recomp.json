@@ -1,0 +1,12 @@
+{
+  "id": "zelda64recomp",
+  "name": "Zelda64Recomp",
+  "game": "The Legend of Zelda: Majora's Mask",
+  "family": "N64 recomps",
+  "platform": "n64",
+  "github": "Zelda64Recomp/Zelda64Recomp",
+  "asset_suffix": "-linux-x64.zip",
+  "asset_excludes": ["flatpak"],
+  "binary": "Zelda64Recompiled",
+  "requirement": "Asks for your own Majora's Mask (US) ROM on first launch"
+}

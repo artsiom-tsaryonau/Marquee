@@ -28,6 +28,12 @@
   const featured = $derived(app.ports.find((p) => p.status === 'update') ?? app.ports[0]);
 
   function primary(p: PortEntry) {
+    if (p.id in app.portBusy) return;
+    if (!app.demo) {
+      if (p.status === 'ready') void app.launchPort(p);
+      else void app.installPort(p);
+      return;
+    }
     if (p.status === 'ready') {
       const g = app.games.find((x) => x.id === `port:${p.id}`);
       if (g) app.play(g);
@@ -39,7 +45,14 @@
   }
 
   const action = (p: PortEntry) =>
-    ({ ready: 'Play', update: 'Update', 'needs-rom': 'Choose ROM', 'needs-data': 'Find data', 'not-installed': 'Install' })[p.status];
+    p.id in app.portBusy
+      ? 'Installing…'
+      : ({ ready: 'Play', update: 'Update', 'needs-rom': 'Choose ROM', 'needs-data': 'Find data', 'not-installed': 'Install' })[p.status];
+  const filters = $derived(
+    app.demo
+      ? (['all', 'ready', 'update', 'needs-rom', 'needs-data', 'not-installed'] as const)
+      : (['all', 'ready', 'update', 'not-installed'] as const),
+  );
 </script>
 
 <div class="ports">
@@ -64,7 +77,7 @@
     <div class="feature-text">
       <span class="eyebrow">Native ports</span>
       <Logo game={{ title: 'Ports', art: portsAtmosphere }} size="lg" />
-      <p>Native PC ports are not in this milestone. PS2 games stay in Library. You supply your own files.</p>
+      <p>No ports could be loaded. PS2 games stay in Library. You supply your own files.</p>
       <button class="btn primary" data-nav onclick={() => app.go('library')}>
         <Icon name="grid" /> Open library
       </button>
@@ -73,7 +86,7 @@
   {/if}
 
   <div class="filters" data-nav-row>
-    {#each ['all', 'ready', 'update', 'needs-rom', 'needs-data', 'not-installed'] as const as f (f)}
+    {#each filters as f (f)}
       <button class="chip" class:on={filter === f} data-nav onclick={() => (filter = f)}>{f === 'all' ? 'All ports' : statusLabel[f]}</button>
     {/each}
   </div>
@@ -93,14 +106,17 @@
             {p.requirement}
           </p>
           <div class="foot">
-            <code>{p.upstream}</code>
-            <button class="btn small" class:primary={p.status !== 'ready'} data-nav onclick={() => primary(p)}>{action(p)}</button>
+            <code>{app.portBusy[p.id] ?? p.upstream}</code>
+            {#if !app.demo && p.status !== 'not-installed'}
+              <button class="btn small" data-nav onclick={() => app.openPortFolder(p)} title="Open the port folder to add your own ROM or game files">Open folder</button>
+            {/if}
+            <button class="btn small" disabled={p.id in app.portBusy} class:primary={p.status !== 'ready'} data-nav onclick={() => primary(p)}>{action(p)}</button>
           </div>
         </div>
       </article>
     {/each}
   </div>
-  <p class="note">The catalogue links only to official port releases. You supply your own game files.</p>
+  <p class="note">The catalogue links only to official port releases on GitHub. You supply your own game files; updates keep them.</p>
 </div>
 
 <style>

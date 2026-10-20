@@ -1,0 +1,12 @@
+{
+  "id": "sm64coopdx",
+  "name": "sm64coopdx",
+  "game": "Super Mario 64",
+  "family": "SM64 ports",
+  "platform": "n64",
+  "github": "coop-deluxe/sm64coopdx",
+  "asset_suffix": "_linux.zip",
+  "asset_excludes": [],
+  "binary": "sm64coopdx",
+  "requirement": "Needs your own baserom.us.z64 in the port folder (Open folder)"
+}

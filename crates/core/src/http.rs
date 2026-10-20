@@ -9,6 +9,7 @@ const USER_AGENT: &str = "Marquee/0.0 (https://github.com/artsiom-tsaryonau/Marq
 pub const COVER_MAX_BYTES: u64 = 8 * 1024 * 1024;
 pub const JSON_MAX_BYTES: u64 = 2 * 1024 * 1024;
 pub const APPIMAGE_MAX_BYTES: u64 = 512 * 1024 * 1024;
+pub const PORT_MAX_BYTES: u64 = 1024 * 1024 * 1024;
 
 pub fn get_bytes(url: &str) -> Result<Vec<u8>> {
     read_limited(url, COVER_MAX_BYTES, Duration::from_secs(45))
