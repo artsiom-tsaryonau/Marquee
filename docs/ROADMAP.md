@@ -29,7 +29,7 @@ One public repo holds the app, the core, the CLI and the port catalogue. The cat
 | Part | Holds | Releases |
 | --- | --- | --- |
 | App | Tauri app, Rust core crate, CLI, docs, packaging | Tagged app releases: AppImage, RPM, later Flatpak, plus `latest.json` for the auto-updater |
-| `catalog/` | One YAML file per port, system definitions for emulators, JSON schema, CI validator | A signed `index.json` rebuilt whenever `catalog/` changes on main |
+| `catalog/` | One YAML file per port, system definitions for emulators, JSON schema, validator | A signed `index.json`, rebuilt by `tools/build-index` and uploaded as a release asset |
 
 **Layout**
 
@@ -48,22 +48,21 @@ marquee/
   tools/build-index      validates every catalogue file, checks upstream repos exist, writes index.json
   packaging/             rpm spec, flatpak manifest, .desktop file, icons
   docs/                  ROADMAP.md (this plan), ARCHITECTURE.md, CONTRIBUTING.md
-  .github/workflows/     ci.yml, release.yml, catalog.yml
+  scripts/               check.sh, release.sh (run locally; no hosted CI)
 ```
 
 **License:** GPL-3.0-or-later, matching Lutris and Heroic. Marquee only calls Lutris's CLI and reads its database, so this is a choice, not an obligation; MIT also works. Catalogue data: CC0 so anyone can reuse it.
 
-**GitHub features to switch on**
+**Checks and releases (local, no GitHub Actions)**
 
-- **Actions — `ci.yml`:** on every push, `cargo fmt --check`, `cargo clippy`, `cargo test`, `pnpm lint`, `pnpm test`, and a Tauri debug build on `ubuntu-latest` (Fedora container optional).
-- **Actions — `release.yml`:** on a `v*` tag, build AppImage + RPM with `tauri-action`, sign the updater bundle, attach everything to a GitHub Release.
+- **`scripts/check.sh`:** `cargo fmt --check`, `cargo clippy`, `cargo test`, `pnpm check`, `pnpm build`. Run it before every push; agents run it too.
+- **`scripts/release.sh <version>`:** builds AppImage + RPM with `cargo tauri build`, signs the updater bundle, writes `latest.json`, tags, and publishes a GitHub Release with `gh release create`.
 - **Releases:** the app's updater reads `latest.json` from the newest release, so updates are one click and need no server.
 - **Issues:** templates for "Broken port", "Missing artwork" and "Bug"; the app's "Report a problem" button opens a pre-filled issue URL, so no token is needed.
-- **Projects board:** one board with the phases below as milestones; issues carry the phase label.
-- **Renovate or Dependabot:** weekly dependency updates for Cargo and npm.
-- **Pages (later):** a small site with screenshots and install instructions.
+- **Dependencies:** `cargo update` and `pnpm update` by hand or by an agent, then `scripts/check.sh`.
+- **Site (later):** a small page with screenshots and install instructions.
 
-Workflow: commit straight to main (sole contributor); tags drive releases.
+Workflow: commit straight to main (sole contributor); `scripts/release.sh` makes the tags and releases.
 
 ## Architecture
 
@@ -260,7 +259,7 @@ Most ports come from a few shared frameworks, so Marquee needs one handler per f
 | `archive-url` | Projects outside GitHub (e.g. OldUnreal) | Direct URL + SHA-256 from the catalogue |
 | `self-managed` | OpenGOAL | Installs the project's own launcher and lets it manage versions and extraction |
 | `build-from-source` | Ports with no binaries (zelda3, sm) | Builds in a Podman container with the toolchain, output into `~/Games/ports/<id>/` |
-| `github-nightly` (later) | Ports with CI builds only | GitHub Actions artifacts; needs a token, so optional |
+| `github-nightly` (later) | Ports that only publish CI builds | Downloads the port's own GitHub Actions artifacts; needs a token, so optional |
 
 **Data-step handlers (`requires` in a port file)**
 
@@ -272,7 +271,7 @@ Most ports come from a few shared frameworks, so Marquee needs one handler per f
 
 - One client for all GitHub calls: ETag caching, a 60 requests/hour budget unauthenticated, 5,000 with an optional token from the keyring.
 - Follows renamed or transferred repos (GitHub redirects) and flags archived ones in the UI.
-- A weekly Action checks every port's latest release still matches its asset regex and opens an issue when not.
+- `tools/build-index --check-upstream` checks that every port's latest release still matches its asset regex; run it before publishing a new catalogue.
 
 Mods (later, phase 7): Thunderstore for N64 recomp mods and GameBanana for HarbourMasters ports are the usual sources; verify each before integrating.
 
@@ -305,7 +304,25 @@ Every game page gets a strip of scores and facts from several sites, so old and 
 | AreWeAntiCheatYet | Anti-cheat status | Open dataset on GitHub | Online Windows games | 5 |
 | OpenCritic | Top Critic Average, % recommended | Licensed API, not public; ask before integrating | Releases since about 2015 | Optional |
 | MobyGames | Critic and user scores, credits, release variants | API key, paid since September 2024; 360 requests/hour | DOS-era and retro games | Optional, user brings a key |
-| SteamDB, Metacritic, HowLongToBeat | Link-out buttons only | No public API; SteamDB's FAQ forbids scraping | Deep dives | 2 |
+| SteamDB, Metacritic, HowLongToBeat | Link-out buttons only (SteamDB's data comes from Steam directly; see below) | No public API; SteamDB's FAQ forbids scraping its site | Deep dives | 2 |
+
+#### Steam data the way SteamDB gets it
+
+SteamDB's FAQ says its data comes from Steam itself: the Steam network through SteamKit (PICS, the Product Info Cache Server the Steam client uses; `app_info_print <appid>` in the Steam console shows the same data), Steam's Web APIs, and store pages. Marquee reads those sources directly and never requests steamdb.info.
+
+| Data | Where Marquee gets it | Needs | Phase |
+| --- | --- | --- | --- |
+| App info: developer/publisher, release date, supported OS, controller support, Steam Deck compatibility, store tags, review score, Metacritic score, current build and last update per branch | The Steam client's local cache `appcache/appinfo.vdf` (PICS data), parsed read-only; newer clients write a newer binary layout, so support both | Nothing; covers the apps your Steam client knows | 1 |
+| The same for games not on this machine (wishlist, IGDB matches) | Anonymous PICS request over the Steam network: a SteamKit-style Rust client (e.g. the `steam-vent` crate; check how mature it is) or `steamcmd +login anonymous +app_info_print <appid> +quit` as a fallback | Nothing; anonymous login | 5 |
+| "Updated 3 days ago" badge and patch notes | Build id/time changes in PICS, plus `ISteamNews/GetNewsForApp` | No key | 2 |
+| Players right now | `ISteamUserStats/GetNumberOfCurrentPlayers`, the same Valve number SteamDB charts | No key | 2 |
+| Player-count history | Marquee samples while it runs and keeps a local graph. A full SteamDB-style history needs a server polling around the clock, so this stays small | Nothing | 7 |
+| Current price and discount | Store `appdetails` (`price_overview`, per country) | No key | 7 |
+| Price history and historical low | IsThereAnyDeal API (SteamDB credits it for older Steam prices) | Free key | 7 |
+| Achievement icons and global unlock % | Steam Web API (row above) | Web API key for your own progress | 5 |
+| Depots and manifests | Out of scope: needs ownership and is for downloading, which Steam already does | — | — |
+
+Rules: anonymous wherever possible, never the user's Steam password (the Steam client stays the only thing logged in), batched PICS requests, per-app caching, gentle polling.
 
 **Matching:** store ids first (IGDB's `external_games` maps Steam, GOG and Epic ids), then title + year + platform; ROMs by hash through libretro-database, then IGDB/ScreenScraper. A "Wrong game?" action on the game page lets you pick the right match, and the choice is saved.
 
@@ -372,7 +389,7 @@ Eight phases; each ends in something you can use, and phase 1 alone already give
 
 ```mermaid
 flowchart LR
-  P0["0 Foundations (S)<br/>themed window, CI green"] --> P1["1 Unified library (M)<br/>Lutris + Steam games with covers"]
+  P0["0 Foundations (S)<br/>themed window, checks green"] --> P1["1 Unified library (M)<br/>Lutris + Steam games with covers"]
   P1 --> P2["2 Look + Big Screen (M)<br/>couch-browsable at 60 fps"]
   P2 --> P3["3 Ports manager (L)<br/>Fallout 2 CE installs and runs"]
   P3 --> P4["4 Emulation (L)<br/>ROM dump shows and launches"]
@@ -388,10 +405,10 @@ Each box's second line is the gate that closes the phase; the details and checkl
 - [x] Create the GitHub repo, this roadmap as `docs/ROADMAP.md`
 - [ ] Pick the license (GPL-3.0 or MIT) and add `LICENSE`; catalogue data CC0
 - [ ] Scaffold Tauri 2 + Svelte 5 app and the `core` / `cli` crates in one Cargo workspace
-- [ ] `ci.yml` green: fmt, clippy, tests, debug build
+- [ ] `scripts/check.sh` green: fmt, clippy, tests, UI type check and build
 - [x] Clickable mock-up of Home, Library and Game page with sample data (`apps/desktop`, runs in a browser); fonts, colours, card size still to settle
 
-**Done when:** `pnpm tauri dev` opens an empty themed window and CI passes on main.
+**Done when:** `pnpm tauri dev` opens the themed UI in a native window and `scripts/check.sh` passes.
 
 ### Phase 1 — Unified library, read-only (M)
 
@@ -410,6 +427,7 @@ Each box's second line is the gate that closes the phase; the details and checkl
 - [ ] Big Screen mode, button glyphs, UI sounds, reduce-motion setting
 - [ ] Playtime and last-played on cards; favourites and hidden
 - [ ] `metadata` module: IGDB matching, Steam review summaries, RAWG fallback, link-outs to SteamDB / Metacritic / HowLongToBeat
+- [ ] Steam app info from local `appinfo.vdf`; players-now and "Updated N days ago" with patch notes
 - [ ] Score strip and time to beat on the game page; score sorts and filters; "Hidden gems" and "Quick wins" rows
 
 **Done when:** you can browse and launch any game from the couch without touching a mouse, at a steady 60 fps, and 9 in 10 library entries show at least one score.
@@ -447,7 +465,7 @@ Each box's second line is the gate that closes the phase; the details and checkl
 
 ### Phase 6 — Packaging and updates (M)
 
-- [ ] `release.yml`: AppImage + RPM on tag, signed updater bundle
+- [ ] `scripts/release.sh`: AppImage + RPM, signed updater bundle, GitHub Release via `gh`
 - [ ] In-app update prompt; catalogue auto-refresh
 - [ ] RPM repo on Fedora Copr; Flatpak manifest (host access through `flatpak-spawn --host`)
 
@@ -471,8 +489,8 @@ The biggest risk is scope: keep each phase shippable and resist adding stores or
 | Lutris database schema changes between versions | Library scan breaks after a Lutris update | Read-only, tolerant column lookup; prefer `lutris --list-games --json` where it has the field; test against the installed version (0.5.22) |
 | Epic login or API changes | Epic library disappears | Depend on Legendary and update it, never reimplement Epic's API |
 | Anti-cheat blocks Linux for a game or MMO | Game installs but never runs | Check the anti-cheat database before install and show "Doesn't run on Linux"; no workarounds |
-| Launcher installer URLs or setups change | Windows-app recipe fails | Recipe CI check like ports; fall back to "choose setup.exe" |
-| Port release asset names change | Install picks the wrong file or none | Asset regex per port, weekly CI job that checks every port's latest release weekly |
+| Launcher installer URLs or setups change | Windows-app recipe fails | Recipe check in `tools/build-index` like ports; fall back to "choose setup.exe" |
+| Port release asset names change | Install picks the wrong file or none | Asset regex per port; `tools/build-index --check-upstream` before each catalogue release |
 | GitHub API rate limit (60/hour unauthenticated) | Update checks fail | ETag caching, one catalogue fetch per day, optional token |
 | Flatpak sandbox blocks launching host apps | Flatpak build can't start Steam/Lutris | Ship RPM/AppImage first; Flatpak uses `flatpak-spawn --host` |
 | Legal: catalogue mistaken for a ROM source | Takedowns, bad reputation | Catalogue links only to official port releases; every port lists its game-file requirement; no download links for game data |
@@ -503,7 +521,7 @@ By the end of the week you should have the repo, a running themed Tauri window, 
 3. Add the Tauri shell to the existing UI: `pnpm tauri init` inside `apps/desktop/` (creates `src-tauri/`).
 4. Turn the repo into a Cargo workspace with members `apps/desktop/src-tauri`, `crates/core`, `crates/cli`; add `rusqlite`, `serde`, `steamlocate`, `notify`, `keyring`, `reqwest`, `tokio` to `core`.
 5. Write the Lutris adapter first: open `~/.local/share/lutris/pga.db` read-only and print `service_games` grouped by service. Then the Steam `.acf` reader.
-6. Add `ci.yml` (fmt, clippy, test, `pnpm build`) and push to main.
+6. Add `scripts/check.sh` (fmt, clippy, test, `pnpm check`, `pnpm build`), run it, push to main.
 7. Get a SteamGridDB API key and store it with `secret-tool store --label=marquee service marquee key steamgriddb`; same for IGDB (Twitch client id + secret) and RAWG when phase 2 starts.
 8. Make the HTML mock-up of Home, Library and Game page and settle the look.
 
@@ -511,5 +529,5 @@ By the end of the week you should have the repo, a running themed Tauri window, 
 - [x] Repo on GitHub
 - [ ] `pnpm tauri dev` opens the window
 - [ ] `cargo run -p marquee-cli -- list` prints your games
-- [ ] CI green
+- [ ] `scripts/check.sh` green
 - [ ] Mock-up approved

@@ -41,9 +41,18 @@ export interface GameEntry {
   /** Hours: main story, main + extras, completionist (IGDB). */
   timeToBeat: [number, number, number] | null;
   achievements: { unlocked: number; total: number } | null;
+  /** Steam games: PICS app info + Web API (see roadmap, "Steam data the way SteamDB gets it"). */
+  steam?: SteamInfo;
   /** Ports only: requirement state shown on the card. */
   portStatus?: PortStatus;
   art: Art;
+}
+
+export interface SteamInfo {
+  playersNow: number;
+  updatedDaysAgo: number;
+  patchTitle: string;
+  deck: 'verified' | 'playable' | 'unsupported' | 'unknown';
 }
 
 /** 0–100 per source; null when that site has no score. */

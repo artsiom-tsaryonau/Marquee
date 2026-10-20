@@ -71,6 +71,9 @@ function timeToBeat(r: () => number): [number, number, number] {
   return [main, Math.round(main * (1.4 + r() * 0.6)), Math.round(main * (2.2 + r() * 1.8))];
 }
 
+const patches = ['Hotfix 1.4.2', 'Winter update', 'Performance patch', 'Patch 2.0: new region', 'Balance changes', 'Linux build fixes'];
+const deck = ['verified', 'playable', 'unsupported', 'unknown'] as const;
+
 const today = new Date('2026-10-20T20:00:00');
 const daysAgo = (d: number) => new Date(today.getTime() - d * 86400000).toISOString();
 
@@ -94,6 +97,15 @@ export const games: GameEntry[] = raw.map(([title, tagline, source, platform, ge
     ratings: ratings(r, source),
     timeToBeat: r() > 0.1 ? timeToBeat(r) : null,
     achievements: source === 'steam' || source === 'rom' ? { unlocked: played ? Math.floor(r() * 40) : 0, total: 40 + Math.floor(r() * 30) } : null,
+    steam:
+      source === 'steam'
+        ? {
+            playersNow: Math.floor(r() * r() * 40000) + 12,
+            updatedDaysAgo: Math.floor(r() * 60),
+            patchTitle: patches[Math.floor(r() * patches.length)],
+            deck: deck[Math.floor(r() * 3.4)],
+          }
+        : undefined,
     art: art(r),
   };
 });

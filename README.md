@@ -26,10 +26,13 @@ What to try:
 
 All artwork is generated on the fly (`src/lib/components/Artwork.svelte`); library titles are invented.
 
+Before pushing, run `scripts/check.sh` (there is no hosted CI).
+
 ## Layout
 
 ```
 apps/desktop/   Svelte 5 + TypeScript + Vite UI (Tauri shell comes next)
+scripts/        check.sh: local checks before every push
 docs/           ROADMAP.md
 ```
 

@@ -89,6 +89,14 @@
         <dd>{g.lastPlayed ? ago(g.lastPlayed) : '—'}</dd>
         <dt>Genre</dt>
         <dd>{g.genre} · {g.year}</dd>
+        {#if g.steam}
+          <dt>Players now</dt>
+          <dd><span class="live-dot"></span>{g.steam.playersNow.toLocaleString()}</dd>
+          <dt>Last update</dt>
+          <dd>{g.steam.updatedDaysAgo === 0 ? 'Today' : `${g.steam.updatedDaysAgo} d ago`} · <span class="patch">{g.steam.patchTitle}</span></dd>
+          <dt>Steam Deck</dt>
+          <dd><span class="badge deck-{g.steam.deck}">{g.steam.deck[0].toUpperCase() + g.steam.deck.slice(1)}</span></dd>
+        {/if}
         {#if g.platform === 'pc-windows' && g.source !== 'steam'}
           <dt>Compatibility</dt>
           <dd><span class="badge gold">ProtonDB Gold</span> <span class="badge ok">No anti-cheat</span></dd>
@@ -237,6 +245,32 @@
     padding: 3px 8px;
     border-radius: 999px;
     margin: 0 4px 4px 0;
+  }
+  .live-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 8px;
+    border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 8px #22c55e;
+  }
+  .patch {
+    color: var(--text-dim);
+    font-weight: 500;
+  }
+  .badge.deck-verified {
+    background: rgb(52 211 153 / 0.18);
+    color: var(--ok);
+  }
+  .badge.deck-playable {
+    background: rgb(250 204 21 / 0.2);
+    color: #fde047;
+  }
+  .badge.deck-unsupported,
+  .badge.deck-unknown {
+    background: var(--field);
+    color: var(--text-dim);
   }
   .badge.gold {
     background: rgb(250 204 21 / 0.2);
