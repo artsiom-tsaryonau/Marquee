@@ -1,5 +1,7 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { app } from '../state.svelte';
+  import type { KeyInfo } from '../api/contracts';
   import Icon from '../components/Icon.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
 
@@ -11,6 +13,24 @@
     { name: 'Heroic', detail: 'Optional import', on: false },
     { name: 'ROM folders', detail: '~/ROMs/<system>/', on: true },
   ]);
+
+  let drafts = $state<Record<string, string>>({});
+  onMount(() => void app.loadKeys());
+
+  const sourceLabel = (k: KeyInfo) =>
+    ({
+      app: `Saved in Marquee · ${k.preview}`,
+      env: `From the environment · ${k.preview} · saving here overrides it`,
+      dot_env: `From a .env file · ${k.preview} · saving here overrides it`,
+      none: 'Not set',
+    })[k.source];
+
+  async function save(k: KeyInfo) {
+    const value = drafts[k.id]?.trim();
+    if (!value) return;
+    await app.saveKey(k.id, value);
+    drafts[k.id] = '';
+  }
 </script>
 
 <div class="settings">
@@ -69,6 +89,38 @@
         </select>
       </div>
     {/if}
+  </section>
+
+  <section class="glass-panel">
+    <h2>API keys</h2>
+    <p class="hint">
+      Saved on this computer in a file only you can read. After you save a secret, Marquee shows only where it comes from and its last four characters, never the value. A value saved here beats the environment and any .env file.
+    </p>
+    {#each app.keys as k (k.id)}
+      <div class="item key">
+        <div>
+          <strong>{k.label} <span class="pill">{k.used_by}</span></strong>
+          <span>{k.description}</span>
+          <span>{k.help}</span>
+          <span class="status" class:set={k.set}>{sourceLabel(k)}</span>
+        </div>
+        <form class="key-edit" onsubmit={(e) => { e.preventDefault(); void save(k); }}>
+          <input
+            data-nav
+            type={k.secret ? 'password' : 'text'}
+            autocomplete="off"
+            spellcheck="false"
+            placeholder={k.set ? 'Replace value…' : 'Paste value'}
+            aria-label={k.label}
+            bind:value={drafts[k.id]}
+          />
+          <button class="btn small primary" data-nav type="submit" disabled={!drafts[k.id]?.trim()}>Save</button>
+          {#if k.source === 'app'}
+            <button class="btn glass small" data-nav type="button" onclick={() => app.clearKey(k.id)}>Clear</button>
+          {/if}
+        </form>
+      </div>
+    {/each}
   </section>
 
   {#if app.webUrl}
@@ -200,6 +252,46 @@
   .item span {
     color: var(--text-dim);
     font-size: 13px;
+  }
+  .hint {
+    margin: 0 0 6px;
+    color: var(--text-dim);
+    font-size: 13px;
+    max-width: 62ch;
+  }
+  .key {
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+  .key > div:first-child {
+    flex: 1 1 320px;
+    min-width: 0;
+  }
+  .key .status {
+    font-weight: 600;
+  }
+  .key .status.set {
+    color: var(--ok);
+  }
+  .key-edit {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .key-edit input {
+    width: 230px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--field);
+    color: var(--text);
+    font: inherit;
+    font-size: 13px;
+  }
+  .key-edit input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
   }
   section > .btn {
     margin-top: 8px;

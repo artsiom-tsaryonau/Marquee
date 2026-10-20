@@ -8,7 +8,7 @@ This roadmap is still the long-term plan. Work actually landed is tracked in [PS
 1. Run the PCSX2 gate by hand (BIOS + own ISO): Play → quit → duration → no stale "busy".
 2. PS2 serial → title lookup (PCSX2 `GameIndex.yaml`, Redump or libretro DATs; none need a login). Today titles come from file names.
 3. Steam installed games: library folders and `appmanifest_*.acf`, covers from Steam's CDN, launch with `steam://rungameid/<id>`. No key and no login handled by Marquee.
-4. Lutris import (keep existing Wine entries), then SteamGridDB covers (key in `.env` today, keyring later).
+4. Lutris import (keep existing Wine entries), then SteamGridDB covers (keys are managed in Settings → API keys; see `crates/core/src/keys.rs`).
 5. Steam extras, all optional: owned-but-not-installed (user's own Web API key + SteamID), news (`ISteamNews`, no key), wishlist and sales (store endpoints, undocumented, best-effort).
 6. Controller support and Big Screen; replace the heaviest blur/backdrop effects if GPU load is still high.
 
@@ -80,6 +80,8 @@ marquee/
 Workflow: commit straight to main (sole contributor); `scripts/release.sh` makes the tags and releases.
 
 ## Architecture
+
+**Key management is built (2026-10-20).** `crates/core/src/keys.rs` holds the registry of known keys; values resolve saved-in-Marquee, then environment, then `.env`; saved values go in `<config dir>/keys.json` (mode 600) and secrets are never sent to the UI or over HTTP, only a masked preview. The system keyring is still the stated goal for the packaged app; the store is isolated behind `KeyStore`, so swapping it in is local to that file.
 
 **One app, two surfaces (built 2026-10-20).** The native window and a browser tab are the same application. `crates/core/src/api.rs` is the single command layer (`dispatch(command, args)`); the Tauri window calls it through one `core_call` command, and `server.rs` exposes it over HTTP on `127.0.0.1` (default port 47820, `MARQUEE_PORT`). `hub.rs` is the one event stream both read, so a scan or install started in either surface shows up in both. The browser needs the token from `<data dir>/server.token` (every API and cover request, loopback only, foreign `Host` rejected); the UI picks its connection at startup: native window, browser with a token, or the invented demo as a fallback (`?demo=1`). `marquee serve` runs the same server headless. Remote (non-loopback) access is deliberately not built.
 

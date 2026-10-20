@@ -59,7 +59,7 @@ docs/           PS2.md, ROADMAP.md, EXPANSION_CATALOGUE.md, PS2_METADATA_FOLLOWU
 
 ## Secrets
 
-API keys go in `.env` (git-ignored; see `.env.example`), for example `STEAM_GRID_DB_API_KEY`. Nothing reads it yet. The planned home for keys in the packaged app is the system keyring, entered in Settings. Never put a Steam password anywhere: Marquee launches through the Steam client, which keeps its own login.
+Keys (SteamGridDB, Steam Web API, SteamID, IGDB/Twitch, RAWG) are managed in **Settings → API keys**, in the native app and in the browser surface alike. A value is read from, in order: what you saved in Marquee, the process environment, then a `.env` file (see `.env.example`; git-ignored). Saved values live in `<config dir>/keys.json`, readable only by you, and the UI only ever sees where a key comes from and its last four characters, never the value. Adding a key to Marquee is one entry in `crates/core/src/keys.rs`. Never put a Steam password anywhere: Marquee launches through the Steam client, which keeps its own login. Nothing uses these keys yet; they are the infrastructure for artwork and the Steam extras.
 
 ## License
 

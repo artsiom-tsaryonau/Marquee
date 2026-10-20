@@ -128,6 +128,21 @@ export interface PortInfo {
   folder: string | null;
 }
 
+/** One configurable key. The UI never receives the secret itself, only a masked preview. */
+export interface KeyInfo {
+  id: string;
+  env: string;
+  label: string;
+  description: string;
+  help: string;
+  used_by: string;
+  secret: boolean;
+  /** Where the active value comes from: saved in Marquee, the environment, a .env file, or nowhere. */
+  source: 'app' | 'env' | 'dot_env' | 'none';
+  set: boolean;
+  preview: string | null;
+}
+
 export interface LibraryApi {
   /** `desktop` = native window, `web` = browser attached to a running Marquee, `demo` = invented data. */
   kind: 'demo' | 'desktop' | 'web';
@@ -147,6 +162,9 @@ export interface LibraryApi {
   webUrl(): Promise<string | null>;
   installPcsx2(channel?: string): Promise<Runner[]>;
   refreshArtwork(editionId?: string): Promise<ArtworkReport>;
+  listKeys(): Promise<KeyInfo[]>;
+  setKey(id: string, value: string): Promise<KeyInfo[]>;
+  clearKey(id: string): Promise<KeyInfo[]>;
   listPorts(): Promise<PortInfo[]>;
   checkPortUpdates(): Promise<PortInfo[]>;
   installPort(portId: string): Promise<PortInfo[]>;

@@ -7,6 +7,7 @@ pub mod http;
 pub mod hub;
 pub mod instance;
 pub mod iso;
+pub mod keys;
 pub mod library;
 pub mod model;
 pub mod paths;
@@ -36,6 +37,7 @@ pub struct Core {
     installing: Mutex<bool>,
     installing_ports: Mutex<std::collections::HashSet<String>>,
     events: Arc<hub::EventHub>,
+    keys: keys::KeyStore,
 }
 
 impl Core {
@@ -51,6 +53,7 @@ impl Core {
 
     fn open_with(data_dir: Option<PathBuf>, allow_fake: bool, discover_host: bool) -> Result<Self> {
         let paths = Paths::resolve(data_dir)?;
+        let keys = keys::KeyStore::new(&paths.config_dir);
         let lock = InstanceLock::acquire(&paths.instance_lock())?;
         let db = Db::open(&paths)?;
         db.abandon_running_sessions()?;
@@ -63,6 +66,7 @@ impl Core {
             installing: Mutex::new(false),
             installing_ports: Mutex::new(std::collections::HashSet::new()),
             events: Arc::new(hub::EventHub::new()),
+            keys,
         };
         core.refresh_runners()?;
         Ok(core)
@@ -382,6 +386,28 @@ impl Core {
     pub fn open_setup(&self, runner_id: &str) -> Result<()> {
         let home = self.paths.pcsx2_xdg_config();
         self.with_db(|db| runners::open_setup(db, runner_id, Some(&home)))
+    }
+
+    /// Known API keys and where each comes from. Never contains a secret value.
+    pub fn list_keys(&self) -> Result<Vec<keys::KeyInfo>> {
+        self.keys.list()
+    }
+
+    /// Save a key from Settings (an empty value clears it).
+    pub fn set_key(&self, id: &str, value: &str) -> Result<Vec<keys::KeyInfo>> {
+        self.keys.set(id, value)?;
+        self.keys.list()
+    }
+
+    /// Forget the value saved in Marquee; one from the environment or `.env` stays.
+    pub fn clear_key(&self, id: &str) -> Result<Vec<keys::KeyInfo>> {
+        self.keys.clear(id)?;
+        self.keys.list()
+    }
+
+    /// The real value, for features inside Marquee (never sent to the UI).
+    pub fn key(&self, id: &str) -> Result<Option<String>> {
+        self.keys.get(id)
     }
 
     /// Every event the core emits goes here; the window and the web server both read it.

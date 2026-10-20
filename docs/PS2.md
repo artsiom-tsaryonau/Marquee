@@ -260,6 +260,7 @@ After import, Marquee fetches 2D covers from [xlenore/ps2-covers](https://github
 | Command layer (window and web share it) | `crates/core/src/api.rs` (`dispatch`) |
 | Tauri bridge | `apps/desktop/src-tauri/src/commands.rs` (`core_call`, `web_url`), `lib.rs` (starts the server, forwards events) |
 | Event stream | `crates/core/src/hub.rs` |
+| API keys (registry, precedence, masking) | `crates/core/src/keys.rs`; Settings → API keys in `Settings.svelte` |
 | Local web server (token, loopback) | `crates/core/src/server.rs`, `marquee serve` |
 | Native ports | `crates/core/src/ports.rs`, `catalog/ports/*.json`, `apps/desktop/src/lib/screens/Ports.svelte` |
 | Native vs browser vs demo | `apps/desktop/src/lib/api/` (`desktop.ts`, `http.ts`, `demo.ts`, shared `core.ts`) |

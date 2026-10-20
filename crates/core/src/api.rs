@@ -59,6 +59,9 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
             let edition = maybe(&args, "edition_id");
             out(core.refresh_artwork(edition.as_deref(), Some(sink))?)
         }
+        "list_keys" => out(core.list_keys()?),
+        "set_key" => out(core.set_key(&text(&args, "id")?, &text(&args, "value")?)?),
+        "clear_key" => out(core.clear_key(&text(&args, "id")?)?),
         "list_ports" => out(core.list_ports()?),
         "check_port_updates" => out(core.check_port_updates()?),
         "install_port" => out(core.install_port(&text(&args, "port_id")?, sink)?),

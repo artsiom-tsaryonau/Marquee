@@ -1,6 +1,7 @@
 import type {
   AppError,
   ArtworkReport,
+  KeyInfo,
   LibraryApi,
   LibraryRoot,
   LibrarySnapshot,
@@ -42,6 +43,9 @@ export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'su
     setDisplayTitle: (editionId, title) => call<void>('set_display_title', { edition_id: editionId, title }),
     installPcsx2: (channel) => call<Runner[]>('install_pcsx2', { channel: channel ?? null }),
     refreshArtwork: (editionId) => call<ArtworkReport>('refresh_artwork', { edition_id: editionId ?? null }),
+    listKeys: () => call<KeyInfo[]>('list_keys'),
+    setKey: (id, value) => call<KeyInfo[]>('set_key', { id, value }),
+    clearKey: (id) => call<KeyInfo[]>('clear_key', { id }),
     listPorts: () => call<PortInfo[]>('list_ports'),
     checkPortUpdates: () => call<PortInfo[]>('check_port_updates'),
     installPort: (portId) => call<PortInfo[]>('install_port', { port_id: portId }),

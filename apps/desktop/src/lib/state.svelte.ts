@@ -1,6 +1,6 @@
 import { createApi, type LibraryApi } from './api';
 import { gamesFromSnapshot, pickRunner } from './api/map';
-import type { CoreEvent, LibraryRoot, LibrarySnapshot, PortInfo, Runner, ScanReport, Session } from './api/contracts';
+import type { CoreEvent, KeyInfo, LibraryRoot, LibrarySnapshot, PortInfo, Runner, ScanReport, Session } from './api/contracts';
 import { artFromSeed } from './art';
 import { describeScan } from './format';
 import { installOption } from './install';
@@ -42,6 +42,7 @@ class AppState {
   api: LibraryApi = createApi();
   demo = this.api.kind === 'demo';
   webUrl = $state<string | null>(null);
+  keys = $state<KeyInfo[]>([]);
   libraryStatus = $state<LibraryStatus>(this.api.kind === 'demo' ? 'demo' : 'loading');
   loadError = $state<string | null>(null);
   roots = $state<LibraryRoot[]>([]);
@@ -429,6 +430,32 @@ class AppState {
           : p.requirement,
       art: artFromSeed(`port:${p.id}`),
     }));
+  }
+
+  async loadKeys() {
+    try {
+      this.keys = await this.api.listKeys();
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? 'Could not load keys');
+    }
+  }
+
+  async saveKey(id: string, value: string) {
+    try {
+      this.keys = await this.api.setKey(id, value);
+      this.notify('Saved');
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? 'Could not save the key');
+    }
+  }
+
+  async clearKey(id: string) {
+    try {
+      this.keys = await this.api.clearKey(id);
+      this.notify('Removed from Marquee');
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? 'Could not remove the key');
+    }
   }
 
   async copyWebUrl() {

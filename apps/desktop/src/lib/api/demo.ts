@@ -1,5 +1,5 @@
 import { games } from '../mock';
-import type { LibraryApi, LibrarySnapshot, ScanReport } from './contracts';
+import type { KeyInfo, LibraryApi, LibrarySnapshot, ScanReport } from './contracts';
 
 function emptySnapshot(): LibrarySnapshot {
   return {
@@ -18,6 +18,20 @@ function emptySnapshot(): LibrarySnapshot {
 }
 
 /** Browser demo: sample library stays in the Svelte state layer. */
+const demoDefs: Omit<KeyInfo, 'source' | 'set' | 'preview'>[] = [
+  { id: 'steamgriddb', env: 'STEAM_GRID_DB_API_KEY', label: 'SteamGridDB API key', description: 'Covers, heroes and logos for Steam, Lutris and port games.', help: 'Free: steamgriddb.com, sign in, Preferences, API.', used_by: 'Artwork', secret: true },
+  { id: 'steam_web_api', env: 'STEAM_WEB_API_KEY', label: 'Steam Web API key', description: 'Lists games you own but have not installed, with playtime. Your own key; never share it.', help: 'Free: steamcommunity.com/dev/apikey (personal use).', used_by: 'Steam library', secret: true },
+  { id: 'steam_id', env: 'STEAM_ID64', label: 'Your SteamID64', description: 'The 17-digit number that identifies your Steam account. Not a secret.', help: 'From your profile address, or a lookup such as steamid.io.', used_by: 'Steam library, wishlist', secret: false },
+];
+const demoSaved: Record<string, string> = {};
+function demoKeys(): KeyInfo[] {
+  return demoDefs.map((d) => {
+    const v = demoSaved[d.id];
+    const preview = !v ? null : d.secret ? `••••${v.slice(-4)}` : v;
+    return { ...d, source: v ? 'app' : 'none', set: !!v, preview };
+  });
+}
+
 export const demoApi: LibraryApi = {
   kind: 'demo',
   async snapshot() {
@@ -49,6 +63,19 @@ export const demoApi: LibraryApi = {
   async whenReady() {},
   async installPcsx2() {
     throw { code: 'DEMO', message: 'Install PCSX2 in the desktop app' };
+  },
+  // Same list as the real app, kept in memory, so the Settings screen looks identical in the demo.
+  async listKeys() {
+    return demoKeys();
+  },
+  async setKey(id: string, value: string) {
+    if (value.trim()) demoSaved[id] = value.trim();
+    else delete demoSaved[id];
+    return demoKeys();
+  },
+  async clearKey(id: string) {
+    delete demoSaved[id];
+    return demoKeys();
   },
   async webUrl() {
     return null;
