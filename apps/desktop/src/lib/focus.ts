@@ -109,12 +109,18 @@ export function startFocusEngine(opts: { back: () => void; onInput: (label: stri
     for (const index of heldByPad.keys()) {
       if (!connected.has(index)) heldByPad.delete(index);
     }
-    raf = requestAnimationFrame(poll);
+    // No controller connected: stop polling (no 60 fps wake-ups) until one appears.
+    raf = connected.size > 0 ? requestAnimationFrame(poll) : 0;
   };
-  raf = requestAnimationFrame(poll);
+  const startPolling = () => {
+    if (!raf) raf = requestAnimationFrame(poll);
+  };
+  window.addEventListener('gamepadconnected', startPolling);
+  if ((navigator.getGamepads?.() ?? []).some(Boolean)) startPolling();
 
   return () => {
     window.removeEventListener('keydown', onKey);
+    window.removeEventListener('gamepadconnected', startPolling);
     cancelAnimationFrame(raf);
   };
 }

@@ -68,6 +68,11 @@
   animation-iteration-count: 1 !important;
   transition-duration: 0.001ms !important;
 }
+:root[data-idle='yes'] *,
+:root[data-idle='yes'] *::before,
+:root[data-idle='yes'] *::after {
+  animation-play-state: paused !important;
+}
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

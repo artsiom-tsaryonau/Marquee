@@ -31,11 +31,27 @@
   const activeDownloads = $derived(app.downloads.filter((d) => d.state === 'downloading').length);
   const dur = $derived(app.reduceMotion ? 0 : 260);
 
+  // Decorative animation stops when nobody is looking at it: tab hidden, window
+  // unfocused, or a game is running on top. Keeps the GPU free for the emulator.
+  let away = $state(typeof document !== 'undefined' && (document.hidden || !document.hasFocus()));
+  $effect(() => {
+    const update = () => (away = document.hidden || !document.hasFocus());
+    document.addEventListener('visibilitychange', update);
+    window.addEventListener('focus', update);
+    window.addEventListener('blur', update);
+    return () => {
+      document.removeEventListener('visibilitychange', update);
+      window.removeEventListener('focus', update);
+      window.removeEventListener('blur', update);
+    };
+  });
+
   $effect(() => {
     const root = document.documentElement;
     root.dataset.theme = app.theme;
     root.dataset.mode = app.mode;
     root.dataset.motion = app.reduceMotion ? 'reduce' : 'full';
+    root.dataset.idle = away || app.running ? 'yes' : 'no';
   });
 
   onMount(() => {

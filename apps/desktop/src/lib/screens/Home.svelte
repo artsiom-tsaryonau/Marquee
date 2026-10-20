@@ -136,21 +136,12 @@
   .hero-layer {
     position: absolute;
     inset: 0;
-    animation: kenburns 24s ease-in-out infinite alternate;
   }
   .hero-cover {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
-  }
-  @keyframes kenburns {
-    from {
-      transform: scale(1.02);
-    }
-    to {
-      transform: scale(1.12) translate(-1.5%, 1%);
-    }
   }
   .hero {
     position: relative;

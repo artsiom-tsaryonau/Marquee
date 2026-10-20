@@ -2,15 +2,20 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
 import { startFocusEngine } from '../src/lib/focus';
 
-let keydown, frame, pads, clicks, backCalls, stop;
+let keydown, frame, pads, clicks, backCalls, stop, listeners;
 const originals = new Map(['window', 'document', 'navigator', 'requestAnimationFrame', 'cancelAnimationFrame']
   .map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
 
 beforeEach(() => {
   clicks = backCalls = 0;
   pads = [];
+  listeners = {};
+  frame = undefined;
   const globals = {
-    window: { addEventListener: (_, fn) => (keydown = fn), removeEventListener() {} },
+    window: {
+      addEventListener: (type, fn) => (type === 'keydown' ? (keydown = fn) : (listeners[type] = fn)),
+      removeEventListener() {},
+    },
     document: { activeElement: { click: () => clicks++ }, querySelectorAll: () => [] },
     navigator: { getGamepads: () => pads },
     requestAnimationFrame: (fn) => (frame = fn, 1),
@@ -29,6 +34,11 @@ afterEach(() => {
     else delete globalThis[key];
   }
 });
+
+// A browser fires this when a controller first reports input; polling only runs from then on.
+function connect() {
+  listeners.gamepadconnected();
+}
 
 function pad(index, pressed = false) {
   return { index, axes: [0, 0], buttons: Array.from({ length: 16 }, (_, i) => ({ pressed: i === 0 && pressed })) };
@@ -63,6 +73,7 @@ test('buttons still use spatial navigation and Escape still goes back', () => {
 
 test('held A emits one click with a second idle controller in either order', () => {
   pads = [pad(0, true), pad(1)];
+  connect();
   frame(); frame(); frame();
   assert.equal(clicks, 1);
   pads = [pad(1), pad(0, true)];
@@ -77,16 +88,34 @@ test('held A emits one click with a second idle controller in either order', () 
 
 test('controllers have independent press edges', () => {
   pads = [pad(0, true), pad(1, true)];
+  connect();
   frame(); frame();
   assert.equal(clicks, 2);
 });
 
 test('disconnect clears held state before a controller reconnects', () => {
   pads = [pad(0, true)];
+  connect();
   frame();
   pads = [null];
   frame();
   pads = [pad(0, true)];
+  connect();
   frame();
   assert.equal(clicks, 2);
+});
+
+test('no controller means no polling loop at all', () => {
+  assert.equal(frame, undefined, 'nothing is scheduled before a controller connects');
+  pads = [pad(0)];
+  connect();
+  const poll = frame;
+  frame = undefined;
+  poll();
+  assert.notEqual(frame, undefined, 'polling continues while a controller is present');
+  const next = frame;
+  frame = undefined;
+  pads = [null];
+  next();
+  assert.equal(frame, undefined, 'polling stops once the controller is gone');
 });
