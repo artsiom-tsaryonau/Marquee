@@ -16,6 +16,8 @@
         "title": "Marquee",
         "width": 1440,
         "height": 900,
+        "minWidth": 1100,
+        "minHeight": 700,
         "theme": "Dark",
         "backgroundColor": "#07070d"
       }
