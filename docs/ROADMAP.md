@@ -95,6 +95,7 @@ The app and the CLI share one core; only the bottom layer touches stores, files 
 | `library` | SQLite database of unified game entries, search index, favourites, collections, playtime |
 | `sources` | One adapter per source behind a `Source` trait: `scan()`, `launch()`, optional `install()` / `uninstall()` |
 | `artwork` | Fetch, cache and resize cover, hero, logo and icon images; extract an accent colour per game |
+| `metadata` | Match each entry to IGDB and other databases; fetch and cache scores, reviews summary, time to beat, achievements, compatibility notes |
 | `ports` | Read the catalogue index, install/update ports from GitHub Releases or Flathub, verify game files |
 | `emulation` | System definitions, ROM folder scan, hash identification, emulator command lines |
 | `runner` | Start a game, track its process for playtime, report "running" / "exited" to the UI |
@@ -112,6 +113,8 @@ The app and the CLI share one core; only the bottom layer touches stores, files 
 | `installed`, `install_path` | true, `~/Games/ports/shipwright` |
 | `launch` | `{kind: "uri", target: "steam://rungameid/1623730"}` or `{kind: "exec", argv: [...]}` |
 | `artwork` | local paths for cover, hero, logo, icon + accent colour |
+| `ratings` | per-source scores with fetch date, e.g. `{steam_reviews: 94, igdb_critic: 88, opencritic: null}` |
+| `time_to_beat` | main / main + extras / completionist hours, from IGDB |
 | `playtime_min`, `last_played` | from Steam/Lutris, or tracked by `runner` |
 | `tags`, `favorite`, `hidden` | user data, never overwritten by a rescan |
 
@@ -285,6 +288,35 @@ Mods (later, phase 7): Thunderstore for N64 recomp mods and GameBanana for Harbo
 - Pipeline: download once, convert to WebP with the `image` crate, store per game, serve to the UI via Tauri's asset protocol; extract an accent colour for each hero image.
 - User override: drop an image on a game page to replace any artwork.
 
+### Ratings, reviews and game info
+
+Every game page gets a strip of scores and facts from several sites, so old and obscure games get as much context as new Steam releases. Each value is cached with its fetch date, credited by name and links to its source page. Marquee only uses official or documented APIs. Sites without one get a link-out button and are never scraped.
+
+| Site | What Marquee shows | Access | Best for | Phase |
+| --- | --- | --- | --- | --- |
+| Steam Store reviews | User review summary, e.g. "Very Positive · 94% of 120k" | `store.steampowered.com/appreviews/<appid>?json=1&num_per_page=0` (`query_summary`); no key | Steam games | 2 |
+| IGDB | Summary, genres, release date, critic score (`aggregated_rating` + count), user rating, time to beat, cross-store ids | Twitch client id + secret, free (Twitch account with 2FA); about 4 requests/s | Matching every entry to one canonical game; old games | 2 |
+| RAWG | Fallback summary, user ratings and its Metacritic score field | Free API key; requires a visible "data from RAWG" link | Gaps in IGDB | 2 |
+| Steam Web API | Achievements, your unlock progress, global unlock % | `GetSchemaForGame`, `GetPlayerAchievements`, `GetGlobalAchievementPercentagesForApp`; Web API key | Steam games | 5 |
+| ScreenScraper | Ratings, synopsis, media for ROMs, matched by hash | Free account; daily per-user quota | Emulated games | 4 |
+| RetroAchievements | Achievement sets and your progress for emulated games | Free Web API key from your account | Emulated games (RetroArch cores) | 4 |
+| PCGamingWiki | Known fixes, widescreen/ultrawide, controller support, save locations | Open MediaWiki/Cargo API, no key | Windows games, ports | 5 |
+| ProtonDB | Compatibility tier | Community summary JSON per appid (unofficial, keep it optional) | Windows games | 5 |
+| AreWeAntiCheatYet | Anti-cheat status | Open dataset on GitHub | Online Windows games | 5 |
+| OpenCritic | Top Critic Average, % recommended | Licensed API, not public; ask before integrating | Releases since about 2015 | Optional |
+| MobyGames | Critic and user scores, credits, release variants | API key, paid since September 2024; 360 requests/hour | DOS-era and retro games | Optional, user brings a key |
+| SteamDB, Metacritic, HowLongToBeat | Link-out buttons only | No public API; SteamDB's FAQ forbids scraping | Deep dives | 2 |
+
+**Matching:** store ids first (IGDB's `external_games` maps Steam, GOG and Epic ids), then title + year + platform; ROMs by hash through libretro-database, then IGDB/ScreenScraper. A "Wrong game?" action on the game page lets you pick the right match, and the choice is saved.
+
+**Caching and limits:** results live in the library DB with a per-source TTL (reviews 7 days, static facts 30 days); one queue per site respects its rate limit, and everything shown works offline from cache. API keys go in the keyring through `secrets`.
+
+**What the scores unlock in the UI:**
+
+- Game page: score strip (critics, users, Steam reviews), time to beat, achievements progress, ProtonDB/anti-cheat badges, PCGamingWiki fixes.
+- Library: sort by critic score, user score or time to beat; filters "Short (< 5 h)" and "Highly rated".
+- Home: a "Hidden gems in your backlog" row (owned, never played, critic score 80+) and "Quick wins" (under 5 h to beat).
+
 ### GitHub
 
 - App updates: Tauri updater plugin reading `latest.json` from the newest GitHub Release (signed).
@@ -300,9 +332,9 @@ The look is art-led and dark-first: each game's own hero image fills the screen,
 
 | Screen | What it shows | Key interactions |
 | --- | --- | --- |
-| Home | Full-bleed hero of the selected game with its logo; rows: Continue playing, Recently added, Ports ready to play, by platform | Left/right moves along a row and swaps the hero; A = play, Y = game page |
+| Home | Full-bleed hero of the selected game with its logo; rows: Continue playing, Recently added, Ports ready to play, Hidden gems in your backlog, by platform | Left/right moves along a row and swaps the hero; A = play, Y = game page |
 | Library | Virtualised cover grid of every entry, sticky filter bar (source, platform, installed, favourites), instant fuzzy search | Type or press a key to search; grid stays 60 fps at 1,000+ covers |
-| Game page | Hero banner, logo, Play/Install button, source badge, playtime, last played, screenshots; ports also show requirement status | Play, Install, Update, Open folder, Change artwork, Add to Steam |
+| Game page | Hero banner, logo, Play/Install button, source badge, score strip, time to beat, playtime, last played, screenshots, achievements; ports also show requirement status | Play, Install, Update, Open folder, Change artwork, Add to Steam |
 | Ports | Store-like catalogue of ports with "Ready", "Needs your ROM", "Update available" badges | Install with progress; a requirements checklist with file pickers |
 | Downloads | Queue of port installs and updates with progress and logs | Pause, retry, view log |
 | Settings | Connected sources, ROM folders, emulator choices, API keys, theme, controller test | Connect/disconnect a source; rescan |
@@ -377,8 +409,10 @@ Each box's second line is the gate that closes the phase; the details and checkl
 - [ ] `gilrs` gamepad thread + focus engine; full controller navigation of Home, Library, Game page
 - [ ] Big Screen mode, button glyphs, UI sounds, reduce-motion setting
 - [ ] Playtime and last-played on cards; favourites and hidden
+- [ ] `metadata` module: IGDB matching, Steam review summaries, RAWG fallback, link-outs to SteamDB / Metacritic / HowLongToBeat
+- [ ] Score strip and time to beat on the game page; score sorts and filters; "Hidden gems" and "Quick wins" rows
 
-**Done when:** you can browse and launch any game from the couch without touching a mouse, at a steady 60 fps.
+**Done when:** you can browse and launch any game from the couch without touching a mouse, at a steady 60 fps, and 9 in 10 library entries show at least one score.
 
 ### Phase 3 — Ports manager (L)
 
@@ -394,13 +428,15 @@ Each box's second line is the gate that closes the phase; the details and checkl
 - [ ] System definitions for NES, SNES, N64, GB/GBC/GBA, DS, GameCube/Wii, PS1, PS2, PSP
 - [ ] ROM folder scan, libretro-database identification, per-system emulator choice
 - [ ] Launch via Flatpak emulators or RetroArch cores; per-game emulator override
+- [ ] ScreenScraper ratings and synopsis for ROMs; RetroAchievements sets and progress
 
 **Done when:** dropping a dump into `~/ROMs/n64/` shows it with the right title and art and it launches in the chosen emulator.
 
 ### Phase 5 — More stores and Windows apps (L)
 
 - [ ] Epic via Legendary: login window, library, install, launch
-- [ ] Steam Web API: owned-but-not-installed games, playtime
+- [ ] Steam Web API: owned-but-not-installed games, playtime, achievements
+- [ ] PCGamingWiki fixes and settings notes on Windows game pages
 - [ ] umu-launcher runtime: background GE-Proton updates, protonfixes, one prefix per game
 - [ ] "Add a Windows app" flow: recipes, winetricks, Start Menu shortcut detection, icon extraction
 - [ ] Import existing Lutris Wine entries (Purple, EA App) without reinstalling
@@ -443,7 +479,8 @@ The biggest risk is scope: keep each phase shippable and resist adding stores or
 
 **Open decisions**
 
-- [ ] Final name and GitHub owner (personal account or an organisation)
+- [x] Name and owner: `Marquee`, at github.com/artsiom-tsaryonau/Marquee
+- [ ] OpenCritic and MobyGames: worth a licence or user-supplied key, or link-outs only?
 - [ ] Svelte or React for the UI
 - [ ] GPL-3.0 or MIT for the app
 - [ ] Whether Big Screen mode should also run as a Gamescope session from the login screen
@@ -467,7 +504,7 @@ By the end of the week you should have the repo, a running themed Tauri window, 
 4. Turn the repo into a Cargo workspace with members `apps/desktop/src-tauri`, `crates/core`, `crates/cli`; add `rusqlite`, `serde`, `steamlocate`, `notify`, `keyring`, `reqwest`, `tokio` to `core`.
 5. Write the Lutris adapter first: open `~/.local/share/lutris/pga.db` read-only and print `service_games` grouped by service. Then the Steam `.acf` reader.
 6. Add `ci.yml` (fmt, clippy, test, `pnpm build`) and push to main.
-7. Get a SteamGridDB API key and store it with `secret-tool store --label=marquee service marquee key steamgriddb`.
+7. Get a SteamGridDB API key and store it with `secret-tool store --label=marquee service marquee key steamgriddb`; same for IGDB (Twitch client id + secret) and RAWG when phase 2 starts.
 8. Make the HTML mock-up of Home, Library and Game page and settle the look.
 
 - [ ] Toolchain installed

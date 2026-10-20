@@ -12,7 +12,7 @@
   let sources = $state<Set<Source>>(new Set());
   let installedOnly = $state(false);
   let favOnly = $state(false);
-  let sort = $state<'title' | 'recent' | 'playtime' | 'added'>('title');
+  let sort = $state<'title' | 'recent' | 'playtime' | 'added' | 'critic' | 'short'>('title');
   let search: HTMLInputElement;
 
   const allSources = Object.keys(sourceLabel) as Source[];
@@ -33,6 +33,8 @@
       recent: (a: typeof list[0], b: typeof list[0]) => (b.lastPlayed ?? '').localeCompare(a.lastPlayed ?? ''),
       playtime: (a: typeof list[0], b: typeof list[0]) => b.playtimeMin - a.playtimeMin,
       added: (a: typeof list[0], b: typeof list[0]) => b.addedAt.localeCompare(a.addedAt),
+      critic: (a: typeof list[0], b: typeof list[0]) => (b.ratings.critic ?? -1) - (a.ratings.critic ?? -1),
+      short: (a: typeof list[0], b: typeof list[0]) => (a.timeToBeat?.[0] ?? 999) - (b.timeToBeat?.[0] ?? 999),
     }[sort];
     return [...list].sort(by);
   });
@@ -77,6 +79,8 @@
       <option value="recent">Recently played</option>
       <option value="playtime">Most played</option>
       <option value="added">Recently added</option>
+      <option value="critic">Critic score</option>
+      <option value="short">Shortest to beat</option>
     </select>
   </div>
 

@@ -59,6 +59,9 @@
         lastPlayed: null,
         addedAt: new Date().toISOString(),
         favorite: false,
+        ratings: { critic: null, criticCount: 0, user: null, steamReviews: null },
+        timeToBeat: null,
+        achievements: null,
         art: p.art,
       });
     }

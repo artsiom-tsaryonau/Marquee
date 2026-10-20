@@ -1,6 +1,6 @@
 // Sample data only. Library titles are invented; port names are the planned
 // catalogue entries, with made-up versions and statuses.
-import type { Art, Download, GameEntry, Motif, Platform, PortEntry, Source } from './types';
+import type { Art, Download, GameEntry, Motif, Platform, PortEntry, Ratings, Source } from './types';
 
 const motifs: Motif[] = ['sun', 'rings', 'peaks', 'grid', 'waves', 'shards', 'orbit', 'monolith'];
 const logos: Art['logo'][] = ['wide', 'serif', 'mono', 'heavy'];
@@ -56,6 +56,21 @@ function art(r: () => number): Art {
   };
 }
 
+function ratings(r: () => number, source: Source): Ratings {
+  const critic = r() > 0.12 ? Math.round(62 + r() * 34) : null;
+  return {
+    critic,
+    criticCount: critic ? Math.floor(8 + r() * 90) : 0,
+    user: Math.round(58 + r() * 38),
+    steamReviews: source === 'steam' ? { percent: Math.round(70 + r() * 28), count: Math.floor(800 + r() * 150000) } : null,
+  };
+}
+
+function timeToBeat(r: () => number): [number, number, number] {
+  const main = Math.round(2 + r() * 40);
+  return [main, Math.round(main * (1.4 + r() * 0.6)), Math.round(main * (2.2 + r() * 1.8))];
+}
+
 const today = new Date('2026-10-20T20:00:00');
 const daysAgo = (d: number) => new Date(today.getTime() - d * 86400000).toISOString();
 
@@ -76,6 +91,9 @@ export const games: GameEntry[] = raw.map(([title, tagline, source, platform, ge
     lastPlayed: played ? daysAgo(Math.floor(r() * 120)) : null,
     addedAt: daysAgo(Math.floor(r() * 400)),
     favorite: r() > 0.75,
+    ratings: ratings(r, source),
+    timeToBeat: r() > 0.1 ? timeToBeat(r) : null,
+    achievements: source === 'steam' || source === 'rom' ? { unlocked: played ? Math.floor(r() * 40) : 0, total: 40 + Math.floor(r() * 30) } : null,
     art: art(r),
   };
 });
@@ -120,6 +138,9 @@ for (const p of ports.filter((p) => p.status === 'ready' || p.status === 'update
     lastPlayed: daysAgo(p.name.length),
     addedAt: daysAgo(p.name.length * 3),
     favorite: false,
+    ratings: { critic: 90 + (p.name.length % 8), criticCount: 20, user: 85 + (p.name.length % 12), steamReviews: null },
+    timeToBeat: [12 + p.name.length, 20 + p.name.length, 40 + p.name.length],
+    achievements: null,
     portStatus: p.status,
     art: p.art,
   });

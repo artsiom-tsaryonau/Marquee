@@ -7,6 +7,7 @@
   import Logo from '../components/Logo.svelte';
   import Icon from '../components/Icon.svelte';
   import Row from '../components/Row.svelte';
+  import ScoreStrip from '../components/ScoreStrip.svelte';
 
   const g = $derived(app.current ?? app.hero);
   const port = $derived(g.source === 'port' ? app.ports.find((p) => `port:${p.id}` === g.id) : undefined);
@@ -55,6 +56,8 @@
 
   <div class="body">
     <div class="main">
+      <h3>Ratings and facts</h3>
+      <div class="scores"><ScoreStrip game={g} /></div>
       <h3>Screenshots</h3>
       <div class="shots" data-nav-row>
         {#each shots as art, i (i)}
@@ -167,6 +170,9 @@
   h3 {
     margin: 0 0 12px;
     font-size: 17px;
+  }
+  .scores {
+    margin-bottom: 28px;
   }
   .shots {
     display: grid;

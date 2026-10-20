@@ -2,7 +2,7 @@
 
 One console-style launcher for Fedora that shows every game you own (Steam, GOG, Epic, Lutris/Wine apps, emulated games and native decomp/recomp ports) in one good-looking library you can drive with a mouse or a controller.
 
-Marquee is a front end over existing tools. Lutris, Steam, Legendary, umu-launcher/Proton and the emulators keep doing installs and compatibility; Marquee owns the library, the look, artwork, the ports catalogue and launching. Windows launchers install from recipes, so there is no manual Wine setup.
+Marquee is a front end over existing tools. Lutris, Steam, Legendary, umu-launcher/Proton and the emulators keep doing installs and compatibility; Marquee owns the library, the look, artwork, the ports catalogue and launching. Windows launchers install from recipes, so there is no manual Wine setup. Game pages pull scores, time to beat and achievements from IGDB, Steam reviews, RAWG, ScreenScraper, RetroAchievements and PCGamingWiki, with link-outs to SteamDB, Metacritic and HowLongToBeat.
 
 **Status:** phase 0. The UI runs in a browser with sample data; nothing reads your real library yet. Plan and phases: [docs/ROADMAP.md](docs/ROADMAP.md).
 

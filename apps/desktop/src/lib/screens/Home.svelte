@@ -15,6 +15,10 @@
   const portsReady = $derived(app.games.filter((g) => g.source === 'port'));
   const favorites = $derived(app.games.filter((g) => g.favorite));
   const emulated = $derived(app.games.filter((g) => g.source === 'rom'));
+  const hiddenGems = $derived(app.games.filter((g) => !g.playtimeMin && (g.ratings.critic ?? 0) >= 80));
+  const quickWins = $derived(
+    app.games.filter((g) => g.timeToBeat && g.timeToBeat[0] <= 6).sort((a, b) => a.timeToBeat![0] - b.timeToBeat![0]),
+  );
   const notInstalled = $derived(app.games.filter((g) => !g.installed));
 
   const g = $derived(app.hero);
@@ -60,7 +64,9 @@
 
   <Row title="Continue playing" games={continuePlaying} shape="wide" />
   <Row title="Ports ready to play" games={portsReady} />
+  <Row title="Hidden gems in your backlog" games={hiddenGems} />
   <Row title="Favourites" games={favorites} />
+  <Row title="Quick wins · under 6 hours" games={quickWins} />
   <Row title="Recently added" games={recentlyAdded} />
   <Row title="Emulated classics" games={emulated} />
   <Row title="In your library, not installed" games={notInstalled} />

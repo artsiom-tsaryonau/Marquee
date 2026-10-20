@@ -37,9 +37,21 @@ export interface GameEntry {
   lastPlayed: string | null;
   addedAt: string;
   favorite: boolean;
+  ratings: Ratings;
+  /** Hours: main story, main + extras, completionist (IGDB). */
+  timeToBeat: [number, number, number] | null;
+  achievements: { unlocked: number; total: number } | null;
   /** Ports only: requirement state shown on the card. */
   portStatus?: PortStatus;
   art: Art;
+}
+
+/** 0–100 per source; null when that site has no score. */
+export interface Ratings {
+  critic: number | null;
+  criticCount: number;
+  user: number | null;
+  steamReviews: { percent: number; count: number } | null;
 }
 
 export type PortStatus = 'ready' | 'needs-rom' | 'needs-data' | 'update' | 'not-installed';
