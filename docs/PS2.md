@@ -20,13 +20,13 @@ Marquee does not download BIOS files or commercial games.
 | --- | --- |
 | Browser demo (`pnpm dev`) | Works. Sample games, simulated launch, fictional +42 min. Ports / Downloads / Add Windows app are demo-only. |
 | CLI (`marquee`) | Works without GTK. Same core as desktop. Use `--data-dir` for isolation. |
-| Desktop (`pnpm tauri dev`) | **Code present, not compiled here.** Missing `webkit2gtk4.1-devel` and `dbus-devel`. |
+| Desktop (`pnpm tauri dev`) | **Code present.** Native packages: `./scripts/fedora-deps.sh`. Window compile still needs a live `cargo check -p marquee-desktop`. |
 | Persistent library | SQLite at `$XDG_DATA_HOME/marquee/library.db` (or `--data-dir` / `MARQUEE_DATA_DIR`). |
 | Real PCSX2 Play | **Pending.** No AppImage / `pcsx2-qt` / Flatpak `net.pcsx2.PCSX2` on this host. |
 | Controller in Tauri WebView | **Pending.** Gamepad API only; `gilrs` not added. Browser gamepad is not evidence. |
 | Metadata / downloaded art | **Not started.** Filename titles + procedural art. |
 
-Working tree: uncommitted UI audit tests (14) plus this Cargo workspace. Nothing was committed unless you commit it later.
+On `main` as of 2026-10-20 (`1b20257`).
 
 ### In scope for this slice
 
@@ -43,7 +43,7 @@ ScreenScraper, SteamGridDB, Steam/Lutris, other emulators, BIN/CUE/CHD play, who
 ### Prerequisites
 
 - Fedora (or similar) with Rust, Node 22+, pnpm
-- For the desktop window: [Tauri Linux packages](https://v2.tauri.app/start/prerequisites/), including `webkit2gtk4.1-devel` and `dbus-devel`
+- For the desktop window: `./scripts/fedora-deps.sh` (WebKit 4.1, DBus, and the rest of the [Tauri Fedora list](https://v2.tauri.app/start/prerequisites/))
 - A folder of `.iso` files you already own
 - PCSX2 as AppImage or Flatpak (`net.pcsx2.PCSX2`), with BIOS already configured inside PCSX2
 
@@ -120,7 +120,7 @@ PS2 vertical slice ahead of roadmap phase 1. Metadata was cut after review.
 - Tauri 2 + dialog + single-instance. Desktop vs explicit demo API. Nav: Home / Library / PS2 / Settings.
 - `catalog/systems/ps2.json` built-in registry (no command fields).
 
-Host while building: Fedora Wayland, rustc 1.96.1, Node 24.18.0, pnpm 12.14.0. `sudo dnf install` of Tauri packages failed (password required).
+Host while building: Fedora Wayland, rustc 1.96.1, Node 24.18.0, pnpm 12.14.0. WebKit/DBus devel are installed via `scripts/fedora-deps.sh` (or equivalent `dnf`).
 
 ### Definition of done
 
@@ -151,7 +151,7 @@ Isolated data directories only. No commercial ISOs or BIOS in the repo.
 | --- | --- |
 | Host | Fedora Linux, Wayland |
 | Primary PCSX2 variant | **Pending** |
-| Desktop compile | **Pending** — `webkit2gtk4.1-devel`, `dbus-devel` |
+| Desktop compile | **Pending** — run `./scripts/fedora-deps.sh` then `cargo check -p marquee-desktop` |
 
 `scripts/check.sh`: fmt; clippy/tests for core+CLI (excludes `marquee-desktop`); `cargo check -p marquee-desktop` prints `BLOCKED` if native deps are missing; then `pnpm check` / `pnpm test` / `pnpm build`.
 
@@ -184,7 +184,7 @@ Fake-runner tests do **not** close the real-emulator gate.
 
 ## Next
 
-1. Install `webkit2gtk4.1-devel`, `dbus-devel`, and remaining Tauri Fedora deps. `cargo check -p marquee-desktop` then `pnpm tauri dev`.
+1. `./scripts/fedora-deps.sh` (or `./scripts/bootstrap.sh`). `cargo check -p marquee-desktop` then `pnpm tauri dev`.
 2. Empty library + Add PS2 folder, no sample fallback.
 3. Install one PCSX2 by hand (Flathub user Flatpak preferred; official GitHub AppImage fallback). Record it as the live-tested primary. Marquee does not install it yet.
 4. Import a user-owned `.iso` folder. Confirm skipped-format summary if other extensions are present.

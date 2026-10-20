@@ -54,14 +54,15 @@ marquee/
   tools/build-index      validates every catalogue file, checks upstream repos exist, writes index.json
   packaging/             rpm spec, flatpak manifest, .desktop file, icons
   docs/                  PS2.md (current slice), ROADMAP.md (this plan), EXPANSION_CATALOGUE.md, PS2_METADATA_FOLLOWUP.md
-  scripts/               check.sh, release.sh (run locally; no hosted CI)
+  scripts/               fedora-deps.sh, bootstrap.sh, check.sh (run locally; no hosted CI)
 ```
 
 **License:** GPL-3.0-or-later, matching Lutris and Heroic. Marquee only calls Lutris's CLI and reads its database, so this is a choice, not an obligation; MIT also works. Catalogue data: CC0 so anyone can reuse it.
 
 **Checks and releases (local, no GitHub Actions)**
 
-- **`scripts/check.sh`:** `cargo fmt --all --check`, clippy/tests for core+CLI (desktop crate excluded until WebKit is present), optional `cargo check -p marquee-desktop` (prints `BLOCKED` if native deps are missing), then `pnpm check`, `pnpm test`, `pnpm build`. Run it before every push; agents run it too.
+- **`scripts/fedora-deps.sh`:** Fedora WebKit/DBus/Tauri devel packages (`sudo dnf` only for what is missing). **`scripts/bootstrap.sh`:** that plus rustc/node/pnpm checks.
+- **`scripts/check.sh`:** `cargo fmt --all --check`, clippy/tests for core+CLI (desktop crate excluded until WebKit is present), optional `cargo check -p marquee-desktop` (prints `BLOCKED` and points at `fedora-deps.sh` if native deps are missing), then `pnpm check`, `pnpm test`, `pnpm build`. Run it before every push; agents run it too.
 - **`scripts/release.sh <version>`:** builds AppImage + RPM with `cargo tauri build`, signs the updater bundle, writes `latest.json`, tags, and publishes a GitHub Release with `gh release create`.
 - **Releases:** the app's updater reads `latest.json` from the newest release, so updates are one click and need no server.
 - **Issues:** templates for "Broken port", "Missing artwork" and "Bug"; the app's "Report a problem" button opens a pre-filled issue URL, so no token is needed.
@@ -555,22 +556,17 @@ The biggest risk is scope: keep each phase shippable and resist adding stores or
 
 ## First week
 
-Superseded in practice by the 2026-10-20 PS2 slice: the workspace, CLI and Tauri shell exist, but they talk to a PS2 library, not Lutris/Steam. Closing phase 0 still needs the native window (`webkit2gtk4.1-devel`, `dbus-devel`). Lutris/Steam CLI listing remains phase 1.
+Superseded in practice by the 2026-10-20 PS2 slice: the workspace, CLI and Tauri shell exist, but they talk to a PS2 library, not Lutris/Steam. Closing phase 0 still needs the native window. Lutris/Steam CLI listing remains phase 1.
 
-Original first-week notes (Fedora 44; check Tauri's prerequisites page if a package name has changed):
+Original first-week notes (Fedora 44; package names live in `scripts/fedora-deps.sh`):
 
 1. Install the toolchain:
 
    ```bash
-   sudo dnf install webkit2gtk4.1-devel dbus-devel openssl-devel curl wget file \
-     libappindicator-gtk3-devel librsvg2-devel libxdo-devel
-   sudo dnf group install c-development
-   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-   sudo dnf install nodejs
-   curl -fsSL https://get.pnpm.io/install.sh | sh -
+   ./scripts/bootstrap.sh
    ```
 2. ~~Create the repo~~ (done).
-3. ~~Add the Tauri shell to the existing UI~~ (done 2026-10-20 as `apps/desktop/src-tauri/`; window compile still needs WebKit/DBus devel).
+3. ~~Add the Tauri shell to the existing UI~~ (done 2026-10-20 as `apps/desktop/src-tauri/`; window compile: `./scripts/fedora-deps.sh`).
 4. ~~Turn the repo into a Cargo workspace~~ (done: `apps/desktop/src-tauri`, `crates/core`, `crates/cli`). Core has rusqlite/serde for PS2; `steamlocate` / Lutris / keyring / reqwest are still phase 1+.
 5. Write the Lutris adapter first: open `~/.local/share/lutris/pga.db` read-only and print `service_games` grouped by service. Then the Steam `.acf` reader. **Not started** — PS2 slice was built instead.
 6. Add `scripts/check.sh` (fmt, clippy, test, `pnpm check`, `pnpm build`), run it, push to main.

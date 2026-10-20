@@ -7,8 +7,10 @@ if [ -f Cargo.toml ]; then
   cargo fmt --all --check
   cargo clippy --workspace --exclude marquee-desktop --all-targets --locked -- -D warnings
   cargo test --workspace --exclude marquee-desktop --locked
-  if ! cargo check -p marquee-desktop --locked; then
-    echo "BLOCKED: cargo check -p marquee-desktop (install webkit2gtk4.1-devel, dbus-devel, and other Tauri Fedora deps to close this gate)." >&2
+  if ! pkg-config --exists webkit2gtk-4.1 || ! pkg-config --exists dbus-1; then
+    echo "BLOCKED: Tauri native deps (webkit2gtk-4.1 / dbus-1). On Fedora: ./scripts/fedora-deps.sh" >&2
+  elif ! cargo check -p marquee-desktop --locked; then
+    echo "BLOCKED: cargo check -p marquee-desktop. On Fedora: ./scripts/fedora-deps.sh" >&2
   fi
 fi
 
