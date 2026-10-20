@@ -25,11 +25,7 @@
       "assetProtocol": {
         "enable": true,
         "scope": [
-          "$HOME/.cache/marquee/art/**",
-          "$HOME/.local/share/marquee/**",
-          "$CACHE/marquee/art/**",
-          "$HOME/**/cache/art/**",
-          "/tmp/**"
+          "$CACHE/marquee/art/**"
         ]
       }
     }

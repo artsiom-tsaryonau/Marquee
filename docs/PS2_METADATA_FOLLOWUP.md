@@ -16,7 +16,7 @@ This ticket adds matching, user corrections and cached artwork on top of that li
 
 ## Why it is separate
 
-ScreenScraper requires forum-issued developer credentials (`devid` / `devpassword`) plus optional user `ssid` / `sspassword`. It is not a SteamGridDB-style single API key. The API may only be used in fully free, publicly distributed applications unless ScreenScraper grants other terms, and Marquee's license is still unchosen. Live matching therefore has product and credential prerequisites the offline slice does not.
+ScreenScraper requires forum-issued developer credentials (`devid` / `devpassword`) plus optional user `ssid` / `sspassword`. It is not a SteamGridDB-style single API key. The API may only be used in fully free, publicly distributed applications unless ScreenScraper grants other terms,. Live matching therefore has product and credential prerequisites the offline slice does not.
 
 Serial extraction and content hashing also serve different jobs. The first milestone already reads `SYSTEM.CNF` for a boot serial. Whole-ISO hashes, if added here, are for integrity, verified relocation and provider lookup — not for showing the first library card.
 
@@ -52,7 +52,7 @@ Keep user titles, favourites and local artwork overrides separate from refreshed
 
 1. Use the documented API (`jeuInfos.php`, `jeuRecherche.php`, `ssuserInfos.php`), not HTML scraping. Recheck [webapi2.php](https://www.screenscraper.fr/webapi2.php) before coding; v2 is marked unstable.
 2. Developer identity (`devid`, `devpassword`, `softname`) authorizes the application. User `ssid` / `sspassword` affect quota and member entitlements. Do not assume a SteamGridDB-style single key covers both.
-3. Register the application through ScreenScraper's forum before shipping live calls. Confirm the chosen LICENSE satisfies “entirely free and distributed,” or obtain their written terms.
+3. Register the application through ScreenScraper's forum before shipping live calls. Confirm the MIT license satisfies “entirely free and distributed,” or obtain their written terms.
 4. Match in this order: serial from `SYSTEM.CNF` (`serialnum`) with `systemeid=58` (PlayStation 2), then documented hash/size fields if a hash was computed for that file, then title + platform + region search. Do not hash every large ISO as a prerequisite to showing or launching a game.
 5. Auto-accept only unambiguous high-confidence matches. Otherwise provide a small candidate chooser and “Keep local title.”
 6. “Wrong game?” rematches without replacing local media identity or losing playtime/favourites.

@@ -48,9 +48,7 @@ pub fn launch(
     xdg_config: Option<std::path::PathBuf>,
 ) -> Result<Session> {
     let (session, argv, runner_kind, isolate) = {
-        let db = db
-            .lock()
-            .map_err(|_| AppError::new("DB", "database lock poisoned"))?;
+        let db = db.lock().unwrap_or_else(|e| e.into_inner());
         if db.running_session()?.is_some() {
             return Err(AppError::new("LAUNCH_BUSY", "a game is already running"));
         }
@@ -132,9 +130,7 @@ pub fn launch(
             Ok(session)
         }
         Err(err) => {
-            let dbg = db
-                .lock()
-                .map_err(|_| AppError::new("DB", "database lock poisoned"))?;
+            let dbg = db.lock().unwrap_or_else(|e| e.into_inner());
             let ended = now_rfc3339();
             dbg.finish_session(
                 &session.id,
@@ -202,7 +198,8 @@ fn wait_and_finish(
         Err(err) => (None, "failed", Some(err.to_string())),
     };
 
-    if let Ok(guard) = db.lock() {
+    {
+        let guard = db.lock().unwrap_or_else(|e| e.into_inner());
         let _ = guard.finish_session(
             &session_id,
             &ended,
