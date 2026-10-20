@@ -45,6 +45,14 @@ enum Command {
     Launch {
         edition_id: String,
     },
+    /// Serve the UI and API on 127.0.0.1 so a browser shows this same library
+    Serve {
+        #[arg(long)]
+        port: Option<u16>,
+        /// Built UI directory
+        #[arg(long, default_value = "apps/desktop/dist")]
+        web_dir: PathBuf,
+    },
     Health,
 }
 
@@ -110,7 +118,7 @@ fn main() -> ExitCode {
 
 fn run() -> marquee_core::error::Result<()> {
     let args = Args::parse();
-    let core = Core::open(args.data_dir, args.allow_fake)?;
+    let core = Arc::new(Core::open(args.data_dir, args.allow_fake)?);
     match args.command {
         Command::Library(LibraryCmd::AddRoot { system, path }) => {
             if system != "ps2" {
@@ -206,6 +214,15 @@ fn run() -> marquee_core::error::Result<()> {
         Command::Artwork(ArtworkCmd::Refresh { edition }) => {
             let report = core.refresh_artwork(edition.as_deref(), None)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Command::Serve { port, web_dir } => {
+            let assets = marquee_core::server::dir_assets(web_dir);
+            let handle = marquee_core::server::start(Arc::clone(&core), Some(assets), port)?;
+            println!("Marquee web UI: {}", handle.url());
+            println!("Press Ctrl+C to stop.");
+            loop {
+                thread::sleep(Duration::from_secs(3600));
+            }
         }
         Command::Health => {
             println!("{}", core.health()?);

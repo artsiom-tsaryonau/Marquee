@@ -129,7 +129,8 @@ export interface PortInfo {
 }
 
 export interface LibraryApi {
-  kind: 'demo' | 'desktop';
+  /** `desktop` = native window, `web` = browser attached to a running Marquee, `demo` = invented data. */
+  kind: 'demo' | 'desktop' | 'web';
   snapshot(): Promise<LibrarySnapshot>;
   addRoot(path: string): Promise<LibraryRoot>;
   pickRoot(): Promise<string | null>;
@@ -142,6 +143,8 @@ export interface LibraryApi {
   setDisplayTitle(editionId: string, title: string): Promise<void>;
   subscribe(handler: (event: CoreEvent) => void): () => void;
   whenReady(): Promise<void>;
+  /** Address that opens this same library in a browser (desktop only). */
+  webUrl(): Promise<string | null>;
   installPcsx2(channel?: string): Promise<Runner[]>;
   refreshArtwork(editionId?: string): Promise<ArtworkReport>;
   listPorts(): Promise<PortInfo[]>;

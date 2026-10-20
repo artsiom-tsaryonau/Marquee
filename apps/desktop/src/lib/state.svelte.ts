@@ -41,6 +41,7 @@ class AppState {
 
   api: LibraryApi = createApi();
   demo = this.api.kind === 'demo';
+  webUrl = $state<string | null>(null);
   libraryStatus = $state<LibraryStatus>(this.api.kind === 'demo' ? 'demo' : 'loading');
   loadError = $state<string | null>(null);
   roots = $state<LibraryRoot[]>([]);
@@ -86,6 +87,7 @@ class AppState {
       const snap = await this.api.snapshot();
       this.applySnapshot(snap);
       await this.loadPorts();
+      this.webUrl = await this.api.webUrl().catch(() => null);
     } catch (err) {
       this.libraryStatus = 'failed';
       this.loadError = err instanceof Error ? err.message : String((err as { message?: string }).message ?? err);
@@ -427,6 +429,16 @@ class AppState {
           : p.requirement,
       art: artFromSeed(`port:${p.id}`),
     }));
+  }
+
+  async copyWebUrl() {
+    if (!this.webUrl) return;
+    try {
+      await navigator.clipboard.writeText(this.webUrl);
+      this.notify('Address copied. Paste it into a browser on this computer.');
+    } catch {
+      this.notify(this.webUrl);
+    }
   }
 
   async loadPorts() {

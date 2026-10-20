@@ -36,7 +36,9 @@ cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev artwork refresh
 cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev ports install zelda64recomp   # also: ports list | check | launch
 ```
 
-**Demo (`pnpm dev`)** still uses invented titles and simulated playtime. Controller input in the browser is not evidence for the Tauri window.
+**One app, two surfaces.** The desktop app also serves the same UI and the same library on `127.0.0.1` (default port 47820, `MARQUEE_PORT` to change). Settings → Web access copies an address ending in `#token=…`; open it in a browser on the same computer and you get the identical UI with the same games, covers, ports and launches, and both surfaces see each other's changes live. Headless: `marquee serve` (after `pnpm build`). While developing, `pnpm dev` proxies `/api` to a running Marquee, so a browser at `http://localhost:1420/#token=…` shows real data with hot reload. The server is loopback-only, needs the token for every API and cover request, and rejects foreign `Host` headers. The token lives in `<data dir>/server.token` (mode 600).
+
+**Demo (`pnpm dev`, no token, or `?demo=1`)** still uses invented titles and simulated playtime. Controller input in the browser is not evidence for the Tauri window.
 
 **Desktop** starts with an empty library and the same Home/Library/Ports/Downloads/Settings chrome as the demo. Install PCSX2 from Home, Library, or Settings: Marquee downloads the official AppImage and unpacks it into its own data dir (no Flatpak wizard, no BIOS or games). Add a PS2 `.iso` folder; covers are looked up by disc serial and cached. **Ports** installs five native ports from their official GitHub releases (Ship of Harkinian, Zelda64Recomp, sm64coopdx, Fallout 2 CE, UZDoom): Install, Update, Play, and Open folder for your own ROM or game files. Downloads on desktop is still empty chrome. “Add a Windows app” is demo-only.
 

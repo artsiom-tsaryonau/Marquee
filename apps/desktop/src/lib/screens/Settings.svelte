@@ -71,6 +71,21 @@
     {/if}
   </section>
 
+  {#if app.webUrl}
+  <section class="glass-panel">
+    <h2>Web access</h2>
+    <div class="item">
+      <div>
+        <strong>Open this library in a browser</strong>
+        <span>Same games, same data, same launches. Only this computer can connect, and only with the key in the address.</span>
+      </div>
+      <div class="row-actions">
+        <button class="btn glass small" data-nav onclick={() => app.copyWebUrl()}>Copy address</button>
+      </div>
+    </div>
+  </section>
+  {/if}
+
   {#if app.demo}
   <section class="glass-panel">
     <h2>Sources</h2>

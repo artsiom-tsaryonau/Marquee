@@ -50,6 +50,9 @@ export const demoApi: LibraryApi = {
   async installPcsx2() {
     throw { code: 'DEMO', message: 'Install PCSX2 in the desktop app' };
   },
+  async webUrl() {
+    return null;
+  },
   async listPorts() {
     return [];
   },

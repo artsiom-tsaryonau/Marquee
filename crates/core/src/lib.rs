@@ -1,8 +1,10 @@
+pub mod api;
 pub mod artwork;
 pub mod catalog;
 pub mod db;
 pub mod error;
 pub mod http;
+pub mod hub;
 pub mod instance;
 pub mod iso;
 pub mod library;
@@ -10,6 +12,7 @@ pub mod model;
 pub mod paths;
 pub mod ports;
 pub mod runners;
+pub mod server;
 pub mod sessions;
 pub mod tools;
 
@@ -32,6 +35,7 @@ pub struct Core {
     discover_host: bool,
     installing: Mutex<bool>,
     installing_ports: Mutex<std::collections::HashSet<String>>,
+    events: Arc<hub::EventHub>,
 }
 
 impl Core {
@@ -58,6 +62,7 @@ impl Core {
             discover_host,
             installing: Mutex::new(false),
             installing_ports: Mutex::new(std::collections::HashSet::new()),
+            events: Arc::new(hub::EventHub::new()),
         };
         core.refresh_runners()?;
         Ok(core)
@@ -377,6 +382,11 @@ impl Core {
     pub fn open_setup(&self, runner_id: &str) -> Result<()> {
         let home = self.paths.pcsx2_xdg_config();
         self.with_db(|db| runners::open_setup(db, runner_id, Some(&home)))
+    }
+
+    /// Every event the core emits goes here; the window and the web server both read it.
+    pub fn hub(&self) -> Arc<hub::EventHub> {
+        Arc::clone(&self.events)
     }
 
     pub fn db_arc(&self) -> Arc<Mutex<Db>> {

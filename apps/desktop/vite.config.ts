@@ -5,5 +5,13 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 export default defineConfig({
   plugins: [svelte()],
   clearScreen: false,
-  server: { port: 1420, strictPort: true },
+  server: {
+    port: 1420,
+    strictPort: true,
+    // Browser dev against a running Marquee: same origin, same data.
+    proxy: {
+      '/api': { target: 'http://127.0.0.1:47820', changeOrigin: true },
+      '/art': { target: 'http://127.0.0.1:47820', changeOrigin: true },
+    },
+  },
 });

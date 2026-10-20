@@ -1,157 +1,27 @@
-use crate::{event_sink, AppState};
+use crate::AppState;
+use marquee_core::api;
 use marquee_core::error::{AppError, Result};
-use marquee_core::model::{
-    ArtworkReport, LibraryRoot, LibrarySnapshot, Runner, ScanReport, Session,
-};
-use marquee_core::ports::PortInfo;
-use std::path::PathBuf;
+use serde_json::Value;
 use std::sync::Arc;
-use tauri::{AppHandle, State};
+use tauri::State;
 
-fn core(state: &State<AppState>) -> Arc<marquee_core::Core> {
-    Arc::clone(&state.core)
-}
-
-async fn blocking<T: Send + 'static>(
-    work: impl FnOnce() -> Result<T> + Send + 'static,
-) -> Result<T> {
-    tauri::async_runtime::spawn_blocking(work)
-        .await
-        .map_err(|err| AppError::new("IO", err.to_string()))?
-}
-
+/// Every UI action goes through the same `dispatch` the local web server uses.
 #[tauri::command]
-pub async fn health(state: State<'_, AppState>) -> Result<String> {
-    let core = core(&state);
-    blocking(move || core.health()).await
-}
-
-#[tauri::command]
-pub async fn library_snapshot(state: State<'_, AppState>) -> Result<LibrarySnapshot> {
-    let core = core(&state);
-    blocking(move || core.snapshot()).await
-}
-
-#[tauri::command]
-pub async fn add_library_root(state: State<'_, AppState>, path: String) -> Result<LibraryRoot> {
-    let core = core(&state);
-    blocking(move || core.add_root(PathBuf::from(path), Some("PlayStation 2".into()))).await
-}
-
-#[tauri::command]
-pub async fn scan_library_root(
-    app: AppHandle,
+pub async fn core_call(
     state: State<'_, AppState>,
-    root_id: Option<String>,
-) -> Result<ScanReport> {
-    let core = core(&state);
-    let sink = event_sink(&app);
-    blocking(move || core.scan(root_id.as_deref(), Some(sink))).await
+    cmd: String,
+    args: Option<Value>,
+) -> Result<Value> {
+    let core = Arc::clone(&state.core);
+    tauri::async_runtime::spawn_blocking(move || {
+        api::dispatch(&core, &cmd, args.unwrap_or(Value::Null))
+    })
+    .await
+    .map_err(|err| AppError::new("IO", err.to_string()))?
 }
 
+/// Address (with token) that opens this same library in a browser.
 #[tauri::command]
-pub async fn list_runners(state: State<'_, AppState>) -> Result<Vec<Runner>> {
-    let core = core(&state);
-    blocking(move || core.refresh_runners()).await
-}
-
-#[tauri::command]
-pub async fn select_runner(state: State<'_, AppState>, runner_id: String) -> Result<()> {
-    let core = core(&state);
-    blocking(move || core.select_runner(&runner_id)).await
-}
-
-#[tauri::command]
-pub async fn open_runner_setup(state: State<'_, AppState>, runner_id: String) -> Result<()> {
-    let core = core(&state);
-    blocking(move || core.open_setup(&runner_id)).await
-}
-
-#[tauri::command]
-pub async fn launch_game(
-    app: AppHandle,
-    state: State<'_, AppState>,
-    edition_id: String,
-) -> Result<Session> {
-    let core = core(&state);
-    let sink = event_sink(&app);
-    blocking(move || core.launch(&edition_id, &[], sink)).await
-}
-
-#[tauri::command]
-pub async fn set_favourite(
-    state: State<'_, AppState>,
-    edition_id: String,
-    favorite: bool,
-) -> Result<()> {
-    let core = core(&state);
-    blocking(move || core.set_favourite(&edition_id, favorite)).await
-}
-
-#[tauri::command]
-pub async fn set_display_title(
-    state: State<'_, AppState>,
-    edition_id: String,
-    title: String,
-) -> Result<()> {
-    let core = core(&state);
-    blocking(move || core.set_display_title(&edition_id, &title)).await
-}
-
-#[tauri::command]
-pub async fn install_pcsx2(
-    app: AppHandle,
-    state: State<'_, AppState>,
-    channel: Option<String>,
-) -> Result<Vec<Runner>> {
-    let core = core(&state);
-    let sink = event_sink(&app);
-    let channel = channel.unwrap_or_else(|| "auto".into());
-    blocking(move || core.install_pcsx2(&channel, sink)).await
-}
-
-#[tauri::command]
-pub async fn refresh_artwork(
-    app: AppHandle,
-    state: State<'_, AppState>,
-    edition_id: Option<String>,
-) -> Result<ArtworkReport> {
-    let core = core(&state);
-    let sink = event_sink(&app);
-    blocking(move || core.refresh_artwork(edition_id.as_deref(), Some(sink))).await
-}
-
-#[tauri::command]
-pub async fn list_ports(state: State<'_, AppState>) -> Result<Vec<PortInfo>> {
-    let core = core(&state);
-    blocking(move || core.list_ports()).await
-}
-
-#[tauri::command]
-pub async fn check_port_updates(state: State<'_, AppState>) -> Result<Vec<PortInfo>> {
-    let core = core(&state);
-    blocking(move || core.check_port_updates()).await
-}
-
-#[tauri::command]
-pub async fn install_port(
-    app: AppHandle,
-    state: State<'_, AppState>,
-    port_id: String,
-) -> Result<Vec<PortInfo>> {
-    let core = core(&state);
-    let sink = event_sink(&app);
-    blocking(move || core.install_port(&port_id, sink)).await
-}
-
-#[tauri::command]
-pub async fn launch_port(state: State<'_, AppState>, port_id: String) -> Result<()> {
-    let core = core(&state);
-    blocking(move || core.launch_port(&port_id)).await
-}
-
-#[tauri::command]
-pub async fn open_port_folder(state: State<'_, AppState>, port_id: String) -> Result<()> {
-    let core = core(&state);
-    blocking(move || core.open_port_folder(&port_id)).await
+pub fn web_url(state: State<'_, AppState>) -> Option<String> {
+    state.web_url.clone()
 }

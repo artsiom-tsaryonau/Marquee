@@ -3,6 +3,7 @@ import { artFromSeed } from '../art';
 import type { GameEntry } from '../types';
 import type { Edition, LibraryRoot, LibrarySnapshot, Runner } from './contracts';
 import { isDesktopRuntime } from './desktop';
+import { webToken } from './http';
 
 function pickRunner(snap: LibrarySnapshot): Runner | null {
   const selected = snap.settings.selected_runner_id
@@ -53,12 +54,18 @@ export function editionToGame(edition: Edition, snap: LibrarySnapshot): GameEntr
 }
 
 function coverSrc(path: string | null): string | undefined {
-  if (!path || !isDesktopRuntime()) return undefined;
-  try {
-    return convertFileSrc(path);
-  } catch {
-    return undefined;
+  if (!path) return undefined;
+  if (isDesktopRuntime()) {
+    try {
+      return convertFileSrc(path);
+    } catch {
+      return undefined;
+    }
   }
+  // Browser: covers are served by Marquee itself, by file name, with the token.
+  const token = webToken();
+  const name = path.split('/').pop();
+  return token && name ? `/art/${encodeURIComponent(name)}?token=${encodeURIComponent(token)}` : undefined;
 }
 
 export function gamesFromSnapshot(snap: LibrarySnapshot): GameEntry[] {
