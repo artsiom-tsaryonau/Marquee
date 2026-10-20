@@ -62,6 +62,21 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
             let edition = maybe(&args, "edition_id");
             out(core.refresh_artwork(edition.as_deref(), Some(sink))?)
         }
+        "list_emulators" => out(core.list_emulators()?),
+        "check_emulator_updates" => out(core.check_emulator_updates()?),
+        "install_emulator" => out(core.install_emulator(&text(&args, "id")?, sink)?),
+        "open_emulator" => out(core.open_emulator(&text(&args, "id")?)?),
+        "uninstall_emulator" => {
+            let purge = args
+                .get("purge_data")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            out(core.uninstall_emulator(&text(&args, "id")?, purge)?)
+        }
+        "list_bios" => out(core.list_bios()?),
+        "import_bios" => out(core.import_bios(&PathBuf::from(text(&args, "path")?))?),
+        "remove_bios" => out(core.remove_bios(&text(&args, "system")?)?),
+        "uninstall_pcsx2" => out(core.uninstall_pcsx2()?),
         "list_keys" => out(core.list_keys()?),
         "set_key" => out(core.set_key(&text(&args, "id")?, &text(&args, "value")?)?),
         "clear_key" => out(core.clear_key(&text(&args, "id")?)?),

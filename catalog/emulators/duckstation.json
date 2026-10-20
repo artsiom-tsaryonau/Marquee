@@ -1,0 +1,22 @@
+{
+  "id": "duckstation",
+  "name": "DuckStation",
+  "kind": "duckstation",
+  "systems": ["ps1"],
+  "github": "stenzek/duckstation",
+  "asset_suffix": "DuckStation-x64.AppImage",
+  "asset_excludes": ["sse2"],
+  "rolling": true,
+  "binary": "AppRun",
+  "config_subdir": "duckstation",
+  "bios_subdir": "duckstation/bios",
+  "bios_system": "ps1",
+  "requirement": "Needs your own PS1 BIOS (Marquee can import a folder of them)",
+  "packages": [
+    {
+      "manager": "flatpak",
+      "command": "flatpak install --user flathub org.duckstation.DuckStation",
+      "note": "Marquee also finds a Flatpak copy, but keeps its own settings and saves separate from it."
+    }
+  ]
+}

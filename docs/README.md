@@ -16,8 +16,11 @@ The 2026-10-21 direct-store decision supersedes earlier numbered phases, “Lutr
 
 | Document | Purpose and limits |
 | --- | --- |
+| [PS1/PS2 correction pass](PS1_PS2_CORRECTIONS_2026-10-21.md) | Mixed-platform UI, CUE validation/offsets, media access, defaults and session-accounting corrections |
 | [PS2](PS2.md) | PCSX2/offline-disc slice, setup, and its still-open live acceptance gate |
 | [PS1](PS1.md) | DuckStation slice and schema-v4 root systems; verify its own live gate independently |
+| [Managed emulators and BIOS](EMULATORS.md) | Seven managed emulator launchers and Tools UI, PS1/PS2 BIOS management, lifecycle/removal commands and per-platform integration limits |
+| [Purple for Aion 2](PURPLE.md) | Managed setup/open recipe, runtime pins, retry/cancellation, and the unverified live game gate |
 | [Tools and launchers](LAUNCHERS.md) | Implemented generic shortcuts and advanced configuration, not direct account/store integration |
 | [Legacy Lutris bridge](AUTOMATIC_SOURCES.md) | Existing local-cache projection; deprioritized. Current automatic discovery still exists until code changes make it opt-in |
 | [Correction report](CORRECTION_PASS.md) | Dated correction-pass evidence and known limits; historical test totals do not replace a fresh release check |
@@ -25,4 +28,4 @@ The 2026-10-21 direct-store decision supersedes earlier numbered phases, “Lutr
 
 Implementation notes can contain dated snapshots. They do not reorder the current roadmap, make unverified live gates complete, or imply planned store/runtime features already exist. For migrations, inspect the actual schema and use the next available version; do not reuse v4 for the proposed unified backend.
 
-The documentation-direction update changes no runtime behavior. In particular, it neither removes legacy integrations nor installs new store/runtime helpers.
+The direct-store documentation update itself changed no runtime behavior. The subsequent Purple integration adds an explicit, user-triggered setup recipe; it does not install anything at application startup or remove legacy integrations.

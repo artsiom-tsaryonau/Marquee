@@ -40,7 +40,7 @@
           : game.mediaMissing
             ? { label: 'Missing', tone: 'warn' }
             : game.setupState === 'runner_missing'
-              ? { label: 'Needs PCSX2', tone: 'warn' }
+              ? { label: game.platform === 'ps1' ? 'Needs DuckStation' : 'Needs PCSX2', tone: 'warn' }
               : game.setupState === 'missing'
                 ? { label: 'Needs BIOS', tone: 'warn' }
                 : !game.installed

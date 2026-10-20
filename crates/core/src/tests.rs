@@ -222,7 +222,8 @@ fn launch_argv_keeps_metacharacters_inert() {
         runners::launch_argv(&flatpak, Path::new("/media/quote\"and$meta.iso"), &[]).unwrap();
     assert_eq!(argv[0], "flatpak");
     assert_eq!(argv[1], "run");
-    assert_eq!(argv[2], "net.pcsx2.PCSX2");
+    assert_eq!(argv[2], "--filesystem=/media/quote\"and$meta.iso:ro");
+    assert_eq!(argv[3], "net.pcsx2.PCSX2");
     assert_eq!(argv.last().unwrap(), "/media/quote\"and$meta.iso");
 }
 
@@ -257,7 +258,7 @@ fn empty_default_bios_dir_is_unverified_not_missing() {
 }
 
 /// A PS1 root imports `.iso`, launches via DuckStation's argv shape, and keeps
-/// `.cue`/`.bin` counted as skipped rather than borrowed from the PS2 set.
+/// CUE imports once while BIN companions are skipped.
 #[test]
 fn ps1_root_imports_iso_and_uses_duckstation_argv() {
     let dir = tempfile::tempdir().unwrap();
@@ -268,7 +269,7 @@ fn ps1_root_imports_iso_and_uses_duckstation_argv() {
     write_iso(&games.join("Pair.bin"), "BOOT = cdrom:\\SLUS_007.76;1");
     File::create(games.join("Pair.cue"))
         .unwrap()
-        .write_all(b"FILE \"Pair.bin\" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n")
+        .write_all(b"FILE \"Pair.bin\" BINARY\n  TRACK 01 MODE1/2048\n    INDEX 01 00:00:00\n")
         .unwrap();
     File::create(games.join("Orphan.bin"))
         .unwrap()
@@ -326,6 +327,7 @@ fn ps1_root_imports_iso_and_uses_duckstation_argv() {
         vec![
             "flatpak",
             "run",
+            "--filesystem=/games/ps1/Cave.iso:ro",
             "org.duckstation.DuckStation",
             "-batch",
             "-fullscreen",
@@ -484,7 +486,9 @@ fn spawn_failed_and_missing_runner_are_typed() {
     let bad = dir.path().join("not-executable");
     File::create(&bad).unwrap().write_all(b"nope").unwrap();
     let mut perm = fs::metadata(&bad).unwrap().permissions();
-    perm.set_mode(0o644);
+    // Availability checks reject mode 0644 before spawn. Use an executable
+    // with an invalid binary format to exercise the actual spawn failure.
+    perm.set_mode(0o755);
     fs::set_permissions(&bad, perm).unwrap();
     {
         let db = core.db_arc();
@@ -788,4 +792,152 @@ fn launcher_commands_share_persistence_validation_and_invalidation() {
     )
     .unwrap();
     assert!(core.list_launchers().unwrap().is_empty());
+}
+
+#[test]
+fn cue_tracks_restore_replace_and_invalidate_art_without_losing_titles() {
+    let t = tempfile::tempdir().unwrap();
+    let games = t.path().join("games");
+    fs::create_dir_all(games.join("tracks")).unwrap();
+    let cue = games.join("game.cue");
+    let bin = games.join("tracks/data.bin");
+    let audio = games.join("audio.bin");
+    fs::write(&cue, "FILE \"tracks/data.bin\" BINARY\nTRACK 01 MODE1/2048\nINDEX 01 00:00:00\nFILE \"audio.bin\" BINARY\nTRACK 02 AUDIO\nINDEX 01 00:00:00\n").unwrap();
+    write_iso(&bin, "BOOT = cdrom:\\SLUS_007.07;1");
+    let core = Core::open_isolated(Some(t.path().join("data")), true).unwrap();
+    let root = core.add_root("ps1", games, None).unwrap();
+    let report = core.scan(Some(&root.id), None).unwrap();
+    assert_eq!(report.added, 1);
+    assert!(!report.warnings.is_empty());
+    let before = core.snapshot().unwrap();
+    let id = before.editions[0].id.clone();
+    assert!(before.editions[0].missing);
+    assert!(before.media[0]
+        .skip_reason
+        .as_ref()
+        .unwrap()
+        .contains("audio.bin"));
+    assert_eq!(
+        core.launch(&id, &[], Arc::new(NoopSink)).unwrap_err().code,
+        "MEDIA_MISSING"
+    );
+    fs::write(&audio, [0; 2352]).unwrap();
+    assert!(!core.snapshot().unwrap().editions[0].missing);
+    core.scan(Some(&root.id), None).unwrap();
+    assert_eq!(
+        core.snapshot().unwrap().editions[0].serial.as_deref(),
+        Some("SLUS_007.07")
+    );
+    core.set_display_title(&id, "My disc").unwrap();
+    core.set_favourite(&id, true).unwrap();
+    core.db_arc()
+        .lock()
+        .unwrap()
+        .upsert_artwork(&id, "cover", "/tmp/old-cover.jpg", "test", "2026-01-01")
+        .unwrap();
+    let cue_before = fs::metadata(&cue).unwrap().modified().unwrap();
+    write_iso(&bin, "BOOT = cdrom:\\SLUS_999.99;1");
+    core.scan(Some(&root.id), None).unwrap();
+    let after = core.snapshot().unwrap();
+    let edition = &after.editions[0];
+    assert_eq!(edition.id, id);
+    assert_eq!(edition.title, "My disc");
+    assert!(edition.favorite);
+    assert_eq!(edition.serial.as_deref(), Some("SLUS_999.99"));
+    assert!(edition.cover_path.is_none());
+    assert_eq!(fs::metadata(&cue).unwrap().modified().unwrap(), cue_before);
+    fs::remove_file(&bin).unwrap();
+    assert!(core.snapshot().unwrap().editions[0].missing);
+    assert_eq!(
+        core.launch(&id, &[], Arc::new(NoopSink)).unwrap_err().code,
+        "MEDIA_MISSING"
+    );
+}
+
+#[test]
+fn conflicting_root_system_is_explicit_and_keeps_editions() {
+    let t = tempfile::tempdir().unwrap();
+    let games = t.path().join("games");
+    write_iso(&games.join("game.iso"), "BOOT = cdrom:\\SLUS_005.94;1");
+    let core = Core::open_isolated(Some(t.path().join("data")), true).unwrap();
+    let root = core.add_root("ps1", games.clone(), None).unwrap();
+    core.scan(Some(&root.id), None).unwrap();
+    let id = core.snapshot().unwrap().editions[0].id.clone();
+    assert_eq!(
+        core.add_root("ps2", games.clone(), None).unwrap_err().code,
+        "ROOT_SYSTEM_CONFLICT"
+    );
+    assert_eq!(core.add_root("ps1", games, None).unwrap().id, root.id);
+    assert_eq!(core.snapshot().unwrap().editions[0].id, id);
+}
+
+#[test]
+fn ps1_and_ps2_defaults_persist_independently() {
+    let t = tempfile::tempdir().unwrap();
+    let data = t.path().join("data");
+    let core = Core::open_isolated(Some(data.clone()), false).unwrap();
+    {
+        let db = core.db_arc();
+        let db = db.lock().unwrap();
+        db.upsert_runner(
+            "test.ps1",
+            "duckstation",
+            "PS1",
+            &["/bin/true".into()],
+            BiosState::Unverified,
+            None,
+            "test",
+        )
+        .unwrap();
+        db.upsert_runner(
+            "test.ps2",
+            "pcsx2",
+            "PS2",
+            &["/bin/true".into()],
+            BiosState::Unverified,
+            None,
+            "test",
+        )
+        .unwrap();
+    }
+    core.select_runner("test.ps2").unwrap();
+    core.select_runner("test.ps1").unwrap();
+    drop(core);
+    let core = Core::open_isolated(Some(data), false).unwrap();
+    let settings = core.snapshot().unwrap().settings;
+    assert_eq!(settings.selected_runner_ids["ps1"], "test.ps1");
+    assert_eq!(settings.selected_runner_ids["ps2"], "test.ps2");
+}
+
+#[test]
+fn failed_process_keeps_attempt_duration_without_crediting_play() {
+    let t = tempfile::tempdir().unwrap();
+    let games = t.path().join("games");
+    write_iso(&games.join("game.iso"), "BOOT2 = cdrom0:\\SLUS_209.63;1");
+    let core = Core::open_isolated(Some(t.path().join("data")), true).unwrap();
+    let root = core.add_root("ps2", games, None).unwrap();
+    core.scan(Some(&root.id), None).unwrap();
+    let id = core.snapshot().unwrap().editions[0].id.clone();
+    core.db_arc()
+        .lock()
+        .unwrap()
+        .upsert_runner(
+            "test.failure",
+            "fake",
+            "Failure",
+            &["/bin/sh".into(), "-c".into(), "sleep 1; exit 1".into()],
+            BiosState::Unverified,
+            None,
+            "test",
+        )
+        .unwrap();
+    core.select_runner("test.failure").unwrap();
+    let session = core.launch(&id, &[], Arc::new(NoopSink)).unwrap();
+    let ended = wait_session(&core, &session.id);
+    assert_eq!(ended.state, SessionState::Failed);
+    assert!(ended.duration_seconds.unwrap() >= 1);
+    let edition = core.snapshot().unwrap().editions.remove(0);
+    assert_eq!(edition.play_count, 0);
+    assert_eq!(edition.playtime_seconds, 0);
+    assert!(edition.last_played_at.is_none());
 }

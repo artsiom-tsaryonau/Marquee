@@ -36,59 +36,31 @@
 <div class="settings">
   <h1>Settings</h1>
 
+  {#each [{ id: 'ps1', name: 'PlayStation', emulator: 'DuckStation', kind: 'duckstation' }, { id: 'ps2', name: 'PlayStation 2', emulator: 'PCSX2', kind: 'pcsx2' }] as system}
+    {@const runner = app.runnerFor(system.id)}
+    {@const choices = app.runners.filter((r) => r.kind === system.kind)}
+    <section class="glass-panel">
+      <h2>{system.name}</h2>
+      <div class="item"><div><strong>Disc folders</strong>
+        {#each app.roots.filter((r) => r.system === system.id) as root}<span>{root.path} · {root.status}</span>{:else}<span>No folder selected</span>{/each}
+        <span>{app.games.filter((g) => g.source === 'rom' && g.platform === system.id).length} disc/image entries · {system.id === 'ps1' ? 'ISO, CHD, CUE with its tracks' : 'ISO'}</span>
+      </div><button class="btn glass small" data-nav onclick={() => app.addSystemFolder(system.id)}><Icon name="folder" size={16} /> Add folder</button></div>
+      <div class="item"><div><strong>{system.emulator}</strong><span>{runner ? `${runner.display_name} · ${runner.bios_state === 'launch_tested' ? 'previously launched' : runner.bios_state}` : 'No available emulator detected'}</span>
+        {#if runner?.bios_hint}<span>{runner.bios_hint}</span>{/if}
+        {#if system.id === 'ps2' && app.installingPcsx2}<span>{app.installProgress || 'Installing…'}</span>{/if}
+        {#if !runner && system.id === 'ps1'}<span>Install DuckStation, then refresh detection. Native commands, AppImages and Flatpak are supported.</span>{/if}
+      </div><div class="row-actions">
+        {#if system.id === 'ps2'}<InstallMenu tone="primary" size="small" />{:else if !runner}<a class="btn glass small" data-nav href="https://github.com/stenzek/duckstation" target="_blank" rel="noreferrer">Get DuckStation ↗</a>{/if}
+        <button class="btn glass small" data-nav onclick={() => app.openSetup(runner?.id, system.id)} disabled={!runner}>Open setup</button>
+      </div></div>
+      {#if choices.length > 1}<div class="item"><div><strong>Default runner</strong><span>Saved independently for {system.name}</span></div><select data-nav aria-label={`${system.name} default runner`} value={runner?.id || ''} onchange={(e) => app.chooseRunner(e.currentTarget.value)}>{#each choices as choice}<option value={choice.id} disabled={!choice.available}>{choice.display_name}{choice.available ? '' : ' · unavailable'}</option>{/each}</select></div>{/if}
+    </section>
+  {/each}
   <section class="glass-panel">
-    <h2>PlayStation 2</h2>
-    <div class="item">
-      <div>
-        <strong>ISO folder</strong>
-        <span>{app.roots[0] ? `${app.roots[0].path} · ${app.roots[0].status}` : 'No folder selected'}</span>
-      </div>
-      <button class="btn glass small" data-nav onclick={() => app.addPs2Folder()}><Icon name="folder" size={16} /> Choose folder</button>
-    </div>
-    <div class="item">
-      <div>
-        <strong>Last import</strong>
-        <span>{app.lastScan ? `${app.lastScan.added} added · ${app.lastScan.skipped_unsupported} skipped` : 'Not scanned yet'}</span>
-      </div>
-      <button class="btn glass small" data-nav onclick={() => app.rescan()} disabled={app.scanning}><Icon name="refresh" size={16} /> {app.scanning ? 'Scanning…' : 'Rescan'}</button>
-    </div>
-    <div class="item">
-      <div>
-        <strong>PCSX2</strong>
-        <span>
-          {#if app.installingPcsx2}
-            {app.installProgress ?? 'Installing…'}
-          {:else if app.selectedRunner?.available}
-            {app.selectedRunner.display_name} · {app.selectedRunner.bios_state.replace('_', ' ')}
-          {:else}
-            Not installed. Marquee can install the official Flatpak (no BIOS or games).
-          {/if}
-        </span>
-      </div>
-      <div class="row-actions">
-        <InstallMenu tone="primary" size="small" />
-        <button class="btn glass small" data-nav onclick={() => app.openSetup()} disabled={!app.selectedRunner?.available}>Open setup</button>
-      </div>
-    </div>
-    <div class="item">
-      <div>
-        <strong>Box art</strong>
-        <span>Looks up covers by disc serial from the public PS2 cover set. Never downloads games.</span>
-      </div>
-      <button class="btn glass small" data-nav onclick={() => app.refreshArtwork()} disabled={app.fetchingArt || app.games.length === 0}>
-        {app.fetchingArt ? 'Fetching…' : 'Fetch covers'}
-      </button>
-    </div>
-    {#if app.runners.length > 1}
-      <div class="item">
-        <div><strong>Installation</strong><span>Choose which PCSX2 Marquee launches</span></div>
-        <select data-nav value={app.selectedRunner?.id ?? ''} onchange={(e) => app.chooseRunner((e.currentTarget as HTMLSelectElement).value)}>
-          {#each app.runners as runner (runner.id)}
-            <option value={runner.id}>{runner.display_name}</option>
-          {/each}
-        </select>
-      </div>
-    {/if}
+    <h2>Disc library maintenance</h2>
+    <div class="item"><div><strong>Last import</strong><span>{app.lastScan ? `${app.lastScan.added} added · ${app.lastScan.skipped_unsupported} companion or unsupported files` : 'Not scanned in this window'}</span></div><button class="btn glass small" data-nav onclick={() => app.rescan()} disabled={app.scanning}>{app.scanning ? 'Scanning…' : 'Rescan folders'}</button></div>
+    <div class="item"><div><strong>Emulator detection</strong><span>Refresh after installing or moving an emulator.</span></div><button class="btn glass small" data-nav onclick={() => app.refreshRunners()}>Refresh emulators</button></div>
+    <div class="item"><div><strong>Box art</strong><span>Looks up PS1 and PS2 covers by disc serial. Missing artwork never blocks Play.</span></div><button class="btn glass small" data-nav onclick={() => app.refreshArtwork()} disabled={app.fetchingArt || !app.games.length}>{app.fetchingArt ? 'Fetching…' : 'Fetch covers'}</button></div>
   </section>
 
   <section class="glass-panel">

@@ -1,0 +1,14 @@
+{
+  "id": "cemu",
+  "name": "Cemu",
+  "systems": [
+    "wiiu"
+  ],
+  "github": "cemu-project/Cemu",
+  "asset_suffix": "x86_64.appimage",
+  "asset_excludes": [],
+  "binary": "AppRun",
+  "config_subdir": "cemu",
+  "requirement": "Needs your own Wii U keys and game files",
+  "packages": []
+}

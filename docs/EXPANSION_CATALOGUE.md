@@ -2,7 +2,7 @@
 
 Researched 2026-10-20. These are integration candidates and product proposals, not implemented adapters or locally tested compatibility claims. Follow the linked upstream documentation when implementing each adapter; releases, supported game revisions and Linux packaging change.
 
-**As of 2026-10-20:** a PS2/PCSX2 offline slice is in the tree (ISO scan, CLI, Tauri window, **Marquee-managed PCSX2 unpack**, serial covers, console UI). It is not a finished adapter: live Play → quit → duration is unverified. Nothing else in this catalogue is implemented. Demo UI still uses sample data in the browser; desktop never does. See [PS2.md](PS2.md).
+**Implementation update, 2026-10-21:** PS1 ISO/CHD/CUE and PS2 ISO adapters, five managed native ports, and seven [managed emulator launchers](EMULATORS.md) now exist. DuckStation connects to library-disc launch; PPSSPP, RPCS3, Flycast, Azahar, Cemu and xemu currently open independently. These install/open recipes do not imply media import or per-game launch support for their platforms. PS1/PS2 retail live gates and wider compatibility acceptance remain open. See the [roadmap](ROADMAP.md) and [correction pass](PS1_PS2_CORRECTIONS_2026-10-21.md). Other entries below remain candidates unless explicitly marked implemented.
 
 ## Product direction
 

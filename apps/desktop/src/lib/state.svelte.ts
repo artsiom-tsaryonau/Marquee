@@ -1,6 +1,6 @@
 import { createApi, type LibraryApi } from './api';
 import { gamesFromSnapshot, pickRunner } from './api/map';
-import type { CoreEvent, KeyInfo, LauncherConfig, LauncherInfo, LutrisConfig, LutrisSnapshot, LibraryRoot, LibrarySnapshot, PortInfo, Runner, ScanReport, Session } from './api/contracts';
+import type { BiosFile, CoreEvent, EmulatorInfo, KeyInfo, LauncherConfig, LauncherInfo, LutrisConfig, LutrisSnapshot, LibraryRoot, LibrarySnapshot, PortInfo, Runner, ScanReport, Session } from './api/contracts';
 import { nativePortGame, canonicalId } from './unified';
 import { lutrisToGame } from './lutris';
 import { artFromSeed } from './art';
@@ -47,6 +47,11 @@ class AppState {
   demo = this.api.kind === 'demo';
   webUrl = $state<string | null>(null);
   keys = $state<KeyInfo[]>([]);
+  emulators = $state<EmulatorInfo[]>([]);
+  bios = $state<BiosFile[]>([]);
+  /** Emulator id → what it is doing right now (install/update progress or a short action). */
+  emulatorBusy = $state<Record<string, string>>({});
+  biosBusy = $state(false);
   launchers = $state<LauncherInfo[]>([]);
   lutrisSource = $state<LutrisSnapshot | null>(null);
   lutrisError = $state<string | null>(null);
@@ -62,6 +67,8 @@ class AppState {
   roots = $state<LibraryRoot[]>([]);
   runners = $state<Runner[]>([]);
   selectedRunner = $state<Runner | null>(null);
+  runnerSettings = $state<LibrarySnapshot['settings']>({ last_root: null, last_collection: null, last_focus: null, selected_runner_id: null });
+  runnerFor(system: string) { return pickRunner({ runners: this.runners, settings: this.runnerSettings }, system); }
   lastScan = $state<ScanReport | null>(null);
   scanning = $state(false);
   installingPcsx2 = $state(false);
@@ -97,13 +104,13 @@ class AppState {
   }
 
   async boot() {
-    if (this.demo) { await this.loadLaunchers(); return; }
+    if (this.demo) { await Promise.all([this.loadLaunchers(), this.loadEmulators()]); return; }
     this.unlisten = this.api.subscribe((event) => this.onEvent(event));
     try {
       await this.api.whenReady();
       const snap = await this.api.snapshot();
       this.applySnapshot(snap);
-      await Promise.all([this.loadPorts(), this.loadLaunchers(), this.loadLutris()]);
+      await Promise.all([this.loadPorts(), this.loadLaunchers(), this.loadLutris(), this.loadEmulators(), this.loadBios()]);
       this.webUrl = await this.api.webUrl().catch(() => null);
     } catch (err) {
       this.libraryStatus = 'failed';
@@ -116,6 +123,7 @@ class AppState {
   applySnapshot(snap: LibrarySnapshot) {
     this.roots = snap.roots;
     this.runners = snap.runners;
+    this.runnerSettings = snap.settings;
     this.selectedRunner = pickRunner(snap);
     this.games = [...gamesFromSnapshot(snap), ...this.games.filter((g) => g.source === 'port' || !!g.lutris)];
     this.libraryStatus = this.games.length ? 'loaded' : 'empty';
@@ -187,6 +195,9 @@ class AppState {
       this.installingPcsx2 = false;
       this.installProgress = null;
       this.notify(event.message);
+    }
+    if (event.type === 'tool_install_progress' && event.tool_id in this.emulatorBusy) {
+      this.emulatorBusy[event.tool_id] = event.message;
     }
     if (event.type === 'port_progress') {
       if (event.port_id in this.portBusy) this.portBusy[event.port_id] = event.message;
@@ -369,13 +380,11 @@ class AppState {
       if (this.libraryStatus === 'empty' && report.skipped_unsupported && !report.added) {
         this.notify(
           system === 'ps1'
-            ? 'Nothing imported. PS1 folders import .iso and .chd; .cue/.bin still need converting.'
+            ? 'Nothing imported. PS1 supports .iso, .chd and .cue with its referenced tracks. Standalone BIN files need a CUE sheet.'
             : 'Nothing imported. CHD/CUE/BIN/GZ/CSO are not supported yet — add a folder of .iso files.'
         );
       }
-      if (report.added > 0) {
-        void this.refreshArtwork();
-      }
+      void this.refreshArtwork();
     } catch (err) {
       this.notify((err as { message?: string }).message ?? 'Could not add folder');
     } finally {
@@ -394,9 +403,7 @@ class AppState {
       this.lastScan = report;
       this.applySnapshot(await this.api.snapshot());
       this.notify(describeScan(report));
-      if (report.added > 0) {
-        void this.refreshArtwork();
-      }
+      void this.refreshArtwork();
     } catch (err) {
       this.notify((err as { message?: string }).message ?? 'Scan failed');
     } finally {
@@ -414,17 +421,23 @@ class AppState {
     }
   }
 
-  async openSetup(id?: string) {
+  async refreshRunners() {
     if (this.demo) return;
-    const runnerId = id ?? this.selectedRunner?.id;
+    try { await this.api.listRunners(); this.applySnapshot(await this.api.snapshot()); }
+    catch (err) { this.notify((err as { message?: string }).message ?? 'Could not refresh emulators'); }
+  }
+
+  async openSetup(id?: string, system = 'ps2') {
+    if (this.demo) return;
+    const runnerId = id ?? this.runnerFor(system)?.id;
     if (!runnerId) {
-      this.notify('Install PCSX2 from Settings, then add your own BIOS files.');
+      this.notify(`Set up ${system === 'ps1' ? 'DuckStation' : 'PCSX2'} in Tools, then select your BIOS in the emulator.`);
       return;
     }
     try {
       await this.api.openSetup(runnerId);
     } catch (err) {
-      this.notify((err as { message?: string }).message ?? 'Could not open PCSX2 setup');
+      this.notify((err as { message?: string }).message ?? 'Could not open emulator setup');
     }
   }
 
@@ -577,6 +590,103 @@ class AppState {
       this.notify('Address copied. Paste it into a browser on this computer.');
     } catch {
       this.notify(this.webUrl);
+    }
+  }
+
+  async loadEmulators() {
+    if (this.demo) {
+      this.emulators = await this.api.listEmulators();
+      return;
+    }
+    try {
+      this.emulators = await this.api.listEmulators();
+      // A few GitHub calls for installed emulators only; failures keep the offline state.
+      void this.api.checkEmulatorUpdates().then((list) => (this.emulators = list)).catch(() => {});
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? 'Could not load emulators');
+    }
+  }
+
+  async loadBios() {
+    try {
+      this.bios = await this.api.listBios();
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? 'Could not read BIOS files');
+    }
+  }
+
+  private async emulatorAction(id: string, label: string, run: () => Promise<void>) {
+    if (this.demo) {
+      this.notify('Manage emulators in the desktop app');
+      return;
+    }
+    if (id in this.emulatorBusy) return;
+    this.emulatorBusy[id] = label;
+    try {
+      await run();
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? `Could not ${label.toLowerCase()}`);
+    } finally {
+      delete this.emulatorBusy[id];
+    }
+  }
+
+  async installEmulator(emulator: EmulatorInfo) {
+    await this.emulatorAction(emulator.id, `Installing ${emulator.name}…`, async () => {
+      this.emulators = await this.api.installEmulator(emulator.id);
+      await this.api.snapshot().then((snap) => this.applySnapshot(snap)).catch(() => {});
+      this.notify(`${emulator.name} is installed. ${emulator.requirement}`);
+    });
+  }
+
+  async uninstallEmulator(emulator: EmulatorInfo, purgeData: boolean) {
+    await this.emulatorAction(emulator.id, `Removing ${emulator.name}…`, async () => {
+      this.emulators = await this.api.uninstallEmulator(emulator.id, purgeData);
+      await this.api.snapshot().then((snap) => this.applySnapshot(snap)).catch(() => {});
+      this.notify(purgeData ? `${emulator.name} and its saves were removed` : `${emulator.name} was removed; its settings and saves are kept`);
+    });
+  }
+
+  async openEmulator(emulator: EmulatorInfo) {
+    await this.emulatorAction(emulator.id, `Opening ${emulator.name}…`, async () => {
+      await this.api.openEmulator(emulator.id);
+      this.notify(`Opened ${emulator.name}`);
+    });
+  }
+
+  async importBios() {
+    if (this.demo) {
+      this.notify('Import BIOS files in the desktop app');
+      return;
+    }
+    const path = await this.api.pickRoot();
+    if (!path || this.biosBusy) return;
+    this.biosBusy = true;
+    try {
+      const report = await this.api.importBios(path);
+      await this.loadBios();
+      const added = report.added.length;
+      this.notify(added ? `Added ${added} BIOS file${added === 1 ? '' : 's'}` : 'No new BIOS files found in that folder');
+      void this.api.snapshot().then((snap) => this.applySnapshot(snap)).catch(() => {});
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? 'Could not import BIOS files');
+    } finally {
+      this.biosBusy = false;
+    }
+  }
+
+  async removeBios(system: string) {
+    if (this.demo || this.biosBusy) return;
+    this.biosBusy = true;
+    try {
+      const removed = await this.api.removeBios(system);
+      await this.loadBios();
+      this.notify(`Removed ${removed} ${system.toUpperCase()} BIOS file${removed === 1 ? '' : 's'}`);
+      void this.api.snapshot().then((snap) => this.applySnapshot(snap)).catch(() => {});
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? 'Could not remove BIOS files');
+    } finally {
+      this.biosBusy = false;
     }
   }
 

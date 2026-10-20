@@ -1,0 +1,14 @@
+{
+  "id": "ppsspp",
+  "name": "PPSSPP",
+  "systems": [
+    "psp"
+  ],
+  "github": "hrydgard/ppsspp",
+  "asset_suffix": "anylinux-x86_64.appimage",
+  "asset_excludes": [],
+  "binary": "AppRun",
+  "config_subdir": "ppsspp",
+  "requirement": "No BIOS needed. Bring your own game files",
+  "packages": []
+}

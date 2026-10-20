@@ -6,6 +6,7 @@
   import InstallMenu from '../components/InstallMenu.svelte';
   import LutrisSource from '../components/LutrisSource.svelte';
   import PurpleLauncher from '../components/PurpleLauncher.svelte';
+  import EmulatorsPanel from '../components/EmulatorsPanel.svelte';
   import Icon from '../components/Icon.svelte';
 
   const sections = ['launchers', 'emulators', 'ports'];
@@ -108,8 +109,9 @@
     </section>
   {/if}
   {#if app.toolSections.includes('emulators')}
-    <section aria-labelledby="emulators-title"><div class="section-heading"><div><h2 id="emulators-title">Emulators</h2><p>Choose the default runner for your PS2 installations.</p></div><InstallMenu /></div>
-      <div class="tool-grid">{#each runners as runner}<article class="tool-card glass-panel"><div class="card-heading"><span class="app-mark"><Icon name="controller" size={24} /></span><div><h3>{runner.display_name}</h3><span class="badge" class:available={runner.available}>{app.selectedRunner?.id === runner.id ? 'Default' : runner.available ? 'Detected' : 'Unavailable'}</span></div></div><p class="status">{runner.bios_state.replaceAll('_', ' ')}</p><p class="command">{runner.command.join(' ')}</p><div class="card-actions"><button class="btn primary small" data-nav disabled={!runner.available || app.selectedRunner?.id === runner.id} onclick={() => app.chooseRunner(runner.id)}>Use as default</button><button class="btn glass small" data-nav disabled={!runner.available} onclick={() => app.openSetup(runner.id)}>Setup</button></div></article>{:else}<div class="empty glass-panel"><Icon name="controller" size={28} /><h3>{query || onlyReady ? 'No matching runners' : 'Set up PlayStation 2'}</h3><p>Install PCSX2, then add your BIOS and disc folder in Settings.</p><button class="btn glass" data-nav onclick={() => app.go('settings')}>Open settings</button></div>{/each}</div>
+    <EmulatorsPanel {query} {onlyReady} />
+    <section aria-labelledby="emulators-title"><div class="section-heading"><div><h2 id="emulators-title">Emulators</h2><p>PS1 uses DuckStation; PS2 uses PCSX2. Defaults are saved per system.</p></div><InstallMenu /></div>
+      <div class="tool-grid">{#each runners as runner}<article class="tool-card glass-panel"><div class="card-heading"><span class="app-mark"><Icon name="controller" size={24} /></span><div><h3>{runner.display_name}</h3><span class="badge" class:available={runner.available}>{app.runnerFor(runner.kind === 'duckstation' ? 'ps1' : 'ps2')?.id === runner.id ? 'Default' : runner.available ? 'Detected' : 'Unavailable'}</span></div></div><p class="status">{runner.bios_state.replaceAll('_', ' ')}</p><p class="command">{runner.command.join(' ')}</p><div class="card-actions"><button class="btn primary small" data-nav disabled={!runner.available || app.runnerFor(runner.kind === 'duckstation' ? 'ps1' : 'ps2')?.id === runner.id} onclick={() => app.chooseRunner(runner.id)}>Use as default</button><button class="btn glass small" data-nav disabled={!runner.available} onclick={() => app.openSetup(runner.id)}>Setup</button></div></article>{:else}<div class="empty glass-panel"><Icon name="controller" size={28} /><h3>{query || onlyReady ? 'No matching runners' : 'Set up an emulator'}</h3><p>Install DuckStation for PS1 or PCSX2 for PS2, then open its setup and add a disc folder in Settings.</p><button class="btn glass" data-nav onclick={() => app.go('settings')}>Open settings</button></div>{/each}</div>
     </section>
   {/if}
   {#if app.toolSections.includes('ports')}

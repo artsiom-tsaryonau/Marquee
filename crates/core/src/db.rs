@@ -222,6 +222,16 @@ impl Db {
             last_collection: self.get_setting("last_collection")?,
             last_focus: self.get_setting("last_focus")?,
             selected_runner_id: self.get_setting("selected_runner_id")?,
+            selected_runner_ids: ["ps1", "ps2"]
+                .into_iter()
+                .filter_map(
+                    |system| match self.get_setting(&format!("selected_runner.{system}")) {
+                        Ok(Some(id)) => Some(Ok((system.to_string(), id))),
+                        Ok(None) => None,
+                        Err(e) => Some(Err(e)),
+                    },
+                )
+                .collect::<Result<_>>()?,
         })
     }
 
@@ -382,7 +392,7 @@ impl Db {
         Ok(self
             .conn
             .query_row(
-                "SELECT id, edition_id, kind, size_bytes, mtime FROM media WHERE path = ?1",
+                "SELECT id, edition_id, kind, size_bytes, mtime, serial FROM media WHERE path = ?1",
                 [path_bytes(path)],
                 |r| {
                     Ok(MediaKey {
@@ -391,6 +401,7 @@ impl Db {
                         kind: r.get(2)?,
                         size_bytes: r.get(3)?,
                         mtime: r.get(4)?,
+                        serial: r.get(5)?,
                     })
                 },
             )
@@ -461,6 +472,12 @@ impl Db {
                 source
             ],
         )?;
+        Ok(())
+    }
+
+    pub fn delete_runner(&self, id: &str) -> Result<()> {
+        self.conn
+            .execute("DELETE FROM runners WHERE id = ?1", [id])?;
         Ok(())
     }
 
@@ -696,6 +713,7 @@ pub struct MediaKey {
     pub kind: String,
     pub size_bytes: i64,
     pub mtime: i64,
+    pub serial: Option<String>,
 }
 
 pub struct MediaRow {

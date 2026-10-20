@@ -1,0 +1,17 @@
+{
+  "id": "xemu",
+  "name": "xemu",
+  "systems": [
+    "xbox"
+  ],
+  "github": "xemu-project/xemu",
+  "asset_suffix": "x86_64.appimage",
+  "asset_excludes": [
+    "dbg",
+    "aarch"
+  ],
+  "binary": "AppRun",
+  "config_subdir": "xemu",
+  "requirement": "Needs your own Xbox BIOS, MCPX boot ROM and hard-disk image",
+  "packages": []
+}

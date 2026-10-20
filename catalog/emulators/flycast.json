@@ -1,0 +1,17 @@
+{
+  "id": "flycast",
+  "name": "Flycast",
+  "systems": [
+    "dreamcast"
+  ],
+  "github": "flyinghead/flycast",
+  "asset_suffix": ".appimage",
+  "asset_excludes": [
+    "arm",
+    "aarch"
+  ],
+  "binary": "AppRun",
+  "config_subdir": "flycast",
+  "requirement": "Needs your own Dreamcast BIOS (dc_boot.bin, dc_flash.bin) in its data folder",
+  "packages": []
+}

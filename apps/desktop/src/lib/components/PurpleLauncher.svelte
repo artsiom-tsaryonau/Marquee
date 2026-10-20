@@ -7,6 +7,7 @@
 
   let status = $state<PurpleStatus | null>(null);
   let error = $state<string | null>(null);
+  let connectionError = $state<string | null>(null);
   let pending = $state(false);
   let details = $state(false);
   const busy = $derived(pending || !!status?.busy || !!status?.running);
@@ -16,8 +17,8 @@
     async function refresh() {
       if (polling) return;
       polling = true;
-      try { const next = await app.api.purpleStatus(); if (alive) { status = next; error = null; } }
-      catch (err) { if (alive) error = asError(err).message; }
+      try { const next = await app.api.purpleStatus(); if (alive) { status = next; connectionError = null; } }
+      catch (err) { if (alive) connectionError = asError(err).message; }
       finally { polling = false; }
     }
     void refresh();
@@ -42,7 +43,7 @@
   <p>Marquee prepares the compatibility runtime and a separate Purple installation for you. Sign in and select Aion 2 in Purple’s Store.</p>
   <p class="compatibility">Aion 2 on Linux is unverified. NCSOFT lists Windows as its supported PC platform; installing Purple does not establish game compatibility.</p>
   {#if status?.busy || status?.error}<p class="progress" role="status" aria-live="polite">{status.message}</p>{/if}
-  {#if error || status?.error}<p class="error" role="alert">{error || status?.error}</p>{/if}
+  {#if error || connectionError || status?.error}<p class="error" role="alert">{error || connectionError || status?.error}</p>{/if}
   <div class="actions" data-nav-row>
     {#if status?.ready}
       <button class="btn primary" data-nav disabled={app.demo || busy} onclick={() => action('open')}><Icon name="play" size={16} />{status.running ? 'Purple is open' : 'Open Purple for Aion 2'}</button>

@@ -21,6 +21,7 @@ export interface LibraryRoot {
   id: string;
   path: string;
   kind: 'folder';
+  system: string;
   label: string | null;
   status: 'online' | 'offline';
   last_scan_at: string | null;
@@ -60,7 +61,7 @@ export interface MediaFile {
 
 export interface Runner {
   id: string;
-  kind: 'pcsx2' | 'fake';
+  kind: 'pcsx2' | 'duckstation' | 'fake';
   display_name: string;
   command: string[];
   bios_state: 'missing' | 'unverified' | 'launch_tested';
@@ -102,6 +103,7 @@ export interface Settings {
   last_collection: string | null;
   last_focus: string | null;
   selected_runner_id: string | null;
+  selected_runner_ids?: Record<string, string>;
 }
 
 export interface LibrarySnapshot {
@@ -195,6 +197,28 @@ export interface LauncherInfo extends LauncherConfig {
   status: string;
 }
 
+export interface PackageHint { manager: string; command: string; note: string }
+
+export interface EmulatorInfo {
+  id: string;
+  name: string;
+  systems: string[];
+  /** True when library games launch through it; otherwise it can only be installed and opened. */
+  integrated: boolean;
+  upstream: string;
+  requirement: string;
+  installed_version: string | null;
+  latest_version: string | null;
+  status: 'not_installed' | 'ready' | 'update';
+  program_dir: string | null;
+  data_dir: string;
+  bios_dir: string | null;
+  alternatives: PackageHint[];
+}
+
+export interface BiosFile { system: string; file: string; region: string; version: string }
+export interface BiosImport { added: BiosFile[]; ignored: number }
+
 export interface LibraryApi {
   /** `desktop` = native window, `web` = browser attached to a running Marquee, `demo` = invented data. */
   kind: 'demo' | 'desktop' | 'web';
@@ -234,6 +258,14 @@ export interface LibraryApi {
   installPort(portId: string): Promise<PortInfo[]>;
   launchPort(portId: string): Promise<void>;
   openPortFolder(portId: string): Promise<void>;
+  listEmulators(): Promise<EmulatorInfo[]>;
+  checkEmulatorUpdates(): Promise<EmulatorInfo[]>;
+  installEmulator(id: string): Promise<EmulatorInfo[]>;
+  uninstallEmulator(id: string, purgeData: boolean): Promise<EmulatorInfo[]>;
+  openEmulator(id: string): Promise<void>;
+  listBios(): Promise<BiosFile[]>;
+  importBios(path: string): Promise<BiosImport>;
+  removeBios(system: string): Promise<number>;
 }
 
 export interface ArtworkReport {

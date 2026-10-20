@@ -262,6 +262,8 @@ pub struct Settings {
     pub last_collection: Option<String>,
     pub last_focus: Option<String>,
     pub selected_runner_id: Option<String>,
+    #[serde(default)]
+    pub selected_runner_ids: std::collections::BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

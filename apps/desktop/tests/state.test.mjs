@@ -23,6 +23,64 @@ beforeEach(() => {
 });
 after(() => mock.timers.reset());
 
+const { editionToGame, pickRunner, gamesFromSnapshot } = await import('../src/lib/api/map');
+function discSnapshot() {
+  return { roots: [], media: [{ id: 'm1', path: '/roms/ps1/game.cue', available: true, skip_reason: null }, { id: 'm2', path: '/roms/ps2/game.iso', available: true, skip_reason: null }], sessions: [],
+    editions: [{ id: 'e1', system: 'ps1', title: 'Metal Gear Solid', media_id: 'm1', missing: false, cover_path: null, playtime_seconds: 0 }, { id: 'e2', system: 'ps2', title: 'Vice City', media_id: 'm2', missing: false, cover_path: null, playtime_seconds: 0 }],
+    runners: [{ id: 'pcsx2', kind: 'pcsx2', display_name: 'PCSX2', available: true, bios_state: 'unverified' }], settings: { selected_runner_id: 'pcsx2' } };
+}
+test('mixed disc library keeps PS1 categories and setup separate from PS2', () => {
+  const [ps1, ps2] = gamesFromSnapshot(discSnapshot());
+  assert.equal(ps1.platform, 'ps1'); assert.equal(ps1.genre, 'PS1'); assert.equal(ps1.setupState, 'runner_missing'); assert.equal(ps1.runnerId, undefined);
+  assert.equal(ps2.platform, 'ps2'); assert.equal(ps2.runnerId, 'pcsx2');
+});
+test('runner defaults are platform scoped and unavailable pins fall back', () => {
+  const snap = discSnapshot(); snap.runners.push({ id: 'duck', kind: 'duckstation', display_name: 'DuckStation', available: true, bios_state: 'unverified' });
+  snap.settings.selected_runner_ids = { ps1: 'duck', ps2: 'pcsx2' }; snap.settings.selected_runner_id = 'duck';
+  assert.equal(pickRunner(snap, 'ps2').id, 'pcsx2'); assert.equal(pickRunner(snap, 'ps1').id, 'duck');
+  snap.runners.push({ id: 'dead', kind: 'pcsx2', available: false }); snap.settings.selected_runner_ids.ps2 = 'dead';
+  assert.equal(pickRunner(snap, 'ps2').id, 'pcsx2');
+});
+test('setup actions use the game system instead of the global PCSX2 default', async () => {
+  const api = app.api, demo = app.demo, runners = app.runners, settings = app.runnerSettings;
+  const calls = [], snap = discSnapshot(); snap.runners.push({ id: 'duck', kind: 'duckstation', available: true });
+  try {
+    app.demo = false; app.runners = snap.runners; app.runnerSettings = snap.settings;
+    app.api = { ...api, openSetup: async (id) => calls.push(id) };
+    await app.openSetup(undefined, 'ps1'); await app.openSetup(undefined, 'ps2'); assert.deepEqual(calls, ['duck', 'pcsx2']);
+  } finally { app.api = api; app.demo = demo; app.runners = runners; app.runnerSettings = settings; }
+});
+test('missing companion diagnostics reach cards without unrelated offline folders', () => {
+  const snap = discSnapshot(); snap.media[0].available = false; snap.media[0].skip_reason = 'Missing CUE track: audio.bin'; snap.editions[0].missing = true;
+  snap.roots = [{ system: 'ps2', path: '/other', status: 'offline' }];
+  const game = editionToGame(snap.editions[0], snap);
+  assert.equal(game.installed, false); assert.equal(game.mediaIssue, 'Missing CUE track: audio.bin'); assert.equal(game.rootOffline, false);
+});
+
+test('unrelated tool events never change PCSX2 installation state', () => {
+  app.installingPcsx2 = false;
+  app.installProgress = 'PCSX2 progress';
+  app.onEvent({ type: 'tool_install_started', tool_id: 'purple', channel: 'stable' });
+  app.onEvent({ type: 'tool_install_progress', tool_id: 'purple', message: 'Setting up Purple' });
+  app.onEvent({ type: 'tool_install_finished', tool_id: 'purple', runner_id: null });
+  app.onEvent({ type: 'tool_install_failed', tool_id: 'purple', message: 'Purple failed' });
+  assert.equal(app.installingPcsx2, false);
+  assert.equal(app.installProgress, 'PCSX2 progress');
+});
+
+test('Purple uses the shared command transport and demo never fabricates installation', async () => {
+  const { commands } = await import('../src/lib/api/core');
+  const { demoApi } = await import('../src/lib/api/demo');
+  const calls = [];
+  const api = commands(async (cmd, args) => { calls.push([cmd, args]); return {}; });
+  await api.purpleStatus(); await api.installPurple(); await api.cancelPurple(); await api.openPurple();
+  assert.deepEqual(calls.map(([cmd]) => cmd), ['purple_status', 'install_purple', 'cancel_purple', 'open_purple']);
+  assert.equal((await demoApi.purpleStatus()).ready, false);
+  assert.equal((await demoApi.purpleStatus()).aion2_verified, false);
+  await assert.rejects(demoApi.installPurple(), (e) => e.code === 'DEMO');
+  await assert.rejects(demoApi.openPurple(), (e) => e.code === 'DEMO');
+});
+
 function finishNextDownload() {
   app.downloads[0].progress = 0.999;
   mock.timers.tick(400);
@@ -263,5 +321,35 @@ test('automatic source discovery adds store games and disconnect preserves other
     await app.configureLutris({ ...config, enabled: false });
     assert.equal(app.games.some((g) => g.lutris), false); assert.equal(app.route, 'library');
     assert.deepEqual(app.games.map((g) => g.id), before);
+  } finally { app.api = api; app.demo = demo; }
+});
+
+test('emulator install shows progress, clears it afterwards, and removal asks for saves explicitly', async () => {
+  const api = app.api, demo = app.demo, emulators = app.emulators;
+  const calls = [];
+  const info = (status) => [{ id: 'duckstation', name: 'DuckStation', systems: ['ps1'], integrated: true, requirement: 'Needs a BIOS', status, installed_version: status === 'ready' ? 'latest-1' : null, alternatives: [] }];
+  const snap = { roots: [], media: [], sessions: [], editions: [], runners: [], settings: {} };
+  try {
+    app.demo = false;
+    app.api = { ...api, snapshot: async () => snap,
+      installEmulator: async (id) => { calls.push(['install', id]); assert.ok(id in app.emulatorBusy); app.onEvent({ type: 'tool_install_progress', tool_id: id, message: 'Downloading…' }); assert.equal(app.emulatorBusy[id], 'Downloading…'); return info('ready'); },
+      uninstallEmulator: async (id, purge) => { calls.push(['uninstall', id, purge]); return info('not_installed'); } };
+    const pending = app.installEmulator(info('not_installed')[0]);
+    await pending;
+    assert.equal(app.emulators[0].status, 'ready'); assert.deepEqual(app.emulatorBusy, {});
+    await app.uninstallEmulator(app.emulators[0], false);
+    await app.uninstallEmulator(info('ready')[0], true);
+    assert.deepEqual(calls, [['install', 'duckstation'], ['uninstall', 'duckstation', false], ['uninstall', 'duckstation', true]]);
+    assert.deepEqual(app.emulatorBusy, {});
+  } finally { app.api = api; app.demo = demo; app.emulators = emulators; }
+});
+
+test('a failed emulator install reports the error and does not stay busy', async () => {
+  const api = app.api, demo = app.demo;
+  try {
+    app.demo = false;
+    app.api = { ...api, installEmulator: async () => { throw { code: 'NETWORK', message: 'offline' }; } };
+    await app.installEmulator({ id: 'flycast', name: 'Flycast', requirement: '' });
+    assert.equal(app.toast, 'offline'); assert.deepEqual(app.emulatorBusy, {});
   } finally { app.api = api; app.demo = demo; }
 });

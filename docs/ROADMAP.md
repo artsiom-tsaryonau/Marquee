@@ -22,22 +22,36 @@ Wine is an execution component. It does not provide owned-library sync, store au
 
 ## Current implementation versus target
 
-These are working-tree capabilities, not a claim that every live acceptance gate has passed.
+These are implemented capabilities; live acceptance gates are recorded separately and remain open until observed.
 
 | Area | Current state |
 | --- | --- |
 | Core and surfaces | Rust core/CLI, Tauri/Svelte desktop, shared authenticated loopback browser surface, event hub, MIT application license |
-| Disc library | PS2 import/PCSX2 support; PS1 ISO/CHD and DuckStation slice added in the shared tree; live emulator acceptance remains tracked separately in [PS2](PS2.md) and [PS1](PS1.md) |
+| Disc library | PS2 ISO/PCSX2 and PS1 ISO/CHD/CUE/DuckStation; platform categories, independent defaults, CUE dependency/offset validation, and temporary read-only Flatpak media grants. See [corrections](PS1_PS2_CORRECTIONS_2026-10-21.md); live gates remain open |
 | Sessions and corrections | Persistent sessions, recovery/checkpoint work, staged port updates, mutation invalidation, and per-file scan warnings; see [correction report](CORRECTION_PASS.md) |
 | Native ports | Five managed recipes; binary installation is not proof that required game data is ready |
 | Unified library UI | Platform/run-method/source filters, explicit grouping, edition/run selectors, Jak/OpenGOAL reference assets; persistent normalized backend remains planned |
-| Tools | Persisted external shortcuts, readiness checks, pinning, detected command presets, structured executable/arguments/cwd; see [Tools](LAUNCHERS.md) |
+| Tools | Persisted external shortcuts, readiness checks, pinning, detected presets, structured executable/arguments/cwd, Purple setup, and managed emulator/BIOS panels; see [Tools](LAUNCHERS.md) |
+| Managed emulators | Seven catalogue recipes: DuckStation, PPSSPP, RPCS3, Flycast, Azahar, Cemu, xemu. Install/open/update/remove with verified AppImages and isolated data; DuckStation connects to PS1 disc launch, the other six currently open independently. PCSX2 retains its dedicated installer. See [emulator management](EMULATORS.md) |
+| BIOS management | User-supplied PS1/PS2 identification/import/list/removal through Tools, CLI and API; region selection support. This is not evidence of live firmware/game compatibility |
 | Legacy Lutris bridge | Local read-only installed/cache projection and handoffs exist. Current code auto-discovers an existing database. Moving this behind an optional legacy integration is planned; documentation changes do not disable it |
 | Direct Steam/Epic/GOG | Not implemented as end-to-end native store integrations. Command shortcuts and Lutris cache entries do not count as direct integrations |
-| Compatibility automation | umu/Proton lifecycle, automatic prefix/dependency setup, and real Windows-app installation remain planned; the Windows-app wizard is a demo |
+| Compatibility automation | A narrow [Purple/Aion 2 recipe](PURPLE.md) now provides managed umu/GE-Proton prefix/dependency setup and launcher opening. Live Purple/Aion 2 compatibility is unverified. General runtime lifecycle and arbitrary Windows apps remain planned; other wizard recipes are demos |
 | Metadata and packaging | Serial covers exist; broader metadata, native gamepad integration, packaged updates, and release verification remain separate work |
 
+## Completed increments — 2026-10-21
+
+- [x] Correct mixed PS1/PS2 categorization, per-system setup/defaults, CUE availability and identity refresh, root-conflict reporting, and failed-launch accounting. The real collection validates as 9 PS1 + 2 PS2 entries with stable IDs.
+- [x] Add Purple installation/opening with managed umu/GE-Proton, dependency checkpoints, cancellation and diagnostics. Aion 2 sign-in/gameplay is unverified.
+- [x] Add seven managed emulator catalogue entries and the Tools install/open/update/remove panel, plus user-supplied BIOS management. Native/Flatpak discovery remains an alternative.
+- [ ] Observe PS1 and PS2 retail boot/input/exit/restart gates; test Purple sign-in and Aion 2 gameplay separately.
+- [ ] Verify each additional emulator's actual installation, isolation, prerequisites and successful opening on this host. Add system-specific media/game adapters before advertising library Play for PSP, PS3, Dreamcast, 3DS, Wii U or Xbox.
+
+These owner-requested increments are included ahead of the direct-store milestones. They do not close Steam/Epic/GOG or the general runtime/job manager.
+
 ## Work order
+
+**Requested early increment:** [Purple for Aion 2](PURPLE.md) supplies a standalone managed launcher recipe ahead of C1. It does not close C1/E1, connect a store account, or establish Aion 2 Linux support. Preserve and reuse its safe job/runtime primitives where appropriate; generalize only as the store milestone requires.
 
 1. **S1 — Direct Steam:** installed library first, then authorized owned-library sync, installation handoff, and live launch/return evidence.
 2. **C1 + E1 — Managed compatibility and Epic:** establish the minimum Windows runtime/prefix/job infrastructure needed by the first supported Epic game, then ship the Legendary-backed account/library/install/play flow.
@@ -150,7 +164,9 @@ The normalized data model is shared infrastructure, implemented incrementally wh
 Preserve existing work and correctness gates:
 
 - [PS2 slice](PS2.md): PCSX2 setup, user-owned ISO/BIOS, live launch/exit/time evidence.
-- [PS1 slice](PS1.md): DuckStation, per-system roots, supported ISO/CHD, separate live gate.
+- [PS1 slice](PS1.md): DuckStation, per-system roots, supported ISO/CHD/CUE, separate live gate.
+- [Managed emulators and BIOS](EMULATORS.md): seven install/open recipes and Tools management; preserve the distinction between a managed program and an integrated game adapter.
+- [PS1/PS2 corrections](PS1_PS2_CORRECTIONS_2026-10-21.md): real-collection validation and fixes; original findings are retained in the linked audit.
 - [Expansion catalogue](EXPANSION_CATALOGUE.md): prioritized platforms, port families, legitimate game-data requirements, shelves, streaming, and adapter limits.
 - [Unified-library/OpenGOAL track](UNIFIED_LIBRARY.md): explicit editions/run methods, reference assets, managed Jak extraction and runtime support.
 - [Metadata follow-up](PS2_METADATA_FOLLOWUP.md): ScreenScraper prerequisites and SteamGridDB matching. Broader [metadata and UI enrichment](ENRICHMENT.md) is optional background work and never gates Play.

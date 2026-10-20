@@ -16,7 +16,7 @@
   let query = $state('');
   let platform = $state<Platform | ''>('');
   let method = $state<LaunchMethod | ''>('');
-  const platforms = $derived([...new Set(app.games.map((g) => g.platform))]);
+  const platforms = $derived([...new Set(app.games.filter((g) => !collection || g.platform === collection).map((g) => g.platform))].sort((a, b) => platformLabel[a].localeCompare(platformLabel[b])));
   let sources = $state<Set<Source>>(new Set());
   let installedOnly = $state(false);
   let favOnly = $state(false);
@@ -79,6 +79,10 @@
 
 <div class="library">
   <header class="library-heading"><div><span class="eyebrow">Your collection</span><h1>{collection === 'ps2' ? 'PlayStation 2' : 'Library'}</h1><p>Choose a game, then choose how you play.</p></div><div class="heading-actions"><button class="btn glass small" data-nav onclick={() => app.go('tools')}><Icon name="controller" size={16} /> Tools & launchers</button><button class="btn glass small" data-nav onclick={() => app.addSystemFolder('ps1')}><Icon name="plus" size={16} /> Add PS1 folder</button><button class="btn primary small" data-nav onclick={() => app.addPs2Folder()}><Icon name="plus" size={16} /> Add PS2 folder</button></div></header>
+  <div class="categories" data-nav-row aria-label="Game platforms">
+    <button class="chip" class:on={!platform} data-nav aria-pressed={!platform} onclick={() => platform = ''}>All platforms</button>
+    {#each platforms as p}<button class="chip" class:on={platform === p} data-nav aria-pressed={platform === p} onclick={() => platform = p}>{platformLabel[p]} <span>{app.games.filter((g) => g.platform === p).length}</span></button>{/each}
+  </div>
   <div class="bar glass-panel">
     <label class="search">
       <Icon name="search" size={18} />
@@ -125,11 +129,11 @@
     </div>
   {:else if !shown.length && !query && app.games.length === 0}
     <div class="empty-banner actions">
-      <p>No PS2 games yet.</p>
-      <button class="btn primary" data-nav onclick={() => app.addPs2Folder()}>Add PS2 folder</button>
+      <p>No game discs yet.</p>
+      <button class="btn glass" data-nav onclick={() => app.addSystemFolder('ps1')}>Add PS1 folder</button><button class="btn primary" data-nav onclick={() => app.addPs2Folder()}>Add PS2 folder</button>
       <InstallMenu />
       {#if app.lastScan?.skipped_unsupported}
-        <p>Skipped {app.lastScan.skipped_unsupported} unsupported files. Import .iso files for this milestone.</p>
+        <p>Skipped {app.lastScan.skipped_unsupported} companion or unsupported files. PS1 accepts ISO, CHD and CUE sets; PS2 accepts ISO.</p>
       {/if}
     </div>
   {/if}
@@ -153,6 +157,7 @@
 </div>
 
 <style>
+  .categories { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; } .categories span { margin-left:6px; opacity:.65; font-variant-numeric:tabular-nums; }
   .load-more { display:flex; justify-content:center; margin-top:28px; }
   .library-heading { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:18px; margin:4px 0 26px; }
   .library-heading h1 { font-size:34px; margin:5px 0 8px; letter-spacing:-.8px; }

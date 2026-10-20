@@ -1,7 +1,7 @@
 import { launcherTemplates } from '../launchers';
 import type { LauncherConfig, LauncherInfo, LutrisConfig } from './contracts';
 import { games } from '../mock';
-import type { KeyInfo, LibraryApi, LibrarySnapshot, ScanReport } from './contracts';
+import type { EmulatorInfo, KeyInfo, LibraryApi, LibrarySnapshot, ScanReport } from './contracts';
 
 function emptySnapshot(): LibrarySnapshot {
   return {
@@ -17,6 +17,24 @@ function emptySnapshot(): LibrarySnapshot {
       selected_runner_id: null,
     },
   };
+}
+
+const demoCatalogue: [string, string, string[], boolean, string][] = [
+  ['duckstation', 'DuckStation', ['ps1'], true, 'Needs your own PS1 BIOS (Marquee can import a folder of them)'],
+  ['flycast', 'Flycast', ['dreamcast'], false, 'Needs your own Dreamcast BIOS in its data folder'],
+  ['cemu', 'Cemu', ['wiiu'], false, 'Needs your own Wii U keys and game files'],
+  ['rpcs3', 'RPCS3', ['ps3'], false, "Installs the PS3 firmware from Sony's own file, which you download yourself"],
+  ['ppsspp', 'PPSSPP', ['psp'], false, 'No BIOS needed. Bring your own game files'],
+  ['xemu', 'xemu', ['xbox'], false, 'Needs your own Xbox BIOS, MCPX boot ROM and hard-disk image'],
+  ['azahar', 'Azahar', ['3ds'], false, 'Bring your own decrypted 3DS game files'],
+];
+function demoEmulators(): EmulatorInfo[] {
+  return demoCatalogue.map(([id, name, systems, integrated, requirement]) => ({
+    id, name, systems, integrated, upstream: id, requirement,
+    installed_version: null, latest_version: null, status: 'not_installed' as const,
+    program_dir: null, data_dir: `~/.local/share/marquee/${id}`, bios_dir: null,
+    alternatives: id === 'duckstation' ? [{ manager: 'flatpak', command: 'flatpak install --user flathub org.duckstation.DuckStation', note: 'Marquee also finds a Flatpak copy, but keeps its own settings and saves separate from it.' }] : [],
+  }));
 }
 
 /** Browser demo: sample library stays in the Svelte state layer. */
@@ -118,6 +136,31 @@ export const demoApi: LibraryApi = {
   },
   async openPortFolder() {
     throw { code: 'DEMO', message: 'Open port folders in the desktop app' };
+  },
+  // The same catalogue the app ships, shown as not installed so the Tools screen looks real.
+  async listEmulators() {
+    return demoEmulators();
+  },
+  async checkEmulatorUpdates() {
+    return demoEmulators();
+  },
+  async installEmulator() {
+    throw { code: 'DEMO', message: 'Install emulators in the desktop app' };
+  },
+  async uninstallEmulator() {
+    throw { code: 'DEMO', message: 'Manage emulators in the desktop app' };
+  },
+  async openEmulator() {
+    throw { code: 'DEMO', message: 'Open emulators in the desktop app' };
+  },
+  async listBios() {
+    return [];
+  },
+  async importBios() {
+    throw { code: 'DEMO', message: 'Import BIOS files in the desktop app' };
+  },
+  async removeBios() {
+    throw { code: 'DEMO', message: 'Manage BIOS files in the desktop app' };
   },
   async refreshArtwork() {
     return { fetched: 0, skipped: 0, failed: 0 };

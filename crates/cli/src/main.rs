@@ -42,6 +42,10 @@ enum Command {
     Artwork(ArtworkCmd),
     #[command(subcommand)]
     Ports(PortsCmd),
+    #[command(subcommand)]
+    Bios(BiosCmd),
+    #[command(subcommand)]
+    Emulators(EmulatorsCmd),
     Launch {
         edition_id: String,
     },
@@ -54,6 +58,34 @@ enum Command {
         web_dir: PathBuf,
     },
     Health,
+}
+
+#[derive(Subcommand)]
+enum EmulatorsCmd {
+    /// Emulators Marquee can install, and what is installed
+    List,
+    /// Ask GitHub whether installed emulators have a newer version
+    Check,
+    /// Install or update an emulator inside Marquee's own folder
+    Install { id: String },
+    /// Open an installed emulator's own window
+    Open { id: String },
+    /// Remove an emulator's program (settings and saves stay unless --purge-data)
+    Uninstall {
+        id: String,
+        #[arg(long)]
+        purge_data: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum BiosCmd {
+    /// BIOS images Marquee holds and the region of each
+    List,
+    /// Copy every recognisable BIOS from a folder or file into Marquee
+    Import { path: PathBuf },
+    /// Delete every BIOS Marquee holds for ps1 or ps2
+    Remove { system: String },
 }
 
 #[derive(Subcommand)]
@@ -93,6 +125,8 @@ enum RunnersCmd {
         #[arg(long, default_value = "auto")]
         channel: String,
     },
+    /// Delete the PCSX2 Marquee installed (settings, saves and BIOS stay)
+    Uninstall,
 }
 
 #[derive(Subcommand)]
@@ -187,6 +221,50 @@ fn run() -> marquee_core::error::Result<()> {
             let runners = core.install_pcsx2(&channel, sink)?;
             println!("{}", serde_json::to_string_pretty(&runners)?);
         }
+        Command::Runners(RunnersCmd::Uninstall) => {
+            core.uninstall_pcsx2()?;
+            println!("PCSX2 removed. Settings, saves and BIOS were kept.");
+        }
+        Command::Emulators(cmd) => {
+            let list = match cmd {
+                EmulatorsCmd::List => core.list_emulators()?,
+                EmulatorsCmd::Check => core.check_emulator_updates()?,
+                EmulatorsCmd::Install { id } => {
+                    let sink = Arc::new(FnSink(|event: CoreEvent| match event {
+                        CoreEvent::ToolInstallProgress { message, .. } => println!("{message}"),
+                        CoreEvent::ToolInstallFailed { message, .. } => eprintln!("{message}"),
+                        _ => {}
+                    }));
+                    core.install_emulator(&id, sink)?
+                }
+                EmulatorsCmd::Open { id } => {
+                    core.open_emulator(&id)?;
+                    println!("opened {id}");
+                    return Ok(());
+                }
+                EmulatorsCmd::Uninstall { id, purge_data } => {
+                    core.uninstall_emulator(&id, purge_data)?
+                }
+            };
+            println!("{}", serde_json::to_string_pretty(&list)?);
+        }
+        Command::Bios(cmd) => match cmd {
+            BiosCmd::List => {
+                for b in core.list_bios()? {
+                    println!("{}\t{}\tv{}\t{}", b.system, b.region, b.version, b.file);
+                }
+            }
+            BiosCmd::Import { path } => {
+                let report = core.import_bios(&path)?;
+                for b in &report.added {
+                    println!("added {} {} v{} {}", b.system, b.region, b.version, b.file);
+                }
+                println!("{} added, {} ignored", report.added.len(), report.ignored);
+            }
+            BiosCmd::Remove { system } => {
+                println!("removed {} file(s)", core.remove_bios(&system)?);
+            }
+        },
         Command::Ports(cmd) => {
             let list = match cmd {
                 PortsCmd::List => core.list_ports()?,

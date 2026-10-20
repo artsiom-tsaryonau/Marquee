@@ -12,3 +12,9 @@ target/
 # Never committed: copyrighted/third-party media stays on this machine.
 roms/
 
+# BIOS dumps and other copyrighted firmware must never be committed
+*.zip
+*.bin
+*.rom
+*.7z
+bios/

@@ -1,5 +1,7 @@
 # PlayStation 2 (offline slice)
 
+Current correction notes: [PS1/PS2 correction pass](PS1_PS2_CORRECTIONS_2026-10-21.md). Platform mapping, CUE handling and launch access have changed since the historical checks below. Live gameplay acceptance remains separate.
+
 Slice notes from 2026-10-20; work-order clarification updated 2026-10-21.
 
 This document records the PS2 slice: **what exists**, **how to run it**, **what was verified**, and **what is next**. Long-term phases: [ROADMAP.md](ROADMAP.md). Other systems: [EXPANSION_CATALOGUE.md](EXPANSION_CATALOGUE.md). Next ticket (not started): [PS2_METADATA_FOLLOWUP.md](PS2_METADATA_FOLLOWUP.md).

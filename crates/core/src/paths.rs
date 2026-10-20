@@ -66,6 +66,17 @@ impl Paths {
     pub fn pcsx2_bios_dir(&self) -> PathBuf {
         self.pcsx2_xdg_config().join("PCSX2").join("bios")
     }
+    /// Isolated `XDG_CONFIG_HOME` for Marquee's DuckStation. DuckStation keeps its
+    /// whole user folder (settings, BIOS, memory cards, save states) under it.
+    pub fn duckstation_xdg_config(&self) -> PathBuf {
+        self.data_dir.join("duckstation").join("xdg-config")
+    }
+
+    pub fn duckstation_bios_dir(&self) -> PathBuf {
+        self.duckstation_xdg_config()
+            .join("duckstation")
+            .join("bios")
+    }
 }
 
 fn env_dir(var: &str) -> Option<PathBuf> {

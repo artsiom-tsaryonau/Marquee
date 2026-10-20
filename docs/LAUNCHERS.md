@@ -14,9 +14,13 @@ The target normal flow detects and manages Steam/Legendary/gogdl/umu/Proton depe
 - Missing/non-executable programs and unavailable working directories block Open. Readiness checks the executable and directory, not whether a launcher is authenticated or whether arbitrary arguments are meaningful to it.
 - Launcher changes use the shared core API and `launchers_changed` event, so native and browser surfaces refresh together. An older refresh response cannot replace a newer saved configuration.
 - Search and Ready-only filtering apply to the tool cards. Category visibility remains a local browser/window preference.
-- PCSX2 default runner/setup and installed native port management stay available on this screen.
+- PS1/PS2 default runners and setup, installed native ports, and the [seven managed emulator recipes and BIOS panel](EMULATORS.md) are available on this screen. Standalone emulator opening is distinguished from game-library launch support.
 - The library has a collection header, relevant source chips, a clear-filters action, and explicit empty-filter states. It remembers the selected installation per canonical game in local preferences; the preferred installation is only used if it matches the current filters.
 - Keyboard/controller focus skips disabled controls. Back closes the launcher editor before navigating away.
+
+## Managed Purple for Aion 2
+
+Tools now includes a dedicated **Purple for Aion 2** card. **Install Purple** creates an isolated umu/GE-Proton environment and applies the referenced dependency recipe, then opens the official installer. **Open Purple for Aion 2** opens that managed launcher. No Lutris or manual shortcut configuration is required. Setup progress, stop/retry, runtime/prefix/log details are shared with the browser surface. This is separate from generic shortcuts. Aion 2 Linux compatibility and live launcher setup remain unverified; see [the recipe and acceptance gate](PURPLE.md).
 
 ## Advanced shortcut setup (implemented)
 

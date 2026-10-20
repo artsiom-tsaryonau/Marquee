@@ -10,7 +10,7 @@
   let { onclose }: { onclose: () => void } = $props();
 
   const recipes: { id: string; name: string; note: string; art: Art }[] = [
-    { id: 'purple', name: 'NCSOFT Purple', note: 'corefonts · vcrun2022', art: { hue: 270, hue2: 300, motif: 'shards', logo: 'heavy' } },
+    { id: 'purple', name: 'NCSOFT Purple', note: 'Open managed setup in Tools', art: { hue: 270, hue2: 300, motif: 'shards', logo: 'heavy' } },
     { id: 'ea', name: 'EA App', note: 'Lutris script available', art: { hue: 10, hue2: 350, motif: 'rings', logo: 'wide' } },
     { id: 'bnet', name: 'Battle.net', note: 'vcrun2022 · dxvk', art: { hue: 205, hue2: 190, motif: 'orbit', logo: 'wide' } },
     { id: 'ubi', name: 'Ubisoft Connect', note: 'Lutris script available', art: { hue: 220, hue2: 250, motif: 'waves', logo: 'heavy' } },

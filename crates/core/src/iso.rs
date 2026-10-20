@@ -58,9 +58,16 @@ pub fn unresolved() -> DiscIdentity {
 /// Read a disc's `SYSTEM.CNF` regardless of rip layout. Works for both PS1
 /// (`BOOT`) and PS2 (`BOOT2`) discs.
 pub fn identify_disc_iso(path: &Path) -> Result<DiscIdentity> {
+    identify_disc_track(path, 0, None)
+}
+
+pub fn identify_disc_track(path: &Path, base: u64, stride: Option<u64>) -> Result<DiscIdentity> {
     let mut file = File::open(path)?;
-    for probe in PROBES {
-        if let Some(cnf) = read_system_cnf(&mut file, probe)? {
+    for probe in PROBES
+        .into_iter()
+        .filter(|p| stride.is_none_or(|s| p.stride == s))
+    {
+        if let Some(cnf) = read_system_cnf(&mut file, probe, base)? {
             return Ok(identity_from_system_cnf(&cnf));
         }
     }
@@ -88,7 +95,9 @@ pub fn identity_from_system_cnf(text: &str) -> DiscIdentity {
 fn extract_boot_serial(text: &str) -> Option<String> {
     for line in text.lines() {
         let line = line.trim();
-        let (key, value) = line.split_once('=')?;
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
         if !key.trim().eq_ignore_ascii_case("BOOT2") && !key.trim().eq_ignore_ascii_case("BOOT") {
             continue;
         }
@@ -171,9 +180,9 @@ fn block_offset(probe: Probe, block: u64) -> u64 {
     block * probe.stride + probe.data_offset
 }
 
-fn read_system_cnf(file: &mut File, probe: Probe) -> Result<Option<String>> {
+fn read_system_cnf(file: &mut File, probe: Probe, base: u64) -> Result<Option<String>> {
     let mut pvd = [0u8; SECTOR as usize];
-    file.seek(SeekFrom::Start(block_offset(probe, 16)))?;
+    file.seek(SeekFrom::Start(base + block_offset(probe, 16)))?;
     if file.read(&mut pvd)? < SECTOR as usize {
         return Ok(None);
     }
@@ -198,8 +207,7 @@ fn read_system_cnf(file: &mut File, probe: Probe) -> Result<Option<String>> {
         extent * block / SECTOR
     };
     let mut dir = vec![0u8; size];
-    file.seek(SeekFrom::Start(block_offset(probe, root_block)))?;
-    file.read_exact(&mut dir)?;
+    read_logical(file, probe, base, root_block, &mut dir)?;
     let Some((file_extent, file_size)) = find_cnf(&dir) else {
         return Ok(None);
     };
@@ -207,9 +215,24 @@ fn read_system_cnf(file: &mut File, probe: Probe) -> Result<Option<String>> {
         return Ok(None);
     }
     let mut buf = vec![0u8; file_size as usize];
-    file.seek(SeekFrom::Start(block_offset(probe, u64::from(file_extent))))?;
-    file.read_exact(&mut buf)?;
+    read_logical(file, probe, base, u64::from(file_extent), &mut buf)?;
     Ok(Some(String::from_utf8_lossy(&buf).into_owned()))
+}
+
+fn read_logical(
+    file: &mut File,
+    probe: Probe,
+    base: u64,
+    block: u64,
+    dest: &mut [u8],
+) -> Result<()> {
+    for (i, chunk) in dest.chunks_mut(SECTOR as usize).enumerate() {
+        file.seek(SeekFrom::Start(
+            base + block_offset(probe, block + i as u64),
+        ))?;
+        file.read_exact(chunk)?;
+    }
+    Ok(())
 }
 
 fn find_cnf(dir: &[u8]) -> Option<(u32, u32)> {
@@ -368,6 +391,21 @@ mod tests {
         assert_eq!(id.region.as_deref(), Some("NTSC-U"));
     }
 
+    #[test]
+    fn raw_filesystem_reads_cross_sector_boundaries_without_headers() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("multi.bin");
+        let cnf = format!(
+            "# comment\n{}\nBOOT = cdrom:\\SLUS_005.94;1\n",
+            " ".repeat(2500)
+        );
+        let iso = build_test_iso(&[("SYSTEM.CNF", cnf.as_bytes())]);
+        std::fs::write(&path, raw_2352(&iso)).unwrap();
+        assert_eq!(
+            identify_disc_iso(&path).unwrap().serial.as_deref(),
+            Some("SLUS_005.94")
+        );
+    }
     #[test]
     fn malformed_and_missing_cnf_are_unresolved() {
         let dir = tempfile::tempdir().unwrap();

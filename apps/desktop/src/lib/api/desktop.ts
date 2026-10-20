@@ -18,7 +18,7 @@ export const desktopApi: LibraryApi = {
   kind: 'desktop',
   ...commands(call),
   async pickRoot() {
-    const selected = await open({ directory: true, multiple: false, title: 'Choose a PS2 ISO folder' });
+    const selected = await open({ directory: true, multiple: false, title: 'Choose a game disc folder' });
     return typeof selected === 'string' ? selected : null;
   },
   async pickExecutable() {

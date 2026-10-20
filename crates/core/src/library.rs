@@ -32,10 +32,14 @@ pub fn add_root(db: &Db, path: &Path, system: &str, label: Option<&str>) -> Resu
     }
     if let Some((id, _)) = db.root_by_path(&canonical)? {
         let roots = snapshot_roots(db)?;
-        return roots
+        let existing = roots
             .into_iter()
             .find(|r| r.id == id)
-            .ok_or_else(|| AppError::new("DB", "root vanished"));
+            .ok_or_else(|| AppError::new("DB", "root vanished"))?;
+        if existing.system != system {
+            return Err(AppError::new("ROOT_SYSTEM_CONFLICT", format!("This folder is already registered as {}. Choose its existing category or a different folder; its games and history were kept.", existing.system)));
+        }
+        return Ok(existing);
     }
     let id = Uuid::new_v4().to_string();
     db.upsert_root(&id, &canonical, "folder", &descriptor.id, label)?;
@@ -162,14 +166,24 @@ fn ingest_disc(
         .as_ref()
         .map(|row| row.size_bytes == size && row.mtime == mtime)
         .unwrap_or(false);
-    if unchanged {
+    // CUE identity depends on companion tracks. Re-read bounded metadata on
+    // every scan so restored/replaced tracks cannot leave a stale identity.
+    if unchanged && kind != MediaKind::Ps1Cue {
         report.updated += 1;
         return Ok(());
     }
     // `.chd` is compressed and not ISO9660 on disk, so it carries no serial.
     // `.cue` is a sheet; its data track holds the filesystem.
     let identity = match kind {
-        MediaKind::Ps1Cue => crate::cue::identify_cue(path)?,
+        MediaKind::Ps1Cue => match crate::cue::identify_cue(path) {
+            Ok(identity) => identity,
+            Err(err) => {
+                report
+                    .warnings
+                    .push(format!("{}: {}", path_display(path), err.message));
+                crate::iso::unresolved()
+            }
+        },
         MediaKind::Ps1Chd => crate::iso::unresolved(),
         _ => identify_disc_iso(path)?,
     };
@@ -204,6 +218,15 @@ fn ingest_disc(
         identity.region.as_deref(),
         None,
     )?;
+    if existing
+        .as_ref()
+        .is_some_and(|m| m.serial != identity.serial)
+    {
+        // Keep cache files harmlessly on disk; detach stale art until the
+        // optional background lookup fetches the new identity's cover.
+        db.conn
+            .execute("DELETE FROM artwork WHERE edition_id=?1", [&edition_id])?;
+    }
     if existing.is_some() {
         report.updated += 1;
     } else {
@@ -257,18 +280,26 @@ pub fn snapshot_media(db: &Db) -> Result<Vec<MediaFile>> {
         .into_iter()
         .map(|row| {
             let kind = MediaKind::parse(&row.kind).unwrap_or(MediaKind::Iso);
+            let mut available = row.path.is_file();
+            let mut skip_reason = row.skip_reason;
+            if kind == MediaKind::Ps1Cue && available {
+                if let Err(err) = crate::cue::manifest(&row.path) {
+                    available = false;
+                    skip_reason = Some(err.message);
+                }
+            }
             Ok(MediaFile {
                 id: row.id,
                 edition_id: row.edition_id,
                 kind,
-                available: row.path.is_file(),
+                available,
                 path: row.path,
                 size_bytes: row.size_bytes as u64,
                 mtime: row.mtime,
                 serial: row.serial,
                 serial_raw: row.serial_raw,
                 region: row.region,
-                skip_reason: row.skip_reason,
+                skip_reason,
             })
         })
         .collect()

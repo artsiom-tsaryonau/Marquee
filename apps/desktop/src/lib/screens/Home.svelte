@@ -44,9 +44,9 @@
   <header class="hero">
     {#if empty}
       <div class="info">
-        <p class="eyebrow"><span class="pill">PlayStation 2</span></p>
+        <p class="eyebrow"><span class="pill">Your game library</span></p>
         <Logo game={{ title: 'Marquee', art: homeAtmosphere }} size="xl" />
-        <p class="tagline">Choose a folder of PS2 .iso files. Marquee will not download games or BIOS files.</p>
+        <p class="tagline">Add PS1 ISO, CHD or CUE sets, or PS2 ISO files. Each platform uses its own emulator setup.</p>
         {#if app.libraryStatus === 'failed'}
           <p class="tagline">{app.loadError}</p>
         {/if}
@@ -54,6 +54,7 @@
           <p class="tagline">{app.installProgress}</p>
         {/if}
         <div class="actions">
+          <button class="btn glass" data-nav onclick={() => app.addSystemFolder('ps1')}><Icon name="plus" /> Add PS1 folder</button>
           <button class="btn primary" data-nav onclick={addFolder}>
             <Icon name="plus" /> Add PS2 folder
           </button>
@@ -78,15 +79,17 @@
         </div>
         <div class="actions">
           {#if !app.demo && g.setupState === 'runner_missing'}
-            <InstallMenu tone="primary" />
+            {#if g.platform === 'ps1'}<button class="btn primary" data-nav onclick={() => app.go('tools')}>Set up DuckStation</button>{:else}<InstallMenu tone="primary" />{/if}
           {:else}
             <button class="btn primary" data-nav style="--accent-h:{g.art.hue2}" onclick={() => {
-              if (g.installed) app.play(g);
+              if (!app.demo && g.mediaMissing) app.open(g);
+              else if (!app.demo && g.setupState === 'missing') void app.openSetup(g.runnerId, g.platform);
+              else if (g.installed) app.play(g);
               else if (app.demo) app.install(g.title, { kind: 'game', id: g.id });
-              else app.addPs2Folder();
+              else app.open(g);
             }}>
               <Icon name={g.installed ? 'play' : 'download'} />
-              {g.installed ? 'Play' : app.demo ? 'Install' : 'Reconnect'}
+              {!app.demo && g.mediaMissing ? 'Check disc files' : !app.demo && g.setupState === 'missing' ? 'Open emulator setup' : g.installed ? 'Play' : app.demo ? 'Install' : 'Details'}
             </button>
           {/if}
           <button class="btn glass" data-nav onclick={() => app.open(g)}>Details</button>

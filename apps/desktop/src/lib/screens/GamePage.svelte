@@ -20,7 +20,8 @@
   const shots = $derived(g ? [0, 1, 2, 3].map((i) => ({ ...g.art, hue: (g.art.hue + i * 24) % 360, motif: (['peaks', 'waves', 'grid', 'orbit'] as const)[(i + g.art.hue) % 4] })) : []);
   const similar = $derived(g ? app.games.filter((x) => canonicalId(x) !== canonicalId(g) && (x.genre === g.genre || x.source === g.source)).slice(0, 10) : []);
   const dur = $derived(app.reduceMotion ? 0 : 360);
-  const offline = $derived(!!g && !app.demo && g.platform === 'ps2');
+  const offline = $derived(!!g && !app.demo && g.source === 'rom' && (g.platform === 'ps1' || g.platform === 'ps2'));
+  const emulator = $derived(g?.platform === 'ps1' ? 'DuckStation' : 'PCSX2');
   let editing = $state(false);
   let titleDraft = $state('');
 
@@ -32,7 +33,7 @@
           epic: 'Legendary',
           lutris: 'Lutris · umu-launcher + GE-Proton',
           port: 'Native port binary',
-          rom: offline ? (app.selectedRunner?.display_name ?? 'PCSX2') : 'Emulator (Flatpak)',
+          rom: offline ? (g.runnerName ?? emulator) : 'Emulator',
         }[g.source]
       : '',
   );
@@ -42,9 +43,9 @@
       ? 'Play'
       : g.lutris ? (g.mediaMissing ? 'Files unavailable' : g.installed ? 'Play via Lutris' : 'Install in Lutris')
       : g.setupState === 'missing'
-        ? 'Open PCSX2 setup'
+        ? `Open ${emulator} setup`
         : g.mediaMissing
-          ? 'Disc missing'
+          ? 'Disc files unavailable'
           : g.installed
             ? 'Play'
             : app.demo
@@ -96,11 +97,12 @@
     {/if}
     <div class="actions">
       {#if offline && g.setupState === 'runner_missing'}
-        <InstallMenu tone="primary" size="big" />
+        {#if g.platform === 'ps2'}<InstallMenu tone="primary" size="big" />
+        {:else}<button class="btn primary big" data-nav onclick={() => app.go('tools')}><Icon name="settings" /> Set up DuckStation</button>{/if}
       {:else}
-        <button class="btn primary big" data-nav disabled={!!g.lutris && g.mediaMissing} onclick={() => {
+        <button class="btn primary big" data-nav disabled={(!app.demo && !!g.mediaMissing)} onclick={() => {
           if (g.lutris) void app.openLutrisGame(g);
-          else if (offline && g.setupState === 'missing') app.openSetup();
+          else if (offline && g.setupState === 'missing') app.openSetup(g.runnerId, g.platform);
           else if (g.installed) app.play(g);
           else if (app.demo) app.install(g.title, { kind: 'game', id: g.id });
         }}>
@@ -109,7 +111,7 @@
         </button>
       {/if}
       {#if offline && (g.setupState === 'unverified' || g.setupState === 'runner_missing' || g.setupState === 'missing')}
-        <button class="btn glass" data-nav onclick={() => app.openSetup()}><Icon name="settings" /> Open PCSX2 setup</button>
+        {#if g.runnerId}<button class="btn glass" data-nav onclick={() => app.openSetup(g.runnerId, g.platform)}><Icon name="settings" /> Open {emulator} setup</button>{/if}
       {/if}
       {#if offline && g.serial && !g.coverUrl}
         <button class="btn glass" data-nav onclick={() => app.refreshArtwork(g.id)} disabled={app.fetchingArt}>
@@ -134,6 +136,7 @@
         <button class="btn glass" data-nav onclick={() => app.notify(`${g.title} added to Steam (restart Steam)`)}><Icon name="plus" /> Add to Steam</button>
       {/if}
     </div>
+    {#if offline && (g.mediaIssue || g.setupState === 'runner_missing')}<p class="tagline" role="status">{g.mediaIssue || `${emulator} is not installed or available for this platform. Open Tools to set it up.`}</p>{/if}
   </div>
 
   <div class="body">

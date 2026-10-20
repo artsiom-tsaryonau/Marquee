@@ -2,6 +2,8 @@
 
 Decision date: 2026-10-21. Priority: **Steam → Epic through Legendary → GOG through gogdl**, with the minimum managed compatibility foundation developed alongside Epic. [ROADMAP.md](ROADMAP.md) is the authoritative work order.
 
+An explicit subsequent request added the narrow [Purple for Aion 2 recipe](PURPLE.md): managed umu/GE-Proton setup, dependency checkpoints, cancellation and launcher opening now exist. Live Purple/Aion 2 compatibility remains unverified. This is an early C1 increment, not completion of the general runtime manager or a store adapter; preserve its isolated data and receipt contract when generalizing it.
+
 ## Intended user experience
 
 The user wants a single place for games and does not want to configure Lutris. Marquee replaces that role. A supported normal workflow is:

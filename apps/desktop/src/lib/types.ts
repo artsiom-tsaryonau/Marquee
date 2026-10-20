@@ -54,6 +54,9 @@ export interface GameEntry {
   mediaMissing?: boolean;
   rootOffline?: boolean;
   setupState?: SetupState;
+  runnerId?: string;
+  runnerName?: string;
+  mediaIssue?: string;
   ratings: Ratings;
   /** Hours: main story, main + extras, completionist (IGDB). */
   timeToBeat: [number, number, number] | null;

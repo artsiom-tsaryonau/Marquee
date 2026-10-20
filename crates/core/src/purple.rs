@@ -67,7 +67,14 @@ pub struct Manager {
 impl Manager {
     pub fn new(paths: &Paths) -> Self {
         Self {
-            root: paths.data_dir.join("windows/purple"),
+            root: if paths.data_dir.is_absolute() {
+                paths.data_dir.clone()
+            } else {
+                std::env::current_dir()
+                    .unwrap_or_default()
+                    .join(&paths.data_dir)
+            }
+            .join("windows/purple"),
             busy: AtomicBool::new(false),
             running: AtomicBool::new(false),
             cancel: AtomicBool::new(false),
@@ -186,6 +193,7 @@ impl Manager {
         self.status()
     }
     pub fn cancel(&self) -> Result<Status> {
+        let _operation = self.operation.lock().unwrap_or_else(|e| e.into_inner());
         if !self.busy.load(Ordering::Acquire) {
             return self.status();
         }
@@ -279,12 +287,17 @@ impl Manager {
     fn dependencies(&self, receipt: &mut Receipt, runtime: &Path) -> Result<()> {
         for verb in VERBS {
             self.check_cancel()?;
-            if receipt.completed.iter().any(|s| s == verb) { continue; }
+            if receipt.completed.iter().any(|s| s == verb) {
+                continue;
+            }
             // umu returns nonzero for already installed verbs. Recover a verb
             // that completed immediately before an interrupted receipt write.
-            let installed = fs::read_to_string(self.prefix().join("winetricks.log")).is_ok_and(|log| log.lines().any(|line| line.trim() == *verb));
+            let installed = fs::read_to_string(self.prefix().join("winetricks.log"))
+                .is_ok_and(|log| log.lines().any(|line| line.trim() == *verb));
             if !installed {
-                self.progress(format!("Installing {verb}. Complete any dependency installer windows that appear…"));
+                self.progress(format!(
+                    "Installing {verb}. Complete any dependency installer windows that appear…"
+                ));
                 self.execute(Some(runtime), &["winetricks", verb], verb)?;
             }
             receipt.completed.push((*verb).into());
@@ -307,6 +320,7 @@ impl Manager {
             )
             .env("GAMEID", "marquee-purple")
             .env("STORE", "ncsoft")
+            .env("PROTON_VERB", "waitforexitandrun")
             .env_remove("WINEDLLOVERRIDES")
             .env_remove("WINESERVER")
             .env_remove("WINE")
@@ -526,4 +540,217 @@ fn extract_helper(tar: &Path, dest: &Path) -> Result<()> {
     tmp.as_file().sync_all()?;
     tmp.persist(dest).map_err(|e| AppError::from(e.error))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::Value;
+    fn manager(dir: &Path) -> Manager {
+        let paths = Paths::resolve(Some(dir.join("Marquee with spaces"))).unwrap();
+        let manager = Manager::new(&paths);
+        fs::create_dir_all(manager.helper().parent().unwrap()).unwrap();
+        fs::create_dir_all(manager.prefix()).unwrap();
+        manager
+    }
+    fn runtime(manager: &Manager) -> PathBuf {
+        let path = manager
+            .root
+            .join("runtime/Steam/compatibilitytools.d/GE-Proton-test");
+        fs::create_dir_all(&path).unwrap();
+        fs::write(path.join("proton"), "test").unwrap();
+        fs::write(path.join("toolmanifest.vdf"), "test").unwrap();
+        path
+    }
+    fn fake_helper(manager: &Manager) {
+        fs::write(manager.helper(), r#"import os,sys,json,pathlib
+root=pathlib.Path.cwd()
+with open(root/'calls.jsonl','a') as f: f.write(json.dumps({'args':sys.argv[1:],'prefix':os.environ['WINEPREFIX'],'runtime':os.environ['PROTONPATH'],'folders':os.environ['UMU_FOLDERS_PATH']})+'\n')
+if (root/'fail').exists() and sys.argv[-1] == 'dotnet48': sys.exit(7)
+"#).unwrap();
+    }
+    #[test]
+    fn failed_dependency_is_not_checkpointed_and_retry_resumes_in_order() {
+        let temp = tempfile::tempdir().unwrap();
+        let manager = manager(temp.path());
+        let runtime = runtime(&manager);
+        fake_helper(&manager);
+        fs::write(manager.root.join("fail"), "").unwrap();
+        let mut receipt = Receipt {
+            recipe: RECIPE.into(),
+            runtime: Some(runtime.clone()),
+            completed: vec![],
+        };
+        assert!(manager.dependencies(&mut receipt, &runtime).is_err());
+        assert_eq!(
+            manager.receipt().unwrap().completed,
+            vec!["vcrun2010", "d3dx10"]
+        );
+        fs::remove_file(manager.root.join("fail")).unwrap();
+        let mut resumed = manager.receipt().unwrap();
+        manager.dependencies(&mut resumed, &runtime).unwrap();
+        assert_eq!(resumed.completed, VERBS);
+        let calls: Vec<Value> = fs::read_to_string(manager.root.join("calls.jsonl"))
+            .unwrap()
+            .lines()
+            .map(|l| serde_json::from_str(l).unwrap())
+            .collect();
+        assert_eq!(calls.len(), 7);
+        assert_eq!(
+            calls[0]["args"],
+            serde_json::json!(["winetricks", "vcrun2010"])
+        );
+        assert_eq!(
+            calls[3]["args"],
+            serde_json::json!(["winetricks", "dotnet48"])
+        );
+        assert_eq!(calls[0]["prefix"], manager.prefix().to_str().unwrap());
+        assert_eq!(calls[0]["runtime"], runtime.to_str().unwrap());
+        assert!(!manager.status().unwrap().ready);
+        assert!(!manager.status().unwrap().aion2_verified);
+    }
+    #[test]
+    fn interrupted_receipt_recovers_from_exact_winetricks_log_entries() {
+        let temp = tempfile::tempdir().unwrap();
+        let manager = manager(temp.path());
+        let runtime = runtime(&manager);
+        fake_helper(&manager);
+        fs::write(
+            manager.prefix().join("winetricks.log"),
+            "vcrun2010\nd3dx10\ndotnet48\nvcrun2022\ncorefonts\narial\n",
+        )
+        .unwrap();
+        let mut receipt = Receipt::default();
+        manager.dependencies(&mut receipt, &runtime).unwrap();
+        assert_eq!(receipt.completed, VERBS);
+        assert!(!manager.root.join("calls.jsonl").exists());
+    }
+    #[test]
+    fn exe_alone_is_not_ready_and_runtime_never_falls_back() {
+        let temp = tempfile::tempdir().unwrap();
+        let manager = manager(temp.path());
+        let runtime = runtime(&manager);
+        fake_helper(&manager);
+        fs::create_dir_all(manager.prefix().join(EXE).parent().unwrap()).unwrap();
+        fs::write(manager.prefix().join(EXE), b"MZtest").unwrap();
+        assert!(manager.status().unwrap().installed);
+        assert!(!manager.status().unwrap().ready);
+        manager
+            .save(&Receipt {
+                recipe: RECIPE.into(),
+                runtime: Some(runtime.clone()),
+                completed: vec!["installer".into()],
+            })
+            .unwrap();
+        assert!(manager.status().unwrap().ready);
+        assert!(!manager.status().unwrap().aion2_verified);
+        fs::remove_file(runtime.join("proton")).unwrap();
+        assert!(!manager.status().unwrap().ready);
+    }
+    #[test]
+    fn pinned_command_preserves_metacharacters_as_one_argument() {
+        let temp = tempfile::tempdir().unwrap();
+        let manager = manager(temp.path());
+        let runtime = runtime(&manager);
+        fake_helper(&manager);
+        let arg = "setup space; $(touch NO) `false`.exe";
+        manager.execute(Some(&runtime), &[arg], "test").unwrap();
+        let call: Value = serde_json::from_str(
+            fs::read_to_string(manager.root.join("calls.jsonl"))
+                .unwrap()
+                .trim(),
+        )
+        .unwrap();
+        assert_eq!(call["args"], serde_json::json!([arg]));
+        assert!(!manager.root.join("NO").exists());
+    }
+    #[test]
+    fn cancellation_stops_the_owned_process_without_marking_success() {
+        let temp = tempfile::tempdir().unwrap();
+        let manager = Arc::new(manager(temp.path()));
+        let runtime = runtime(&manager);
+        fs::write(manager.helper(), "import time\ntime.sleep(30)\n").unwrap();
+        let other = Arc::clone(&manager);
+        let worker = std::thread::spawn(move || other.execute(Some(&runtime), &[""], "test"));
+        std::thread::sleep(Duration::from_millis(250));
+        manager.cancel.store(true, Ordering::Release);
+        assert_eq!(worker.join().unwrap().unwrap_err().code, "CANCELLED");
+        assert!(!manager.status().unwrap().ready);
+    }
+    #[test]
+    fn archive_rejects_link_helper_and_leaves_existing_helper_intact() {
+        let temp = tempfile::tempdir().unwrap();
+        let archive = temp.path().join("bad.tar");
+        let dest = temp.path().join("helper");
+        fs::write(&dest, "existing").unwrap();
+        let mut builder = tar::Builder::new(fs::File::create(&archive).unwrap());
+        let mut header = tar::Header::new_gnu();
+        header.set_entry_type(tar::EntryType::Symlink);
+        header.set_size(0);
+        header.set_mode(0o777);
+        header.set_cksum();
+        builder
+            .append_link(&mut header, "umu/umu-run", "/tmp/unrelated")
+            .unwrap();
+        builder.finish().unwrap();
+        assert!(extract_helper(&archive, &dest).is_err());
+        assert_eq!(fs::read_to_string(&dest).unwrap(), "existing");
+    }
+    #[test]
+    fn archive_extracts_only_the_known_helper_without_executing_it() {
+        let temp = tempfile::tempdir().unwrap();
+        let archive = temp.path().join("good.tar");
+        let dest = temp.path().join("helper");
+        let mut builder = tar::Builder::new(fs::File::create(&archive).unwrap());
+        let mut header = tar::Header::new_gnu();
+        header.set_size(6);
+        header.set_mode(0o755);
+        header.set_cksum();
+        builder
+            .append_data(&mut header, "umu/umu-run", &b"helper"[..])
+            .unwrap();
+        builder.finish().unwrap();
+        extract_helper(&archive, &dest).unwrap();
+        assert_eq!(fs::read_to_string(&dest).unwrap(), "helper");
+    }
+
+    #[test]
+    fn shared_api_opens_launcher_without_creating_a_game_session() {
+        let temp = tempfile::tempdir().unwrap();
+        let core =
+            Arc::new(crate::Core::open_isolated(Some(temp.path().join("library")), false).unwrap());
+        let manager = &core.purple;
+        fs::create_dir_all(manager.helper().parent().unwrap()).unwrap();
+        let runtime = runtime(manager);
+        fake_helper(manager);
+        let exe = manager.prefix().join(EXE);
+        fs::create_dir_all(exe.parent().unwrap()).unwrap();
+        fs::write(&exe, b"MZtest").unwrap();
+        manager
+            .save(&Receipt {
+                recipe: RECIPE.into(),
+                runtime: Some(runtime),
+                completed: vec!["installer".into()],
+            })
+            .unwrap();
+        crate::api::dispatch(&core, "open_purple", serde_json::json!({})).unwrap();
+        for _ in 0..60 {
+            if !manager.running.load(Ordering::Acquire) {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert!(!manager.running.load(Ordering::Acquire));
+        let call: Value = serde_json::from_str(
+            fs::read_to_string(manager.root.join("calls.jsonl"))
+                .unwrap()
+                .trim(),
+        )
+        .unwrap();
+        assert_eq!(call["args"], serde_json::json!([exe]));
+        assert!(core.snapshot().unwrap().sessions.is_empty());
+        let status = crate::api::dispatch(&core, "purple_status", serde_json::json!({})).unwrap();
+        assert_eq!(status["ready"], true);
+        assert_eq!(status["aion2_verified"], false);
+    }
 }

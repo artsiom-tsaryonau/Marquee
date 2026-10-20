@@ -1,0 +1,14 @@
+{
+  "id": "azahar",
+  "name": "Azahar",
+  "systems": [
+    "3ds"
+  ],
+  "github": "azahar-emu/azahar",
+  "asset_suffix": "azahar.appimage",
+  "asset_excludes": [],
+  "binary": "AppRun",
+  "config_subdir": "azahar",
+  "requirement": "Bring your own decrypted 3DS game files",
+  "packages": []
+}

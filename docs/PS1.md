@@ -1,5 +1,7 @@
 # PlayStation (PS1 slice)
 
+Current correction notes: [PS1/PS2 correction pass](PS1_PS2_CORRECTIONS_2026-10-21.md). Platform mapping, CUE handling and launch access have changed since the historical checks below. Live gameplay acceptance remains separate.
+
 Last updated: 2026-10-21.
 
 This document covers the **PS1 vertical slice**: a second system beside PS2, using the same library, session supervisor, and CLI. PS2 remains the reference slice and the current release gate — see [PS2.md](PS2.md). Long-term phases: [ROADMAP.md](ROADMAP.md). Other systems: [EXPANSION_CATALOGUE.md](EXPANSION_CATALOGUE.md).
@@ -110,7 +112,7 @@ A stored `selected_runner_id` is honoured only when it belongs to that family (o
 
 DuckStation needs a PS1 BIOS, and the same three states apply (`missing` blocks Play; `unverified` does not). The Flatpak path probed is `~/.var/app/org.duckstation.DuckStation/config/duckstation`.
 
-Marquee never copies BIOS or rewrites emulator settings. Add BIOS in DuckStation itself.
+Marquee never downloads BIOS images. For a Flatpak or other external DuckStation, add BIOS in DuckStation itself. Marquee's own managed DuckStation (`marquee emulators install duckstation`) keeps its BIOS in `~/.local/share/marquee/duckstation/xdg-config/duckstation/bios`; fill it with `marquee bios import <folder>`. See [Managed emulators and BIOS](EMULATORS.md).
 
 ### Errors
 

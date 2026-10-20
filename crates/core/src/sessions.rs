@@ -62,7 +62,9 @@ pub fn launch(
         if !media.available {
             return Err(AppError::new(
                 "MEDIA_MISSING",
-                format!("disc file is missing: {}", path_display(&media.path)),
+                media.skip_reason.clone().unwrap_or_else(|| {
+                    format!("disc file is missing: {}", path_display(&media.path))
+                }),
             )
             .with_context(json!({ "path": path_display(&media.path) })));
         }
@@ -79,14 +81,19 @@ pub fn launch(
         // The stored selection is a hint for one emulator family; only honour it
         // when it matches this title's system, so a PS2 pin cannot hijack a PS1
         // launch (and vice versa).
-        let selected = db.get_setting("selected_runner_id")?;
+        let selected = db
+            .get_setting(&format!("selected_runner.{system}"))?
+            .or(db.get_setting("selected_runner_id")?);
         let selected =
             runners::selection_for(&runners, selected.as_deref(), &system).map(str::to_string);
-        let runner_id = db.profile_runner(edition_id)?.or(selected);
+        let profile = db.profile_runner(edition_id)?;
+        let profile =
+            runners::selection_for(&runners, profile.as_deref(), &system).map(str::to_string);
+        let runner_id = profile.or(selected);
         let runner = match runner_id {
             Some(id) => runners
                 .iter()
-                .find(|r| r.id == id)
+                .find(|r| r.id == id && r.available)
                 .cloned()
                 .or_else(|| runners::pick_for_system(&runners, &system).cloned()),
             None => runners::pick_for_system(&runners, &system).cloned(),
@@ -117,6 +124,13 @@ pub fn launch(
             error: None,
         };
         let isolate = runners::uses_marquee_prefix(&runner);
+        // Pair the game with a BIOS of its own region. Best effort: no match,
+        // no settings file yet, or any error simply leaves PCSX2's own choice.
+        if isolate && runner.kind == RunnerKind::Pcsx2 {
+            if let Some(home) = xdg_config.as_deref() {
+                let _ = crate::bios::select_for_pcsx2(home, media.region.as_deref());
+            }
+        }
         (session, argv, runner.kind, isolate)
     };
 
@@ -221,8 +235,8 @@ fn wait_and_finish(
     sink: Arc<dyn EventSink>,
     session_id: String,
     _edition_id: String,
-    runner_id: String,
-    runner_kind: RunnerKind,
+    _runner_id: String,
+    _runner_kind: RunnerKind,
     mut child: std::process::Child,
     identity: Option<ProcessIdentity>,
     _lease: Arc<crate::instance::InstanceLock>,
@@ -273,14 +287,12 @@ fn wait_and_finish(
             exit_code,
             state,
             error.as_deref(),
-            true,
+            state == "ended",
         ) {
             eprintln!("could not finalize session {session_id}: {err}");
             return;
         }
-        if state == "ended" && runner_kind.needs_bios() {
-            let _ = runners::mark_launch_tested(&guard, &runner_id);
-        }
+        // Process exit alone does not establish that a BIOS/game booted.
         if let Ok(Some(row)) = guard.session_by_id(&session_id) {
             if let Ok(session) = row_to_session(row) {
                 if state == "ended" {

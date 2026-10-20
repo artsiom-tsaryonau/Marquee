@@ -1,5 +1,8 @@
 import type {
   AppError,
+  BiosFile,
+  BiosImport,
+  EmulatorInfo,
   ArtworkReport,
   KeyInfo,
   LibraryApi,
@@ -65,5 +68,13 @@ export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'su
     installPort: (portId) => call<PortInfo[]>('install_port', { port_id: portId }),
     launchPort: (portId) => call<void>('launch_port', { port_id: portId }),
     openPortFolder: (portId) => call<void>('open_port_folder', { port_id: portId }),
+    listEmulators: () => call<EmulatorInfo[]>('list_emulators'),
+    checkEmulatorUpdates: () => call<EmulatorInfo[]>('check_emulator_updates'),
+    installEmulator: (id) => call<EmulatorInfo[]>('install_emulator', { id }),
+    uninstallEmulator: (id, purgeData) => call<EmulatorInfo[]>('uninstall_emulator', { id, purge_data: purgeData }),
+    openEmulator: (id) => call<void>('open_emulator', { id }),
+    listBios: () => call<BiosFile[]>('list_bios'),
+    importBios: (path) => call<BiosImport>('import_bios', { path }),
+    removeBios: (system) => call<number>('remove_bios', { system }),
   };
 }

@@ -1,8 +1,10 @@
 pub mod api;
 pub mod artwork;
+pub mod bios;
 pub mod catalog;
 pub mod cue;
 pub mod db;
+pub mod emulators;
 pub mod error;
 pub mod http;
 pub mod hub;
@@ -144,7 +146,9 @@ impl Core {
             if let Some(path) = db.get_setting("pcsx2_appimage_path")? {
                 extra.push(PathBuf::from(path));
             }
-            runners::refresh(db, self.allow_fake, &extra, self.discover_host, Some(&bios))
+            runners::refresh(db, self.allow_fake, &extra, self.discover_host, Some(&bios))?;
+            emulators::sync_runners(db, &self.paths)?;
+            runners::snapshot(db)
         })
     }
 
@@ -264,12 +268,18 @@ impl Core {
 
     pub fn select_runner(&self, runner_id: &str) -> Result<()> {
         let runners = self.refresh_runners()?;
-        if !runners.iter().any(|r| r.id == runner_id) {
+        let Some(runner) = runners.iter().find(|r| r.id == runner_id && r.available) else {
             return Err(AppError::new(
                 "RUNNER_MISSING",
                 format!("runner not found: {runner_id}"),
             ));
-        }
+        };
+        let system = match runner.kind {
+            RunnerKind::Duckstation => "ps1",
+            RunnerKind::Pcsx2 => "ps2",
+            RunnerKind::Fake => "test",
+        };
+        self.set_setting(&format!("selected_runner.{system}"), runner_id)?;
         self.set_setting("selected_runner_id", runner_id)?;
         self.events.emit(CoreEvent::LibraryChanged);
         Ok(())
@@ -478,6 +488,175 @@ impl Core {
                 AppError::new("LAUNCHER_MISSING", "Launcher configuration was not found")
             })?;
         launchers::launch(&info.launcher)
+    }
+
+    /// Emulators Marquee can install, with install state. Offline: an update shows
+    /// only after `check_emulator_updates`.
+    pub fn list_emulators(&self) -> Result<Vec<emulators::EmulatorInfo>> {
+        emulators::catalogue()?
+            .iter()
+            .map(|def| {
+                let installed = self.with_db(|db| emulators::installed(db, &def.id))?;
+                let latest = self.with_db(|db| db.get_setting(&emulators::latest_key(&def.id)))?;
+                Ok(emulators::info(
+                    &self.paths,
+                    def,
+                    installed.as_ref(),
+                    latest.as_deref().filter(|v| !v.is_empty()),
+                ))
+            })
+            .collect()
+    }
+
+    /// Ask GitHub for the newest version of each installed emulator.
+    pub fn check_emulator_updates(&self) -> Result<Vec<emulators::EmulatorInfo>> {
+        for def in emulators::catalogue()? {
+            if self
+                .with_db(|db| emulators::installed(db, &def.id))?
+                .is_none()
+            {
+                continue;
+            }
+            if let Ok(version) = emulators::latest_version(&def) {
+                self.set_setting(&emulators::latest_key(&def.id), &version)?;
+            }
+        }
+        self.list_emulators()
+    }
+
+    /// Install an emulator, or update it. Settings, saves and BIOS are kept.
+    pub fn install_emulator(
+        &self,
+        id: &str,
+        sink: Arc<dyn EventSink>,
+    ) -> Result<Vec<emulators::EmulatorInfo>> {
+        let def = emulators::find(id)?;
+        if self.with_db(|db| db.running_session())?.is_some() {
+            return Err(AppError::new("LAUNCH_BUSY", "close the running game first"));
+        }
+        {
+            let mut busy = self
+                .installing_ports
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
+            if !busy.insert(format!("emulator:{id}")) {
+                return Err(AppError::new(
+                    "INSTALL_BUSY",
+                    format!("{} is already installing", def.name),
+                ));
+            }
+        }
+        struct Done<'a>(&'a Mutex<std::collections::HashSet<String>>, String);
+        impl Drop for Done<'_> {
+            fn drop(&mut self) {
+                self.0
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .remove(&self.1);
+            }
+        }
+        let _done = Done(&self.installing_ports, format!("emulator:{id}"));
+        sink.emit(CoreEvent::ToolInstallStarted {
+            tool_id: id.into(),
+            channel: "appimage".into(),
+        });
+        match emulators::install(&self.paths, &def, &sink) {
+            Ok(installed) => {
+                self.set_setting(
+                    &emulators::setting_key(id),
+                    &serde_json::to_string(&installed)?,
+                )?;
+                self.set_setting(&emulators::latest_key(id), &installed.version)?;
+                self.refresh_runners()?;
+                sink.emit(CoreEvent::ToolInstallFinished {
+                    tool_id: id.into(),
+                    runner_id: Some(emulators::runner_id(id)),
+                });
+                sink.emit(CoreEvent::LibraryChanged);
+                self.list_emulators()
+            }
+            Err(err) => {
+                sink.emit(CoreEvent::ToolInstallFailed {
+                    tool_id: id.into(),
+                    message: err.message.clone(),
+                });
+                Err(err)
+            }
+        }
+    }
+
+    /// Open an installed emulator's own window (not a game).
+    pub fn open_emulator(&self, id: &str) -> Result<()> {
+        let def = emulators::find(id)?;
+        let installed = self
+            .with_db(|db| emulators::installed(db, id))?
+            .ok_or_else(|| {
+                AppError::new("RUNNER_MISSING", format!("{} is not installed", def.name))
+            })?;
+        emulators::open(&self.paths, &def, &installed)
+    }
+
+    /// Remove an emulator's program. `purge_data` also deletes its settings, saves and BIOS.
+    pub fn uninstall_emulator(
+        &self,
+        id: &str,
+        purge_data: bool,
+    ) -> Result<Vec<emulators::EmulatorInfo>> {
+        let def = emulators::find(id)?;
+        if self.with_db(|db| db.running_session())?.is_some() {
+            return Err(AppError::new("LAUNCH_BUSY", "close the running game first"));
+        }
+        emulators::uninstall(&self.paths, &def, purge_data)?;
+        self.with_db(|db| db.delete_runner(&emulators::runner_id(id)))?;
+        for key in [emulators::setting_key(id), emulators::latest_key(id)] {
+            self.set_setting(&key, "")?;
+        }
+        self.refresh_runners()?;
+        self.events.emit(CoreEvent::LibraryChanged);
+        self.list_emulators()
+    }
+
+    /// BIOS images Marquee holds, with the region read from each image.
+    pub fn list_bios(&self) -> Result<Vec<bios::BiosFile>> {
+        bios::list(&self.paths)
+    }
+
+    /// Copy every recognisable BIOS from a folder (or one file) into Marquee's own store.
+    pub fn import_bios(&self, source: &std::path::Path) -> Result<bios::ImportReport> {
+        let report = bios::import(&self.paths, source)?;
+        self.refresh_runners()?;
+        self.events.emit(CoreEvent::LibraryChanged);
+        Ok(report)
+    }
+
+    /// Delete every BIOS Marquee holds for `system` (`ps1` or `ps2`).
+    pub fn remove_bios(&self, system: &str) -> Result<usize> {
+        let removed = bios::remove(&self.paths, system)?;
+        self.refresh_runners()?;
+        self.events.emit(CoreEvent::LibraryChanged);
+        Ok(removed)
+    }
+
+    /// Delete the PCSX2 Marquee installed. Settings, memory cards, saves and BIOS stay
+    /// until removed on purpose.
+    pub fn uninstall_pcsx2(&self) -> Result<Vec<Runner>> {
+        if self.with_db(|db| db.running_session())?.is_some() {
+            return Err(AppError::new("LAUNCH_BUSY", "close the running game first"));
+        }
+        let prefix = self.paths.pcsx2_prefix();
+        if prefix.exists() {
+            std::fs::remove_dir_all(&prefix)?;
+        }
+        for key in [
+            "pcsx2_unpacked_path",
+            "pcsx2_appimage_path",
+            "marquee_installed_pcsx2",
+        ] {
+            self.set_setting(key, "")?;
+        }
+        let runners = self.refresh_runners()?;
+        self.events.emit(CoreEvent::LibraryChanged);
+        Ok(runners)
     }
 
     /// Known API keys and where each comes from. Never contains a secret value.
