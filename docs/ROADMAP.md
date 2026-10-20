@@ -97,6 +97,7 @@ The app and the CLI share one core; only the bottom layer touches stores, files 
 | `metadata` | Match each entry to IGDB and other databases; fetch and cache scores, reviews summary, time to beat, achievements, compatibility notes |
 | `ports` | Read the catalogue index, install/update ports from GitHub Releases or Flathub, verify game files |
 | `emulation` | System definitions, ROM folder scan, hash identification, emulator command lines |
+| `tools` | Detect, install, update and remove launchers and helpers (Steam, Lutris, Heroic, Legendary, umu, Proton builds, emulators, MangoHud, Gamescope) |
 | `runner` | Start a game, track its process for playtime, report "running" / "exited" to the UI |
 | `secrets` | API keys and tokens in the system keyring (GNOME Keyring via Secret Service), never in files |
 | `settings` | ROM folders, enabled sources, theme, controller mapping |
@@ -207,6 +208,43 @@ notes: "Embedded-browser login; anti-cheat depends on the game"
 - Proton version updates are downloaded in the background; nobody picks Wine versions by hand.
 - On a crash: the Proton log is captured and a dialog offers "Try another Proton version", "Reset prefix", "Open ProtonDB", "Report a problem". A version that works is saved for that game.
 - Existing Lutris Wine entries (Purple, EA App, Epic launcher) are imported as they are: Marquee reads the prefix and `exe` from `~/.local/share/lutris/games/<slug>.yml`, so nothing is reinstalled.
+
+### Launchers and tools on demand
+
+Marquee can install the launchers and helpers it builds on, so a fresh Fedora install needs nothing set up by hand. Each tool is one YAML file in `catalog/tools/` that says how to detect it and how to install it, using the same install adapters as ports. Settings → **Launchers & tools** lists them all with status (Installed · version, Update available, Not installed) and Install / Update / Remove buttons.
+
+**How tools get installed, in order of preference**
+
+1. **Flathub, user scope** (`flatpak install --user flathub <id>`): no root password, sandboxed, updates with `flatpak update --user`. The default for Steam, Lutris, Heroic, RetroArch and most emulators.
+2. **Fedora packages through PackageKit** (the D-Bus service GNOME Software uses): one polkit password prompt, then it's a normal RPM that `dnf upgrade` keeps current. Used for host tools a sandbox can't replace: MangoHud, Gamescope, GameMode, `steam-devices` (controller udev rules), umu-launcher. Steam as an RPM needs the RPM Fusion nonfree repo; Marquee offers to enable it and explains why, or falls back to the Flatpak.
+3. **GitHub Releases into the user's home**: Proton builds (GE-Proton, umu-proton) into `~/.local/share/Steam/compatibilitytools.d/` (or the Flatpak Steam path), Legendary's single binary into `~/.local/share/marquee/bin/`.
+
+**Tool file (`catalog/tools/lutris.yml`)**
+
+```yaml
+id: lutris
+name: Lutris
+kind: launcher
+detect:
+  - { flatpak: net.lutris.Lutris }
+  - { command: lutris }
+install:
+  - { kind: flathub, id: net.lutris.Lutris }       # default
+  - { kind: packagekit, package: lutris }          # if the user prefers RPMs
+provides: [library-source, wine-runner]
+```
+
+**First-run setup**
+
+- On first start Marquee checks what is already installed and shows one screen: "Found Steam and Lutris. Add Heroic for Epic and GOG? Add GE-Proton for Windows games?" with everything ticked that the user's library needs.
+- When a feature needs a missing tool, the UI says so in place. For example, an Epic game shows "Install Legendary to play", a ROM shows "Install Dolphin", and one click installs it and continues.
+- Tools Marquee installed are tracked, so "Remove" cleans up only what Marquee added and never a tool the user installed themselves.
+
+**Limits**
+
+- If both a Flatpak and an RPM of the same launcher exist, Marquee uses the one with the library and doesn't install a second one. Source adapters already read both paths.
+- Marquee never installs drivers or kernel modules; it links to the Fedora/RPM Fusion docs for NVIDIA instead.
+- If Marquee itself runs as a Flatpak, installs go through `flatpak-spawn --host`; the RPM/AppImage builds call them directly.
 
 ### Ports catalogue
 
@@ -354,7 +392,7 @@ The look is art-led and dark-first: each game's own hero image fills the screen,
 | Game page | Hero banner, logo, Play/Install button, source badge, score strip, time to beat, playtime, last played, screenshots, achievements; ports also show requirement status | Play, Install, Update, Open folder, Change artwork, Add to Steam |
 | Ports | Store-like catalogue of ports with "Ready", "Needs your ROM", "Update available" badges | Install with progress; a requirements checklist with file pickers |
 | Downloads | Queue of port installs and updates with progress and logs | Pause, retry, view log |
-| Settings | Connected sources, ROM folders, emulator choices, API keys, theme, controller test | Connect/disconnect a source; rescan |
+| Settings | Connected sources, ROM folders, emulator choices, API keys, theme, controller test; **Launchers & tools** tab with install status of Steam, Lutris, Heroic, Proton builds, emulators and helpers | Connect/disconnect a source; rescan; install / update / remove a tool |
 
 **Visual language**
 
@@ -438,8 +476,9 @@ Each box's second line is the gate that closes the phase; the details and checkl
 - [ ] First 5 ports: Ship of Harkinian, Zelda64Recomp, sm64coopdx, fallout2-ce, UZDoom
 - [ ] Install, update, uninstall from GitHub Releases and Flathub; downloads screen
 - [ ] Requirement checks: ROM hash, GOG/Steam install detection, file pickers
+- [ ] `tools` module + `catalog/tools/`: detect and install Steam, Lutris, Heroic, RetroArch from Flathub (user scope); PackageKit installs for MangoHud, Gamescope, GameMode, `steam-devices`; Launchers & tools tab
 
-**Done when:** Fallout 2 CE installs, finds your GOG Fallout 2 data, and launches from its card; updates show a badge.
+**Done when:** Fallout 2 CE installs, finds your GOG Fallout 2 data, and launches from its card; updates show a badge; Lutris installs from the Launchers & tools tab without a terminal.
 
 ### Phase 4 — Emulation (L)
 
@@ -467,6 +506,7 @@ Each box's second line is the gate that closes the phase; the details and checkl
 
 - [ ] `scripts/release.sh`: AppImage + RPM, signed updater bundle, GitHub Release via `gh`
 - [ ] In-app update prompt; catalogue auto-refresh
+- [ ] First-run setup screen: detect installed launchers, offer the missing ones the library needs
 - [ ] RPM repo on Fedora Copr; Flatpak manifest (host access through `flatpak-spawn --host`)
 
 **Done when:** tagging `v0.1.0` produces a release you install with `dnf` and that updates itself.
@@ -492,6 +532,7 @@ The biggest risk is scope: keep each phase shippable and resist adding stores or
 | Launcher installer URLs or setups change | Windows-app recipe fails | Recipe check in `tools/build-index` like ports; fall back to "choose setup.exe" |
 | Port release asset names change | Install picks the wrong file or none | Asset regex per port; `tools/build-index --check-upstream` before each catalogue release |
 | GitHub API rate limit (60/hour unauthenticated) | Update checks fail | ETag caching, one catalogue fetch per day, optional token |
+| Installing launchers needs root or a repo the user doesn't have (Steam RPM needs RPM Fusion) | Tool install fails or surprises the user | Flathub user-scope installs by default; PackageKit with a clear polkit prompt only for host tools; say before enabling any repo |
 | Flatpak sandbox blocks launching host apps | Flatpak build can't start Steam/Lutris | Ship RPM/AppImage first; Flatpak uses `flatpak-spawn --host` |
 | Legal: catalogue mistaken for a ROM source | Takedowns, bad reputation | Catalogue links only to official port releases; every port lists its game-file requirement; no download links for game data |
 
