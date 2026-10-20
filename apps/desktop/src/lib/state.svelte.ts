@@ -438,6 +438,8 @@ class AppState {
     this.installProgress = 'Starting PCSX2 install…';
     try {
       await this.api.installPcsx2(channel);
+      // The finished event normally clears this, but a dropped event must not leave it stuck.
+      this.installingPcsx2 = false;
       this.applySnapshot(await this.api.snapshot());
     } catch (err) {
       this.installingPcsx2 = false;

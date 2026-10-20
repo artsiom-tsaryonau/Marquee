@@ -10,6 +10,8 @@
 use crate::error::Result;
 use std::path::{Path, PathBuf};
 
+const CUE_MAX_BYTES: u64 = 1024 * 1024;
+
 /// A parsed CUE sheet.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CueSheet {
@@ -129,7 +131,16 @@ pub fn track_path(cue_path: &Path, file: &str) -> Option<PathBuf> {
 
 /// Resolve the `.bin` a sheet boots from, if it exists on disk.
 pub fn resolve_track(cue_path: &Path) -> Option<PathBuf> {
-    let text = std::fs::read_to_string(cue_path).ok()?;
+    // A sheet is a few hundred bytes; cap the read so a mislabelled huge file
+    // cannot exhaust memory, and tolerate Latin-1 names rather than failing.
+    use std::io::Read;
+    let mut bytes = Vec::new();
+    std::fs::File::open(cue_path)
+        .ok()?
+        .take(CUE_MAX_BYTES)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    let text = String::from_utf8_lossy(&bytes);
     let sheet = parse(&text);
     let track = data_track(&sheet)?;
     let candidate = track_path(cue_path, &track.file)?;
@@ -218,5 +229,20 @@ mod tests {
     fn bare_unquoted_file_names_are_accepted() {
         let sheet = parse("FILE game.bin BINARY\nTRACK 01 MODE1/2352\nINDEX 01 00:00:00\n");
         assert_eq!(data_track(&sheet).unwrap().file, "game.bin");
+    }
+
+    #[test]
+    fn non_utf8_sheet_still_resolves_and_oversized_sheet_does_not_hang() {
+        let dir = tempfile::tempdir().unwrap();
+        let cue = dir.path().join("g.cue");
+        std::fs::write(dir.path().join("g.bin"), b"x").unwrap();
+        let mut text =
+            b"REM caf\xe9\nFILE \"g.bin\" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n"
+                .to_vec();
+        std::fs::write(&cue, &text).unwrap();
+        assert_eq!(resolve_track(&cue), Some(dir.path().join("g.bin")));
+        text.extend(std::iter::repeat_n(b'\n', 3 * 1024 * 1024));
+        std::fs::write(&cue, &text).unwrap();
+        assert!(resolve_track(&cue).is_some());
     }
 }

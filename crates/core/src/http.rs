@@ -28,6 +28,20 @@ pub fn download_file(
     timeout: Duration,
     mut on_progress: impl FnMut(u64),
 ) -> Result<String> {
+    let result = stream_to_file(url, dest, max_bytes, timeout, &mut on_progress);
+    if result.is_err() {
+        let _ = std::fs::remove_file(dest);
+    }
+    result
+}
+
+fn stream_to_file(
+    url: &str,
+    dest: &Path,
+    max_bytes: u64,
+    timeout: Duration,
+    on_progress: &mut impl FnMut(u64),
+) -> Result<String> {
     let resp = call(url, timeout)?;
     let mut reader = resp.into_reader();
     let mut file = File::create(dest)?;

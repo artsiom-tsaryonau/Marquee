@@ -151,10 +151,7 @@ impl Core {
     pub fn install_pcsx2(&self, channel: &str, sink: Arc<dyn EventSink>) -> Result<Vec<Runner>> {
         let channel = tools::Pcsx2Channel::parse(channel)?;
         {
-            let mut flag = self
-                .installing
-                .lock()
-                .map_err(|_| AppError::new("DB", "install lock poisoned"))?;
+            let mut flag = self.installing.lock().unwrap_or_else(|e| e.into_inner());
             if *flag {
                 return Err(AppError::new("INSTALL_BUSY", "PCSX2 is already installing"));
             }
@@ -163,9 +160,7 @@ impl Core {
         struct Guard<'a>(&'a Mutex<bool>);
         impl Drop for Guard<'_> {
             fn drop(&mut self) {
-                if let Ok(mut flag) = self.0.lock() {
-                    *flag = false;
-                }
+                *self.0.lock().unwrap_or_else(|e| e.into_inner()) = false;
             }
         }
         let _guard = Guard(&self.installing);
