@@ -213,6 +213,8 @@ export interface EmulatorInfo {
   program_dir: string | null;
   data_dir: string;
   bios_dir: string | null;
+  icon: string | null;
+  args: string[];
   alternatives: PackageHint[];
 }
 
@@ -263,6 +265,7 @@ export interface LibraryApi {
   installEmulator(id: string): Promise<EmulatorInfo[]>;
   uninstallEmulator(id: string, purgeData: boolean): Promise<EmulatorInfo[]>;
   openEmulator(id: string): Promise<void>;
+  configureEmulator(id: string, args: string[]): Promise<EmulatorInfo[]>;
   listBios(): Promise<BiosFile[]>;
   importBios(path: string): Promise<BiosImport>;
   removeBios(system: string): Promise<number>;

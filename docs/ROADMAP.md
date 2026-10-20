@@ -31,7 +31,7 @@ These are implemented capabilities; live acceptance gates are recorded separatel
 | Sessions and corrections | Persistent sessions, recovery/checkpoint work, staged port updates, mutation invalidation, and per-file scan warnings; see [correction report](CORRECTION_PASS.md) |
 | Native ports | Five managed recipes; binary installation is not proof that required game data is ready |
 | Unified library UI | Platform/run-method/source filters, explicit grouping, edition/run selectors, Jak/OpenGOAL reference assets; persistent normalized backend remains planned |
-| Tools | Persisted external shortcuts, readiness checks, pinning, detected presets, structured executable/arguments/cwd, Purple setup, and managed emulator/BIOS panels; see [Tools](LAUNCHERS.md) |
+| Tools | Persisted external shortcuts, readiness checks, pinning, detected presets, structured executable/arguments/cwd (edited in a dialog), Purple setup, and managed emulator/BIOS panels with platform filters, picture cards and a settings dialog; see [Tools](LAUNCHERS.md) |
 | Managed emulators | Seven catalogue recipes: DuckStation, PPSSPP, RPCS3, Flycast, Azahar, Cemu, xemu. Install/open/update/remove with verified AppImages and isolated data; DuckStation connects to PS1 disc launch, the other six currently open independently. PCSX2 retains its dedicated installer. See [emulator management](EMULATORS.md) |
 | BIOS management | User-supplied PS1/PS2 identification/import/list/removal through Tools, CLI and API; region selection support. This is not evidence of live firmware/game compatibility |
 | Legacy Lutris bridge | Local read-only installed/cache projection and handoffs exist. Current code auto-discovers an existing database. Moving this behind an optional legacy integration is planned; documentation changes do not disable it |
@@ -44,8 +44,16 @@ These are implemented capabilities; live acceptance gates are recorded separatel
 - [x] Correct mixed PS1/PS2 categorization, per-system setup/defaults, CUE availability and identity refresh, root-conflict reporting, and failed-launch accounting. The real collection validates as 9 PS1 + 2 PS2 entries with stable IDs.
 - [x] Add Purple installation/opening with managed umu/GE-Proton, dependency checkpoints, cancellation and diagnostics. Aion 2 sign-in/gameplay is unverified.
 - [x] Add seven managed emulator catalogue entries and the Tools install/open/update/remove panel, plus user-supplied BIOS management. Native/Flatpak discovery remains an alternative.
+- [x] Rework the Tools emulator area to match the Library: platform and status filter chips, picture cards (the emulator's own icon over generated art), and a per-emulator settings dialog (status, launch arguments, install locations, package-manager hint, remove with or without saves). The launcher editor is now a dialog too. Launch arguments are saved per emulator and added to Open and library launches. Not yet checked in a live browser/desktop session.
 - [ ] Observe PS1 and PS2 retail boot/input/exit/restart gates; test Purple sign-in and Aion 2 gameplay separately.
 - [ ] Verify each additional emulator's actual installation, isolation, prerequisites and successful opening on this host. Add system-specific media/game adapters before advertising library Play for PSP, PS3, Dreamcast, 3DS, Wii U or Xbox.
+
+### Next for Tools and emulators
+
+1. **Settings profiles ("just run with good settings").** A per-emulator, versioned profile written into the isolated settings file (for example DuckStation `settings.ini`) from Marquee, with a "Recommended for this machine" preset. It needs host detection (GPU/driver, display resolution and refresh), an editable dialog section, and a record of what Marquee changed so the user's own edits are never overwritten. Each key must be verified against the emulator's real config before it ships. DuckStation first; suppress its first-run wizard as part of it.
+2. **Shared catalogue UI.** Bring PCSX2, native ports and launchers into the same filter/card/dialog layout so Tools has one visual language. Group the Tools page by platform filter rather than by tool type.
+3. **Per-system adapters** so the six non-integrated emulators can launch library games, one system at a time, with live evidence.
+4. **Open items carried forward:** PCSX2 `[Filenames] BIOS` key verified against a live launch; port uninstall; scan no longer holding the database lock.
 
 These owner-requested increments are included ahead of the direct-store milestones. They do not close Steam/Epic/GOG or the general runtime/job manager.
 
@@ -156,7 +164,7 @@ The normalized data model is shared infrastructure, implemented incrementally wh
 - Normal first run: detect existing installations, offer Steam/Epic/GOG connections, show the real library. No required Tools/Add launcher/database-path step.
 - Game page: truthful Install/Play/Update/Verify/Repair actions, edition/run choice, data readiness, screenshots with provenance, and visible errors.
 - Downloads: persistent installation jobs, progress, cancellation, retries, and recovery across desktop/browser. Unsupported delegated progress is labeled as a handoff.
-- Tools: automatically managed components and health; custom commands/paths are advanced overrides.
+- Tools: Library-style filters, picture cards and configuration dialogs; automatically managed components and health; custom commands/paths are advanced overrides.
 - Validate large libraries and keyboard/controller focus. Native Tauri gamepad support and visual/performance testing remain explicit gates.
 
 ## Native ports, emulation, and enrichment

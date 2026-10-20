@@ -21,3 +21,7 @@ export const platformLabel: Record<Platform, string> = {
   ps2: 'PlayStation 2',
   gba: 'Game Boy Advance',
 };
+
+/** Emulator catalogue system ids, as people say them. */
+const systemNames: Record<string, string> = { ps1: 'PlayStation', ps2: 'PlayStation 2', ps3: 'PlayStation 3', psp: 'PSP', dreamcast: 'Dreamcast', wiiu: 'Wii U', xbox: 'Xbox', '3ds': 'Nintendo 3DS' };
+export const systemLabel = (id: string): string => systemNames[id] ?? id.toUpperCase();

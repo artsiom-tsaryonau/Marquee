@@ -32,7 +32,7 @@ function demoEmulators(): EmulatorInfo[] {
   return demoCatalogue.map(([id, name, systems, integrated, requirement]) => ({
     id, name, systems, integrated, upstream: id, requirement,
     installed_version: null, latest_version: null, status: 'not_installed' as const,
-    program_dir: null, data_dir: `~/.local/share/marquee/${id}`, bios_dir: null,
+    program_dir: null, data_dir: `~/.local/share/marquee/${id}`, bios_dir: null, icon: null, args: [],
     alternatives: id === 'duckstation' ? [{ manager: 'flatpak', command: 'flatpak install --user flathub org.duckstation.DuckStation', note: 'Marquee also finds a Flatpak copy, but keeps its own settings and saves separate from it.' }] : [],
   }));
 }
@@ -149,6 +149,9 @@ export const demoApi: LibraryApi = {
   },
   async uninstallEmulator() {
     throw { code: 'DEMO', message: 'Manage emulators in the desktop app' };
+  },
+  async configureEmulator() {
+    throw { code: 'DEMO', message: 'Configure emulators in the desktop app' };
   },
   async openEmulator() {
     throw { code: 'DEMO', message: 'Open emulators in the desktop app' };

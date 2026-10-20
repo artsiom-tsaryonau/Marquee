@@ -62,6 +62,7 @@
   </header>
 
   {#if draft}
+    <div class="modal-wrap" role="dialog" aria-modal="true" aria-label="Launcher configuration" tabindex="-1" onkeydown={(e) => { if (e.key === "Escape" && !saving) draft = null; }} onclick={(e) => { if (e.target === e.currentTarget && !saving) draft = null; }}>
     <form class="editor glass-panel" onsubmit={submit} aria-label="Launcher configuration" aria-busy={saving}>
       <div class="section-heading"><div><span class="eyebrow">Configuration</span><h2>{app.launchers.some((l) => l.id === draft?.id) ? 'Edit launcher' : 'Add a launcher'}</h2></div><button class="btn glass small" type="button" data-nav disabled={saving} onclick={() => { draft = null; }} aria-label="Close launcher editor"><Icon name="x" /></button></div>
       <p>Open an existing application, AppImage, or native game. Saving does not start it.</p>
@@ -79,6 +80,7 @@
       {#if error}<p class="error" role="alert">{error}</p>{/if}
       <footer><span>For Flatpak, choose the flatpak executable and add its run arguments. Windows apps need a configured compatibility launcher.</span><button class="btn glass" type="button" data-nav disabled={saving} onclick={() => { draft = null; }}>Cancel</button><button class="btn primary" type="submit" data-nav disabled={saving}>{saving ? 'Saving…' : 'Save launcher'}</button></footer>
     </form>
+    </div>
   {/if}
 
   <PurpleLauncher />
@@ -136,7 +138,7 @@
   .badge { display:inline-block; padding:4px 8px; border-radius:6px; font-size:11px; color:var(--text-dim); background:var(--field); } .badge.available { color:var(--ok); background:rgb(52 211 153 / .08); } .status { font-size:13px; } .command { font:12px ui-monospace,monospace; color:var(--text-dim); overflow-wrap:anywhere; margin:10px 0 16px; } .detail { font-size:12px; color:var(--text-dim); }
   .card-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:auto; padding-top:18px; } .pin, .text-button { border:0; background:none; color:var(--text-dim); padding:8px; cursor:pointer; } .pin.pinned { color:var(--warn); } .text-button { font:inherit; font-size:12px; }
   .empty { grid-column:1/-1; text-align:center; padding:36px; border-radius:18px; color:var(--text-dim); display:grid; gap:12px; justify-items:center; } .empty h3, .empty p { margin:0; }
-  .editor { border-radius:20px; padding:26px; display:grid; gap:18px; } .editor .section-heading { margin:0; } .fields { display:grid; grid-template-columns:1fr 1fr; gap:18px; } .fields label { display:grid; gap:9px; font-size:13px; } .fields .wide { grid-column:1/-1; } .path-field { display:flex; gap:8px; } .path-field input { flex:1; } .optional { color:var(--text-dim); font-weight:normal; font-size:12px; } .templates { display:flex; align-items:center; flex-wrap:wrap; gap:8px; font-size:12px; color:var(--text-dim); }
+  .modal-wrap { position:fixed; inset:0; z-index:40; display:grid; place-items:start center; overflow:auto; padding:6vh 24px; background:rgb(0 0 0 / .6); backdrop-filter:blur(6px); } .modal-wrap .editor { width:min(820px,100%); } .editor { border-radius:20px; padding:26px; display:grid; gap:18px; } .editor .section-heading { margin:0; } .fields { display:grid; grid-template-columns:1fr 1fr; gap:18px; } .fields label { display:grid; gap:9px; font-size:13px; } .fields .wide { grid-column:1/-1; } .path-field { display:flex; gap:8px; } .path-field input { flex:1; } .optional { color:var(--text-dim); font-weight:normal; font-size:12px; } .templates { display:flex; align-items:center; flex-wrap:wrap; gap:8px; font-size:12px; color:var(--text-dim); }
   fieldset { border:1px solid var(--line); padding:16px; border-radius:12px; display:grid; gap:10px; } legend { padding:0 8px; font-size:13px; } .argument { display:flex; gap:8px; } .pin-choice { display:flex; gap:10px; align-items:center; font-size:13px; } input[type=checkbox] { width:18px; height:18px; accent-color:var(--accent); }
   footer { display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding-top:16px; border-top:1px solid var(--line); } footer span { flex:1; min-width:220px; font-size:12px; color:var(--text-dim); line-height:1.6; } .error { color:var(--bad); } .opengoal { display:flex; gap:20px; align-items:center; padding:22px; border-radius:18px; margin-top:18px; } .opengoal img { width:48px; height:48px; object-fit:contain; } .opengoal div { flex:1; } .opengoal p { font-size:13px; }
   @media(max-width:800px) { .tools { padding:22px var(--gutter); } .tool-hero { padding:22px; } .hero-icon { display:none; } .sections { padding:0; border:0; width:100%; } .opengoal { flex-wrap:wrap; } .fields { grid-template-columns:1fr; } }

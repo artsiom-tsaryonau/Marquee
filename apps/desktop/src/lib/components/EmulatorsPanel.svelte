@@ -2,25 +2,35 @@
   import { onMount } from 'svelte';
   import { app } from '../state.svelte';
   import type { BiosFile, EmulatorInfo } from '../api/contracts';
+  import { artFromSeed } from '../art';
+  import { coverSrc } from '../api/map';
+  import { systemLabel } from '../labels';
+  import Artwork from './Artwork.svelte';
+  import EmulatorDialog from './EmulatorDialog.svelte';
   import Icon from './Icon.svelte';
 
   let { query = '', onlyReady = false }: { query?: string; onlyReady?: boolean } = $props();
   /** `<emulator id>:purge` or `bios:<system>` while an irreversible action waits for a second click. */
   let confirm = $state<string | null>(null);
-  let copied = $state<string | null>(null);
 
   onMount(() => {
     void app.loadEmulators();
     void app.loadBios();
   });
 
+  let platform = $state('');
+  let status = $state<'' | 'installed' | 'update'>('');
+  const platforms = $derived([...new Set(app.emulators.flatMap((e) => e.systems))].sort((a, b) => systemLabel(a).localeCompare(systemLabel(b))));
   const shown = $derived(
     app.emulators.filter(
-      (e) => (!onlyReady || e.status !== 'not_installed') && `${e.name} ${e.systems.join(' ')}`.toLowerCase().includes(query.toLowerCase()),
+      (e) =>
+        (!onlyReady || e.status !== 'not_installed') &&
+        (!platform || e.systems.includes(platform)) &&
+        (!status || (status === 'update' ? e.status === 'update' : e.status !== 'not_installed')) &&
+        `${e.name} ${e.systems.map(systemLabel).join(' ')}`.toLowerCase().includes(query.toLowerCase()),
     ),
   );
   const systemsWithBios = $derived([...new Set(app.bios.map((b) => b.system))]);
-  const label: Record<string, string> = { ps1: 'PlayStation', ps2: 'PlayStation 2', ps3: 'PlayStation 3', psp: 'PSP', dreamcast: 'Dreamcast', wiiu: 'Wii U', xbox: 'Xbox', '3ds': 'Nintendo 3DS' };
 
   function version(v: string | null) {
     if (!v) return '';
@@ -28,23 +38,6 @@
   }
   function byRegion(files: BiosFile[], system: string) {
     return files.filter((b) => b.system === system);
-  }
-  async function copy(text: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-      copied = text;
-      setTimeout(() => (copied = copied === text ? null : copied), 1800);
-    } catch {
-      app.notify(text);
-    }
-  }
-  async function purge(e: EmulatorInfo) {
-    if (confirm !== `${e.id}:purge`) {
-      confirm = `${e.id}:purge`;
-      return;
-    }
-    confirm = null;
-    await app.uninstallEmulator(e, true);
   }
   async function dropBios(system: string) {
     if (confirm !== `bios:${system}`) {
@@ -64,57 +57,54 @@
     </div>
     <span class="pill">{shown.length}</span>
   </div>
+  <div class="filters" data-nav-row aria-label="Supported platforms">
+    <button class="chip" class:on={!platform} data-nav aria-pressed={!platform} onclick={() => (platform = '')}>All platforms</button>
+    {#each platforms as p}
+      <button class="chip" class:on={platform === p} data-nav aria-pressed={platform === p} onclick={() => (platform = p)}>
+        {systemLabel(p)} <span>{app.emulators.filter((e) => e.systems.includes(p)).length}</span>
+      </button>
+    {/each}
+    <span class="spacer"></span>
+    <button class="chip" class:on={status === 'installed'} data-nav aria-pressed={status === 'installed'} onclick={() => (status = status === 'installed' ? '' : 'installed')}>Installed</button>
+    <button class="chip" class:on={status === 'update'} data-nav aria-pressed={status === 'update'} onclick={() => (status = status === 'update' ? '' : 'update')}>Updates</button>
+  </div>
   <div class="grid">
     {#each shown as e (e.id)}
       {@const busy = app.emulatorBusy[e.id]}
+      {@const icon = coverSrc(e.icon)}
       <article class="card glass-panel" class:ready={e.status !== 'not_installed'}>
-        <div class="head">
-          <span class="mark"><Icon name="controller" size={22} /></span>
-          <div class="title">
-            <h3>{e.name}</h3>
-            <span class="badge" class:ok={e.status === 'ready'} class:warn={e.status === 'update'}>
-              {e.status === 'not_installed' ? 'Not installed' : e.status === 'update' ? 'Update available' : 'Ready'}
-            </span>
+        <button class="tile" data-nav onclick={() => (app.emulatorDialogId = e.id)} aria-label={`${e.name}: settings`}>
+          <Artwork art={artFromSeed(`emulator:${e.id}`)} />
+          <span class="shade"></span>
+          {#if icon}<img class="pic" src={icon} alt="" loading="lazy" />{:else}<span class="pic fallback"><Icon name="controller" size={30} /></span>{/if}
+          <span class="badge" class:ok={e.status === 'ready'} class:warn={e.status === 'update'}>
+            {e.status === 'not_installed' ? 'Not installed' : e.status === 'update' ? 'Update available' : 'Ready'}
+          </span>
+        </button>
+        <div class="info">
+          <h3>{e.name}</h3>
+          <p class="systems">{e.systems.map(systemLabel).join(' · ')}</p>
+          <p class="detail">{e.integrated ? 'Launches your library games' : 'Opens on its own for now'}{e.installed_version ? ` · ${version(e.installed_version)}` : ''}</p>
+          {#if busy}<p class="busy" role="status">{busy}</p>{/if}
+          <div class="actions">
+            {#if e.status === 'not_installed'}
+              <button class="btn primary small" data-nav disabled={!!busy} onclick={() => app.installEmulator(e)}><Icon name="download" size={15} />{busy ? 'Installing…' : 'Install'}</button>
+            {:else if e.status === 'update'}
+              <button class="btn primary small" data-nav disabled={!!busy} onclick={() => app.installEmulator(e)}>Update</button>
+            {:else}
+              <button class="btn primary small" data-nav disabled={!!busy} onclick={() => app.openEmulator(e)}><Icon name="play" size={15} />Open</button>
+            {/if}
+            <button class="btn glass small" data-nav onclick={() => (app.emulatorDialogId = e.id)}><Icon name="settings" size={15} />Configure</button>
           </div>
         </div>
-        <p class="systems">{e.systems.map((s) => label[s] ?? s.toUpperCase()).join(' · ')}{e.integrated ? ' · launches your library games' : ' · opens on its own'}</p>
-        <p class="detail">{e.requirement}</p>
-        {#if e.installed_version}
-          <p class="detail">Version {version(e.installed_version)}{e.status === 'update' && e.latest_version ? ` → ${version(e.latest_version)}` : ''}</p>
-        {/if}
-        {#if busy}<p class="busy" role="status">{busy}</p>{/if}
-        <div class="actions">
-          {#if e.status === 'not_installed'}
-            <button class="btn primary small" data-nav disabled={!!busy} onclick={() => app.installEmulator(e)}><Icon name="download" size={15} />{busy ? 'Installing…' : 'Install'}</button>
-          {:else}
-            <button class="btn primary small" data-nav disabled={!!busy} onclick={() => app.openEmulator(e)}><Icon name="play" size={15} />Open</button>
-            {#if e.status === 'update'}<button class="btn glass small" data-nav disabled={!!busy} onclick={() => app.installEmulator(e)}>Update</button>{/if}
-            <button class="btn glass small" data-nav disabled={!!busy} onclick={() => app.uninstallEmulator(e, false)}>Remove</button>
-            <button class="text-button danger" data-nav disabled={!!busy} onclick={() => purge(e)} onblur={() => (confirm = null)}>
-              {confirm === `${e.id}:purge` ? 'Click again: delete saves too' : 'Remove with saves…'}
-            </button>
-          {/if}
-        </div>
-        {#if e.status !== 'not_installed'}
-          <p class="path" title={e.data_dir}>Saves and settings: {e.data_dir}</p>
-        {/if}
-        {#each e.alternatives as alt}
-          <details class="alt">
-            <summary>Advanced: use {alt.manager} instead</summary>
-            <p>{alt.note}</p>
-            <div class="cmd">
-              <code>{alt.command}</code>
-              <button class="btn glass small" data-nav onclick={() => copy(alt.command)}>{copied === alt.command ? 'Copied' : 'Copy'}</button>
-            </div>
-            <p class="detail">Marquee never runs this for you.</p>
-          </details>
-        {/each}
       </article>
     {:else}
       <div class="empty glass-panel"><p>No emulators match these filters.</p></div>
     {/each}
   </div>
 </section>
+
+<EmulatorDialog />
 
 <section aria-labelledby="bios-title" class="managed">
   <div class="section-heading">
@@ -127,10 +117,10 @@
   {#if app.bios.length}
     <div class="grid">
       {#each systemsWithBios as system}
-        <article class="card glass-panel">
+        <article class="card bios-card glass-panel">
           <div class="head">
             <span class="mark"><Icon name="monitor" size={22} /></span>
-            <div class="title"><h3>{label[system] ?? system.toUpperCase()}</h3><span class="badge ok">{byRegion(app.bios, system).length} file{byRegion(app.bios, system).length === 1 ? '' : 's'}</span></div>
+            <div class="title"><h3>{systemLabel(system)}</h3><span class="badge ok">{byRegion(app.bios, system).length} file{byRegion(app.bios, system).length === 1 ? '' : 's'}</span></div>
           </div>
           <ul class="bios-list">
             {#each byRegion(app.bios, system) as b (b.file)}
@@ -161,26 +151,34 @@
   .section-heading h2 { margin: 0; font-size: 21px; letter-spacing: -.4px; }
   .section-heading p, p { color: var(--text-soft); margin: 5px 0; line-height: 1.6; font-size: 13px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
-  .card { padding: 22px; border-radius: 18px; display: flex; flex-direction: column; min-width: 0; transition: border-color .2s; }
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 18px; }
+  .filters .spacer { flex: 1; }
+  .filters .chip span { opacity: .6; margin-left: 4px; }
+  .card { border-radius: 18px; display: flex; flex-direction: column; min-width: 0; overflow: hidden; transition: border-color .2s, transform .2s; }
   .card:hover { border-color: rgb(139 92 246 / .45); }
+  .card:not(.ready) .tile { filter: saturate(.55); }
+  .bios-card { padding: 22px; }
+  .tile { position: relative; display: block; width: 100%; height: 150px; padding: 0; border: 0; overflow: hidden; cursor: pointer; background: none; color: inherit; }
+  .tile :global(svg) { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .shade { position: absolute; inset: 0; background: linear-gradient(to top, rgb(8 8 14 / .7), transparent 65%); }
+  .pic { position: absolute; left: 50%; top: 50%; width: 76px; height: 76px; transform: translate(-50%, -52%); object-fit: contain; filter: drop-shadow(0 8px 16px rgb(0 0 0 / .5)); transition: transform .25s; }
+  .tile:hover .pic { transform: translate(-50%, -52%) scale(1.08); }
+  .pic.fallback { display: grid; place-items: center; border-radius: 20px; background: rgb(0 0 0 / .3); color: #fff; }
+  .tile .badge { position: absolute; left: 12px; bottom: 10px; }
+  .info { padding: 16px 18px 18px; display: flex; flex-direction: column; flex: 1; }
   .head { display: flex; gap: 14px; align-items: center; margin-bottom: 14px; }
   .title { flex: 1; min-width: 0; }
-  h3 { margin: 0 0 6px; font-size: 17px; }
+  h3 { margin: 0 0 4px; font-size: 17px; }
   .mark { display: grid; place-items: center; width: 48px; height: 48px; flex-shrink: 0; border-radius: 14px; background: var(--field); color: var(--text-soft); }
-  .badge { display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 11px; color: var(--text-dim); background: var(--field); }
-  .badge.ok { color: var(--ok); background: rgb(52 211 153 / .08); }
-  .badge.warn { color: var(--warn); background: rgb(251 191 36 / .1); }
+  .badge { display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 11px; color: var(--text-soft); background: rgb(0 0 0 / .45); backdrop-filter: blur(4px); }
+  .badge.ok { color: var(--ok); }
+  .badge.warn { color: var(--warn); }
   .systems { font-size: 13px; }
   .detail { font-size: 12px; color: var(--text-dim); }
   .busy { font-size: 12px; color: var(--accent); }
-  .path { font: 11px ui-monospace, monospace; color: var(--text-dim); overflow-wrap: anywhere; margin: 12px 0 0; }
-  .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: auto; padding-top: 16px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: auto; padding-top: 14px; }
   .text-button { border: 0; background: none; color: var(--text-dim); padding: 8px; cursor: pointer; font: inherit; font-size: 12px; }
   .text-button.danger:hover, .text-button.danger:focus-visible { color: var(--bad); }
-  .alt { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; font-size: 12px; color: var(--text-dim); }
-  .alt summary { cursor: pointer; }
-  .cmd { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
-  code { flex: 1; min-width: 0; overflow-wrap: anywhere; font: 11px ui-monospace, monospace; background: var(--field); padding: 8px 10px; border-radius: 8px; color: var(--text-soft); }
   .bios-list { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; }
   .bios-list li { display: grid; grid-template-columns: 64px 1fr auto; gap: 10px; align-items: center; font-size: 12px; }
   .region { color: var(--accent); font-weight: 600; }

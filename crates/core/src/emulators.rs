@@ -67,6 +67,54 @@ pub struct EmulatorDef {
     pub packages: Vec<PackageHint>,
 }
 
+/// What the user can change per emulator.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Config {
+    /// Extra command-line arguments, one value each, added before any disc.
+    #[serde(default)]
+    pub args: Vec<String>,
+}
+
+pub fn config_key(id: &str) -> String {
+    format!("emulator.{id}.config")
+}
+
+pub fn config(db: &Db, id: &str) -> Result<Config> {
+    Ok(db
+        .get_setting(&config_key(id))?
+        .filter(|raw| !raw.is_empty())
+        .and_then(|raw| serde_json::from_str(&raw).ok())
+        .unwrap_or_default())
+}
+
+/// Trim, drop empty values and refuse anything that could not be one plain argument.
+pub fn clean_args(args: &[String]) -> Result<Vec<String>> {
+    let cleaned: Vec<String> = args
+        .iter()
+        .map(|a| a.trim().to_string())
+        .filter(|a| !a.is_empty())
+        .collect();
+    if cleaned.len() > 16
+        || cleaned
+            .iter()
+            .any(|a| a.len() > 512 || a.contains(['\0', '\n', '\r']))
+    {
+        return Err(AppError::new(
+            "BAD_REQUEST",
+            "Use up to 16 arguments of at most 512 characters, one per field",
+        ));
+    }
+    Ok(cleaned)
+}
+
+pub fn set_config(db: &Db, id: &str, args: &[String]) -> Result<Config> {
+    let cfg = Config {
+        args: clean_args(args)?,
+    };
+    db.set_setting(&config_key(id), &serde_json::to_string(&cfg)?)?;
+    Ok(cfg)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Installed {
     pub version: String,
@@ -91,6 +139,10 @@ pub struct EmulatorInfo {
     /// Where settings, saves and BIOS live.
     pub data_dir: PathBuf,
     pub bios_dir: Option<PathBuf>,
+    /// The emulator's own icon, copied out of the install so the UI can show it.
+    pub icon: Option<PathBuf>,
+    /// Extra launch arguments the user configured.
+    pub args: Vec<String>,
     /// Advanced: commands you could run yourself instead. Marquee never runs them.
     pub alternatives: Vec<PackageHint>,
 }
@@ -143,11 +195,47 @@ pub fn installed(db: &Db, id: &str) -> Result<Option<Installed>> {
         .and_then(|raw| serde_json::from_str(&raw).ok()))
 }
 
+/// The icon shipped inside the unpacked AppImage, copied into the art cache once.
+fn ensure_icon(paths: &Paths, def: &EmulatorDef) -> Option<PathBuf> {
+    let dir = paths.cache_dir.join("art");
+    for ext in ["png", "svg"] {
+        let cached = dir.join(format!("emulator-{}.{ext}", def.id));
+        if cached.is_file() {
+            return Some(cached);
+        }
+    }
+    let mut found: Vec<(u8, PathBuf)> = fs::read_dir(program_dir(paths, &def.id))
+        .ok()?
+        .flatten()
+        .filter_map(|e| {
+            let path = e.path();
+            let name = e.file_name().to_string_lossy().to_ascii_lowercase();
+            let ext = path.extension()?.to_str()?.to_ascii_lowercase();
+            if !path.is_file() || !matches!(ext.as_str(), "png" | "svg") || name.starts_with('.') {
+                return None;
+            }
+            let rank = if name.contains(&def.id) { 0 } else { 1 };
+            Some((rank, path))
+        })
+        .collect();
+    found.sort();
+    let (_, source) = found.into_iter().next()?;
+    if fs::metadata(&source).ok()?.len() > 4 * 1024 * 1024 {
+        return None;
+    }
+    let ext = source.extension()?.to_str()?.to_ascii_lowercase();
+    fs::create_dir_all(&dir).ok()?;
+    let target = dir.join(format!("emulator-{}.{ext}", def.id));
+    fs::copy(&source, &target).ok()?;
+    Some(target)
+}
+
 pub fn info(
     paths: &Paths,
     def: &EmulatorDef,
     installed: Option<&Installed>,
     latest: Option<&str>,
+    cfg: &Config,
 ) -> EmulatorInfo {
     let present = installed.is_some_and(|i| program_dir(paths, &def.id).join(&i.bin).is_file());
     let status = match (present, installed, latest) {
@@ -168,6 +256,12 @@ pub fn info(
         program_dir: present.then(|| program_dir(paths, &def.id)),
         data_dir: config_home(paths, &def.id),
         bios_dir: bios_dir(paths, def),
+        icon: if present {
+            ensure_icon(paths, def)
+        } else {
+            None
+        },
+        args: cfg.args.clone(),
         alternatives: def.packages.clone(),
     }
 }
@@ -357,19 +451,21 @@ pub fn uninstall(paths: &Paths, def: &EmulatorDef, purge_data: bool) -> Result<(
 
 /// `env XDG_*=… <program>`: the isolation travels with the command, so every
 /// way of starting the emulator (library launch, Open button) is contained.
-fn launch_command(paths: &Paths, id: &str, env: &str, bin: &Path) -> Vec<String> {
+fn launch_command(paths: &Paths, id: &str, env: &str, bin: &Path, args: &[String]) -> Vec<String> {
     let root = paths.data_dir.join(id);
-    vec![
+    let mut command = vec![
         env.to_string(),
         format!("XDG_CONFIG_HOME={}", config_home(paths, id).display()),
         format!("XDG_DATA_HOME={}", root.join("xdg-data").display()),
         format!("XDG_CACHE_HOME={}", root.join("xdg-cache").display()),
         bin.to_string_lossy().into_owned(),
-    ]
+    ];
+    command.extend(args.iter().cloned());
+    command
 }
 
 /// Start the emulator's own window (not a game), contained in its own folders.
-pub fn open(paths: &Paths, def: &EmulatorDef, installed: &Installed) -> Result<()> {
+pub fn open(paths: &Paths, def: &EmulatorDef, installed: &Installed, cfg: &Config) -> Result<()> {
     let bin = program_dir(paths, &def.id).join(&installed.bin);
     if !bin.is_file() {
         return Err(AppError::new(
@@ -385,7 +481,7 @@ pub fn open(paths: &Paths, def: &EmulatorDef, installed: &Installed) -> Result<(
     } else {
         "env"
     };
-    let command = launch_command(paths, &def.id, env, &bin);
+    let command = launch_command(paths, &def.id, env, &bin, &cfg.args);
     let (program, args) = command.split_first().expect("command is never empty");
     let mut child = Command::new(program)
         .args(args)
@@ -435,7 +531,7 @@ pub fn sync_runners(db: &Db, paths: &Paths) -> Result<()> {
             &runner_id(&def.id),
             kind,
             &format!("{} (Marquee)", def.name),
-            &launch_command(paths, &def.id, env, &bin),
+            &launch_command(paths, &def.id, env, &bin, &config(db, &def.id)?.args),
             state,
             hint.as_deref(),
             "marquee",
@@ -487,17 +583,30 @@ mod tests {
         };
         // Recorded but the files are gone (deleted by hand): not installed.
         assert_eq!(
-            info(&paths, &def, Some(&record), None).status,
+            info(&paths, &def, Some(&record), None, &Config::default()).status,
             "not_installed"
         );
         fs::create_dir_all(program_dir(&paths, "duckstation")).unwrap();
         fs::write(program_dir(&paths, "duckstation").join("AppRun"), "x").unwrap();
-        assert_eq!(info(&paths, &def, Some(&record), None).status, "ready");
         assert_eq!(
-            info(&paths, &def, Some(&record), Some("latest-bbbb")).status,
+            info(&paths, &def, Some(&record), None, &Config::default()).status,
+            "ready"
+        );
+        assert_eq!(
+            info(
+                &paths,
+                &def,
+                Some(&record),
+                Some("latest-bbbb"),
+                &Config::default()
+            )
+            .status,
             "update"
         );
-        assert_eq!(info(&paths, &def, None, None).status, "not_installed");
+        assert_eq!(
+            info(&paths, &def, None, None, &Config::default()).status,
+            "not_installed"
+        );
     }
 
     #[test]
@@ -574,6 +683,47 @@ mod tests {
             "an emulator with no library integration must not be a runner"
         );
         assert_eq!(rows[0].kind, "duckstation");
+    }
+
+    #[test]
+    fn arguments_are_cleaned_saved_and_added_to_the_runner_command() {
+        assert_eq!(
+            clean_args(&["  -foo ".into(), "".into(), "bar".into()]).unwrap(),
+            vec!["-foo", "bar"]
+        );
+        assert!(clean_args(&["a\nb".into()]).is_err());
+        assert!(clean_args(&vec!["x".to_string(); 17]).is_err());
+        let t = tempfile::tempdir().unwrap();
+        let paths = Paths::resolve(Some(t.path().join("data"))).unwrap();
+        let db = Db::open_in_memory().unwrap();
+        set_config(&db, "duckstation", &["-nofullscreen-test".into()]).unwrap();
+        assert_eq!(
+            config(&db, "duckstation").unwrap().args,
+            vec!["-nofullscreen-test"]
+        );
+        let cmd = launch_command(
+            &paths,
+            "duckstation",
+            "env",
+            Path::new("/p/AppRun"),
+            &["--x".into()],
+        );
+        assert_eq!(cmd.last().unwrap(), "--x");
+        assert_eq!(cmd[cmd.len() - 2], "/p/AppRun");
+    }
+
+    #[test]
+    fn the_emulators_own_icon_is_copied_to_the_art_cache() {
+        let t = tempfile::tempdir().unwrap();
+        let paths = Paths::resolve(Some(t.path().join("data"))).unwrap();
+        let def = find("flycast").unwrap();
+        let dir = program_dir(&paths, "flycast");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("other.png"), "x").unwrap();
+        fs::write(dir.join("flycast.png"), "icon").unwrap();
+        let icon = ensure_icon(&paths, &def).unwrap();
+        assert!(icon.ends_with("art/emulator-flycast.png"));
+        assert_eq!(fs::read_to_string(icon).unwrap(), "icon");
     }
 
     #[test]

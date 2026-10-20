@@ -73,6 +73,7 @@ export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'su
     installEmulator: (id) => call<EmulatorInfo[]>('install_emulator', { id }),
     uninstallEmulator: (id, purgeData) => call<EmulatorInfo[]>('uninstall_emulator', { id, purge_data: purgeData }),
     openEmulator: (id) => call<void>('open_emulator', { id }),
+    configureEmulator: (id, args) => call<EmulatorInfo[]>('configure_emulator', { id, args }),
     listBios: () => call<BiosFile[]>('list_bios'),
     importBios: (path) => call<BiosImport>('import_bios', { path }),
     removeBios: (system) => call<number>('remove_bios', { system }),

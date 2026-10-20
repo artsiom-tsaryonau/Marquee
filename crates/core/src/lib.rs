@@ -498,11 +498,13 @@ impl Core {
             .map(|def| {
                 let installed = self.with_db(|db| emulators::installed(db, &def.id))?;
                 let latest = self.with_db(|db| db.get_setting(&emulators::latest_key(&def.id)))?;
+                let cfg = self.with_db(|db| emulators::config(db, &def.id))?;
                 Ok(emulators::info(
                     &self.paths,
                     def,
                     installed.as_ref(),
                     latest.as_deref().filter(|v| !v.is_empty()),
+                    &cfg,
                 ))
             })
             .collect()
@@ -585,6 +587,18 @@ impl Core {
         }
     }
 
+    /// Save what the user can configure for an emulator (extra launch arguments).
+    pub fn configure_emulator(
+        &self,
+        id: &str,
+        args: Vec<String>,
+    ) -> Result<Vec<emulators::EmulatorInfo>> {
+        emulators::find(id)?;
+        self.with_db(|db| emulators::set_config(db, id, &args))?;
+        self.refresh_runners()?;
+        self.list_emulators()
+    }
+
     /// Open an installed emulator's own window (not a game).
     pub fn open_emulator(&self, id: &str) -> Result<()> {
         let def = emulators::find(id)?;
@@ -593,7 +607,8 @@ impl Core {
             .ok_or_else(|| {
                 AppError::new("RUNNER_MISSING", format!("{} is not installed", def.name))
             })?;
-        emulators::open(&self.paths, &def, &installed)
+        let cfg = self.with_db(|db| emulators::config(db, id))?;
+        emulators::open(&self.paths, &def, &installed, &cfg)
     }
 
     /// Remove an emulator's program. `purge_data` also deletes its settings, saves and BIOS.

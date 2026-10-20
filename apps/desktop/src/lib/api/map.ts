@@ -56,7 +56,7 @@ export function editionToGame(edition: Edition, snap: LibrarySnapshot): GameEntr
   };
 }
 
-function coverSrc(path: string | null): string | undefined {
+export function coverSrc(path: string | null): string | undefined {
   if (!path) return undefined;
   if (isDesktopRuntime()) {
     try {

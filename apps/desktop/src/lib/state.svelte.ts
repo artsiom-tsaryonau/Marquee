@@ -52,6 +52,8 @@ class AppState {
   /** Emulator id → what it is doing right now (install/update progress or a short action). */
   emulatorBusy = $state<Record<string, string>>({});
   biosBusy = $state(false);
+  /** Emulator whose settings dialog is open. */
+  emulatorDialogId = $state<string | null>(null);
   launchers = $state<LauncherInfo[]>([]);
   lutrisSource = $state<LutrisSnapshot | null>(null);
   lutrisError = $state<string | null>(null);
@@ -261,6 +263,7 @@ class AppState {
   }
 
   back() {
+    if (this.emulatorDialogId) { this.emulatorDialogId = null; return; }
     if (this.closeLauncherEditor) { this.closeLauncherEditor(); return; }
     if (this.installToolId) {
       this.closeInstall();
@@ -652,6 +655,20 @@ class AppState {
       await this.api.openEmulator(emulator.id);
       this.notify(`Opened ${emulator.name}`);
     });
+  }
+
+  async configureEmulator(emulator: EmulatorInfo, args: string[]): Promise<boolean> {
+    if (this.demo) {
+      this.notify('Configure emulators in the desktop app');
+      return false;
+    }
+    try {
+      this.emulators = await this.api.configureEmulator(emulator.id, args);
+      this.notify(`${emulator.name} settings saved`);
+      return true;
+    } catch (err) {
+      throw new Error((err as { message?: string }).message ?? 'Could not save the settings');
+    }
   }
 
   async importBios() {

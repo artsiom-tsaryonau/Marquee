@@ -65,6 +65,19 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
         "list_emulators" => out(core.list_emulators()?),
         "check_emulator_updates" => out(core.check_emulator_updates()?),
         "install_emulator" => out(core.install_emulator(&text(&args, "id")?, sink)?),
+        "configure_emulator" => {
+            let list = args
+                .get("args")
+                .and_then(Value::as_array)
+                .map(|items| {
+                    items
+                        .iter()
+                        .filter_map(|v| v.as_str().map(str::to_string))
+                        .collect()
+                })
+                .unwrap_or_default();
+            out(core.configure_emulator(&text(&args, "id")?, list)?)
+        }
         "open_emulator" => out(core.open_emulator(&text(&args, "id")?)?),
         "uninstall_emulator" => {
             let purge = args

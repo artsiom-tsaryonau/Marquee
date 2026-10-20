@@ -75,6 +75,12 @@ The same operations are API commands: `list_emulators`, `check_emulator_updates`
 - **PS2 region matching:** before launching with Marquee's PCSX2, Marquee picks the newest BIOS of the game's region and writes it to `[Filenames] BIOS` in `PCSX2.ini`. This only happens once PCSX2 has written that file itself, and the key name is unverified against a live launch. With no match, PCSX2 keeps its own choice.
 - **PS1 region matching** is done by DuckStation itself from the BIOS folder.
 
+## Tools screen
+
+Emulators appear as picture cards in the Library's style: platform chips (from each emulator's systems), Installed/Updates chips, and the search box. The picture is the emulator's own icon, copied out of the unpacked AppImage into the art cache the first time it is listed, over generated art. Cards open a settings dialog with status, install/update/open, **launch arguments**, install locations, the package-manager hint, and remove with or without saves.
+
+Launch arguments are saved per emulator (`emulator.<id>.config`), validated (at most 16, 512 characters each, no line breaks) and added to the command for both Open and library launches. API: `configure_emulator {id, args}` (no CLI subcommand yet).
+
 ## Package managers (advanced)
 
 Each catalogue entry may list `packages`: a manager and the command you could run yourself (for DuckStation: `flatpak install --user flathub org.duckstation.DuckStation`). `list_emulators` returns them as `alternatives` so a screen can show a copyable suggestion. Marquee never runs them. It still detects a Flatpak or native copy as a separate runner, but prefers its own managed one.
@@ -93,3 +99,5 @@ Install, update checks, uninstall, runner registration and isolation then come f
 - A live DuckStation Play, quit and duration check has not been run. See [PS1](PS1.md).
 - Ports still have no uninstall.
 - PCSX2 is not yet on the catalogue.
+- Settings profiles ("recommended settings for this machine") are planned, not built; see the [roadmap](ROADMAP.md).
+- The new Tools layout has been type-checked and built but not yet looked at in a live window.
