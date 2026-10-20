@@ -1,8 +1,16 @@
 # Marquee — Game Launcher Roadmap
 
-Status: **phase 0 mostly closed** (native window opens; MIT license added), plus an **out-of-sequence PS2 slice** coded 2026-10-20. Last updated 2026-10-20.
+Status: **phase 0 closed** (native window, MIT license), plus three **out-of-sequence slices** landed 2026-10-20: the offline PS2 library, the first **ports manager** (phase 3, five ports), and the **shared web/desktop surface**. Last updated 2026-10-20.
 
-This roadmap is still the long-term plan (Lutris/Steam first in phase 1). Work actually landed is tracked in [PS2.md](PS2.md). Do not start Steam/Lutris adapters or [PS2_METADATA_FOLLOWUP.md](PS2_METADATA_FOLLOWUP.md) until the PCSX2 launch/exit gate there is closed.
+This roadmap is still the long-term plan. Work actually landed is tracked in [PS2.md](PS2.md). The owner reordered it on 2026-10-20: ports and the shared surface first, **Steam installed games next**, then Lutris import, then real artwork. [PS2_METADATA_FOLLOWUP.md](PS2_METADATA_FOLLOWUP.md) still waits for the PCSX2 launch/exit gate, which is a manual check.
+
+**Next up, in order**
+1. Run the PCSX2 gate by hand (BIOS + own ISO): Play → quit → duration → no stale "busy".
+2. PS2 serial → title lookup (PCSX2 `GameIndex.yaml`, Redump or libretro DATs; none need a login). Today titles come from file names.
+3. Steam installed games: library folders and `appmanifest_*.acf`, covers from Steam's CDN, launch with `steam://rungameid/<id>`. No key and no login handled by Marquee.
+4. Lutris import (keep existing Wine entries), then SteamGridDB covers (key in `.env` today, keyring later).
+5. Steam extras, all optional: owned-but-not-installed (user's own Web API key + SteamID), news (`ISteamNews`, no key), wishlist and sales (store endpoints, undocumented, best-effort).
+6. Controller support and Big Screen; replace the heaviest blur/backdrop effects if GPU load is still high.
 
 **Current implementation milestone (ahead of phase 1):** solidify the offline PS2 core and desktop app (library, **Marquee-managed PCSX2 unpack**, covers, sessions, UI chrome). **Live PCSX2 Play → quit → duration is pending.** See [PS2.md](PS2.md).
 
@@ -72,6 +80,8 @@ marquee/
 Workflow: commit straight to main (sole contributor); `scripts/release.sh` makes the tags and releases.
 
 ## Architecture
+
+**One app, two surfaces (built 2026-10-20).** The native window and a browser tab are the same application. `crates/core/src/api.rs` is the single command layer (`dispatch(command, args)`); the Tauri window calls it through one `core_call` command, and `server.rs` exposes it over HTTP on `127.0.0.1` (default port 47820, `MARQUEE_PORT`). `hub.rs` is the one event stream both read, so a scan or install started in either surface shows up in both. The browser needs the token from `<data dir>/server.token` (every API and cover request, loopback only, foreign `Host` rejected); the UI picks its connection at startup: native window, browser with a token, or the invented demo as a fallback (`?demo=1`). `marquee serve` runs the same server headless. Remote (non-loopback) access is deliberately not built.
 
 Three layers: a Svelte UI that only draws, a Rust core that knows every source, and the existing tools that actually run games. The UI talks to the core through Tauri commands and events; the CLI uses the same core, so every feature can be tested without the UI.
 
@@ -158,6 +168,8 @@ Every source is an adapter that reads what an existing tool already knows; Marqu
 Paths for Flatpak installs differ (`~/.var/app/com.valvesoftware.Steam/...`, `~/.var/app/net.lutris.Lutris/...`); every adapter checks both. Verify each command against the tool's current docs when implementing it.
 
 ### Steam
+
+> **Steam Web API terms** ([steamcommunity.com/dev/apiterms](https://steamcommunity.com/dev/apiterms), checked 2026-10-20): the key is personal and secret, so every user brings their own and Marquee never bundles one; apps must not intercept or store a Steam password, so login stays in the Steam client and Marquee launches through it; fetch only the signed-in user's own data and say what is stored; at most 100,000 calls a day; never imply Valve endorses Marquee. News (`ISteamNews/GetNewsForApp`) and wishlist work without a key. Prices, specials and new releases come from the store's undocumented endpoints (`appdetails`, `featuredcategories`): optional, cached, and hidden when they fail.
 
 - Find Steam with `steamlocate` (native and Flatpak), then read every library folder's `appmanifest_*.acf` for name, size, install state and path.
 - Artwork comes free from Steam's CDN per appid: `library_600x900.jpg` (cover), `library_hero.jpg` (hero), `logo.png` (logo), all under `https://cdn.cloudflare.steamstatic.com/steam/apps/<appid>/`. Fall back to SteamGridDB when one is missing.
@@ -482,7 +494,8 @@ Each box's second line is the gate that closes the phase; the details and checkl
 
 Svelte Home (hero + rows), Library grid, Game page, Big Screen scale, reduce-motion, and a browser Gamepad focus engine **already exist** in `apps/desktop`. That is the mock-up / PS2 shell, not this phase closing. Still to do here: real artwork pipeline, `gilrs` in the WebView, and metadata.
 
-- [ ] Home screen driven by real covers/heroes (Steam CDN / SGDB), not only procedural art
+- [ ] Home screen driven by real covers/heroes (Steam CDN / SGDB), not only procedural art *(PS2 covers already show; the hero stretches a small cover into a sharp backdrop, which needs a proper treatment)*
+- [x] Idle GPU load: no endless hero zoom, decorative animation pauses when hidden, unfocused or a game is running, gamepads polled only while connected. *Not measured on the NVIDIA Wayland host; the 56px backdrop blur and glass panels remain, and `WEBKIT_DISABLE_DMABUF_RENDERER=1` forces a slower WebKitGTK path.*
 - [ ] `gilrs` gamepad thread feeding the existing focus engine; full controller navigation in the Tauri WebView
 - [ ] Big Screen as a dedicated launch (`marquee --big-screen` / Gamescope); button glyphs; UI sounds that actually play
 - [ ] Playtime and last-played on cards from the core (PS2 sessions already persist; Steam/Lutris not wired)
@@ -498,7 +511,7 @@ Svelte Home (hero + rows), Library grid, Game page, Big Screen scale, reduce-mot
 - [ ] Catalogue schema + validator + signed `index.json` built from `catalog/` *(PS2 `catalog/systems/ps2.json` exists; it is not this index.)*
 - [x] First 5 ports: Ship of Harkinian, Zelda64Recomp, sm64coopdx, fallout2-ce, UZDoom (`catalog/ports/*.json`, `crates/core/src/ports.rs`; installed and update-checked from GitHub Releases on 2026-10-20; Play needs your own game files and has not been run on a real session)
 - [ ] Install, update, uninstall from GitHub Releases and Flathub; downloads screen *(install and update from GitHub Releases done; uninstall deliberately not built because the port folder holds your ROMs and data)*
-- [ ] Requirement checks: ROM hash, GOG/Steam install detection, file pickers
+- [ ] Requirement checks: ROM hash, GOG/Steam install detection, file pickers *(today each card only states what you must supply, and Open folder opens the port folder; nothing is hash-checked yet)*
 - [ ] `tools` module + `catalog/tools/`: detect and install Steam, Lutris, Heroic, RetroArch from Flathub (user scope); PackageKit installs for MangoHud, Gamescope, GameMode, `steam-devices`; Launchers & tools tab. *(PCSX2 is already Marquee-managed: official AppImage unpacked under the data dir, like cx-script deps. This phase generalizes that to other tools.)*
 
 **Done when:** Fallout 2 CE installs, finds your GOG Fallout 2 data, and launches from its card; updates show a badge; Lutris installs from the Launchers & tools tab without a terminal.
@@ -515,7 +528,7 @@ Svelte Home (hero + rows), Library grid, Game page, Big Screen scale, reduce-mot
 ### Phase 5 — More stores and Windows apps (L)
 
 - [ ] Epic via Legendary: login window, library, install, launch
-- [ ] Steam Web API: owned-but-not-installed games, playtime, achievements
+- [ ] Steam Web API: owned-but-not-installed games, playtime, achievements *(optional; the user's own key, stored in the keyring)*
 - [ ] PCGamingWiki fixes and settings notes on Windows game pages
 - [ ] umu-launcher runtime: background GE-Proton updates, protonfixes, one prefix per game
 - [ ] "Add a Windows app" flow: recipes, winetricks, Start Menu shortcut detection, icon extraction

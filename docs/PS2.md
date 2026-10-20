@@ -216,7 +216,7 @@ Fake-runner tests do **not** close the real-emulator gate.
 
 ## Next
 
-**Current goal: solidify the PS2 backend and desktop app.** Do not start Steam, Lutris, ScreenScraper, other systems, or controller work until this slice is live-complete.
+**Current goal: solidify the PS2 backend and desktop app.** Ports, the shared web/desktop surface and the idle-GPU cleanup landed on 2026-10-20 at the owner's request, ahead of this gate; see the roadmap for the new order (Steam installed games next). ScreenScraper, other systems and controller work still wait for this slice to be live-complete.
 
 1. Restart the desktop window (`./scripts/tauri-dev.sh` on this NVIDIA Wayland host) so the look, install, covers, and session reclaim are in the binary.
 2. **Add a PS2 `.iso` folder** (native picker). Confirm no sample games, skipped-format summary if needed, covers after import.
@@ -257,8 +257,12 @@ After import, Marquee fetches 2D covers from [xlenore/ps2-covers](https://github
 | Isolated tests | `Core::open_isolated` in `crates/core/src/lib.rs` |
 | Tests | `crates/core/src/tests.rs` (+ module tests in `iso`, `artwork`, `tools`, `catalog`) |
 | CLI | `crates/cli/src/main.rs` |
-| Tauri commands | `apps/desktop/src-tauri/src/commands.rs` |
-| Desktop vs demo | `apps/desktop/src/lib/api/` |
+| Command layer (window and web share it) | `crates/core/src/api.rs` (`dispatch`) |
+| Tauri bridge | `apps/desktop/src-tauri/src/commands.rs` (`core_call`, `web_url`), `lib.rs` (starts the server, forwards events) |
+| Event stream | `crates/core/src/hub.rs` |
+| Local web server (token, loopback) | `crates/core/src/server.rs`, `marquee serve` |
+| Native ports | `crates/core/src/ports.rs`, `catalog/ports/*.json`, `apps/desktop/src/lib/screens/Ports.svelte` |
+| Native vs browser vs demo | `apps/desktop/src/lib/api/` (`desktop.ts`, `http.ts`, `demo.ts`, shared `core.ts`) |
 | Play / empty library | `apps/desktop/src/lib/state.svelte.ts` |
 | Install UI | `apps/desktop/src/lib/install.ts`, `InstallMenu.svelte`, `InstallDialog.svelte` |
 | Empty shelves | `apps/desktop/src/lib/components/GhostCover.svelte` |

@@ -4,11 +4,11 @@ One console-style launcher for Fedora that shows every game you own (Steam, GOG,
 
 Marquee is a front end over existing tools. Lutris, Steam, Legendary, umu-launcher/Proton and the emulators keep doing installs and compatibility; Marquee owns the library, the look, artwork, the ports catalogue and launching. Windows launchers install from recipes, so there is no manual Wine setup. Game pages pull scores, time to beat and achievements from IGDB, Steam reviews, RAWG, ScreenScraper, RetroAchievements and PCGamingWiki, with link-outs to SteamDB, Metacritic and HowLongToBeat.
 
-**Status (2026-10-20):** current goal is to **solidify the PS2 backend and desktop app** (library DB, ISO import, **Marquee-managed PCSX2 unpack**, serial covers, sessions, UI chrome). The native window **opens** and uses the same look as `pnpm dev`. Empty desktop never shows sample games. **A real PCSX2 Play → quit → duration has not been verified** on the implementation host. Steam/Lutris adapters are not started. Licensed MIT.
+**Status (2026-10-20):** current goal is to **solidify the PS2 backend and desktop app** (library DB, ISO import, **Marquee-managed PCSX2 unpack**, serial covers, sessions, UI chrome). The native window **opens** and uses the same look as `pnpm dev`. Empty desktop never shows sample games. **A real PCSX2 Play → quit → duration has not been verified** on the implementation host. **Native ports** (five, from official GitHub releases) and the **browser surface** (same UI and library as the desktop app) are in. Steam/Lutris adapters are not started; Steam installed games is next. Licensed MIT.
 
 PS2 slice (status, setup, verification): [docs/PS2.md](docs/PS2.md). Long-term plan: [docs/ROADMAP.md](docs/ROADMAP.md). Other systems: [expansion catalogue](docs/EXPANSION_CATALOGUE.md).
 
-Do not start Steam/Lutris or [ScreenScraper / SteamGridDB](docs/PS2_METADATA_FOLLOWUP.md) until the PCSX2 launch/exit gate in [docs/PS2.md](docs/PS2.md) is closed. Serial covers are already in this slice; they never download BIOS or games.
+The owner reordered work on 2026-10-20: ports and the shared web/desktop surface came first, then Steam. The PCSX2 launch/exit gate in [docs/PS2.md](docs/PS2.md) is still open and is a manual check on a machine with a BIOS and your own ISOs. [ScreenScraper / SteamGridDB](docs/PS2_METADATA_FOLLOWUP.md) metadata waits for it. Serial covers are already in this slice; they never download BIOS or games.
 
 ## Run
 
@@ -50,12 +50,16 @@ Before pushing, run `scripts/check.sh` (there is no hosted CI). It formats and t
 
 ```
 apps/desktop/   Svelte 5 + TypeScript + Vite UI and Tauri 2 shell
-crates/core/    library DB, ISO scan, PCSX2 unpack/argv, serial covers, sessions
+crates/core/    library DB, ISO scan, PCSX2 unpack/argv, serial covers, sessions, ports, command layer (`api`), event hub, local web server
 crates/cli/     `marquee` diagnostics over the same core
 catalog/        built-in PS2 system descriptor, ports/ (one JSON per port)
 scripts/        fedora-deps.sh, bootstrap.sh, check.sh, make-icon.py, tauri-dev.sh
 docs/           PS2.md, ROADMAP.md, EXPANSION_CATALOGUE.md, PS2_METADATA_FOLLOWUP.md
 ```
+
+## Secrets
+
+API keys go in `.env` (git-ignored; see `.env.example`), for example `STEAM_GRID_DB_API_KEY`. Nothing reads it yet. The planned home for keys in the packaged app is the system keyring, entered in Settings. Never put a Steam password anywhere: Marquee launches through the Steam client, which keeps its own login.
 
 ## License
 
