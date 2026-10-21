@@ -7,13 +7,11 @@
   import Icon, { type IconName } from './lib/components/Icon.svelte';
   import Logo from './lib/components/Logo.svelte';
   import Artwork from './lib/components/Artwork.svelte';
-  import AddWindowsApp from './lib/components/AddWindowsApp.svelte';
   import InstallDialog from './lib/components/InstallDialog.svelte';
   import Home from './lib/screens/Home.svelte';
   import Library from './lib/screens/Library.svelte';
   import GamePage from './lib/screens/GamePage.svelte';
   import Ports from './lib/screens/Ports.svelte';
-  import Downloads from './lib/screens/Downloads.svelte';
   import Tools from './lib/screens/Tools.svelte';
   import Settings from './lib/screens/Settings.svelte';
 
@@ -22,15 +20,12 @@
     { route: 'library', label: 'Library', icon: 'grid' },
     { route: 'tools', label: 'Tools', icon: 'settings' },
     { route: 'ports', label: 'Ports', icon: 'puzzle' },
-    { route: 'downloads', label: 'Downloads', icon: 'download' },
     { route: 'settings', label: 'Settings', icon: 'settings' },
   ];
 
-  let adding = $state(false);
   let booting = $state(new URLSearchParams(location.search).get('splash') !== '0');
   let now = $state(new Date());
 
-  const activeDownloads = $derived(app.downloads.filter((d) => d.state === 'downloading').length);
   const dur = $derived(app.motionReduced ? 0 : 260);
 
   // Decorative animation stops when nobody is looking at it: tab hidden, window
@@ -69,28 +64,16 @@
     if (r) app.route = r;
     if (q.get('mode') === 'big' || q.get('mode') === 'desktop') app.mode = q.get('mode') as 'big' | 'desktop';
     if (q.get('theme') === 'light' || q.get('theme') === 'dark') app.theme = q.get('theme') as 'light' | 'dark';
-    if (q.get('empty') === '1') {
-      app.games = [];
-      app.ports = [];
-      app.downloads = [];
-      app.heroId = null;
-      app.libraryStatus = 'empty';
-    }
-    if (q.get('game') && app.games.length) {
-      app.open(app.games.find((g) => g.id.endsWith(q.get('game')!)) ?? app.games[0]);
-    }
-    if (q.get('add')) adding = true;
     if (q.get('motion') === '0') app.reduceMotion = true;
     const stop = startFocusEngine({
       back: () => {
         if (app.installToolId) app.closeInstall();
-        else if (adding) adding = false;
         else app.back();
       },
       onInput: (l) => (app.lastInput = l),
     });
     const refreshSources = () => {
-      if (!app.demo && !document.hidden && document.hasFocus() && app.lutrisSource?.config.enabled && !app.lutrisLoading) void app.loadLutris();
+      if (!document.hidden && document.hasFocus() && app.lutrisSource?.config.enabled && !app.lutrisLoading) void app.loadLutris();
     };
     window.addEventListener('focus', refreshSources);
     const sourcePoll = setInterval(refreshSources, 60000);
@@ -111,7 +94,7 @@
 
 <Backdrop blur={app.route !== 'game'} />
 
-<div class="shell" inert={!!(app.launching || app.running || adding || app.installToolId)}>
+<div class="shell" inert={!!(app.launching || app.running || app.installToolId)}>
   {#if app.mode === 'desktop'}
     <nav class="side glass-panel" aria-label="Main">
       <div class="brand"><span class="mark">M</span><span class="word">Marquee</span></div>
@@ -119,19 +102,12 @@
         <button class="nav" class:on={app.route === n.route} data-nav onclick={() => app.go(n.route)}>
           <Icon name={n.icon} size={22} />
           <span>{n.label}</span>
-          {#if n.route === 'downloads' && activeDownloads}<em>{activeDownloads}</em>{/if}
         </button>
       {/each}
       <div class="spacer"></div>
-      {#if app.demo}
-        <button class="nav add" data-nav onclick={() => (adding = true)}>
-          <Icon name="plus" size={22} /><span>Add Windows app</span>
-        </button>
-      {:else}
-        <button class="nav add" data-nav onclick={() => app.addPs2Folder()}>
-          <Icon name="plus" size={22} /><span>Add PS2 folder</span>
-        </button>
-      {/if}
+      <button class="nav add" data-nav onclick={() => app.addPs2Folder()}>
+        <Icon name="plus" size={22} /><span>Add PS2 folder</span>
+      </button>
       <button class="nav" data-nav onclick={() => (app.mode = 'big')}>
         <Icon name="tv" size={22} /><span>Big Screen</span>
       </button>
@@ -145,11 +121,7 @@
         {/each}
       </div>
       <div class="status">
-        {#if app.demo}
-          <button class="tab" data-nav onclick={() => (adding = true)} aria-label="Add Windows app"><Icon name="plus" size={20} /></button>
-        {:else}
-          <button class="tab" data-nav onclick={() => app.addPs2Folder()} aria-label="Add PS2 folder"><Icon name="plus" size={20} /></button>
-        {/if}
+        <button class="tab" data-nav onclick={() => app.addPs2Folder()} aria-label="Add PS2 folder"><Icon name="plus" size={20} /></button>
         <button class="tab" data-nav onclick={() => (app.mode = 'desktop')} aria-label="Desktop mode"><Icon name="monitor" size={20} /></button>
         <span class="time">{time}</span>
       </div>
@@ -165,7 +137,6 @@
         {:else if app.route === 'game'}<GamePage />
         {:else if app.route === 'tools'}<Tools />
         {:else if app.route === 'ports'}<Ports />
-        {:else if app.route === 'downloads'}<Downloads />
         {:else}<Settings />{/if}
       </div>
     {/key}
@@ -179,10 +150,6 @@
     </footer>
   {/if}
 </div>
-
-{#if adding && app.demo}
-  <AddWindowsApp onclose={() => (adding = false)} />
-{/if}
 
 {#if app.installToolId}
   <InstallDialog />
@@ -199,7 +166,7 @@
         <p>Starting via {g.source === 'steam' ? 'Steam' : g.source === 'port' ? 'native port' : g.source === 'rom' ? 'PCSX2' : 'Lutris'}…</p>
       {:else}
         <p class="running"><span class="live"></span> Playing now</p>
-        <button class="btn glass" onclick={() => (app.demo ? app.stop() : app.dismissOverlay())}>Return to Marquee <kbd>Esc</kbd></button>
+        <button class="btn glass" onclick={() => (app.dismissOverlay())}>Return to Marquee <kbd>Esc</kbd></button>
       {/if}
     </div>
   </div>
@@ -329,21 +296,6 @@
     border-radius: 3px;
     background: var(--accent);
     box-shadow: 0 0 12px var(--accent);
-  }
-  .nav em {
-    position: absolute;
-    left: 32px;
-    top: 7px;
-    font-style: normal;
-    font-size: 10px;
-    font-weight: 800;
-    min-width: 16px;
-    height: 16px;
-    border-radius: 8px;
-    display: grid;
-    place-items: center;
-    background: var(--accent);
-    color: #fff;
   }
   .nav.add {
     color: var(--accent);

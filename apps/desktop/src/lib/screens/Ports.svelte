@@ -29,30 +29,15 @@
 
   function primary(p: PortEntry) {
     if (p.id in app.portBusy) return;
-    if (!app.demo) {
-      if (p.status === 'ready') void app.launchPort(p);
-      else void app.installPort(p);
-      return;
-    }
-    if (p.status === 'ready') {
-      const g = app.games.find((x) => x.id === `port:${p.id}`);
-      if (g) app.play(g);
-    } else if (p.status === 'needs-rom' || p.status === 'needs-data') {
-      app.notify(`Pick your ${p.status === 'needs-rom' ? 'ROM' : 'game folder'} for ${p.game}`);
-    } else {
-      app.install(`${p.name} ${p.version}`, { kind: 'port', id: p.id });
-    }
+    if (p.status === 'ready') void app.launchPort(p);
+    else void app.installPort(p);
   }
 
   const action = (p: PortEntry) =>
     p.id in app.portBusy
       ? 'Installing…'
       : ({ ready: 'Play', update: 'Update', 'needs-rom': 'Choose ROM', 'needs-data': 'Find data', 'not-installed': 'Install' })[p.status];
-  const filters = $derived(
-    app.demo
-      ? (['all', 'ready', 'update', 'needs-rom', 'needs-data', 'not-installed'] as const)
-      : (['all', 'ready', 'update', 'not-installed'] as const),
-  );
+  const filters = ['all', 'ready', 'update', 'not-installed'] as const;
 </script>
 
 <div class="ports">
@@ -107,7 +92,7 @@
           </p>
           <div class="foot">
             <code>{app.portBusy[p.id] ?? p.upstream}</code>
-            {#if !app.demo && p.status !== 'not-installed'}
+            {#if p.status !== 'not-installed'}
               <button class="btn small" data-nav onclick={() => app.openPortFolder(p)} title="Open the port folder to add your own ROM or game files">Open folder</button>
             {/if}
             <button class="btn small" disabled={p.id in app.portBusy} class:primary={p.status !== 'ready'} data-nav onclick={() => primary(p)}>{action(p)}</button>

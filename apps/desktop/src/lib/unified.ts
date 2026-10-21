@@ -28,7 +28,7 @@ export function matchesVariant(game: GameEntry, platform: Platform | '', method:
 // Explicit identities only: titles, punctuation, and filenames never merge games.
 // SCUS-97124 is the US retail Precursor Legacy disc, also accepted by OpenGOAL.
 export function enrichIdentity(game: GameEntry): GameEntry {
-  if (game.serial !== 'SCUS-97124' && game.id !== 'port:opengoal' && game.id !== 'demo:jak-ps2') return game;
+  if (game.serial !== 'SCUS-97124' && game.id !== 'port:opengoal') return game;
   return { ...game, canonicalId: 'jak-and-daxter-tpl', editionKey: 'jak-tpl-original', editionLabel: 'Original · The Precursor Legacy',
     coverUrl: game.coverUrl ?? '/reference/jak/cover.jpg', heroUrl: '/reference/jak/hero.webp',
     screenshots: [
@@ -47,10 +47,3 @@ export function nativePortGame(port: PortEntry): GameEntry {
     portStatus: port.status, art: artFromSeed(`port:${port.id}`), launchMethod: 'native',
   });
 }
-export const jakExample: GameEntry = enrichIdentity({
-  id: 'demo:jak-ps2', title: 'Jak and Daxter: The Precursor Legacy', tagline: 'One adventure. Choose how you play.',
-  platform: 'ps2', source: 'rom', installed: true, genre: 'Platformer', year: 2001,
-  playtimeMin: 0, lastPlayed: null, addedAt: '2026-10-20', favorite: false,
-  ratings: { critic: null, criticCount: 0, user: null, steamReviews: null }, timeToBeat: null, achievements: null,
-  art: artFromSeed('jak-tpl'), launchMethod: 'emulation',
-});

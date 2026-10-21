@@ -5,15 +5,6 @@
   import Icon from '../components/Icon.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
 
-  const sources = $state([
-    { name: 'Lutris', detail: '~/.local/share/lutris/pga.db · read-only', on: true },
-    { name: 'Steam', detail: 'Native + Flatpak library folders', on: true },
-    { name: 'GOG', detail: 'Through Lutris', on: true },
-    { name: 'Epic Games', detail: 'Legendary · not signed in', on: false },
-    { name: 'Heroic', detail: 'Optional import', on: false },
-    { name: 'ROM folders', detail: '~/ROMs/<system>/', on: true },
-  ]);
-
   let drafts = $state<Record<string, string>>({});
   onMount(() => void app.loadKeys());
 
@@ -110,21 +101,6 @@
   </section>
   {/if}
 
-  {#if app.demo}
-  <section class="glass-panel">
-    <h2>Sources</h2>
-    {#each sources as s (s.name)}
-      <div class="item">
-        <div>
-          <strong>{s.name}</strong>
-          <span>{s.detail}</span>
-        </div>
-        <button class="switch" class:on={s.on} data-nav role="switch" aria-checked={s.on} aria-label={s.name} onclick={() => (s.on = !s.on)}><i></i></button>
-      </div>
-    {/each}
-    <button class="btn glass small" data-nav onclick={() => app.rescan()}><Icon name="refresh" size={16} /> Rescan now</button>
-  </section>
-  {/if}
 
   <section class="glass-panel">
     <h2>Look and feel</h2>
@@ -167,19 +143,6 @@
     </div>
   </section>
 
-  {#if app.demo}
-  <section class="glass-panel">
-    <h2>Windows games</h2>
-    <div class="item">
-      <div><strong>Proton</strong><span>GE-Proton, updated in the background. You never pick Wine versions.</span></div>
-      <span class="pill">GE-Proton 10-20</span>
-    </div>
-    <div class="item">
-      <div><strong>Prefixes</strong><span>One per game under ~/Games/&lt;id&gt;/</span></div>
-      <span class="pill">7 prefixes</span>
-    </div>
-  </section>
-  {/if}
 </div>
 
 <style>
@@ -271,9 +234,6 @@
   .key-edit input:focus-visible {
     outline: 2px solid var(--accent);
     outline-offset: 1px;
-  }
-  section > .btn {
-    margin-top: 8px;
   }
   .switch {
     flex: none;

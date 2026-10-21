@@ -102,7 +102,7 @@
       <div class="templates" data-nav-row><span>Start with</span>{#each launcherTemplates as template}<button class="chip" type="button" data-nav disabled={saving} onclick={() => { if (draft) draft = { ...draft, ...template, args: [...template.args] }; }}>{template.name}</button>{/each}</div>
       <div class="fields">
         <label>Name<input bind:this={nameInput} bind:value={draft.name} data-nav required maxlength={100} placeholder="My launcher" disabled={saving} /></label>
-        <label class="wide">Executable<div class="path-field"><input bind:value={draft.executable} data-nav required placeholder="Command name or /absolute/path/to/AppImage" disabled={saving} />{#if !app.demo}<button class="btn glass small" type="button" data-nav onclick={browse} disabled={saving}>Browse</button>{/if}</div></label>
+        <label class="wide">Executable<div class="path-field"><input bind:value={draft.executable} data-nav required placeholder="Command name or /absolute/path/to/AppImage" disabled={saving} /><button class="btn glass small" type="button" data-nav onclick={browse} disabled={saving}>Browse</button></div></label>
         <label class="wide">Working directory <span class="optional">optional</span><input value={draft.working_directory ?? ''} oninput={(e) => { if (draft) draft.working_directory = e.currentTarget.value; }} data-nav placeholder="Application folder, if required" disabled={saving} /></label>
       </div>
       <fieldset disabled={saving}><legend>Arguments <span class="optional">optional · one value per field</span></legend>
@@ -160,7 +160,7 @@
       {:else if item.t === 'launcher'}
         {@const l = item.l}
         <ToolCard seed={`launcher:${l.id}`} kind="Launcher" title={l.name} subtitle={l.status} mono={l.executable} detail={l.args.length ? `${l.args.length} argument${l.args.length === 1 ? '' : 's'} configured` : ''}
-          badge={{ text: l.available ? 'Ready' : app.demo ? 'Demo' : 'Needs setup', tone: l.available ? 'ok' : '' }} glyph="monitor" ready={l.available}>
+          badge={{ text: l.available ? 'Ready' : 'Needs setup', tone: l.available ? 'ok' : '' }} glyph="monitor" ready={l.available}>
           {#snippet actions()}
             <button class="btn primary small" data-nav disabled={!l.available || app.openingLaunchers.includes(l.id)} onclick={() => app.openLauncher(l.id)}><Icon name="play" size={15} />{app.openingLaunchers.includes(l.id) ? 'Opening…' : 'Open'}</button>
             <button class="btn glass small" data-nav onclick={() => edit(l)}>Configure</button>

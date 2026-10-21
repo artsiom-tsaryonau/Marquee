@@ -39,17 +39,17 @@
 </script>
 
 <section class="purple glass-panel" aria-labelledby="purple-title" aria-busy={!!status?.busy}>
-  <div class="heading"><span class="mark"><Icon name="monitor" size={28} /></span><div><span class="eyebrow">Managed Windows launcher</span><h2 id="purple-title">Purple for Aion 2</h2></div><span class="badge">{app.demo ? 'Desktop app required' : status?.busy ? 'Setting up' : status?.running ? 'Purple open' : status?.ready ? 'Launcher installed' : 'Setup available'}</span></div>
+  <div class="heading"><span class="mark"><Icon name="monitor" size={28} /></span><div><span class="eyebrow">Managed Windows launcher</span><h2 id="purple-title">Purple for Aion 2</h2></div><span class="badge">{status?.busy ? 'Setting up' : status?.running ? 'Purple open' : status?.ready ? 'Launcher installed' : 'Setup available'}</span></div>
   <p>Marquee prepares the compatibility runtime and a separate Purple installation for you. Sign in and select Aion 2 in Purple’s Store.</p>
   <p class="compatibility">Aion 2 on Linux is unverified. NCSOFT lists Windows as its supported PC platform; installing Purple does not establish game compatibility.</p>
   {#if status?.busy || status?.error}<p class="progress" role="status" aria-live="polite">{status.message}</p>{/if}
   {#if error || connectionError || status?.error}<p class="error" role="alert">{error || connectionError || status?.error}</p>{/if}
   <div class="actions" data-nav-row>
     {#if status?.ready}
-      <button class="btn primary" data-nav disabled={app.demo || busy} onclick={() => action('open')}><Icon name="play" size={16} />{status.running ? 'Purple is open' : 'Open Purple for Aion 2'}</button>
+      <button class="btn primary" data-nav disabled={busy} onclick={() => action('open')}><Icon name="play" size={16} />{status.running ? 'Purple is open' : 'Open Purple for Aion 2'}</button>
     {/if}
     {#if !status?.ready || status?.error}
-      <button class="btn primary" data-nav disabled={app.demo || busy || !status} onclick={() => action('install')}>{status?.busy ? 'Setting up…' : status?.error || status?.installed ? 'Retry setup' : 'Install Purple'}</button>
+      <button class="btn primary" data-nav disabled={busy || !status} onclick={() => action('install')}>{status?.busy ? 'Setting up…' : status?.error || status?.installed ? 'Retry setup' : 'Install Purple'}</button>
     {/if}
     {#if status?.busy}<button class="btn glass" data-nav disabled={pending} onclick={() => action('cancel')}>Stop setup</button>{/if}
     <button class="btn glass" data-nav aria-expanded={details} onclick={() => details = !details}>Setup details</button>

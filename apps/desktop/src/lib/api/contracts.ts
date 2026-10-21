@@ -234,8 +234,8 @@ export interface EmulatorBuildStatus {
 export interface BiosImport { added: BiosFile[]; ignored: number }
 
 export interface LibraryApi {
-  /** `desktop` = native window, `web` = browser attached to a running Marquee, `demo` = invented data. */
-  kind: 'demo' | 'desktop' | 'web';
+  /** `desktop` = native window, `web` = browser attached to a running Marquee. */
+  kind: 'desktop' | 'web';
   snapshot(): Promise<LibrarySnapshot>;
   addRoot(path: string, system?: string): Promise<LibraryRoot>;
   pickRoot(): Promise<string | null>;

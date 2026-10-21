@@ -43,7 +43,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   } catch {
     throw {
       code: 'UNREACHABLE',
-      message: 'Marquee is not running. Start the desktop app (or `marquee run web`), or add ?demo=1 for the demo.',
+      message: 'Marquee is not running. Start the desktop app (or `marquee run web`).',
     } satisfies AppError;
   }
   const body = (await res.json().catch(() => null)) as unknown;

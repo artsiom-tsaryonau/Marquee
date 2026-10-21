@@ -78,18 +78,17 @@
           {#if g.lastPlayed}<span>Last played {ago(g.lastPlayed)}</span>{/if}
         </div>
         <div class="actions">
-          {#if !app.demo && g.setupState === 'runner_missing'}
+          {#if g.setupState === 'runner_missing'}
             {#if g.platform === 'ps1'}<button class="btn primary" data-nav onclick={() => app.go('tools')}>Set up DuckStation</button>{:else}<InstallMenu tone="primary" />{/if}
           {:else}
             <button class="btn primary" data-nav style="--accent-h:{g.art.hue2}" onclick={() => {
-              if (!app.demo && g.mediaMissing) app.open(g);
-              else if (!app.demo && g.setupState === 'missing') void app.openSetup(g.runnerId, g.platform);
+              if (g.mediaMissing) app.open(g);
+              else if (g.setupState === 'missing') void app.openSetup(g.runnerId, g.platform);
               else if (g.installed) app.play(g);
-              else if (app.demo) app.install(g.title, { kind: 'game', id: g.id });
               else app.open(g);
             }}>
               <Icon name={g.installed ? 'play' : 'download'} />
-              {!app.demo && g.mediaMissing ? 'Check disc files' : !app.demo && g.setupState === 'missing' ? 'Open emulator setup' : g.installed ? 'Play' : app.demo ? 'Install' : 'Details'}
+              {g.mediaMissing ? 'Check disc files' : g.setupState === 'missing' ? 'Open emulator setup' : g.installed ? 'Play' : 'Details'}
             </button>
           {/if}
           <button class="btn glass" data-nav onclick={() => app.open(g)}>Details</button>
@@ -103,19 +102,9 @@
   </header>
 
   <Row title="Continue playing" games={continuePlaying} shape="wide" placeholders={empty ? 4 : 0} onPlaceholder={addFolder} />
-  {#if app.demo}
-    <Row title="Ports ready to play" games={portsReady} />
-    <Row title="Hidden gems in your backlog" games={hiddenGems} />
-  {/if}
   <Row title="Favourites" games={favorites} placeholders={empty ? 6 : 0} />
-  {#if app.demo}
-    <Row title="Quick wins · under 6 hours" games={quickWins} />
-  {/if}
   <Row title="Recently added" games={recentlyAdded} placeholders={empty ? 8 : 0} onPlaceholder={addFolder} />
   <Row title="PlayStation 2" games={emulated} placeholders={empty ? 8 : 0} onPlaceholder={addFolder} />
-  {#if app.demo}
-    <Row title="In your library, not installed" games={notInstalled} />
-  {/if}
 </div>
 
 <style>

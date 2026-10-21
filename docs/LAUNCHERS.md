@@ -38,7 +38,7 @@ Configurations are saved in the existing SQLite `settings` table under `external
 
 Shared commands: `list_launchers`, `save_launcher` (`launcher` object), `remove_launcher` (`id`), and `open_launcher` (`id`). Saving/removing emits `launchers_changed` after persistence. Arguments are passed directly through Rust's `Command`; there is no implicit shell.
 
-The browser demo previews the forms and stores configurations in memory. It never launches host applications or marks them as detected.
+The web surface uses the same backend commands as the desktop shell; there is no mock mode.
 
 ## Scope and verification
 

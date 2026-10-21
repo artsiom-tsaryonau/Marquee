@@ -6,11 +6,10 @@ import { lutrisToGame } from './lutris';
 import { artFromSeed } from './art';
 import { describeScan } from './format';
 import { installOption } from './install';
-import { downloads as seedDownloads, games, portGame, ports } from './mock';
-import type { Download, DownloadTarget, GameEntry, PortEntry } from './types';
+import type { GameEntry, PortEntry } from './types';
 
-export type Route = 'home' | 'library' | 'game' | 'ports' | 'downloads' | 'settings' | 'ps2' | 'tools';
-export type LibraryStatus = 'demo' | 'loading' | 'empty' | 'loaded' | 'failed';
+export type Route = 'home' | 'library' | 'game' | 'ports' | 'settings' | 'ps2' | 'tools';
+export type LibraryStatus = 'loading' | 'empty' | 'loaded' | 'failed';
 
 function load<T>(key: string, fallback: T): T {
   try {
@@ -34,7 +33,7 @@ class AppState {
   history: { route: Route; gameId: string | null; heroId: string | null }[] = [];
   gameId = $state<string | null>(null);
   /** The entry whose art fills the backdrop. */
-  heroId = $state<string | null>(games[0]?.id ?? null);
+  heroId = $state<string | null>(null);
 
   mode = $state<'desktop' | 'big'>(load('mode', 'desktop'));
   theme = $state<'dark' | 'light'>(load('theme', 'dark'));
@@ -46,7 +45,6 @@ class AppState {
   sounds = $state<boolean>(load('sounds', false));
 
   api: LibraryApi = createApi();
-  demo = this.api.kind === 'demo';
   webUrl = $state<string | null>(null);
   keys = $state<KeyInfo[]>([]);
   emulators = $state<EmulatorInfo[]>([]);
@@ -66,7 +64,7 @@ class AppState {
   closeLauncherEditor: (() => void) | null = null;
   private launcherRequest = 0;
   openingLaunchers = $state<string[]>([]);
-  libraryStatus = $state<LibraryStatus>(this.api.kind === 'demo' ? 'demo' : 'loading');
+  libraryStatus = $state<LibraryStatus>('loading');
   loadError = $state<string | null>(null);
   roots = $state<LibraryRoot[]>([]);
   runners = $state<Runner[]>([]);
@@ -82,9 +80,8 @@ class AppState {
   fetchingArt = $state(false);
   overlayDismissed = $state(false);
 
-  games = $state<GameEntry[]>(this.demo ? games : []);
-  ports = $state<PortEntry[]>(this.demo ? ports : []);
-  downloads = $state<Download[]>(this.demo ? seedDownloads : []);
+  games = $state<GameEntry[]>([]);
+  ports = $state<PortEntry[]>([]);
   /** Port id → latest progress line while it installs (desktop only). */
   portBusy = $state<Record<string, string>>({});
 
@@ -109,7 +106,6 @@ class AppState {
 
   async boot() {
     this.disconnect();
-    if (this.demo) { await Promise.all([this.loadLaunchers(), this.loadEmulators()]); return; }
     this.unlisten = this.api.subscribe((event) => this.onEvent(event));
     try {
       await this.api.whenReady();
@@ -283,7 +279,6 @@ class AppState {
       return;
     }
     if (this.running || this.launching) {
-      if (this.demo) return this.stop();
       return this.dismissOverlay();
     }
     const prev = this.history.pop();
@@ -297,22 +292,13 @@ class AppState {
 
   play(game: GameEntry) {
     this.heroId = game.id;
-    if (!this.demo) {
-      if (game.lutris) { void this.openLutrisGame(game); return; }
-      if (game.source === 'port') {
-        const port = this.ports.find((p) => `port:${p.id}` === game.id);
-        if (port) void this.launchPort(port);
-        return;
-      }
-      void this.playDesktop(game);
+    if (game.lutris) { void this.openLutrisGame(game); return; }
+    if (game.source === 'port') {
+      const port = this.ports.find((p) => `port:${p.id}` === game.id);
+      if (port) void this.launchPort(port);
       return;
     }
-    this.launching = game;
-    setTimeout(() => {
-      if (this.launching?.id !== game.id) return;
-      this.launching = null;
-      this.running = game;
-    }, 2200);
+    void this.playDesktop(game);
   }
 
   private async playDesktop(game: GameEntry) {
@@ -334,36 +320,21 @@ class AppState {
     this.running = null;
   }
 
-  stop() {
-    const g = this.running;
-    this.running = null;
-    this.launching = null;
-    if (g) {
-      const entry = this.games.find((x) => x.id === g.id);
-      if (entry) {
-        entry.playtimeMin += 42;
-        entry.lastPlayed = new Date().toISOString();
-      }
-      this.notify(`${g.title} closed · 42 min added`);
-    }
-  }
 
   toggleFavorite(game: GameEntry) {
     const entry = this.games.find((x) => x.id === game.id);
     if (!entry) return;
-    if (!this.demo && (entry.source === 'port' || entry.lutris)) return;
+    if (entry.source === 'port' || entry.lutris) return;
     entry.favorite = !entry.favorite;
-    if (!this.demo) {
-      void this.api.setFavourite(entry.id, entry.favorite).catch((err) => {
-        entry.favorite = !entry.favorite;
-        this.notify((err as { message?: string }).message ?? 'Could not save favourite');
-      });
-    }
+    void this.api.setFavourite(entry.id, entry.favorite).catch((err) => {
+      entry.favorite = !entry.favorite;
+      this.notify((err as { message?: string }).message ?? 'Could not save favourite');
+    });
   }
 
   async rename(game: GameEntry, title: string) {
     const entry = this.games.find((x) => x.id === game.id);
-    if (!entry || this.demo) return;
+    if (!entry) return;
     const previous = entry.title;
     entry.title = title;
     try {
@@ -380,10 +351,6 @@ class AppState {
 
   /** Pick a folder and import it for a specific system (`ps1`/`ps2`). */
   async addSystemFolder(system: string) {
-    if (this.demo) {
-      this.notify(`Add a ${system.toUpperCase()} folder in the desktop app`);
-      return;
-    }
     const path = await this.api.pickRoot();
     if (!path) return;
     this.scanning = true;
@@ -409,10 +376,6 @@ class AppState {
   }
 
   async rescan() {
-    if (this.demo) {
-      this.notify('Rescanning all sources…');
-      return;
-    }
     this.scanning = true;
     try {
       const report = await this.api.scan();
@@ -428,7 +391,6 @@ class AppState {
   }
 
   async chooseRunner(id: string) {
-    if (this.demo) return;
     try {
       await this.api.selectRunner(id);
       this.applySnapshot(await this.api.snapshot());
@@ -438,13 +400,11 @@ class AppState {
   }
 
   async refreshRunners() {
-    if (this.demo) return;
     try { await this.api.listRunners(); this.applySnapshot(await this.api.snapshot()); }
     catch (err) { this.notify((err as { message?: string }).message ?? 'Could not refresh emulators'); }
   }
 
   async openSetup(id?: string, system = 'ps2') {
-    if (this.demo) return;
     const runnerId = id ?? this.runnerFor(system)?.id;
     if (!runnerId) {
       this.notify(`Set up ${system === 'ps1' ? 'DuckStation' : 'PCSX2'} in Tools, then select your BIOS in the emulator.`);
@@ -458,10 +418,6 @@ class AppState {
   }
 
   async installPcsx2(channel = 'auto') {
-    if (this.demo) {
-      this.notify('Install PCSX2 in the desktop app');
-      return;
-    }
     if (this.installingPcsx2) return;
     this.installingPcsx2 = true;
     this.installProgress = 'Starting PCSX2 install…';
@@ -478,7 +434,6 @@ class AppState {
   }
 
   async refreshArtwork(editionId?: string) {
-    if (this.demo) return;
     if (this.fetchingArt) return;
     this.fetchingArt = true;
     try {
@@ -520,7 +475,6 @@ class AppState {
     this.libraryStatus = this.games.length ? 'loaded' : 'empty';
   }
   async loadLutris() {
-    if (this.demo) return;
     const request = ++this.lutrisRequest;
     this.lutrisLoading = true; this.lutrisError = null;
     try { const snapshot = await this.api.lutrisLibrary(); if (request === this.lutrisRequest) this.applyLutris(snapshot); }
@@ -610,10 +564,6 @@ class AppState {
   }
 
   async loadEmulators() {
-    if (this.demo) {
-      this.emulators = await this.api.listEmulators();
-      return;
-    }
     try {
       this.emulators = await this.api.listEmulators();
       // A few GitHub calls for installed emulators only; failures keep the offline state.
@@ -632,10 +582,6 @@ class AppState {
   }
 
   private async emulatorAction(id: string, label: string, run: () => Promise<void>) {
-    if (this.demo) {
-      this.notify('Manage emulators in the desktop app');
-      return;
-    }
     if (id in this.emulatorBusy) return;
     this.emulatorBusy[id] = label;
     try {
@@ -686,10 +632,6 @@ class AppState {
   }
 
   async configureEmulator(emulator: EmulatorInfo, args: string[]): Promise<boolean> {
-    if (this.demo) {
-      this.notify('Configure emulators in the desktop app');
-      return false;
-    }
     try {
       this.emulators = await this.api.configureEmulator(emulator.id, args);
       this.notify(`${emulator.name} settings saved`);
@@ -700,10 +642,6 @@ class AppState {
   }
 
   async importBios() {
-    if (this.demo) {
-      this.notify('Import BIOS files in the desktop app');
-      return;
-    }
     const path = await this.api.pickRoot();
     if (!path || this.biosBusy) return;
     this.biosBusy = true;
@@ -721,7 +659,7 @@ class AppState {
   }
 
   async removeBios(system: string) {
-    if (this.demo || this.biosBusy) return;
+    if (this.biosBusy) return;
     this.biosBusy = true;
     try {
       const removed = await this.api.removeBios(system);
@@ -736,7 +674,6 @@ class AppState {
   }
 
   async loadPorts() {
-    if (this.demo) return;
     try {
       this.applyPorts(await this.api.listPorts());
       // Update check is a handful of GitHub calls; failures keep the offline state.
@@ -750,7 +687,7 @@ class AppState {
   }
 
   async installPort(port: PortEntry) {
-    if (this.demo || port.id in this.portBusy) return;
+    if (port.id in this.portBusy) return;
     this.portBusy[port.id] = `Installing ${port.name}…`;
     try {
       this.applyPorts(await this.api.installPort(port.id));
@@ -779,43 +716,6 @@ class AppState {
     }
   }
 
-  install(name: string, target?: DownloadTarget) {
-    if (!this.demo) {
-      this.notify('Downloads are demo-only in this milestone');
-      return;
-    }
-    if (this.downloads.some((d) => d.state !== 'done' && (target
-      ? d.target?.kind === target.kind && d.target.id === target.id
-      : !d.target && d.name === name))) return;
-    this.downloads.unshift({ id: crypto.randomUUID(), name, target, progress: 0, speed: '0 MB/s', state: 'downloading' });
-    this.notify(`${name} added to downloads`);
-  }
-
-  completeDownload(download: Download) {
-    download.progress = 1;
-    download.state = 'done';
-    download.speed = '';
-    const target = download.target;
-    if (target?.kind === 'game') {
-      const game = this.games.find((g) => g.id === target.id);
-      if (game) game.installed = true;
-    } else if (target?.kind === 'port') {
-      const port = this.ports.find((p) => p.id === target.id);
-      if (port) {
-        port.status = 'ready';
-        const game = this.games.find((g) => g.id === `port:${port.id}`);
-        if (game) {
-          game.installed = true;
-          game.portStatus = 'ready';
-        } else {
-          const entry = portGame(port);
-          this.games.unshift({ ...entry, playtimeMin: 0, lastPlayed: null, addedAt: new Date().toISOString() });
-        }
-      }
-    }
-    this.notify(`${download.name} installed`);
-  }
-
   notify(msg: string) {
     this.toast = msg;
     const shown = msg;
@@ -826,23 +726,3 @@ class AppState {
 }
 
 export const app = new AppState();
-
-if (app.demo) {
-  // Fake download progress so the Downloads screen moves.
-  setInterval(() => {
-    let active = 0;
-    for (const d of app.downloads) {
-      if (d.state !== 'downloading') continue;
-      active++;
-      d.progress = Math.min(1, d.progress + 0.01 + Math.random() * 0.02);
-      d.speed = `${(12 + Math.random() * 14).toFixed(1)} MB/s`;
-      if (d.progress >= 1) {
-        app.completeDownload(d);
-      }
-    }
-    if (active === 0) {
-      const next = app.downloads.find((d) => d.state === 'queued');
-      if (next) next.state = 'downloading';
-    }
-  }, 400);
-}

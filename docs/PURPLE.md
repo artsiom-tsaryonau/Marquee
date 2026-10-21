@@ -23,7 +23,6 @@ No executable, prefix or Wine settings are required in the normal flow. The init
 - Only one setup/open operation can run for this managed Purple instance. Setup is blocked while Purple is open, and repeated Open is blocked while its supervised process remains active. This does not discover Purple processes started outside Marquee.
 - Readiness requires the current recipe receipt, installer completion, a Windows executable header, the pinned runtime and the managed helper. It is a launcher installation check, never an Aion 2 compatibility result.
 - Each setup command has a two-hour timeout. Logs rotate on the next stage above 8 MiB; a stage stops if its log exceeds 32 MiB. Setup logs are private. Normal Purple account/session output is discarded; credentials are entered only in Purple and are never requested through Marquee.
-- The browser demo displays the card but cannot install/open Purple. Its older Purple wizard choice leads to Tools rather than simulating a successful install. Other Windows recipes remain demo previews.
 
 ## Storage and command surface
 

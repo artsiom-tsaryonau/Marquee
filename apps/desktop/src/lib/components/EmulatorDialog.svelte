@@ -28,7 +28,7 @@
   $effect(() => {
     const id = sourceId;
     buildStatus = null;
-    if (!id || app.demo) return;
+    if (!id) return;
     let disposed = false;
     let polling = false;
     let lastState: string | undefined;

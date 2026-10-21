@@ -101,14 +101,3 @@ export interface PortEntry {
   art: Art;
 }
 
-export type DownloadTarget = { kind: 'game'; id: string } | { kind: 'port'; id: string };
-
-export interface Download {
-  id: string;
-  name: string;
-  progress: number;
-  speed: string;
-  state: 'downloading' | 'queued' | 'paused' | 'done';
-  /** Stable identity of the entry to update; tool downloads have no library target. */
-  target?: DownloadTarget;
-}

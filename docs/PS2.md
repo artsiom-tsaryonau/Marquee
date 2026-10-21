@@ -20,7 +20,7 @@ Marquee does not download BIOS files or commercial games.
 
 | Surface | State |
 | --- | --- |
-| Browser demo (`pnpm dev`) | **Works.** Sample games, simulated launch, fictional playtime. Home/Library/Ports/Downloads/Settings chrome. `?empty=1` shows the empty desktop look without sample titles. |
+| Web (`marquee run web`) | **Works.** Same dispatch layer as the desktop shell, token-authenticated, no sample data. |
 | CLI (`marquee`) | **Works** without GTK. Same core as desktop. Use `--data-dir` for isolation. |
 | Desktop (`./scripts/run.sh desktop` / `pnpm tauri dev`) | **Window opens** with the same chrome as the frontend (hero, cover rows, nav). Empty library uses procedural art and ghost shelves — never sample games. NVIDIA Wayland needs `WEBKIT_DISABLE_DMABUF_RENDERER=1`. Native folder-picker / Play clicks are **not live-tested**. |
 | Persistent library | SQLite schema **v4** after the shared PS1 root-system work (artwork v2, session recovery v3) at `$XDG_DATA_HOME/marquee/library.db` (or `--data-dir` / `MARQUEE_DATA_DIR`). `artwork` table + migrate v1→2. Newer `user_version` is rejected. |
@@ -53,12 +53,12 @@ ScreenScraper, SteamGridDB, Steam/Lutris, other emulators, BIN/CUE/CHD play, who
 ```bash
 cd apps/desktop
 pnpm install
-pnpm dev              # browser demo, sample data · http://localhost:1420
+scripts/run.sh dev    # Vite + desktop shell
 pnpm tauri dev        # real library (empty until you add a folder)
 ./scripts/run.sh desktop  # same, plus NVIDIA Wayland DMA-BUF workaround
 ```
 
-Desktop starts empty and never falls back to sample games. Nav is Home / Library / Ports / Downloads / Settings (same as the demo). Ports and Downloads on desktop are empty chrome — they do not install ports. Settings → PlayStation 2 → Choose folder, then Play. “Return to Marquee” hides the overlay; it does not quit PCSX2.
+Desktop starts empty and never falls back to sample games. “Return to Marquee” hides the overlay; it does not quit PCSX2. Settings → PlayStation 2 → Choose folder, then Play.
 
 ```bash
 cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev library add-root --system ps2 ~/Games/ps2
@@ -265,7 +265,7 @@ After import, Marquee fetches 2D covers from [xlenore/ps2-covers](https://github
 | API keys (registry, precedence, masking) | `crates/core/src/keys.rs`; Settings → API keys in `Settings.svelte` |
 | Local web server (token, loopback) | `crates/core/src/server.rs`, `marquee run web` |
 | Native ports | `crates/core/src/ports.rs`, `catalog/ports/*.json`, `apps/desktop/src/lib/screens/Ports.svelte` |
-| Native vs browser vs demo | `apps/desktop/src/lib/api/` (`desktop.ts`, `http.ts`, `demo.ts`, shared `core.ts`) |
+| Native vs web | `apps/desktop/src/lib/api/` (`desktop.ts`, `http.ts`, shared `core.ts`) |
 | Play / empty library | `apps/desktop/src/lib/state.svelte.ts` |
 | Install UI | `apps/desktop/src/lib/install.ts`, `InstallMenu.svelte`, `InstallDialog.svelte` |
 | Empty shelves | `apps/desktop/src/lib/components/GhostCover.svelte` |

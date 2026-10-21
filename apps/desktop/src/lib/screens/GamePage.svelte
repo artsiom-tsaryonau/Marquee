@@ -9,7 +9,6 @@
   import Icon from '../components/Icon.svelte';
   import Row from '../components/Row.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
-  import ScoreStrip from '../components/ScoreStrip.svelte';
 
   const g = $derived(app.current ?? app.hero);
   const variants = $derived(g ? app.games.filter((x) => canonicalId(x) === canonicalId(g)) : []);
@@ -17,10 +16,9 @@
   const choices = $derived(g ? variants.filter((x) => editionKey(x) === editionKey(g)) : []);
   function choose(id: string) { app.chooseVariant(id); }
   const port = $derived(g?.source === 'port' ? app.ports.find((p) => `port:${p.id}` === g.id) : undefined);
-  const shots = $derived(g ? [0, 1, 2, 3].map((i) => ({ ...g.art, hue: (g.art.hue + i * 24) % 360, motif: (['peaks', 'waves', 'grid', 'orbit'] as const)[(i + g.art.hue) % 4] })) : []);
   const similar = $derived(g ? app.games.filter((x) => canonicalId(x) !== canonicalId(g) && (x.genre === g.genre || x.source === g.source)).slice(0, 10) : []);
   const dur = $derived(app.motionReduced ? 0 : 360);
-  const offline = $derived(!!g && !app.demo && g.source === 'rom' && (g.platform === 'ps1' || g.platform === 'ps2'));
+  const offline = $derived(!!g && g.source === 'rom' && (g.platform === 'ps1' || g.platform === 'ps2'));
   const emulator = $derived(g?.platform === 'ps1' ? 'DuckStation' : 'PCSX2');
   let editing = $state(false);
   let titleDraft = $state('');
@@ -48,9 +46,7 @@
           ? 'Disc files unavailable'
           : g.installed
             ? 'Play'
-            : app.demo
-              ? 'Install'
-              : 'Reconnect',
+            : 'Reconnect',
   );
 </script>
 
@@ -100,11 +96,10 @@
         {#if g.platform === 'ps2'}<InstallMenu tone="primary" size="big" />
         {:else}<button class="btn primary big" data-nav onclick={() => app.go('tools')}><Icon name="settings" /> Set up DuckStation</button>{/if}
       {:else}
-        <button class="btn primary big" data-nav disabled={(!app.demo && !!g.mediaMissing)} onclick={() => {
+        <button class="btn primary big" data-nav disabled={!!g.mediaMissing} onclick={() => {
           if (g.lutris) void app.openLutrisGame(g);
           else if (offline && g.setupState === 'missing') app.openSetup(g.runnerId, g.platform);
           else if (g.installed) app.play(g);
-          else if (app.demo) app.install(g.title, { kind: 'game', id: g.id });
         }}>
           <Icon name={g.installed && g.setupState !== 'missing' ? 'play' : 'download'} />
           {playLabel}
@@ -119,21 +114,17 @@
         </button>
       {/if}
       {#if g.portStatus === 'update'}
-        <button class="btn glass" data-nav onclick={() => port && app.install(`${g.title} update`, { kind: 'port', id: port.id })}><Icon name="refresh" /> Update</button>
+        <button class="btn glass" data-nav onclick={() => port && app.installPort(port)}><Icon name="refresh" /> Update</button>
       {/if}
-      <button class="btn glass icon" data-nav aria-label="Favourite" disabled={!app.demo && (g.source === 'port' || !!g.lutris)} onclick={() => app.toggleFavorite(g)}>
+      <button class="btn glass icon" data-nav aria-label="Favourite" disabled={g.source === 'port' || !!g.lutris} onclick={() => app.toggleFavorite(g)}>
         <Icon name="star" filled={g.favorite} />
       </button>
       {#if offline}
         <button class="btn glass" data-nav onclick={() => { titleDraft = g.title; editing = true; }}><Icon name="image" /> Rename</button>
-      {:else if !app.demo && g.lutris}
+      {:else if g.lutris}
         <button class="btn glass" data-nav onclick={() => app.go('tools')}><Icon name="settings" /> Lutris connection</button>
-      {:else if !app.demo && port}
+      {:else if port}
         <button class="btn glass" data-nav onclick={() => app.openPortFolder(port)}><Icon name="folder" /> Folder</button>
-      {:else}
-        <button class="btn glass" data-nav onclick={() => app.notify('Opened install folder')}><Icon name="folder" /> Folder</button>
-        <button class="btn glass" data-nav onclick={() => app.notify('Drop an image to replace the artwork')}><Icon name="image" /> Artwork</button>
-        <button class="btn glass" data-nav onclick={() => app.notify(`${g.title} added to Steam (restart Steam)`)}><Icon name="plus" /> Add to Steam</button>
       {/if}
     </div>
     {#if offline && (g.mediaIssue || g.setupState === 'runner_missing')}<p class="tagline" role="status">{g.mediaIssue || `${emulator} is not installed or available for this platform. Open Tools to set it up.`}</p>{/if}
@@ -147,16 +138,6 @@
         {#each g.screenshots as shot}<a class="shot" href={shot.url} target="_blank" rel="noreferrer" data-nav aria-label={shot.caption}><img src={shot.url} alt={shot.caption} loading="lazy" /></a>{/each}
       </div>
       <p class="media-credit">{g.mediaCredit} <a href={g.mediaSource} target="_blank" rel="noreferrer" data-nav>Source gallery</a></p>
-      {:else if !offline && app.demo}
-      <h3>Ratings and facts</h3>
-      <div class="scores"><ScoreStrip game={g} /></div>
-      <h3>Screenshots</h3>
-      <div class="shots" data-nav-row>
-        {#each shots as art, i (i)}
-          <button class="shot" data-nav aria-label="Screenshot {i + 1}"><Artwork {art} /></button>
-        {/each}
-      </div>
-
       {/if}
       {#if g.lutris}
         <h3>Managed by Lutris</h3>
@@ -180,7 +161,7 @@
         <dt>Launches with</dt>
         <dd>{launchVia}</dd>
         <dt>Playtime</dt>
-        <dd>{!app.demo && port ? 'Tracking not available yet' : g.playtimeMin ? hours(g.playtimeMin) : 'Not played yet'}</dd>
+        <dd>{port ? 'Tracking not available yet' : g.playtimeMin ? hours(g.playtimeMin) : 'Not played yet'}</dd>
         <dt>Last played</dt>
         <dd>{g.lastPlayed ? ago(g.lastPlayed) : '—'}</dd>
         {#if g.lutris}<dt>Library provider</dt><dd>Lutris · {g.installed ? 'configured installation' : 'cached store listing'}</dd>{/if}
