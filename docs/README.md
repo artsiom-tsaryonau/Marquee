@@ -26,6 +26,7 @@ The 2026-10-21 direct-store decision supersedes earlier numbered phases, “Lutr
 | [Tools, launchers and legacy Lutris bridge](LAUNCHERS.md) | Generic shortcuts and advanced configuration; the deprioritized Lutris cache bridge (automatic discovery stays until made opt-in) |
 | [Launcher branding](LAUNCHER_BRANDING.md) | Official marks, Simple Icons slugs, and UI wiring notes for Steam/Epic/GOG/Lutris/Heroic/Purple/runtimes |
 | [Desktop rendering](DESKTOP_RENDERING.md) | Production launch, renderer modes, Balanced/Full effects, and remaining acceptance |
+| [Settings profiles](SETTINGS_PROFILES.md) | DuckStation host-aware settings, recipe evidence, ownership and verification limits |
 | [UI/UX implementation](UI_UX.md) | Current interface changes, readiness contracts, tests and remaining visual/native acceptance |
 | [Enrichment, UI and PS2 metadata](ENRICHMENT.md) | Optional metadata/artwork providers and the ScreenScraper/SteamGridDB follow-up |
 | [Catalogue metadata](CATALOGUE_METADATA.md) | Saved-page import, regional revisions/languages, source artwork and ratings, explicit installation links and raw-ISO SHA-1 matching; schema v5 |

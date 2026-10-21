@@ -192,7 +192,9 @@ fn validate_shell(import: &mut Import, provider: &str) -> Result<(HashSet<String
         || import.systems.len() > 100
         || !bounded(&import.captured_at)
     {
-        return Err(bad("Expected a version 1 catalogue snapshot with 1–10000 games"));
+        return Err(bad(
+            "Expected a version 1 catalogue snapshot with 1–10000 games",
+        ));
     }
     Ok((HashSet::new(), now_rfc3339()))
 }
@@ -293,7 +295,9 @@ fn validate_cover(record: &Record, axekin: bool) -> Result<()> {
                         .get(8..32.min(bytes.len()))
                         .is_some_and(|b| b.windows(4).any(|w| w == b"avif" || w == b"avis"))
             }
-            "data:image/webp;base64" => bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP"),
+            "data:image/webp;base64" => {
+                bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP")
+            }
             _ => false,
         };
         if !valid {
@@ -864,7 +868,10 @@ mod tests {
         let db = Db::open_in_memory().unwrap();
         let snap = import(&db, axekin_fixture()).unwrap();
         assert_eq!(snap.records[0].id, "axekin:401151");
-        assert_eq!(snap.records[0].media[0].download_url, "https://pixeldrain.com/u/Y3M5U2GA");
+        assert_eq!(
+            snap.records[0].media[0].download_url,
+            "https://pixeldrain.com/u/Y3M5U2GA"
+        );
         assert_eq!(snap.systems[0].slug, "switch");
     }
 

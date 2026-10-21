@@ -474,11 +474,14 @@ pub fn import_inbox(paths: &Paths, extra: Option<&str>) -> ImportReport {
     total
 }
 
-fn set_ini_value(text: &str, section: &str, key: &str, value: &str) -> String {
+pub(crate) fn set_ini_value(text: &str, section: &str, key: &str, value: &str) -> String {
     let header = format!("[{section}]");
     let mut lines: Vec<String> = text.lines().map(str::to_string).collect();
     let line = format!("{key} = {value}");
-    let Some(start) = lines.iter().position(|l| l.trim() == header) else {
+    let Some(start) = lines
+        .iter()
+        .position(|l| l.trim().eq_ignore_ascii_case(&header))
+    else {
         if lines.last().is_some_and(|l| !l.is_empty()) {
             lines.push(String::new());
         }
@@ -493,7 +496,7 @@ fn set_ini_value(text: &str, section: &str, key: &str, value: &str) -> String {
     let existing = (start + 1..end).find(|&i| {
         lines[i]
             .split_once('=')
-            .is_some_and(|(k, _)| k.trim() == key)
+            .is_some_and(|(k, _)| k.trim().eq_ignore_ascii_case(key))
     });
     match existing {
         Some(i) => lines[i] = line,

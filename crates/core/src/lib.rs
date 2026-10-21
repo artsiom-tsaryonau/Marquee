@@ -21,15 +21,16 @@ pub mod model;
 pub mod neogeo;
 pub mod paths;
 pub mod ports;
+pub mod profiles;
 pub mod purple;
 pub mod romart;
 pub mod romfacts;
-pub mod wanted;
 pub mod runners;
 pub mod server;
 pub mod sessions;
 pub mod source_builds;
 pub mod transfer;
+pub mod wanted;
 
 use crate::db::Db;
 use crate::error::{AppError, Result};
@@ -724,6 +725,44 @@ impl Core {
         self.list_emulators()
     }
 
+    pub fn emulator_profile(&self, id: &str) -> Result<profiles::Status> {
+        if id != "duckstation" {
+            return Err(AppError::new(
+                "PROFILE_UNSUPPORTED",
+                "Settings profiles currently support DuckStation only",
+            ));
+        }
+        profiles::get(&emulators::config_home(&self.paths, id))
+    }
+
+    pub fn configure_emulator_profile(
+        &self,
+        id: &str,
+        config: profiles::Config,
+    ) -> Result<profiles::Status> {
+        if id != "duckstation" {
+            return Err(AppError::new(
+                "PROFILE_UNSUPPORTED",
+                "Settings profiles currently support DuckStation only",
+            ));
+        }
+        let status = self.with_db(|db| {
+            if db
+                .list_sessions()?
+                .iter()
+                .any(|s| s.state == "running" && s.runner_id == emulators::runner_id(id))
+            {
+                return Err(AppError::new(
+                    "PROFILE_BUSY",
+                    "Close the running DuckStation game before changing its settings profile",
+                ));
+            }
+            profiles::configure(&emulators::config_home(&self.paths, id), config)
+        })?;
+        self.events.emit(CoreEvent::LibraryChanged);
+        Ok(status)
+    }
+
     /// Save what the user can configure for an emulator (extra launch arguments).
     pub fn configure_emulator(
         &self,
@@ -755,6 +794,9 @@ impl Core {
                 AppError::new("RUNNER_MISSING", format!("{} is not installed", def.name))
             })?;
         let cfg = self.with_db(|db| emulators::config(db, id))?;
+        if id == "duckstation" {
+            profiles::prepare(&emulators::config_home(&self.paths, id))?;
+        }
         emulators::open(&self.paths, &def, &installed, &cfg)
     }
 

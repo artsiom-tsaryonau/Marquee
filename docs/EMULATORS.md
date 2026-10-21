@@ -244,7 +244,7 @@ The program runs in its local OCI image, so Podman stays a runtime prerequisite;
 - A live DuckStation Play, quit and duration check has not been run. See [PS1](PS1.md).
 - Ports still have no uninstall.
 - PCSX2 is not yet on the catalogue.
-- Settings profiles ("recommended settings for this machine") are planned, not built; see the [roadmap](ROADMAP.md).
+- [DuckStation settings profile v1](SETTINGS_PROFILES.md) is implemented with conservative host detection, custom options and per-key user-edit preservation. Profiles for other emulators and live presentation acceptance remain open.
 - The new Tools layout has been type-checked and built but not yet looked at in a live window.
 
 ## RetroBIOS reference

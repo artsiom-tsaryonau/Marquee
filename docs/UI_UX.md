@@ -73,10 +73,8 @@ unchecked installed ports, modal isolation/restoration and held-direction
 repeat alongside existing regressions. Targeted Rust `ports::` tests cover the
 catalogue and installer preservation/integrity behavior.
 
-The repository-wide `scripts/check.sh` passed its eight script tests when run
-with local socket access, then stopped at existing Rust formatting differences
-in unchanged `lib.rs`, `metadata.rs` and `wanted.rs`. The broader Rust checks
-were not reached by that command. These files were left unchanged.
+The subsequent DuckStation profile step normalized the existing Rust formatting
+differences and passed the full repository checks, including native compilation.
 
 No browser/native UI surface was available for this pass. Builds and mocked DOM
 regressions are not rendered-layout or native-gamepad acceptance. Still inspect:

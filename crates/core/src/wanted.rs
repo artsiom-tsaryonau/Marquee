@@ -11,8 +11,8 @@
 use crate::db::{now_rfc3339, Db};
 use crate::error::{AppError, Result};
 use crate::romart;
-use crate::EventSink;
 use crate::Core;
+use crate::EventSink;
 use rusqlite::{params, Connection};
 use std::collections::{BTreeMap, HashMap};
 use uuid::Uuid;
@@ -45,13 +45,17 @@ pub fn claim(db: &Db, system: &str, file_title: &str) -> Result<Option<String>> 
          WHERE e.system = ?1 AND e.media_id IS NULL",
     )?;
     let candidates = stmt
-        .query_map([system], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
+        .query_map([system], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
+        })?
         .collect::<rusqlite::Result<Vec<_>>>()?;
     drop(stmt);
     let found = candidates
         .into_iter()
         .find(|(_, title)| romart::names_agree(file_title, &romart::plain_title(title)));
-    let Some((id, _)) = found else { return Ok(None) };
+    let Some((id, _)) = found else {
+        return Ok(None);
+    };
     db.conn
         .execute("DELETE FROM wanted WHERE edition_id = ?1", [&id])?;
     Ok(Some(id))
@@ -192,24 +196,47 @@ mod tests {
     fn a_file_claims_its_wanted_game_and_only_that_one() {
         let dir = tempfile::tempdir().unwrap();
         let core = Core::open(Some(dir.path().join("data")), true).unwrap();
-        let wanted = core.add_wanted("nes", "Super Mario Bros.", "wishlist").unwrap();
+        let wanted = core
+            .add_wanted("nes", "Super Mario Bros.", "wishlist")
+            .unwrap();
         let other = core.add_wanted("nes", "Metroid", "owned").unwrap();
         // Adding the same title again returns the same entry.
-        assert_eq!(core.add_wanted("nes", "super  mario bros.", "owned").unwrap(), wanted);
+        assert_eq!(
+            core.add_wanted("nes", "super  mario bros.", "owned")
+                .unwrap(),
+            wanted
+        );
         let snap = core.snapshot().unwrap();
         let e = snap.editions.iter().find(|e| e.id == wanted).unwrap();
         assert_eq!(e.wanted.as_deref(), Some("wishlist"));
         assert!(e.media_id.is_none());
         core.with_db(|db| {
             assert_eq!(claim(db, "snes", "Super Mario Bros. (USA)")?, None);
-            assert_eq!(claim(db, "nes", "Super Mario Bros. (USA)")?, Some(wanted.clone()));
+            assert_eq!(
+                claim(db, "nes", "Super Mario Bros. (USA)")?,
+                Some(wanted.clone())
+            );
             assert_eq!(claim(db, "nes", "Super Mario Bros. (USA)")?, None);
             Ok(())
         })
         .unwrap();
         let snap = core.snapshot().unwrap();
-        assert!(snap.editions.iter().find(|e| e.id == wanted).unwrap().wanted.is_none());
-        assert_eq!(snap.editions.iter().find(|e| e.id == other).unwrap().wanted.as_deref(), Some("owned"));
+        assert!(snap
+            .editions
+            .iter()
+            .find(|e| e.id == wanted)
+            .unwrap()
+            .wanted
+            .is_none());
+        assert_eq!(
+            snap.editions
+                .iter()
+                .find(|e| e.id == other)
+                .unwrap()
+                .wanted
+                .as_deref(),
+            Some("owned")
+        );
     }
 
     #[test]
@@ -238,7 +265,9 @@ mod tests {
         std::fs::write(games.join("Super Mario Bros. (USA).nes"), vec![1u8; 4096]).unwrap();
         std::fs::write(games.join("Other Thing.nes"), vec![2u8; 4096]).unwrap();
         let core = Core::open(Some(dir.path().join("data")), true).unwrap();
-        let wanted = core.add_wanted("nes", "Super Mario Bros.", "wishlist").unwrap();
+        let wanted = core
+            .add_wanted("nes", "Super Mario Bros.", "wishlist")
+            .unwrap();
         let root = core.add_root("nes", games, None).unwrap();
         core.scan(Some(&root.id), None).unwrap();
         let snap = core.snapshot().unwrap();

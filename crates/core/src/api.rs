@@ -116,6 +116,14 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
         "rollback_emulator" => out(core.rollback_emulator(&text(&args, "id")?)?),
         "check_emulator_updates" => out(core.check_emulator_updates()?),
         "install_emulator" => out(core.install_emulator(&text(&args, "id")?, sink)?),
+        "emulator_profile" => out(core.emulator_profile(&text(&args, "id")?)?),
+        "configure_emulator_profile" => {
+            let config = serde_json::from_value(args.get("config").cloned().unwrap_or(Value::Null))
+                .map_err(|e| {
+                    AppError::new("BAD_REQUEST", format!("Invalid settings profile: {e}"))
+                })?;
+            out(core.configure_emulator_profile(&text(&args, "id")?, config)?)
+        }
         "configure_emulator" => {
             let list = args
                 .get("args")

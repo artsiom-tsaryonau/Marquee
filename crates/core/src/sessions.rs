@@ -143,7 +143,7 @@ pub fn launch(
                 .iter()
                 .find_map(|a| a.strip_prefix("XDG_CONFIG_HOME="))
             {
-                let _ = crate::bios::seed_duckstation(Path::new(home));
+                let _ = crate::profiles::prepare(Path::new(home));
             }
         }
         // Generic catalogue emulators: write the entry's seed files (first-run

@@ -144,6 +144,20 @@ enum TorrentCmd {
 
 #[derive(Subcommand)]
 enum EmulatorsCmd {
+    /// Preview the verified DuckStation profile and detected host (no settings writes)
+    Profile { id: String },
+    /// Apply a profile: recommended, custom, or disabled (preserves current values)
+    ProfileSet {
+        id: String,
+        #[arg(long, default_value = "recommended", value_parser = ["recommended", "custom", "disabled"])]
+        mode: String,
+        #[arg(long, default_value = "Automatic", value_parser = ["Automatic", "Vulkan", "OpenGL", "Software"])]
+        renderer: String,
+        #[arg(long, default_value_t = 1)]
+        scale: u8,
+        #[arg(long)]
+        vsync: bool,
+    },
     /// Emulators Marquee can install, and what is installed
     List,
     /// Ask GitHub whether installed emulators have a newer version
@@ -399,6 +413,41 @@ fn run() -> marquee_core::error::Result<()> {
         }
         Command::Emulators(cmd) => {
             let list = match cmd {
+                EmulatorsCmd::Profile { id } => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(&core.emulator_profile(&id)?)?
+                    );
+                    return Ok(());
+                }
+                EmulatorsCmd::ProfileSet {
+                    id,
+                    mode,
+                    renderer,
+                    scale,
+                    vsync,
+                } => {
+                    let mode = match mode.as_str() {
+                        "custom" => marquee_core::profiles::Mode::Custom,
+                        "disabled" => marquee_core::profiles::Mode::Disabled,
+                        _ => marquee_core::profiles::Mode::Recommended,
+                    };
+                    let config = marquee_core::profiles::Config {
+                        mode,
+                        custom: marquee_core::profiles::Options {
+                            renderer,
+                            resolution_scale: scale,
+                            vsync,
+                        },
+                    };
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(
+                            &core.configure_emulator_profile(&id, config)?
+                        )?
+                    );
+                    return Ok(());
+                }
                 EmulatorsCmd::List => core.list_emulators()?,
                 EmulatorsCmd::Check => core.check_emulator_updates()?,
                 EmulatorsCmd::BuildStatus { id } => {

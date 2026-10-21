@@ -442,3 +442,12 @@ test('exact catalogue matching is offered only for available raw ISO media', () 
   entries = gamesFromSnapshot(snap);
   assert.equal(entries.find((g) => g.id === 'e2').catalogueMatchSupported, false);
 });
+
+
+test('emulator profiles use the shared desktop/browser command contract', async () => {
+  const { commands } = await import('../src/lib/api/core');
+  const calls = []; const api = commands(async (name, args) => { calls.push({name,args}); return {}; });
+  const config = { mode:'custom', custom:{renderer:'Automatic',resolution_scale:2,vsync:true} };
+  await api.emulatorProfile('duckstation'); await api.configureEmulatorProfile('duckstation',config);
+  assert.deepEqual(calls,[{name:'emulator_profile',args:{id:'duckstation'}},{name:'configure_emulator_profile',args:{id:'duckstation',config}}]);
+});

@@ -6,6 +6,7 @@
   import { coverSrc } from '../api/map';
   import { systemLabel } from '../labels';
   import Artwork from './Artwork.svelte';
+  import EmulatorProfile from './EmulatorProfile.svelte';
   import Icon from './Icon.svelte';
   import type { EmulatorBuildStatus } from '../api/contracts';
   import { pollWhileActive } from '../activity';
@@ -142,6 +143,8 @@
           {#if e.status === 'update'}<button class="btn glass small" data-nav disabled={!!busy} onclick={() => e.source_build ? build() : app.installEmulator(e)}>Update</button>{/if}
         {/if}
       </div>
+
+      {#if e.id === 'duckstation'}<EmulatorProfile />{/if}
 
       {#if e.source_build}
         <section>

@@ -40,6 +40,8 @@ export function asError(err: unknown): AppError {
 /** The commands are identical on every surface; only the transport (`call`) differs. */
 export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable'> {
   return {
+    emulatorProfile: (id) => call('emulator_profile', { id }),
+    configureEmulatorProfile: (id, config) => call('configure_emulator_profile', { id, config }),
     importCatalogue: (snapshot) => call('import_catalogue', { snapshot }),
     linkCatalogue: (editionId, recordId, mediaId) => call('link_catalogue', { edition_id: editionId, record_id: recordId, media_id: mediaId }),
     unlinkCatalogue: (editionId) => call('unlink_catalogue', { edition_id: editionId }),

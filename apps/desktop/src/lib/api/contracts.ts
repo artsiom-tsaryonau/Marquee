@@ -247,6 +247,18 @@ export interface LauncherInfo extends LauncherConfig {
 
 export interface FirmwareStatus { name: string; required: boolean; present: boolean; path: string | null; note: string }
 
+export interface EmulatorProfileOptions { renderer: 'Automatic' | 'Vulkan' | 'OpenGL' | 'Software'; resolution_scale: number; vsync: boolean }
+export interface EmulatorProfileConfig { mode: 'recommended' | 'custom' | 'disabled'; custom: EmulatorProfileOptions }
+export interface EmulatorProfileStatus {
+  version: number;
+  source: string;
+  host: { gpus: { vendor: string; device: string; driver: string }[]; displays: { name: string; width: number; height: number; refresh_hz: number; source: string }[]; session: string; notes: string[] };
+  recommended: EmulatorProfileOptions;
+  config: EmulatorProfileConfig;
+  fields: { section: string; key: string; desired: string; current: string | null; managed: boolean; preserved: boolean }[];
+  settings_path: string;
+}
+
 export interface EmulatorInfo {
   firmware?: FirmwareStatus[];
   launch_presentation?: string;
@@ -282,6 +294,8 @@ export interface EmulatorBuildStatus {
 export interface BiosImport { added: BiosFile[]; ignored: number }
 
 export interface LibraryApi {
+  emulatorProfile(id: string): Promise<EmulatorProfileStatus>;
+  configureEmulatorProfile(id: string, config: EmulatorProfileConfig): Promise<EmulatorProfileStatus>;
   importCatalogue(snapshot: unknown): Promise<CatalogueSnapshot>;
   linkCatalogue(editionId: string, recordId: string, mediaId: string): Promise<void>;
   unlinkCatalogue(editionId: string): Promise<void>;
