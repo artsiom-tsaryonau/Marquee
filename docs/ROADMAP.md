@@ -15,7 +15,7 @@ Marquee owns the interface, library, store-connection workflow, installation job
 | GOG | Direct GOG adapter; gogdl for supported authentication/download/update/launch operations, plus explicit library integration where needed |
 | Windows games outside Steam | Marquee-managed umu/Proton, isolated prefixes, dependency recipes, and per-game fixes |
 | Native games and ports | Direct executable/adaptor launch; no compatibility layer when a supported native build is chosen |
-| Emulation | Per-system adapters and managed supported emulator builds; system/game data prerequisites remain explicit |
+| Emulation | Per-system adapters, managed emulator builds, and automated media/firmware jobs from authorized sources; folder import as fallback |
 | Lutris/Heroic | Optional legacy imports or exceptional fallback, never required for connecting Steam/Epic/GOG |
 
 Wine is an execution component. It does not provide owned-library sync, store authentication, game downloads, or patch management. Marquee must implement those workflows through store adapters. Helper reuse reduces protocol/runtime work; it does not make Marquee's orchestration automatic without implementation.
@@ -27,13 +27,13 @@ These are implemented capabilities; live acceptance gates are recorded separatel
 | Area | Current state |
 | --- | --- |
 | Core and surfaces | Rust core/CLI, Tauri/Svelte desktop, shared authenticated loopback browser surface, event hub, MIT application license |
-| Disc library | PS2 ISO/PCSX2 and PS1 ISO/CHD/CUE/DuckStation; platform categories, independent defaults, CUE dependency/offset validation, and temporary read-only Flatpak media grants. See [corrections](PS1_PS2_CORRECTIONS_2026-10-21.md); live gates remain open |
-| Sessions and corrections | Persistent sessions, recovery/checkpoint work, staged port updates, mutation invalidation, and per-file scan warnings; see [correction report](CORRECTION_PASS.md) |
+| Disc library | PS2 ISO/PCSX2 and PS1 ISO/CHD/CUE/DuckStation; platform categories, independent defaults, CUE dependency/offset validation, and temporary read-only Flatpak media grants. See [corrections](CORRECTIONS.md); live gates remain open |
+| Sessions and corrections | Persistent sessions, recovery/checkpoint work, staged port updates, mutation invalidation, and per-file scan warnings; see [correction report](CORRECTIONS.md) |
 | Native ports | Five managed recipes; binary installation is not proof that required game data is ready |
 | Unified library UI | Platform/run-method/source filters, explicit grouping, edition/run selectors, Jak/OpenGOAL reference assets; persistent normalized backend remains planned |
 | Tools | Persisted external shortcuts, readiness checks, pinning, detected presets, structured executable/arguments/cwd (edited in a dialog), Purple setup, and managed emulator/BIOS panels with platform filters, picture cards and a settings dialog; see [Tools](LAUNCHERS.md) |
 | Managed emulators | Seven catalogue recipes: DuckStation, PPSSPP, RPCS3, Flycast, Azahar, Cemu, xemu. Install/open/update/remove with verified AppImages and isolated data; DuckStation connects to PS1 disc launch, the other six currently open independently. PCSX2 retains its dedicated installer. See [emulator management](EMULATORS.md) |
-| BIOS management | User-supplied PS1/PS2 identification/import/list/removal through Tools, CLI and API; region selection support. This is not evidence of live firmware/game compatibility |
+| BIOS management | PS1/PS2 list/import/remove today (folder fallback); target is firmware acquisition jobs from authorized sources. Region identification support. Not evidence of live compatibility |
 | Legacy Lutris bridge | Local read-only installed/cache projection and handoffs exist. Current code auto-discovers an existing database. Moving this behind an optional legacy integration is planned; documentation changes do not disable it |
 | Direct Steam/Epic/GOG | Not implemented as end-to-end native store integrations. Command shortcuts and Lutris cache entries do not count as direct integrations |
 | Compatibility automation | A narrow [Purple/Aion 2 recipe](PURPLE.md) now provides managed umu/GE-Proton prefix/dependency setup and launcher opening. Live Purple/Aion 2 compatibility is unverified. General runtime lifecycle and arbitrary Windows apps remain planned; other wizard recipes are demos |
@@ -43,10 +43,14 @@ These are implemented capabilities; live acceptance gates are recorded separatel
 
 - [x] Correct mixed PS1/PS2 categorization, per-system setup/defaults, CUE availability and identity refresh, root-conflict reporting, and failed-launch accounting. The real collection validates as 9 PS1 + 2 PS2 entries with stable IDs.
 - [x] Add Purple installation/opening with managed umu/GE-Proton, dependency checkpoints, cancellation and diagnostics. Aion 2 sign-in/gameplay is unverified.
-- [x] Add seven managed emulator catalogue entries and the Tools install/open/update/remove panel, plus user-supplied BIOS management. Native/Flatpak discovery remains an alternative.
+- [x] Add seven managed emulator catalogue entries and the Tools install/open/update/remove panel, plus BIOS import/management. Native/Flatpak discovery remains an alternative.
 - [x] Rework the Tools emulator area to match the Library: platform and status filter chips, picture cards (the emulator's own icon over generated art), and a per-emulator settings dialog (status, launch arguments, install locations, package-manager hint, remove with or without saves). The launcher editor is now a dialog too. Launch arguments are saved per emulator and added to Open and library launches. Not yet checked in a live browser/desktop session.
 - [ ] Observe PS1 and PS2 retail boot/input/exit/restart gates; test Purple sign-in and Aion 2 gameplay separately.
 - [ ] Verify each additional emulator's actual installation, isolation, prerequisites and successful opening on this host. Add system-specific media/game adapters before advertising library Play for PSP, PS3, Dreamcast, 3DS, Wii U or Xbox.
+
+### Media acquisition (parallel track)
+
+Orchestrate firmware, discs, and port inputs through the same job model as store installs ([MEDIA_ACQUISITION.md](MEDIA_ACQUISITION.md)). Folder import, `library add-root`, and `bios import` remain fallbacks. The `scripts/vimm/` POC explores connector-style ROM acquisition (one file at a time, headed browser). Wiring into Downloads/Tools is follow-up work.
 
 ### Next for Tools and emulators
 
@@ -155,7 +159,9 @@ Build the minimum needed alongside Epic, then reuse it for GOG and later standal
 
 ## U1 — Library and UI completion
 
-The [desktop performance correction pass](DESKTOP_PERFORMANCE.md) adds Balanced visual effects by default, bounded Home shelves, active-window polling/input, and lifecycle cleanup. Native frame-time/GPU measurements and visual acceptance remain open; no measured improvement percentage is claimed.
+The [desktop performance correction pass](DESKTOP_RENDERING.md) adds Balanced visual effects by default, bounded Home shelves, active-window polling/input, and lifecycle cleanup. Native frame-time/GPU measurements and visual acceptance remain open; no measured improvement percentage is claimed.
+
+The [live rendering correction](DESKTOP_RENDERING.md) now selects accelerated shared-memory transport on NVIDIA/Wayland instead of globally disabling compositing; direct GPU still reproduces Error 71 on the tested host. Production launch, explicit rendering fallbacks, startup-policy tests and a reproducible synthetic frame-interval comparison are implemented. The real optimized executable passed isolated startup with compositor/scrolling threads and GPU access. Real-collection frame-time, input-latency and game-return acceptance remain open.
 
 The normalized data model is shared infrastructure, implemented incrementally when S1 needs it rather than a separate store-blocking rewrite. Use the next available schema version; schema v4 is already allocated to PS1 root systems. Preserve legacy IDs through explicit mappings.
 
@@ -176,15 +182,15 @@ Preserve existing work and correctness gates:
 - [PS2 slice](PS2.md): PCSX2 setup, user-owned ISO/BIOS, live launch/exit/time evidence.
 - [PS1 slice](PS1.md): DuckStation, per-system roots, supported ISO/CHD/CUE, separate live gate.
 - [Managed emulators and BIOS](EMULATORS.md): seven install/open recipes and Tools management; preserve the distinction between a managed program and an integrated game adapter.
-- [Managed source-build pilot](SOURCE_BUILDS.md): mGBA pinned-source Qt/SDL build, rootless container dependencies/runtime, status/logs/cancel/retry, provenance and previous-program rollback are implemented. Binary releases remain the default elsewhere. mGBA library import, interactive game/controller acceptance, managed Podman delivery and cache cleanup remain open; Dolphin is the next recipe candidate, not an implemented build.
-- [Emulator presentation research](EMULATOR_PRESENTATION.md): PCSX2 now joins DuckStation in hiding the main window for normal library Play. Visible game-only windows, displayless execution, save-state resume and streaming are separate capabilities; validate them per adapter.
-- [PS1/PS2 corrections](PS1_PS2_CORRECTIONS_2026-10-21.md): real-collection validation and fixes; original findings are retained in the linked audit.
+- [Managed source-build pilot](EMULATORS.md#source-builds-mgba-pilot): mGBA pinned-source Qt/SDL build, rootless container dependencies/runtime, status/logs/cancel/retry, provenance and previous-program rollback are implemented. Binary releases remain the default elsewhere. mGBA library import, interactive game/controller acceptance, managed Podman delivery and cache cleanup remain open; Dolphin is the next recipe candidate, not an implemented build.
+- [Emulator presentation research](EMULATORS.md#game-only-windows-and-headless-emulation): PCSX2 now joins DuckStation in hiding the main window for normal library Play. Visible game-only windows, displayless execution, save-state resume and streaming are separate capabilities; validate them per adapter.
+- [PS1/PS2 corrections](CORRECTIONS.md): real-collection validation and fixes; original findings are retained in the linked audit.
 - [Expansion catalogue](EXPANSION_CATALOGUE.md): prioritized platforms, port families, legitimate game-data requirements, shelves, streaming, and adapter limits.
 - [Unified-library/OpenGOAL track](UNIFIED_LIBRARY.md): explicit editions/run methods, reference assets, managed Jak extraction and runtime support.
-- [Metadata follow-up](PS2_METADATA_FOLLOWUP.md): ScreenScraper prerequisites and SteamGridDB matching. Broader [metadata and UI enrichment](ENRICHMENT.md) is optional background work and never gates Play.
+- [Metadata follow-up](ENRICHMENT.md#ps2-metadata-matching-and-cached-artwork): ScreenScraper prerequisites and SteamGridDB matching. Broader [metadata and UI enrichment](ENRICHMENT.md) is optional background work and never gates Play.
 - Port installers keep staged extraction, bounded archives, integrity checks, user-data preservation, and rollback. “Binary installed” and “game data ready” remain separate.
 - Port data discovery consumes direct Steam/GOG installation records. A Lutris database is not a prerequisite.
-- BIOS, firmware, original ROM/disc assets, and native-port extraction inputs remain user-supplied. Store-authorized downloads of owned Steam/Epic/GOG games are in scope; the earlier blanket “no game downloads” wording is superseded.
+- Marquee installs emulator/port binaries, caches artwork when configured, and will download owned Steam/Epic/GOG titles through store adapters (in scope). The same orchestration should cover firmware, discs, and port inputs via [media acquisition jobs](MEDIA_ACQUISITION.md) — not ad-hoc manual steps as the default. The app never bundles copyrighted BIOS/ROM files. Folder import remains a fallback. The earlier blanket “no game downloads” wording is superseded for authorized store and connector-backed media only.
 
 ## Packaging and later work
 

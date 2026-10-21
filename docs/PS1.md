@@ -1,6 +1,6 @@
 # PlayStation (PS1 slice)
 
-Current correction notes: [PS1/PS2 correction pass](PS1_PS2_CORRECTIONS_2026-10-21.md). Platform mapping, CUE handling and launch access have changed since the historical checks below. Live gameplay acceptance remains separate.
+Current correction notes: [PS1/PS2 correction pass](CORRECTIONS.md). Platform mapping, CUE handling and launch access have changed since the historical checks below. Live gameplay acceptance remains separate.
 
 Last updated: 2026-10-21.
 
@@ -112,14 +112,14 @@ A stored `selected_runner_id` is honoured only when it belongs to that family (o
 
 DuckStation needs a PS1 BIOS, and the same three states apply (`missing` blocks Play; `unverified` does not). The Flatpak path probed is `~/.var/app/org.duckstation.DuckStation/config/duckstation`.
 
-Marquee never downloads BIOS images. For a Flatpak or other external DuckStation, add BIOS in DuckStation itself. Marquee's own managed DuckStation (`marquee emulators install duckstation`) keeps its BIOS in `~/.local/share/marquee/duckstation/xdg-config/duckstation/bios`; fill it with `marquee bios import <folder>`. See [Managed emulators and BIOS](EMULATORS.md).
+Firmware acquisition jobs are planned ([media acquisition](MEDIA_ACQUISITION.md)). Today: `marquee bios import <folder>` or Tools import for managed DuckStation (`~/.local/share/marquee/duckstation/xdg-config/duckstation/bios`). External Flatpak DuckStation still uses its own BIOS UI. See [Managed emulators and BIOS](EMULATORS.md).
 
 ### Errors
 
 | Code | What to do |
 | --- | --- |
 | `RUNNER_MISSING` | Install DuckStation (see below). |
-| `SETUP_MISSING` | Add a PS1 BIOS you dumped from your own console. |
+| `SETUP_MISSING` | Queue BIOS setup (when available) or import a folder in Tools. |
 | `MEDIA_MISSING` | Disc moved, or the format is not launched (`.cue`/`.bin`). |
 | `ROOT_OFFLINE` | Folder missing/unmounted, or an unknown `--system`. |
 

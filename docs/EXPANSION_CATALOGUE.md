@@ -2,7 +2,7 @@
 
 Researched 2026-10-20. These are integration candidates and product proposals, not implemented adapters or locally tested compatibility claims. Follow the linked upstream documentation when implementing each adapter; releases, supported game revisions and Linux packaging change.
 
-**Implementation update, 2026-10-21:** PS1 ISO/CHD/CUE and PS2 ISO adapters, five managed native ports, and seven [managed emulator launchers](EMULATORS.md) now exist. DuckStation connects to library-disc launch; PPSSPP, RPCS3, Flycast, Azahar, Cemu and xemu currently open independently. These install/open recipes do not imply media import or per-game launch support for their platforms. PS1/PS2 retail live gates and wider compatibility acceptance remain open. See the [roadmap](ROADMAP.md) and [correction pass](PS1_PS2_CORRECTIONS_2026-10-21.md). Other entries below remain candidates unless explicitly marked implemented.
+**Implementation update, 2026-10-21:** PS1 ISO/CHD/CUE and PS2 ISO adapters, five managed native ports, and seven [managed emulator launchers](EMULATORS.md) now exist. DuckStation connects to library-disc launch; PPSSPP, RPCS3, Flycast, Azahar, Cemu and xemu currently open independently. These install/open recipes do not imply media import or per-game launch support for their platforms. PS1/PS2 retail live gates and wider compatibility acceptance remain open. See the [roadmap](ROADMAP.md) and [correction pass](CORRECTIONS.md). Other entries below remain candidates unless explicitly marked implemented.
 
 ## Product direction
 
@@ -23,7 +23,7 @@ Priority labels below are Marquee implementation recommendations, not upstream c
 | System | Candidate | Marquee experience | Priority and requirements |
 | --- | --- | --- | --- |
 | PS1 | [DuckStation](https://github.com/stenzek/duckstation) | Disc-library scanning, multi-disc grouping, memory-card shortcuts, per-game launch options | **Slice in tree 2026-10-21** — second system behind the multi-system descriptors: `.iso` and `.chd` import, raw-2352 disc reading, DuckStation kind, psx-covers art, family-scoped runner choice. Multi-disc grouping, memory cards and per-game options are **not** in that slice, and DuckStation discovery/live Play is **unverified** (not installed on the build host). [PS1.md](PS1.md). |
-| PS2 | [PCSX2](https://pcsx2.net/docs/setup/running/) | A PS2 shelf, per-game renderer/settings profiles, memory-card management, compatibility links | **First — slice in tree 2026-10-20** (ISO import, **official AppImage unpacked into Marquee’s data dir**, optional Flatpak, argv, sessions, serial box art, console Home/Library). Per-game PCSX2 settings, memory cards, CUE/CHD play and compatibility links are **not** in that slice. [PCSX2 requires a BIOS](https://pcsx2.net/docs/setup/bios/) that the user supplies; Marquee never downloads it. Empty BIOS dir is unverified, not missing. Live Play pending: [PS2.md](PS2.md). |
+| PS2 | [PCSX2](https://pcsx2.net/docs/setup/running/) | A PS2 shelf, per-game renderer/settings profiles, memory-card management, compatibility links | **First — slice in tree 2026-10-20** (ISO import, **official AppImage unpacked into Marquee’s data dir**, optional Flatpak, argv, sessions, serial box art, console Home/Library). Per-game PCSX2 settings, memory cards, CUE/CHD play and compatibility links are **not** in that slice. [PCSX2 requires a BIOS](https://pcsx2.net/docs/setup/bios/); Marquee should acquire it via jobs when configured (folder import today). Empty BIOS dir is unverified, not missing. Live Play pending: [PS2.md](PS2.md). |
 | PSP | [PPSSPP](https://www.ppsspp.org/) | A portable-games shelf, upscale presets, controller mappings | First. Unpack into Marquee like PCSX2. Keep PSP separate from PS1 games distributed for PSP. |
 | PS3 | [RPCS3](https://github.com/RPCS3/rpcs3) | Import installed game folders and IDs; show firmware/setup state, version-specific notes and a first-launch shader-compilation explanation | Next. Follow upstream setup and per-title compatibility; avoid universal performance promises. |
 | PS Vita | [Vita3K](https://vita3k.org/) | Import installed titles; expose emulator setup and per-game compatibility | Experimental. Offer only after testing the chosen release and title. |
@@ -114,7 +114,7 @@ Treat “ROM” as a library source, not a file extension. The importer should u
 - **Duplicates:** identify identical content, but retain intentional differences in region, language, revision, mods and save locations. Let users group editions without deleting files.
 - **Large libraries:** background indexing, incremental rescans, visible progress, cancel/resume, on-demand hashing and a virtualized grid. Do not hash a whole NAS before showing its first games.
 - **Removable disks / NAS:** retain entries when a volume is offline; show “Connect library drive” rather than “Uninstalled.”
-- **Secrets and firmware:** represent what is missing, open upstream setup instructions, and let the user supply the required files. Marquee's own catalogue should distribute only content it has permission to distribute.
+- **Secrets and firmware:** represent what is missing, queue acquisition jobs from authorized sources, and show upstream setup only when automation cannot proceed. Marquee's catalogue distributes only content it has permission to distribute.
 
 A useful import flow is: choose folder → detect systems → review matches and unresolved files → select existing runners → resolve required setup → add to library. A folder name alone should not determine the game or its readiness.
 
@@ -126,7 +126,7 @@ These are proposed Marquee features. They can be implemented as saved queries pl
 | --- | --- |
 | PlayStation generations | PS1 → PS2 → PS3 → PS4 → PS5 shelves, PSP and Vita alongside; filter to entries with a runnable profile. |
 | Same game, new life | Group original emulation, decomp/recomp, PC release and remaster. Let the user compare visuals, input, saves and setup requirements before choosing a default. |
-| Native revival | Only installed native ports; optionally suggest a port when a compatible user-supplied game is detected. |
+| Native revival | Only installed native ports; optionally suggest a port when a compatible imported disc/ROM is detected. |
 | One ROM, several adventures | Original, supported randomizer seeds, translation and overhaul profiles beneath one base game. Preserve independent saves and exact input hashes. |
 | Couch night | Games with local multiplayer metadata, enough connected controllers and compatible input profiles. Show two-, three- and four-player choices. |
 | Arcade evening | A playlist of short arcade sessions, with a rotating “next game” recommendation after exit. No fake cross-emulator save suspension. |
@@ -160,7 +160,7 @@ Shared collections should export IDs, filters and annotations, not game files, f
 
 For a first-run demo shelf, evaluate [Freedoom](https://freedoom.github.io/), games on [ScummVM's own download page](https://www.scummvm.org/games/), and [MAME's permission-based ROM download list](https://www.mamedev.org/roms/). Track the license and redistribution conditions for each exact item. A title being free to download does not automatically permit bundling it in Marquee.
 
-Commercial ROMs, BIOS images and proprietary game assets should be user-supplied inputs. The existing roadmap already makes Marquee a frontend over tools and excludes game-data downloads; a curated collection should primarily install recipes, metadata and **Marquee-managed runners** (unpack official builds; never BIOS).
+Proprietary game assets are not bundled in the Marquee installer; they are acquired through authorized jobs (stores, connectors, detected installs). Manual folder import remains a fallback. A curated collection should install recipes, metadata, and **Marquee-managed runners** (unpack official builds).
 
 ## Data model and implementation plan
 
@@ -180,7 +180,7 @@ Expand the current narrow TypeScript `Platform` list when these real adapters ar
 
 Compatibility and installation are separate axes. Suggested readiness states are: missing runner, missing firmware, missing content, unsupported revision, offline volume, untested, ready, running and failed. Experimental is a property of a runner/profile, not a synonym for installed.
 
-When launching, pass an executable and argument array rather than constructing a shell command. **Marquee-managed unpack is the default for emulators** (PCSX2 proven: AppImage extract under `$XDG_DATA_HOME/marquee/runners/pcsx2/current`). Prefer that tree over a host Flatpak; keep host copies as optional extra runners. Pin a known working version per profile and retain a rollback path before updating. Preserve the original data and back up settings that an adapter changes. Never download BIOS or original commercial ROM/disc assets through these emulator/port recipes. Authenticated downloads of owned Steam/Epic/GOG games are handled by the separate direct-store adapters.
+When launching, pass an executable and argument array rather than constructing a shell command. **Marquee-managed unpack is the default for emulators** (PCSX2 proven: AppImage extract under `$XDG_DATA_HOME/marquee/runners/pcsx2/current`). Prefer that tree over a host Flatpak; keep host copies as optional extra runners. Pin a known working version per profile and retain a rollback path before updating. Preserve the original data and back up settings that an adapter changes. Emulator/port recipes do not embed copyrighted files; acquisition goes through the shared [media job layer](MEDIA_ACQUISITION.md) and direct-store adapters for owned titles.
 
 Console/port expansion sequence (a separate track after the [direct-store critical path](ROADMAP.md), unless the owner explicitly reprioritizes):
 

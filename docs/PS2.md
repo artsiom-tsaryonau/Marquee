@@ -1,10 +1,10 @@
 # PlayStation 2 (offline slice)
 
-Current correction notes: [PS1/PS2 correction pass](PS1_PS2_CORRECTIONS_2026-10-21.md). Platform mapping, CUE handling and launch access have changed since the historical checks below. Live gameplay acceptance remains separate.
+Current correction notes: [PS1/PS2 correction pass](CORRECTIONS.md). Platform mapping, CUE handling and launch access have changed since the historical checks below. Live gameplay acceptance remains separate.
 
 Slice notes from 2026-10-20; work-order clarification updated 2026-10-21.
 
-This document records the PS2 slice: **what exists**, **how to run it**, **what was verified**, and **what is next**. Long-term phases: [ROADMAP.md](ROADMAP.md). Other systems: [EXPANSION_CATALOGUE.md](EXPANSION_CATALOGUE.md). Next ticket (not started): [PS2_METADATA_FOLLOWUP.md](PS2_METADATA_FOLLOWUP.md).
+This document records the PS2 slice: **what exists**, **how to run it**, **what was verified**, and **what is next**. Long-term phases: [ROADMAP.md](ROADMAP.md). Other systems: [EXPANSION_CATALOGUE.md](EXPANSION_CATALOGUE.md). Next ticket (not started): [PS2_METADATA_FOLLOWUP.md](ENRICHMENT.md#ps2-metadata-matching-and-cached-artwork).
 
 Release boundary:
 
@@ -22,10 +22,10 @@ Marquee does not download BIOS files or commercial games.
 | --- | --- |
 | Web (`marquee run web`) | **Works.** Same dispatch layer as the desktop shell, token-authenticated, no sample data. |
 | CLI (`marquee`) | **Works** without GTK. Same core as desktop. Use `--data-dir` for isolation. |
-| Desktop (`./scripts/run.sh desktop` / `pnpm tauri dev`) | **Window opens** with the same chrome as the frontend (hero, cover rows, nav). Empty library uses procedural art and ghost shelves — never sample games. NVIDIA Wayland needs `WEBKIT_DISABLE_DMABUF_RENDERER=1`. Native folder-picker / Play clicks are **not live-tested**. |
+| Desktop (`./scripts/run.sh desktop`) | Optimized standalone window with embedded UI. NVIDIA/Wayland now defaults to accelerated shared-memory transport; see [live rendering correction](DESKTOP_RENDERING.md). Software mode is an explicit fallback. Native folder-picker / Play clicks are **not live-tested**. |
 | Persistent library | SQLite schema **v4** after the shared PS1 root-system work (artwork v2, session recovery v3) at `$XDG_DATA_HOME/marquee/library.db` (or `--data-dir` / `MARQUEE_DATA_DIR`). `artwork` table + migrate v1→2. Newer `user_version` is rejected. |
 | In-app PCSX2 install | **Built.** Recommended path unpacks the official AppImage into `$XDG_DATA_HOME/marquee/runners/pcsx2/current` (no wizard, no Flatpak). Host Flatpak is optional and does not skip unpack. Tests isolate host PCSX2 (`Core::open_isolated`). |
-| Serial covers | **Built.** xlenore/ps2-covers JPEG cache, `convertFileSrc` + asset protocol. ScreenScraper/SteamGridDB still [follow-up](PS2_METADATA_FOLLOWUP.md). |
+| Serial covers | **Built.** xlenore/ps2-covers JPEG cache, `convertFileSrc` + asset protocol. ScreenScraper/SteamGridDB still [follow-up](ENRICHMENT.md#ps2-metadata-matching-and-cached-artwork). |
 | Real PCSX2 Play → quit → duration | **Pending.** Fake runner `/bin/sleep` records duration in tests. That is not the gate. |
 | Controller in Tauri WebView | **Pending.** Browser Gamepad API + focus engine exist; `gilrs` not added. Browser gamepad is not evidence. |
 
@@ -37,7 +37,7 @@ ISO import, PCSX2 discovery/argv, one supervised session, real playtime, offline
 
 ### Out of scope (do not add here)
 
-ScreenScraper, SteamGridDB, Steam/Lutris, other emulators, BIN/CUE/CHD play, whole-ISO hashing/auto-relink, BIOS file management (Marquee never downloads BIOS), per-game PCSX2 config, memory cards, updater, packaging, full `catalog/tools/` wizard, `gilrs`.
+ScreenScraper, SteamGridDB, Steam/Lutris, other emulators, BIN/CUE/CHD play, whole-ISO hashing/auto-relink, automated BIOS acquisition jobs (folder import exists today), per-game PCSX2 config, memory cards, updater, packaging, full `catalog/tools/` wizard, `gilrs`.
 
 ---
 
@@ -144,7 +144,7 @@ PS2 vertical slice implemented before the direct-store milestones. Metadata matc
 - Schema v2 `artwork` table; reject a newer `user_version`; abandon stale `running` sessions on open (no playtime).
 - Tests isolate host PCSX2 (`open_isolated` / `discover_host: false`).
 - Window icon (`scripts/make-icon.py` + `pnpm tauri icon`).
-- `scripts/run.sh desktop` sets `WEBKIT_DISABLE_DMABUF_RENDERER=1`.
+- Current `scripts/run.sh desktop` launches production; the native startup policy selects accelerated shared-memory transport on NVIDIA/Wayland. `MARQUEE_RENDERER=software` retains the older `WEBKIT_DISABLE_DMABUF_RENDERER=1` fallback. Historical desktop observations below used that older software workaround.
 - `scripts/check.sh`: missing WebKit still prints `BLOCKED` and continues; a failed `cargo check -p marquee-desktop` **exits 1**.
 - Desktop UI matches the frontend chrome: same nav, ken-burns hero, cover rows; empty state uses procedural art + ghost shelves.
 
@@ -161,7 +161,7 @@ Host while building: Fedora Wayland, rustc 1.96.1, Node 24.18.0, pnpm 12.14.0. W
 | One PCSX2 variant launched end-to-end | **Pending.** Discovery + argv implemented (unpacked preferred). Host may already have Flatpak PCSX2; tests must not launch it. |
 | BIOS missing / unverified / launch-tested | **Done** in core. Open-setup not live-tested. |
 | Supervised duration persisted once | Fake runner **yes**. Real PCSX2 **no**. |
-| Reload / duplicate launch / interrupted sessions | **Done** in core: duplicate launch blocked; matching live processes are recovered; already-dead interrupted sessions retain checkpointed time. See [CORRECTION_PASS.md](CORRECTION_PASS.md). Desktop UI reload still live-pending. |
+| Reload / duplicate launch / interrupted sessions | **Done** in core: duplicate launch blocked; matching live processes are recovered; already-dead interrupted sessions retain checkpointed time. See [CORRECTION_PASS.md](CORRECTIONS.md). Desktop UI reload still live-pending. |
 | PS2 collection + keyboard; controller in Tauri | Library filter + keyboard in demo/desktop. **Controller (`gilrs`) pending.** |
 | Offline, no provider credentials | **Done.** Covers are optional; Play does not need them. |
 | CLI same core, session ownership | **Done.** |
@@ -226,7 +226,7 @@ Fake-runner tests do **not** close the real-emulator gate.
 4. **Play → quit emulator → duration once → selection restored.** Relaunch without stale busy. This is the release gate.
 5. Keep `scripts/check.sh` green.
 
-PS2 metadata follow-up: [PS2_METADATA_FOLLOWUP.md](PS2_METADATA_FOLLOWUP.md). In parallel, the next product increment is [direct installed Steam import](STORE_INTEGRATION.md#s1a-installed-steam-games--first-implementation-task); Epic and GOG follow in the roadmap. Do not insert a Lutris milestone.
+PS2 metadata follow-up: [PS2_METADATA_FOLLOWUP.md](ENRICHMENT.md#ps2-metadata-matching-and-cached-artwork). In parallel, the next product increment is [direct installed Steam import](STORE_INTEGRATION.md#s1a-installed-steam-games--first-implementation-task); Epic and GOG follow in the roadmap. Do not insert a Lutris milestone.
 
 ### On-demand PCSX2 install (built)
 

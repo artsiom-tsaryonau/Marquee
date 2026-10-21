@@ -42,8 +42,27 @@ The web surface uses the same backend commands as the desktop shell; there is no
 
 ## Scope and verification
 
-Opening a generic launcher shortcut does not import its games, discover accounts, install Windows compatibility environments, or track game processes started from its window. The separate [legacy Lutris bridge](AUTOMATIC_SOURCES.md) reads existing installed games and cached store listings; it is not the direct Steam/Epic/GOG strategy and is not a required onboarding step. Native game shortcuts also use the launcher lifecycle, without library/session tracking. Managed OpenGOAL extraction and the normalized game/edition/installation backend remain separate milestones.
+Opening a generic launcher shortcut does not import its games, discover accounts, install Windows compatibility environments, or track game processes started from its window. The [legacy Lutris bridge](#legacy-lutris-library-bridge) below reads existing installed games and cached store listings; it is not the direct Steam/Epic/GOG strategy and is not a required onboarding step. Native game shortcuts also use the launcher lifecycle, without library/session tracking. Managed OpenGOAL extraction and the normalized game/edition/installation backend remain separate milestones.
 
 Checks passed: 59 Rust tests, 28 frontend tests, Svelte check with zero errors/warnings, desktop Rust check, production frontend build, and whitespace validation. Regression tests cover literal arguments and working directory, persistence/reopen, validation, API events, stale refresh ordering, edition preference filtering, and disabled navigation.
 
 No browser or native-app surface is available to this tool session. Rendered layouts and actual Steam/Lutris/Heroic windows therefore remain unverified. Launcher execution was tested using a temporary local Python capture program, without opening the user's installed launchers.
+
+## Legacy Lutris library bridge
+
+**Priority superseded.** Marquee is meant to replace the separate library-manager role and does not need existing Lutris configurations imported. The direction is [direct Steam → Epic/Legendary → GOG/gogdl](ROADMAP.md) with [Marquee-managed compatibility](STORE_INTEGRATION.md). This bridge is optional legacy functionality from the earlier Lutris-first approach: do not expand it into a required source, installer, login flow or Wine-management dependency. Existing code still auto-discovers a local database; moving that behind an explicit opt-in is planned, not done.
+
+**Implemented**
+
+- On startup Marquee detects a native or Flatpak Lutris `pga.db`, selects the matching launcher preset and reads the library. An explicit saved disconnect wins over discovery; Advanced settings allow another path, backend command and installed-only mode. One database is handled at a time (native preferred; prefixes are never mixed).
+- Configured installations and cached GOG/Epic/Steam listings enter the unified library with their own store identity and Lutris launch provenance. Cached listings stay uninstalled with unknown platform unless verified. Matching uses **service plus product ID**, never title alone; database paths feed entry IDs so databases cannot collide. A cached entry becoming a configured installation changes its projection ID; durable provider-to-installation mapping is follow-up work.
+- Lutris playtime is converted from hours to minutes; the launcher handoff is not credited as gameplay.
+- Installed games hand off via `lutris:rungameid/<id>`; supported cached entries via Lutris's service-install URI (payload as one path segment). This opens Lutris's own flow; it does not guarantee an unattended install or bypass store authentication.
+- Read-only: selected `games` and `service_games` fields only; no tokens, cookies, Wine YAML or `details` payloads; the source database is never written.
+- Refreshes on focus and every minute while visible; this reads the local cache and starts no online sync. The library renders 48 cards at a time with Show more. Disconnect removes only the imported view.
+
+Sources checked 2026-10-21: [Lutris](https://github.com/lutris/lutris), [FAQ](https://lutris.net/faq), [database schema](https://github.com/lutris/lutris/blob/master/lutris/database/schema.py), [GOG service](https://github.com/lutris/lutris/blob/master/lutris/services/gog.py), [Epic service](https://github.com/lutris/lutris/blob/master/lutris/services/egs.py), [CLI handling](https://github.com/lutris/lutris/blob/master/lutris/gui/application.py), [URI parsing](https://github.com/lutris/lutris/blob/master/lutris/api.py). Lutris's public catalogue is not a download entitlement, and store caches can be stale.
+
+**Remaining legacy-only work:** move discovery behind an explicit legacy-source choice outside onboarding (preserving all user files, prefixes and settings); keep regression coverage; defer account sync, new installer handoffs and migration features.
+
+**Verification.** Five adapter regression tests pass (native/Flatpak defaults, store-aware matching, installed-only/disconnect, nonmutating reads, encoded handoff URIs, schema/missing-file). On this machine the probe found 4 installed entries and 1,164 cached listings (651 Epic, 215 GOG, 298 Steam), 1,167 entries after matching, and the source database checksum was unchanged. No real game, installer or login was run.

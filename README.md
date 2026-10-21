@@ -8,9 +8,9 @@ One console-style launcher for Fedora/Linux for your Steam, Epic, GOG, emulated,
 
 **Current working tree:** Rust core/CLI, Tauri/Svelte desktop and shared browser surface; PS2/PCSX2, PS1/DuckStation slice, serial covers, session/correction work, five managed native-port recipes, unified-library UI, external launcher shortcuts, and a legacy read-only Lutris bridge. A narrow [Purple for Aion 2](docs/PURPLE.md) integration now automates its umu/GE-Proton setup and launcher opening; actual Purple/Aion 2 Linux compatibility remains unverified. Direct Steam/Epic/GOG integrations and general Windows-app installation are not implemented end to end. Other “Add a Windows app” recipes remain demo-only. Real emulator launch/exit acceptance is tracked in [PS2](docs/PS2.md) and [PS1](docs/PS1.md); demo/fake-runner tests do not close those gates. Existing Lutris cache projection does not count as a direct store connection.
 
-**Tools additions:** managed emulator installation/opening/update/removal for DuckStation, PPSSPP, RPCS3, Flycast, Azahar, Cemu and xemu; BIOS import/list/removal for PS1/PS2. DuckStation connects to PS1 library launch; the other six currently open independently. PCSX2 uses its existing dedicated installer. Catalogue availability does not establish tested game compatibility. See [emulator management](docs/EMULATORS.md) and the [PS1/PS2 correction pass](docs/PS1_PS2_CORRECTIONS_2026-10-21.md).
+**Tools additions:** managed emulator installation/opening/update/removal for DuckStation, PPSSPP, RPCS3, Flycast, Azahar, Cemu and xemu; BIOS import/list/removal for PS1/PS2. DuckStation connects to PS1 library launch; the other six currently open independently. PCSX2 uses its existing dedicated installer. Catalogue availability does not establish tested game compatibility. See [emulator management](docs/EMULATORS.md) and the [PS1/PS2 correction pass](docs/CORRECTIONS.md).
 
-Documentation navigation: [docs index](docs/README.md). Broader platform/port ideas remain in the [expansion catalogue](docs/EXPANSION_CATALOGUE.md); [Jak/OpenGOAL and edition/run choices](docs/UNIFIED_LIBRARY.md) remain a separate track. Metadata matching and [ScreenScraper/SteamGridDB](docs/PS2_METADATA_FOLLOWUP.md) must never gate Play. Original ROM/BIOS/firmware/port extraction assets can be extracted from any place or locations; authenticated downloads of owned store games are in scope.
+Documentation navigation: [docs index](docs/README.md). Broader platform/port ideas remain in the [expansion catalogue](docs/EXPANSION_CATALOGUE.md); [Jak/OpenGOAL and edition/run choices](docs/UNIFIED_LIBRARY.md) remain a separate track. Metadata matching and [ScreenScraper/SteamGridDB](docs/ENRICHMENT.md#ps2-metadata-matching-and-cached-artwork) must never gate Play. **Media goal:** same automation as stores — Marquee should download or copy firmware, discs, and port inputs from authorized sources via jobs; folder import stays a fallback. Today: managed emulators/ports, disc folder scan, BIOS import panel, store adapters and unified download jobs still landing. See [media acquisition](docs/MEDIA_ACQUISITION.md).
 
 ## Run
 
@@ -19,9 +19,11 @@ Needs Node 22+, pnpm (`corepack enable pnpm`), and Rust for the desktop/CLI. On 
 ```bash
 ./scripts/setup.sh                # Fedora devel packages, then checks rustc / node / pnpm
 (cd apps/desktop && pnpm install)
-./scripts/run.sh desktop          # or: web | dev | both  (also pnpm run:desktop …)
-(cd apps/desktop && pnpm dev)     # browser demo with sample data · http://localhost:1420
+./scripts/run.sh desktop          # optimized app, built when needed; no Vite/web server
+./scripts/run.sh dev              # explicit browser development with hot reload
 ```
+
+Desktop rendering automatically uses an accelerated shared-memory transport on NVIDIA/Wayland. `MARQUEE_RENDERER=software ./scripts/run.sh desktop` retains the compatibility fallback. See [rendering modes, production launch and live benchmark results](docs/DESKTOP_RENDERING.md).
 
 CLI (same core; use `--data-dir` for an isolated database):
 
@@ -38,7 +40,7 @@ cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev ports install zelda64rec
 
 **Demo (`pnpm dev`, no token, or `?demo=1`)** still uses invented titles and simulated playtime. Controller input in the browser is not evidence for the Tauri window.
 
-**Desktop** uses the real library and the same Home/Library/Tools/Ports/Downloads/Settings chrome as the demo. With no imported media or enabled source it is empty; existing code can also auto-discover a legacy Lutris library, pending the opt-in change described below. Install PCSX2 from Home, Library, or Settings: Marquee downloads the official AppImage and unpacks it into its own data dir (no Flatpak wizard, no BIOS or games). Add a PS2 `.iso` folder; covers are looked up by disc serial and cached. **Ports** installs five native ports from their official GitHub releases (Ship of Harkinian, Zelda64Recomp, sm64coopdx, Fallout 2 CE, UZDoom): Install, Update, Play, and Open folder for your own ROM or game files. **Tools → Purple for Aion 2** provides managed setup and opening with progress, stop/retry and private diagnostics; Purple performs account sign-in, game downloads and patching. This is an unverified Linux compatibility recipe. Downloads on desktop is still empty chrome; Purple progress is on its Tools card. Other Windows-app recipes remain demo-only.
+**Desktop** uses the real library and the same Home/Library/Tools/Ports/Downloads/Settings chrome as the demo. With no imported media or enabled source it is empty; existing code can also auto-discover a legacy Lutris library, pending the opt-in change described below. Install PCSX2 from Home, Library, or Settings: Marquee downloads the official AppImage and unpacks it into its own data dir (no Flatpak wizard). Point library roots at your disc folders (automated acquisition jobs are the target); covers are looked up by disc serial and cached. **Ports** install engine binaries from GitHub; retail data should eventually flow from store/detection jobs, with **Open folder** as fallback today. **Tools → Purple for Aion 2** provides managed setup and opening with progress, stop/retry and private diagnostics; Purple performs account sign-in, game downloads and patching. This is an unverified Linux compatibility recipe. Downloads on desktop is still empty chrome; Purple progress is on its Tools card. Other Windows-app recipes remain demo-only.
 
 Dev URL params: `?route=library`, `?mode=big`, `?theme=light`, `?game=<id suffix>`, `?add=1`, `?splash=0`, `?motion=0`, `?empty=1` (demo with no sample games, for the empty desktop look).
 
@@ -65,16 +67,16 @@ Keys (SteamGridDB, Steam Web API, SteamID, IGDB/Twitch, RAWG) are managed in **S
 
 ## Unified library and correction pass
 
-See [the unified-library model, Jak/OpenGOAL example, and next implementation milestone](docs/UNIFIED_LIBRARY.md) and [the correction report](docs/CORRECTION_PASS.md). The browser demo now includes a Jak edition/run selector; the real library includes installed native ports alongside discs.
+See [the unified-library model, Jak/OpenGOAL example, and next implementation milestone](docs/UNIFIED_LIBRARY.md) and [the correction report](docs/CORRECTIONS.md). The browser demo now includes a Jak edition/run selector; the real library includes installed native ports alongside discs.
 
 ## Tools and launchers
 
-The desktop defaults to **Balanced** visual effects to avoid large blur and grain passes. Settings → Look and feel offers Full effects and Reduce motion. See the [performance findings, fixes and remaining native profiling checks](docs/DESKTOP_PERFORMANCE.md).
+The desktop defaults to **Balanced** visual effects to avoid large blur and grain passes. Settings → Look and feel offers Full effects and Reduce motion. See the [performance findings, fixes and remaining native profiling checks](docs/DESKTOP_RENDERING.md).
 
-**Tools → Emulators → mGBA** now offers a pinned source-build pilot with progress, logs, cancellation/retry and previous-version rollback. Compiler and runtime dependencies stay in rootless Podman; GB/GBC/GBA library import remains follow-up work. See [source builds and verification](docs/SOURCE_BUILDS.md) and [game-only/headless modes](docs/EMULATOR_PRESENTATION.md).
+**Tools → Emulators → mGBA** now offers a pinned source-build pilot with progress, logs, cancellation/retry and previous-version rollback. Compiler and runtime dependencies stay in rootless Podman; GB/GBC/GBA library import remains follow-up work. See [source builds and verification](docs/EMULATORS.md#source-builds-mgba-pilot) and [game-only/headless modes](docs/EMULATORS.md#game-only-windows-and-headless-emulation).
 
 The target normal flow detects and manages store helpers automatically. The current custom shortcut editor is an advanced feature, not the planned account-connection workflow. Use **Tools → Add launcher** to configure existing apps, AppImages, or native runtimes. Saved launchers support individual arguments, a working directory, readiness checks, and pinning. Steam/Lutris/Heroic command detection is included. See [launcher setup, supported behavior, and verification](docs/LAUNCHERS.md).
 
 ## Legacy Lutris bridge
 
-Existing code automatically reads a detected Lutris library and its cached store listings. This is legacy behavior from the earlier approach; the plan is to make it explicitly optional and remove it from default onboarding. This documentation update does not disable or delete that code or any user data. No further Lutris setup/import work is required for the direct-store milestones. See [bridge behavior and its superseded priority](docs/AUTOMATIC_SOURCES.md).
+Existing code automatically reads a detected Lutris library and its cached store listings. This is legacy behavior from the earlier approach; the plan is to make it explicitly optional and remove it from default onboarding. This documentation update does not disable or delete that code or any user data. No further Lutris setup/import work is required for the direct-store milestones. See [bridge behavior and its superseded priority](docs/LAUNCHERS.md#legacy-lutris-library-bridge).

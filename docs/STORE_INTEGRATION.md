@@ -109,7 +109,7 @@ Before adding the Steam flow, move the existing Lutris bridge out of default onb
 
 ## Scope exclusions for this critical path
 
-No Lutris onboarding milestone, optional launcher import expansion, torrent/tracker integration, universal Windows compatibility claim, automatic destructive prefix reset, or full metadata catalogue is required to ship these stores. Original ROM/BIOS/firmware and native-port extraction inputs remain user-supplied. Authenticated downloads of the user's owned store games are in scope.
+No Lutris onboarding milestone, optional launcher import expansion, torrent/tracker integration, universal Windows compatibility claim, automatic destructive prefix reset, or full metadata catalogue is required to ship these stores. Store adapters download owned Steam/Epic/GOG builds. Firmware, discs, and port inputs should use the same job infrastructure and authorized connectors ([media acquisition](MEDIA_ACQUISITION.md)), not a separate manual-only path.
 
 The current task updates documentation and priorities only. It does not remove the legacy bridge, install helpers, collect credentials, migrate the library, or implement the direct stores.
 

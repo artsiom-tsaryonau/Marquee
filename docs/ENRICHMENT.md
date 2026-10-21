@@ -14,7 +14,7 @@ Planning notes aligned 2026-10-21. These retain metadata, visual, and controller
 | Achievements | Verified Steam APIs and optional RetroAchievements integration; ownership/authentication and runtime achievement capabilities are separate |
 | Save locations and fixes | PCGamingWiki data and explicit tested recipes; a metadata suggestion is not proof a fix was applied |
 | Compatibility | Optional ProtonDB/community and anti-cheat information, versioned and credited; actual tested game/runtime evidence takes precedence |
-| Emulation metadata | ScreenScraper only after its provider requirements are met; [detailed follow-up](PS2_METADATA_FOLLOWUP.md) |
+| Emulation metadata | ScreenScraper only after its provider requirements are met; [detailed follow-up](#ps2-metadata-matching-and-cached-artwork) |
 | Additional providers | OpenCritic/MobyGames or similar only after current API access, attribution, and distribution requirements are verified |
 | Deep-dive sites | Link-outs to SteamDB, Metacritic, and HowLongToBeat; no general web-scraping dependency |
 | Optional Steam extras | News/patch notes, supported app-info/cache parsing, players-now, wishlist/prices, and small local histories; individually capability-gated and outside core store acceptance |
@@ -39,3 +39,42 @@ Cache provider results with fetch/source/version data, sensible TTLs, offline be
 Store-specific optional facts, collection rules, per-game notes, save backup/restore, Steam shortcut export, Gamescope launch, streaming/RomM adapters, and standalone Windows-app installer recipes remain possible after the core store flows. A standalone installer recipe may provision a prefix/runtime/dependencies and discover shortcuts, but the existing demo wizard is not an implemented installer.
 
 Torrent/tracker integration remains deferred. Keep optional enrichments and additional stores out of S1/E1/G1 acceptance criteria.
+
+## PS2 metadata matching and cached artwork
+
+Serial-based box art from xlenore/ps2-covers is already in the tree (schema v2 `artwork` table, cached JPEG, Tauri asset protocol; see [PS2.md](PS2.md)). This section covers the remaining ScreenScraper match + SteamGridDB pipeline. xlenore JPEGs are not ScreenScraper identity. **Do not start until the PS2 launch/exit/playtime gate is closed**, unless reordered. Import, Play and session accounting must keep working offline with no credentials; missing credentials, downtime and no-match are nonfatal.
+
+**Required**
+
+- Provider interface, schema and UI that never overwrite local media identity, playtime, or user title/favourite/artwork corrections.
+- ScreenScraper through documented APIs only (no HTML scraping); SteamGridDB artwork after a resolved title or supported external platform ID.
+- Credentials in the system keyring or dev-only environment config; never commit secrets, and don't treat a secret compiled into a public binary as protected.
+- Cached offline reuse of the last valid match/artwork; fixture-HTTP tests, not live quota-limited calls.
+- Extend the existing `artwork` table (attribution, local-override flag, provider id) rather than adding a second store. Add a provider-match entity (edition ID, provider/external ID, confidence/state, fetched time, user override) only when work starts.
+
+**Deferred:** IGDB, RAWG, RetroAchievements, libretro-database; hash-based auto-relink as a silent merge; CHD/CUE advertising (a media-format ticket).
+
+**ScreenScraper**
+
+1. Use `jeuInfos.php`, `jeuRecherche.php`, `ssuserInfos.php`; recheck [webapi2.php](https://www.screenscraper.fr/webapi2.php) first (v2 is marked unstable).
+2. It needs forum-issued developer credentials (`devid`, `devpassword`, `softname`); user `ssid`/`sspassword` affect quota. It is not a single-key API. Register the app first and confirm the MIT license satisfies "entirely free and distributed", or get written terms.
+3. Match by `SYSTEM.CNF` serial with `systemeid=58`, then hash/size if a hash exists, then title + platform + region. Never hash large ISOs as a prerequisite to showing or launching.
+4. Auto-accept only unambiguous high-confidence matches; otherwise a small candidate chooser plus "Keep local title". "Wrong game?" rematches without touching media identity or history.
+5. Bounded concurrency, timeouts, cancellation, backoff for 429; cache successes and misses for a bounded interval. Validate user credentials on `ssuserInfos.php`, since scraping endpoints can succeed with a wrong user password.
+
+*Gate:* success, ambiguous, unmatched, unauthorized, rate-limited and offline responses have tested behavior; user corrections survive; Play works with providers disabled.
+
+**SteamGridDB** ([API v2](https://www.steamgriddb.com/api/v2)): bearer key; lookup by SteamGridDB id, by external platform id (`/games/{platform}/{platformId}`: steam, origin, egs, bnet, uplay, flashpoint, eshop), autocomplete search, grid/hero/logo/icon lists by game id.
+
+1. For PS2, start from a resolved display title (user correction or ScreenScraper match). A PS2 serial like `SLUS_209.63` is **not** a SteamGridDB platform id.
+2. If a match yields a supported platform id (e.g. a Steam re-release), use it. Keep resolved game/artwork ids and author attribution.
+3. Covers first, then hero/logo; the app works with only a cover or procedural placeholders.
+4. Download in the backend with size/timeout limits, verify image content, enforce decode/dimension limits, write atomically into the cache, serve via a scoped Tauri asset path. Keep real artwork separate from procedural `Art` fields; local overrides survive refresh.
+
+*Gate:* images display in the WebView and survive restart/offline; provider failures keep placeholders and never block launching.
+
+**Hashing, if added:** optional and lazy, for integrity, verified relocation/dedup and hash-only lookups. Store algorithm, format, size/mtime and scope; never block first paint, serial extraction or Play.
+
+**CLI/errors/tests:** extend the CLI only for operations Tauri also uses (candidate list/accept, artwork refresh), keep `--data-dir` isolation, add `PROVIDER_UNCONFIGURED` and `RATE_LIMITED` here. Test ScreenScraper success, ambiguity, no match, 401/403, 429/backoff, timeout, malformed body, cancellation and cached offline response; artwork cache hit, atomic replace, truncated/oversized image, unsafe path, override preservation; UI candidate chooser and key status without echoing the secret.
+
+**Done when:** offline import/launch/playtime work with providers off; ScreenScraper matching exists with credentials, caching, attribution and failures; SteamGridDB artwork exists without serial-as-platform-id; overrides survive refresh; license/registration status is recorded (no live-access claim while pending); README says enrichment is optional.

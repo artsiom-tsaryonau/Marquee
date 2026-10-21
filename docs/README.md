@@ -9,22 +9,23 @@ Updated 2026-10-21. **Marquee is the user's single game launcher.** Steam, Legen
 3. [Unified library and OpenGOAL](UNIFIED_LIBRARY.md) — game/edition/installation/profile identity and the separate native Jak track. Shared identity work is incremental; OpenGOAL does not jump ahead of the store order.
 4. [Expansion catalogue](EXPANSION_CATALOGUE.md) — platform/port candidates and collection ideas; a separate expansion track.
 5. [Enrichment and UI](ENRICHMENT.md) — background metadata/artwork and later visual/controller polish; never prerequisites for store Play.
+6. [Media acquisition](MEDIA_ACQUISITION.md) — automated firmware/disc/port data jobs; manual import as fallback.
 
-The 2026-10-21 direct-store decision supersedes earlier numbered phases, “Lutris first,” “no Wine management,” and blanket “no game downloads” instructions. Owned-game store downloads are in scope. Original ROM/BIOS/firmware and port-extraction input data remain user-supplied.
+The 2026-10-21 direct-store decision supersedes earlier numbered phases, “Lutris first,” “no Wine management,” and blanket “no game downloads” instructions. Owned-game store downloads are in scope. The same job model should cover firmware, disc images, and port inputs from **authorized sources** (stores, detected installs, configured connectors) — not manual-only workflows. See [media acquisition](MEDIA_ACQUISITION.md). Marquee does not bundle copyrighted BIOS/ROM files in the app.
 
 ## Feature and implementation notes
 
 | Document | Purpose and limits |
 | --- | --- |
-| [PS1/PS2 correction pass](PS1_PS2_CORRECTIONS_2026-10-21.md) | Mixed-platform UI, CUE validation/offsets, media access, defaults and session-accounting corrections |
 | [PS2](PS2.md) | PCSX2/offline-disc slice, setup, and its still-open live acceptance gate |
 | [PS1](PS1.md) | DuckStation slice and schema-v4 root systems; verify its own live gate independently |
-| [Managed emulators and BIOS](EMULATORS.md) | Seven managed emulator launchers and Tools UI, PS1/PS2 BIOS management, lifecycle/removal commands and per-platform integration limits |
+| [Media acquisition](MEDIA_ACQUISITION.md) | Target: automated firmware/disc/port jobs from authorized sources; manual import as fallback |
+| [Managed emulators and BIOS](EMULATORS.md) | Seven managed emulator launchers and Tools UI, BIOS management, game-only window research, and the mGBA source-build pilot |
 | [Purple for Aion 2](PURPLE.md) | Managed setup/open recipe, runtime pins, retry/cancellation, and the unverified live game gate |
-| [Tools and launchers](LAUNCHERS.md) | Implemented generic shortcuts and advanced configuration, not direct account/store integration |
-| [Legacy Lutris bridge](AUTOMATIC_SOURCES.md) | Existing local-cache projection; deprioritized. Current automatic discovery still exists until code changes make it opt-in |
-| [Correction report](CORRECTION_PASS.md) | Dated correction-pass evidence and known limits; historical test totals do not replace a fresh release check |
-| [PS2 metadata follow-up](PS2_METADATA_FOLLOWUP.md) | ScreenScraper/SteamGridDB requirements, matching, and provider-specific follow-up |
+| [Tools, launchers and legacy Lutris bridge](LAUNCHERS.md) | Generic shortcuts and advanced configuration; the deprioritized Lutris cache bridge (automatic discovery stays until made opt-in) |
+| [Desktop rendering](DESKTOP_RENDERING.md) | Production launch, renderer modes, Balanced/Full effects, and remaining acceptance |
+| [Enrichment, UI and PS2 metadata](ENRICHMENT.md) | Optional metadata/artwork providers and the ScreenScraper/SteamGridDB follow-up |
+| [Correction history](CORRECTIONS.md) | Condensed 2026-10-20/21 corrections, PS1/PS2 audit outcomes and open gates |
 
 Implementation notes can contain dated snapshots. They do not reorder the current roadmap, make unverified live gates complete, or imply planned store/runtime features already exist. For migrations, inspect the actual schema and use the next available version; do not reuse v4 for the proposed unified backend.
 
