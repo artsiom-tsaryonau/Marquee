@@ -324,12 +324,75 @@ pub fn select_for_pcsx2(xdg_config: &Path, game_region: Option<&str>) -> Result<
     };
     let updated = set_ini_value(&text, "Filenames", "BIOS", &chosen.file);
     let updated = set_ini_value(&updated, "UI", "SetupWizardIncomplete", "false");
+    let updated = ensure_pcsx2_controls(&updated);
     if updated != text {
         let mut tmp = tempfile::NamedTempFile::new_in(ini.parent().unwrap_or(xdg_config))?;
         std::io::Write::write_all(&mut tmp, updated.as_bytes())?;
         tmp.persist(&ini).map_err(|e| AppError::from(e.error))?;
     }
     Ok(Some(chosen.file.clone()))
+}
+
+/// PCSX2's own default keyboard layout for controller 1 (what its automapper
+/// writes on a normal first run). A half-seeded file lacks it, so no key would
+/// reach the game. Added only when there is no `[Pad1]` section, so a layout the
+/// user changed is never touched.
+const PCSX2_DEFAULT_CONTROLS: &str = "[InputSources]
+Keyboard = true
+Mouse = true
+SDL = true
+SDLControllerEnhancedMode = true
+
+[Pad]
+MultitapPort1 = false
+MultitapPort2 = false
+PointerXScale = 8
+PointerYScale = 8
+
+[Pad1]
+Type = DualShock2
+InvertL = 0
+InvertR = 0
+Deadzone = 0
+AxisScale = 1.33
+LargeMotorScale = 1
+SmallMotorScale = 1
+ButtonDeadzone = 0
+PressureModifier = 0.5
+Up = Keyboard/Up
+Right = Keyboard/Right
+Down = Keyboard/Down
+Left = Keyboard/Left
+Triangle = Keyboard/I
+Circle = Keyboard/L
+Cross = Keyboard/K
+Square = Keyboard/J
+Select = Keyboard/Backspace
+Start = Keyboard/Return
+L1 = Keyboard/Q
+L2 = Keyboard/1
+R1 = Keyboard/E
+R2 = Keyboard/3
+L3 = Keyboard/2
+R3 = Keyboard/4
+LUp = Keyboard/W
+LRight = Keyboard/D
+LDown = Keyboard/S
+LLeft = Keyboard/A
+RUp = Keyboard/T
+RRight = Keyboard/H
+RDown = Keyboard/G
+RLeft = Keyboard/F
+";
+
+fn ensure_pcsx2_controls(text: &str) -> String {
+    if text.lines().any(|l| l.trim() == "[Pad1]") {
+        return text.to_string();
+    }
+    let mut out = text.trim_end().to_string();
+    out.push_str("\n\n");
+    out.push_str(PCSX2_DEFAULT_CONTROLS);
+    out
 }
 
 /// Make DuckStation's first run silent: it fills every other setting with its
@@ -560,6 +623,10 @@ mod tests {
         assert!(seeded.contains("SettingsVersion = 1"));
         assert!(seeded.contains("SetupWizardIncomplete = false"));
         assert!(seeded.contains("BIOS = eu.bin"));
+        // Keyboard controls come with it, or no key would reach the game.
+        assert!(seeded.contains("[Pad1]") && seeded.contains("Cross = Keyboard/K"));
+        assert!(seeded.contains("Up = Keyboard/Up") && seeded.contains("Start = Keyboard/Return"));
+        assert_eq!(seeded.matches("[Pad1]").count(), 1);
         // No usable BIOS: nothing is created.
         let empty = t.path().join("empty");
         fs::create_dir_all(empty.join("PCSX2/bios")).unwrap();
@@ -578,6 +645,16 @@ mod tests {
         assert!(text.contains("BIOS = eu.bin") && text.contains("Other = 1"));
         assert!(text.contains("Theme = dark"));
         assert_eq!(select_for_pcsx2(&xdg, Some("JP")).unwrap(), None);
+        // A layout the user already has is never replaced.
+        fs::write(
+            &ini,
+            "[Pad1]\nCross = Keyboard/Space\n[Filenames]\nBIOS = us.bin\n",
+        )
+        .unwrap();
+        select_for_pcsx2(&xdg, Some("PAL")).unwrap();
+        let kept = fs::read_to_string(&ini).unwrap();
+        assert!(kept.contains("Cross = Keyboard/Space") && !kept.contains("Cross = Keyboard/K"));
+        assert_eq!(kept.matches("[Pad1]").count(), 1);
     }
 
     #[test]
