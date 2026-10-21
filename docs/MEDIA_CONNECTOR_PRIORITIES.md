@@ -11,7 +11,7 @@ This document does **not** change [roadmap](ROADMAP.md) store order (Steam → E
 | **User-initiated jobs** | One title (or one firmware file) per job; clear consent; cancel/retry like store downloads. |
 | **No silent bulk** | No background scraping of whole vaults, torrent swarms, or Telegram channels. |
 | **Verify when possible** | Match [No-Intro](https://no-intro.org/) / [Redump](http://redump.org/) DATs or catalogue SHA-1 before marking installed. |
-| **Headed browser when required** | Sites with bot checks, interstitial ads, or per-download gates use a **user-visible** browser (same pattern as `scripts/vimm/`). |
+| **Headed browser when required** | Sites with bot checks, interstitial ads, or per-download gates use a **user-visible** browser (local connector tooling; not shipped in this repo). |
 | **Metadata ≠ entitlement** | Catalogue import (Vimm JSON, hashes, covers) does not imply a licensed copy or launchable install. |
 | **Secrets stay in core** | Cookies, tokens, and paths live in the job backend; the UI sees progress and errors only. |
 
@@ -30,7 +30,7 @@ This document does **not** change [roadmap](ROADMAP.md) store order (Steam → E
 
 | Source | FMHY / community role | Marquee approach | Notes |
 | --- | --- | --- | --- |
-| **Vimm's Lair** | Starred general vault on FMHY | Graduate `scripts/vimm/` → **Downloads job**: catalog browse (metadata already via JSON import), **one download at a time**, CDP/headed browser, user completes ads/dialogs | POC exists; respect site rate limits and ToS; no parallel downloads |
+| **Vimm's Lair** | Starred general vault on FMHY | **Downloads job**: catalog browse (metadata via JSON import), **one download at a time**, CDP/headed browser, user completes ads/dialogs | Prototype may exist locally; respect site rate limits and ToS; no parallel downloads |
 | **Catalogue metadata only** | Same vault, saved HTML/JSON | Keep **import-only** path (`catalogue import`); link/match by hash | Implemented; stays separate from download jobs |
 
 **Tier 1 acceptance:** User picks a catalogue row or vault game → job runs → file lands under configured `roms/` layout → library rescan shows install; job fails closed if hash optional-check fails.
@@ -86,7 +86,7 @@ User can always **import a folder** or use **Open in browser** for sources Marqu
 ## Implementation sequence (connector track)
 
 1. **Shared download job manager** (progress, cancel, resume) — same as store milestones in [STORE_INTEGRATION.md](STORE_INTEGRATION.md).
-2. **Vimm download adapter** — wire POC into core; reuse catalogue IDs where possible.
+2. **Vimm download adapter** — implement in core (or a separate optional package); reuse catalogue IDs where possible.
 3. **Post-download verify** — optional SHA-1 / DAT match; surface mismatch in Library.
 4. **Configurable mirror base URL** — Tier 2 Myrient-style fetches with catalogue-relative paths only.
 5. **Firmware jobs** — authorized paths only (e.g. dump-from-own-console workflows); never scrape BIOS hosts.
@@ -98,4 +98,4 @@ User can always **import a folder** or use **Open in browser** for sources Marqu
 - [Expansion catalogue](EXPANSION_CATALOGUE.md) — per-platform launch adapters
 - [Launcher branding](LAUNCHER_BRANDING.md) — unrelated to ROM sources; Tools UI only
 
-Sources checked 2026-10-21: FMHY gaming page (ROM resources, ROM sites, Nintendo ROMs, PlayStation ROMs); Marquee `scripts/vimm/` POC and catalogue schema v5.
+Sources checked 2026-10-21: FMHY gaming page (ROM resources, ROM sites, Nintendo ROMs, PlayStation ROMs); Marquee catalogue schema v5 import format in `marquee-core`.

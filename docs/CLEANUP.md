@@ -11,8 +11,7 @@ What can be deleted from a Marquee checkout and its data folders, what it costs,
 | `target/release` | ~2 GB | Optimized builds used by `scripts/install-emulators.sh` | Rebuilt on next release run (minutes) |
 | `target` (everything) | ~12 GB | All of the above | `cargo clean` does the same; slow first rebuild |
 | `node_modules/`, `apps/desktop/dist/` | varies | Frontend dependencies and build | `npm install` / rebuild |
-| `scripts/vimm/.venv` | ~140 MB | Python virtualenv for the Vimm collector | Recreated by `uv sync` |
-| `scripts/vimm/.poc/`, `__pycache__/` | small | Collector scratch | Recreated on use |
+| `scripts/vimm/` (if present locally) | varies | Optional local vault connector; **gitignored** | Safe to delete; not part of the published repo |
 
 Commands (run from the repo root):
 

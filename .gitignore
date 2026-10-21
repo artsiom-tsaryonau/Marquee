@@ -23,6 +23,9 @@ bios/
 sample/
 data/
 
+# Local vault connector / scraper (not shipped in this repo)
+scripts/vimm/
+
 # Emulators are downloaded by Marquee into its own data folder, never committed.
 # catalog/emulators/*.json (the download recipes) stay tracked.
 runners/

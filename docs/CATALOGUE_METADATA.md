@@ -1,18 +1,22 @@
 # Catalogue metadata and regional revisions
 
-Marquee accepts a version-1 Vimm metadata JSON export generated from the three
-saved HTML samples. The same Rust API powers native Tauri and browser surfaces.
+Marquee accepts a **version-1 Vimm metadata JSON** export (`provider: "vimm"`,
+`schema_version: 1`). The on-disk schema and validation live in `marquee-core`
+(`metadata.rs`). The same Rust API powers native Tauri and browser surfaces.
+Vault HTML scraping tools are **not** part of this repository.
 Importing metadata does not install a game, add a launchable edition, merge
 canonical games, or alter an emulator profile.
 
 ## Use
 
+Import any conforming export file (from your own tooling or a saved snapshot):
+
 ```sh
-uv run --project scripts/vimm --locked scripts/vimm/sample_flow.py build
+cargo run -p marquee-cli -- catalogue import /path/to/catalog.json
 ```
 
-Open Library → **Catalogue metadata** → select
-`scripts/vimm/.poc/catalog.json`. Re-importing updates provider records by
+Or open Library → **Catalogue metadata** → pick the same JSON file in the UI.
+Re-importing updates provider records by
 `vimm:<game_id>` without duplicating them. Each request is limited to 900 KB;
 larger catalogues need multiple exports/batches. Imports accumulate records;
 absence from a later batch does not delete older entries.
@@ -48,9 +52,8 @@ developer/publisher/genre fields in this snapshot; none are invented.
 
 **Open source in browser** opens the stored canonical page using normal Chrome
 tab dispatch when available, otherwise the desktop's default browser opener.
-It does not automate a download or claim live availability. Explicit Chrome
-profile selection remains available through the standalone Python opener; the
-Marquee button currently uses the browser's default profile.
+It does not automate a download or claim live availability. The Marquee button
+uses the browser's default profile when opening the canonical vault URL.
 
 ## Metadata links and file matching
 
@@ -125,7 +128,7 @@ include `catalogue.records`, `catalogue.systems` and `catalogue.links`.
 CLI examples (close an app sharing the same data directory before using CLI):
 
 ```sh
-cargo run -p marquee-cli -- catalogue import scripts/vimm/.poc/catalog.json
+cargo run -p marquee-cli -- catalogue import /path/to/catalog.json
 cargo run -p marquee-cli -- catalogue list
 cargo run -p marquee-cli -- catalogue match EDITION_ID
 cargo run -p marquee-cli -- catalogue link EDITION_ID vimm:GAME_ID MEDIA_ID
@@ -139,24 +142,12 @@ checksum/URL/image validation, unique/ambiguous/missing hash matches, manual
 linking, stale files, schema-v4 migration, persistence, and preservation of
 personal titles, favorites and playtime. Frontend tests cover nonplayable
 discovery, per-install metadata projection, stale-link exclusion and correlated
-variant filters. Python tests check the actual three saved samples.
-
-The optional browser E2E uses an actual isolated Rust HTTP server, built Marquee
-UI and disposable Chromium profile. It imports the JSON, filters by region,
-language/revision/players, opens details, checks cover decoding and provenance,
-checks reload persistence and removes the import. Browser launch requests are
-stubbed, so the test cannot open a personal browser or download source media.
-
-```sh
-cargo build -p marquee-cli --locked
-pnpm --dir apps/desktop build
-uv run --project scripts/vimm --locked scripts/vimm/test_marquee_integration.py
-```
+variant filters. Rust fixtures embed representative export fragments; no vault
+scraper ships in-tree.
 
 Validated on 2026-10-21: repository checks passed (127 Rust tests, 47 frontend
 tests, four launcher tests, Clippy, native compilation, zero Svelte diagnostics
-and production build). Fifteen Python tests and both the standalone sample UI
-and actual Marquee/Rust-backend browser E2E flows passed. The production native
+and production build). The production native
 app opened with accelerated shared-memory rendering. Importing the actual 43
 sample records migrated the user library from v4 to v5 after a SQLite backup
 under its `backups/` directory; before/after fingerprints confirmed that the two

@@ -21,7 +21,7 @@ Marquee does **not** ship copyrighted BIOS or ROM files inside the application. 
 | PS1/PS2 BIOS | — | Tools **Import a folder**; CLI `bios import` |
 | Cover art | Serial lookup and optional API keys | Procedural placeholder |
 | Steam/Epic/GOG titles | Planned direct adapters | Lutris cache read-only projection |
-| Vault-style ROM research | `scripts/vimm/` POC (headed browser, one file at a time) | Not wired into the app yet |
+| Vault-style ROM research | Local headed-browser connector (not in repo); see [connector priorities](MEDIA_CONNECTOR_PRIORITIES.md) | Not wired into the app yet |
 
 ## Planned work (not gated on finishing PS1/PS2 live gates)
 
