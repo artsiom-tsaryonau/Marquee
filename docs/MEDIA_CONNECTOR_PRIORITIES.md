@@ -30,7 +30,7 @@ This document does **not** change [roadmap](ROADMAP.md) store order (Steam → E
 
 | Source | FMHY / community role | Marquee approach | Notes |
 | --- | --- | --- | --- |
-| **Vimm's Lair** | Starred general vault on FMHY | **Downloads job**: catalog browse (metadata via JSON import), **one download at a time**, CDP/headed browser, user completes ads/dialogs | Prototype may exist locally; respect site rate limits and ToS; no parallel downloads |
+| **Vimm's Lair** | Starred general vault on FMHY | **Downloads job**: catalog browse (metadata via JSON import), **one download at a time**, CDP/headed browser, user completes ads/dialogs | POC in [fmhy-marquee-scrapers](https://github.com/artsiom-tsaryonau/fmhy-marquee-scrapers) (`connectors/vimm/`); respect site rate limits and ToS |
 | **Catalogue metadata only** | Same vault, saved HTML/JSON | Keep **import-only** path (`catalogue import`); link/match by hash | Implemented; stays separate from download jobs |
 
 **Tier 1 acceptance:** User picks a catalogue row or vault game → job runs → file lands under configured `roms/` layout → library rescan shows install; job fails closed if hash optional-check fails.

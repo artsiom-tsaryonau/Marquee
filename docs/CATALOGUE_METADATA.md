@@ -3,7 +3,8 @@
 Marquee accepts a **version-1 Vimm metadata JSON** export (`provider: "vimm"`,
 `schema_version: 1`). The on-disk schema and validation live in `marquee-core`
 (`metadata.rs`). The same Rust API powers native Tauri and browser surfaces.
-Vault HTML scraping tools are **not** part of this repository.
+Vault HTML scraping tools live in the separate
+[fmhy-marquee-scrapers](https://github.com/artsiom-tsaryonau/fmhy-marquee-scrapers) repository (`connectors/vimm/`).
 Importing metadata does not install a game, add a launchable edition, merge
 canonical games, or alter an emulator profile.
 

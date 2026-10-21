@@ -11,7 +11,7 @@ What can be deleted from a Marquee checkout and its data folders, what it costs,
 | `target/release` | ~2 GB | Optimized builds used by `scripts/install-emulators.sh` | Rebuilt on next release run (minutes) |
 | `target` (everything) | ~12 GB | All of the above | `cargo clean` does the same; slow first rebuild |
 | `node_modules/`, `apps/desktop/dist/` | varies | Frontend dependencies and build | `npm install` / rebuild |
-| `scripts/vimm/` (if present locally) | varies | Optional local vault connector; **gitignored** | Safe to delete; not part of the published repo |
+| `scripts/vimm/` (legacy path) | — | Removed from Marquee; use [fmhy-marquee-scrapers](https://github.com/artsiom-tsaryonau/fmhy-marquee-scrapers) | Clone sibling repo; Marquee still gitignores `scripts/vimm/` if copied back |
 
 Commands (run from the repo root):
 

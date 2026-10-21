@@ -23,7 +23,7 @@ bios/
 sample/
 data/
 
-# Local vault connector / scraper (not shipped in this repo)
+# Vault connectors live in fmhy-marquee-scrapers (clone separately)
 scripts/vimm/
 
 # Emulators are downloaded by Marquee into its own data folder, never committed.
