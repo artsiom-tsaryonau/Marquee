@@ -9,7 +9,7 @@
   import EmulatorDialog from './EmulatorDialog.svelte';
   import Icon from './Icon.svelte';
 
-  let { query = '', onlyReady = false }: { query?: string; onlyReady?: boolean } = $props();
+  let { query = '', onlyReady = false, platform = '', show = 'all' }: { query?: string; onlyReady?: boolean; platform?: string; show?: 'all' | 'emulators' | 'bios' } = $props();
   /** `<emulator id>:purge` or `bios:<system>` while an irreversible action waits for a second click. */
   let confirm = $state<string | null>(null);
 
@@ -18,19 +18,15 @@
     void app.loadBios();
   });
 
-  let platform = $state('');
-  let status = $state<'' | 'installed' | 'update'>('');
-  const platforms = $derived([...new Set(app.emulators.flatMap((e) => e.systems))].sort((a, b) => systemLabel(a).localeCompare(systemLabel(b))));
   const shown = $derived(
     app.emulators.filter(
       (e) =>
         (!onlyReady || e.status !== 'not_installed') &&
         (!platform || e.systems.includes(platform)) &&
-        (!status || (status === 'update' ? e.status === 'update' : e.status !== 'not_installed')) &&
         `${e.name} ${e.systems.map(systemLabel).join(' ')}`.toLowerCase().includes(query.toLowerCase()),
     ),
   );
-  const systemsWithBios = $derived([...new Set(app.bios.map((b) => b.system))]);
+  const systemsWithBios = $derived([...new Set(app.bios.map((b) => b.system))].filter((s) => !platform || s === platform));
 
   function version(v: string | null) {
     if (!v) return '';
@@ -49,6 +45,7 @@
   }
 </script>
 
+{#if show !== 'bios'}
 <section aria-labelledby="managed-title" class="managed">
   <div class="section-heading">
     <div>
@@ -56,17 +53,6 @@
       <p>Installed into Marquee's own folder from the official releases, checksum-verified. Removing one never touches your saves unless you ask.</p>
     </div>
     <span class="pill">{shown.length}</span>
-  </div>
-  <div class="filters" data-nav-row aria-label="Supported platforms">
-    <button class="chip" class:on={!platform} data-nav aria-pressed={!platform} onclick={() => (platform = '')}>All platforms</button>
-    {#each platforms as p}
-      <button class="chip" class:on={platform === p} data-nav aria-pressed={platform === p} onclick={() => (platform = p)}>
-        {systemLabel(p)} <span>{app.emulators.filter((e) => e.systems.includes(p)).length}</span>
-      </button>
-    {/each}
-    <span class="spacer"></span>
-    <button class="chip" class:on={status === 'installed'} data-nav aria-pressed={status === 'installed'} onclick={() => (status = status === 'installed' ? '' : 'installed')}>Installed</button>
-    <button class="chip" class:on={status === 'update'} data-nav aria-pressed={status === 'update'} onclick={() => (status = status === 'update' ? '' : 'update')}>Updates</button>
   </div>
   <div class="grid">
     {#each shown as e (e.id)}
@@ -104,8 +90,10 @@
   </div>
 </section>
 
+{/if}
 <EmulatorDialog />
 
+{#if show !== 'emulators'}
 <section aria-labelledby="bios-title" class="managed">
   <div class="section-heading">
     <div>
@@ -144,6 +132,7 @@
     </div>
   {/if}
 </section>
+{/if}
 
 <style>
   .managed { display: grid; gap: 0; }
@@ -151,9 +140,6 @@
   .section-heading h2 { margin: 0; font-size: 21px; letter-spacing: -.4px; }
   .section-heading p, p { color: var(--text-soft); margin: 5px 0; line-height: 1.6; font-size: 13px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
-  .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 18px; }
-  .filters .spacer { flex: 1; }
-  .filters .chip span { opacity: .6; margin-left: 4px; }
   .card { border-radius: 18px; display: flex; flex-direction: column; min-width: 0; overflow: hidden; transition: border-color .2s, transform .2s; }
   .card:hover { border-color: rgb(139 92 246 / .45); }
   .card:not(.ready) .tile { filter: saturate(.55); }
