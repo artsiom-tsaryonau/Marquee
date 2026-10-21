@@ -29,7 +29,7 @@ A manual executable picker, Wine-prefix editor, Lutris database path, or separat
 | Native/emulator adapters | Run their supported installations | Original proprietary game/system data |
 | Lutris/Heroic | Optional legacy import or exception fallback | Direct store integration or required onboarding |
 
-The existing Lutris cache bridge remains in the tree. Its current automatic discovery is legacy behavior to move behind an explicit optional integration; do not grow it into the source architecture. A cached GOG/Epic entry obtained from Lutris is not a direct account connection. Do not remove installed games, prefixes, or credentials when de-emphasizing that bridge.
+The existing Lutris cache bridge remains in the tree. It is now an explicit optional integration, disconnected by default; do not grow it into the source architecture. A cached GOG/Epic entry obtained from Lutris is not a direct account connection. Do not remove installed games, prefixes, or credentials when de-emphasizing that bridge.
 
 ## Shared groundwork
 
@@ -47,7 +47,7 @@ Implement groundwork only to the level the next store needs; do not require a br
 
 ## S1A: installed Steam games — first implementation task
 
-Before adding the Steam flow, move the existing Lutris bridge out of default onboarding/automatic discovery into an explicit optional legacy setting. Preserve its saved configurations and all external files; do not uninstall Lutris or alter prefixes. Verify a fresh Marquee setup has no Lutris prerequisite or default Lutris connection step.
+**Prerequisite implemented:** the Lutris bridge is disconnected by default and hidden behind Tools → Legacy integrations unless an explicitly saved connection is enabled. Existing saved configurations, databases, prefixes and accounts are preserved. Available database paths can be suggested without opening them. Tests verify no source reads on a fresh setup, explicit connection/restart/disconnect, and byte-preserved external data. No direct Steam capability is implied.
 
 1. Detect native/Flatpak Steam and its authoritative library configuration. Distinguish two clients if both exist. Use a maintained reader or a tested parser; inspect its version/API before adding a dependency.
 2. Enumerate all registered Steam libraries and `appmanifest_<appid>.acf` files. Reconcile duplicate roots by canonical location while retaining genuinely different installations.
@@ -111,7 +111,7 @@ Before adding the Steam flow, move the existing Lutris bridge out of default onb
 
 No Lutris onboarding milestone, optional launcher import expansion, torrent/tracker integration, universal Windows compatibility claim, automatic destructive prefix reset, or full metadata catalogue is required to ship these stores. Store adapters download owned Steam/Epic/GOG builds. Firmware, discs, and port inputs should use the same job infrastructure and authorized connectors ([media acquisition](MEDIA_ACQUISITION.md)), not a separate manual-only path.
 
-The current task updates documentation and priorities only. It does not remove the legacy bridge, install helpers, collect credentials, migrate the library, or implement the direct stores.
+The original handoff was documentation-only. The opt-in legacy-bridge prerequisite is now implemented; direct Steam/Epic/GOG adapters and their live gates remain subsequent work.
 
 ## Sources and implementation-time verification
 

@@ -308,7 +308,7 @@ test('Lutris handoff does not use PS2 launcher or fabricate a running session', 
   try { app.play(lutrisToGame(lutrisFixture)); await Promise.resolve(); assert.equal(lutrisCalls, 1); assert.equal(discCalls, 0); assert.equal(app.running, null); assert.equal(app.launching, null); }
   finally { app.api = api; }
 });
-test('automatic source discovery adds store games and disconnect preserves other libraries', async () => {
+test('explicit legacy connection adds store games and disconnect preserves other libraries', async () => {
   const api = app.api;
   const config = { enabled: true, include_owned: true, database_path: null, launcher_id: 'detected.lutris' };
   const snapshot = { config, games: [lutrisFixture], detected_paths: ['/test/pga.db'], database_path: '/test/pga.db', cached_by_service: { egs: 1 }, configured_count: 0, installed_count: 0, warnings: [] };

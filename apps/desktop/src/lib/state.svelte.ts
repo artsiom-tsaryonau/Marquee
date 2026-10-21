@@ -41,6 +41,7 @@ class AppState {
   heroId = $state<string | null>(null);
 
   mode = $state<'desktop' | 'big'>(load('mode', 'desktop'));
+  showLegacyIntegrations = $state(load('showLegacyIntegrations', false));
   sidebarExpanded = $state(load('sidebarExpanded', false));
   theme = $state<'dark' | 'light'>(load('theme', 'dark'));
   reduceMotion = $state<boolean>(load('reduceMotion', false));
@@ -120,6 +121,7 @@ class AppState {
       $effect(() => save('mode', this.mode));
       $effect(() => save('theme', this.theme));
       $effect(() => save('sidebarExpanded', this.sidebarExpanded));
+      $effect(() => save('showLegacyIntegrations', this.showLegacyIntegrations));
       $effect(() => save('reduceMotion', this.reduceMotion));
       $effect(() => save('visualEffects', this.visualEffects));
       $effect(() => save('sounds', this.sounds));

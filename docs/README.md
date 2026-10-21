@@ -23,7 +23,7 @@ The 2026-10-21 direct-store decision supersedes earlier numbered phases, “Lutr
 | [Media connector priorities](MEDIA_CONNECTOR_PRIORITIES.md) | FMHY-informed tiers: Vimm/Myrient/DAT verification vs do-not-automate ROM hosts |
 | [Managed emulators and BIOS](EMULATORS.md) | Managed catalogue, DS/Genesis/Neo Geo adapters, pinned local builds, BIOS checks, audio/vsync fixes and dated live acceptance |
 | [Purple for Aion 2](PURPLE.md) | Managed setup/open recipe, runtime pins, retry/cancellation, and the unverified live game gate |
-| [Tools, launchers and legacy Lutris bridge](LAUNCHERS.md) | Generic shortcuts and advanced configuration; the deprioritized Lutris cache bridge (automatic discovery stays until made opt-in) |
+| [Tools, launchers and legacy Lutris bridge](LAUNCHERS.md) | Generic shortcuts and advanced configuration; the explicitly optional Lutris cache bridge (disconnected by default; saved connections preserved) |
 | [Launcher branding](LAUNCHER_BRANDING.md) | Official marks, Simple Icons slugs, and UI wiring notes for Steam/Epic/GOG/Lutris/Heroic/Purple/runtimes |
 | [Desktop rendering](DESKTOP_RENDERING.md) | Production launch, renderer modes, Balanced/Full effects, and remaining acceptance |
 | [Settings profiles](SETTINGS_PROFILES.md) | DuckStation host-aware settings, recipe evidence, ownership and verification limits |

@@ -78,7 +78,7 @@
       ...app.ports.map((p): Item => ({ t:'port', key:`port:${p.id}`, name:p.name, platforms:[p.platform], ready:p.status !== 'not-installed', p })),
       ...biosItems,
       { t: 'source', key: 'src:purple', name: 'Purple for Aion 2', platforms: ['pc'], ready: false, src: 'purple' },
-      { t: 'source', key: 'src:lutris', name: 'Lutris library', platforms: ['pc'], ready: lutrisOn, src: 'lutris' },
+      ...(app.showLegacyIntegrations || lutrisOn ? [{ t: 'source', key: 'src:lutris', name: 'Lutris library · legacy', platforms: ['pc'], ready: lutrisOn, src: 'lutris' } as Item] : []),
     ];
   });
   const matchesText = (i: Item) => {
@@ -182,6 +182,7 @@
     <button class="chip" class:on={onlyReady} data-nav aria-pressed={onlyReady} onclick={() => (onlyReady = !onlyReady)}>Available only</button>
     <button class="chip" class:on={attentionOnly} data-nav aria-pressed={attentionOnly} onclick={() => (attentionOnly = !attentionOnly)}>Needs attention</button>
     <select class="ui-select" data-nav aria-label="Tool type" bind:value={kind}><option value="">All types</option><option value="emulator">Emulators</option><option value="launcher">Launchers</option><option value="port">Native ports</option><option value="source">Library connections</option><option value="bios">Firmware</option><option value="runner">External emulators</option></select>
+    <button class="chip" data-nav aria-pressed={app.showLegacyIntegrations} onclick={() => (app.showLegacyIntegrations = !app.showLegacyIntegrations)}>Legacy integrations</button>
     <button class="chip" data-nav aria-pressed={compact} onclick={() => (compact = !compact)}>Compact view</button>
     <button class="btn glass small" data-nav disabled={app.biosBusy} onclick={() => app.importBios()}><Icon name="folder" size={16} />{app.biosBusy ? 'Importing…' : 'Import BIOS'}</button>
     <button class="btn glass small" data-nav disabled={app.launchersLoading} onclick={() => { void app.loadLaunchers(); void app.loadEmulators(); void app.loadBios(); void app.loadPorts(); }}><Icon name="refresh" size={16} /> Refresh</button>
@@ -291,7 +292,7 @@
         {@const mark = sourceBrandIcon(item.src)}
         <ToolCard seed={`source:${item.src}`} kind="Source" title={item.name}
           subtitle={purple ? 'Managed Windows launcher' : 'Optional legacy integration'}
-          detail={purple ? 'Sets up the compatibility runtime and a separate Purple install.' : 'Discovered automatically; your Lutris settings are kept.'}
+          detail={purple ? 'Sets up the compatibility runtime and a separate Purple install.' : 'Optional read-only import. Existing Lutris settings stay in Lutris.'}
           badge={{ text: purple ? 'Windows' : lutrisOn ? 'Connected' : 'Not connected', tone: !purple && lutrisOn ? 'ok' : '' }}
           icon={mark.src} iconTone={mark.tone} ready={item.ready || purple}>
           {#snippet actions()}

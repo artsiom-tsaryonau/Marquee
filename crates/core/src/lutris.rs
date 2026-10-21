@@ -65,16 +65,16 @@ pub fn discover() -> Vec<PathBuf> {
     .filter(|p| p.is_file())
     .collect()
 }
-/// Reuse existing store sync and runner configuration without a setup wizard.
-/// A persisted explicit disconnect always takes precedence over this default.
-pub fn automatic_config(paths: &[PathBuf]) -> Config {
+/// Suggest the matching legacy launcher without enabling or reading its library.
+/// A saved explicit connection/disconnection always takes precedence.
+pub fn opt_in_config(paths: &[PathBuf]) -> Config {
     let path = paths.first().cloned();
     let flatpak = path
         .as_ref()
         .is_some_and(|p| p.to_string_lossy().contains("/.var/app/net.lutris.Lutris/"));
     Config {
-        enabled: path.is_some(),
-        include_owned: true,
+        enabled: false,
+        include_owned: false,
         database_path: None,
         launcher_id: if flatpak {
             "detected.lutris.flatpak"
@@ -446,15 +446,16 @@ mod tests {
         assert!(disabled.games.is_empty());
     }
     #[test]
-    fn default_connection_detects_native_or_flatpak_without_manual_configuration() {
-        let native = automatic_config(&[PathBuf::from("/home/test/.local/share/lutris/pga.db")]);
-        assert!(native.enabled && native.include_owned);
+    fn default_suggestion_stays_disconnected_for_native_and_flatpak() {
+        let native = opt_in_config(&[PathBuf::from("/home/test/.local/share/lutris/pga.db")]);
+        assert!(!native.enabled && !native.include_owned);
         assert_eq!(native.launcher_id, "detected.lutris");
-        let flatpak = automatic_config(&[PathBuf::from(
+        let flatpak = opt_in_config(&[PathBuf::from(
             "/home/test/.var/app/net.lutris.Lutris/data/lutris/pga.db",
         )]);
         assert_eq!(flatpak.launcher_id, "detected.lutris.flatpak");
-        assert!(!automatic_config(&[]).enabled);
+        assert!(!flatpak.enabled && !flatpak.include_owned);
+        assert!(!opt_in_config(&[]).enabled);
     }
     #[test]
     fn handoff_uses_numeric_launch_id_or_one_encoded_service_segment() {
@@ -515,5 +516,46 @@ mod tests {
             .code,
             "LUTRIS_SCHEMA"
         );
+    }
+    #[test]
+    fn detected_but_unconnected_database_is_not_read_or_modified() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pga.db");
+        std::fs::write(&path, b"not a SQLite database").unwrap();
+        let suggested = opt_in_config(std::slice::from_ref(&path));
+        let result = snapshot(suggested, vec![path.clone()]).unwrap();
+        assert!(!result.config.enabled);
+        assert!(result.games.is_empty());
+        assert_eq!(std::fs::read(path).unwrap(), b"not a SQLite database");
+    }
+    #[test]
+    fn saved_explicit_connections_survive_restart_and_disconnect_does_not_touch_source() {
+        let (dir, path) = fixture();
+        let bytes = std::fs::read(&path).unwrap();
+        let data = dir.path().join("marquee-data");
+        {
+            let core = crate::Core::open_isolated(Some(data.clone()), true).unwrap();
+            assert!(!core.lutris_library().unwrap().config.enabled);
+            let config = Config {
+                enabled: true,
+                include_owned: true,
+                database_path: Some(path.clone()),
+                launcher_id: "detected.lutris".into(),
+            };
+            assert!(!core.configure_lutris(config).unwrap().games.is_empty());
+        }
+        {
+            let core = crate::Core::open_isolated(Some(data.clone()), true).unwrap();
+            let connected = core.lutris_library().unwrap();
+            assert!(connected.config.enabled);
+            assert!(connected.config.include_owned);
+            assert_eq!(connected.config.database_path.as_ref(), Some(&path));
+            let mut config = connected.config;
+            config.enabled = false;
+            assert!(core.configure_lutris(config).unwrap().games.is_empty());
+        }
+        let core = crate::Core::open_isolated(Some(data), true).unwrap();
+        assert!(!core.lutris_library().unwrap().config.enabled);
+        assert_eq!(std::fs::read(path).unwrap(), bytes);
     }
 }

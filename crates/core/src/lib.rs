@@ -448,7 +448,7 @@ impl Core {
             .with_db(|db| db.get_setting(lutris::CONFIG_KEY))?
             .map(|value| serde_json::from_str(&value))
             .transpose()?
-            .unwrap_or_else(|| lutris::automatic_config(&detected));
+            .unwrap_or_else(|| lutris::opt_in_config(&detected));
         lutris::snapshot(config, detected)
     }
     pub fn configure_lutris(&self, config: lutris::Config) -> Result<lutris::Snapshot> {

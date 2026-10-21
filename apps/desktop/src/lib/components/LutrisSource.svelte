@@ -23,14 +23,14 @@
 </script>
 
 <section class="connection glass-panel" aria-labelledby="lutris-heading">
-  <header><span class="mark"><Icon name="grid" size={24} /></span><div><span class="eyebrow">Automatically discovered source</span><h2 id="lutris-heading">Connected game libraries</h2></div><span class="badge" class:on={source?.config.enabled}>{source?.config.enabled ? 'Auto connected' : 'Not connected'}</span></header>
-  <p>Marquee discovers your existing installations and synced store libraries automatically. Your existing Lutris backend keeps its working compatibility settings.</p>
+  <header><span class="mark"><Icon name="grid" size={24} /></span><div><span class="eyebrow">Optional legacy integration</span><h2 id="lutris-heading">Lutris library</h2></div><span class="badge" class:on={source?.config.enabled}>{source?.config.enabled ? 'Connected' : 'Not connected'}</span></header>
+  <p>Connect an existing Lutris library if you want its configured games in Marquee. This optional read-only bridge is separate from direct Steam, Epic and GOG connections. Lutris keeps its settings, prefixes and accounts.</p>
   {#if source?.config.enabled}
     <div class="stats"><span><strong>{source.installed_count}</strong> marked installed</span>{#each Object.entries(source.cached_by_service) as [service, count]}<span><strong>{count}</strong> {({ gog: 'GOG', egs: 'Epic', steam: 'Steam' } as Record<string, string>)[service] ?? service} cached</span>{/each}</div>
     <p class="detail">{source.database_path} · {source.config.include_owned ? 'Installed games and cached store listings' : 'Installed games only'}</p>
     {#each source.warnings as warning}<p class="warning">{warning}</p>{/each}
   {:else}
-    <p class="detail">{source?.detected_paths.length ? 'An existing library was found. Reconnect to show its games.' : 'No existing Lutris library was found. Automatic installation and store sign-in are not connected yet.'} Existing cached libraries need no additional sign-in.</p>
+    <p class="detail">{source?.detected_paths.length ? 'An existing database is available. Connect it explicitly to show its games.' : 'No existing Lutris database was found. You can choose an existing database in Connection settings. This integration is optional.'} Cached listings may be stale; they do not establish a direct store connection.</p>
   {/if}
   {#if app.lutrisError}<p class="error" role="alert">{app.lutrisError}</p>{/if}
   {#if error}<p class="error" role="alert">{error}</p>{/if}
@@ -44,7 +44,7 @@
       <div class="actions"><button class="btn primary small" type="submit" data-nav disabled={saving}>{saving ? 'Connecting…' : 'Save connection'}</button><button class="btn glass small" type="button" data-nav disabled={saving} onclick={() => (editing = false)}>Cancel</button></div>
     </form>
   {:else}
-    <div class="actions">{#if !source?.config.enabled && source?.detected_paths.length}<button class="btn primary small" data-nav disabled={saving} onclick={async () => { saving = true; try { await app.configureLutris({ ...config, enabled: true }); } catch (err) { error = (err as { message?: string }).message ?? 'Could not reconnect'; } finally { saving = false; } }}>Reconnect existing library</button>{/if}<button class="btn glass small" data-nav disabled={saving} onclick={() => { if (source) config = { ...source.config, enabled: true }; editing = true; }}>Advanced settings</button>{#if source?.config.enabled}<button class="btn glass small" data-nav disabled={app.lutrisLoading || saving} onclick={() => app.loadLutris()}><Icon name="refresh" size={15} /> {app.lutrisLoading ? 'Refreshing…' : 'Refresh library'}</button><button class="text-button" data-nav disabled={saving} onclick={disconnect}>Disconnect</button>{/if}</div>
+    <div class="actions">{#if !source?.config.enabled && source?.detected_paths.length}<button class="btn primary small" data-nav disabled={saving} onclick={async () => { saving = true; try { await app.configureLutris({ ...config, enabled: true }); } catch (err) { error = (err as { message?: string }).message ?? 'Could not reconnect'; } finally { saving = false; } }}>Connect existing Lutris library</button>{/if}<button class="btn glass small" data-nav disabled={saving} onclick={() => { if (source) config = { ...source.config, enabled: true }; editing = true; }}>Connection settings</button>{#if source?.config.enabled}<button class="btn glass small" data-nav disabled={app.lutrisLoading || saving} onclick={() => app.loadLutris()}><Icon name="refresh" size={15} /> {app.lutrisLoading ? 'Refreshing…' : 'Refresh library'}</button><button class="text-button" data-nav disabled={saving} onclick={disconnect}>Disconnect</button>{/if}</div>
   {/if}
 </section>
 
