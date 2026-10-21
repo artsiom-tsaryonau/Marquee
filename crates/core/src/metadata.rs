@@ -43,6 +43,8 @@ pub struct Variant {
     pub crc32: String,
     pub md5: String,
     pub sha1: String,
+    #[serde(default)]
+    pub download_url: String,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FieldProvenance {
@@ -154,8 +156,18 @@ pub fn system_id(slug: &str) -> &str {
 fn bad(message: impl Into<String>) -> AppError {
     AppError::new("METADATA", message)
 }
-fn source_url(url: &str) -> bool {
+fn vimm_source_url(url: &str) -> bool {
     url.starts_with("https://vimm.net/vault/") || url == "https://vimm.net/vault"
+}
+fn axekin_source_url(url: &str) -> bool {
+    url.starts_with("https://www.axekin.com/") && bounded(url)
+}
+fn axekin_game_url(url: &str) -> bool {
+    let prefix = "https://www.axekin.com/games/";
+    url.starts_with(prefix) && url.len() > prefix.len() && bounded(url)
+}
+fn https_url(url: &str) -> bool {
+    url.starts_with("https://") && bounded(url)
 }
 fn numeric(id: &str) -> bool {
     !id.is_empty() && id.len() <= 20 && id.bytes().all(|c| c.is_ascii_digit())
@@ -165,19 +177,147 @@ fn bounded(value: &str) -> bool {
 }
 
 fn validate(import: &mut Import) -> Result<()> {
+    match import.provider.as_str() {
+        "vimm" => validate_vimm(import),
+        "axekin" => validate_axekin(import),
+        _ => Err(bad("Unknown catalogue provider")),
+    }
+}
+
+fn validate_shell(import: &mut Import, provider: &str) -> Result<(HashSet<String>, String)> {
     if import.schema_version != 1
-        || import.provider != "vimm"
+        || import.provider != provider
         || import.games.is_empty()
         || import.games.len() > 10_000
         || import.systems.len() > 100
         || !bounded(&import.captured_at)
     {
-        return Err(bad("Expected a version 1 Vimm snapshot with 1–10000 games"));
+        return Err(bad("Expected a version 1 catalogue snapshot with 1–10000 games"));
     }
-    let mut ids = HashSet::new();
-    let imported_at = now_rfc3339();
+    Ok((HashSet::new(), now_rfc3339()))
+}
+
+fn validate_record_shell(record: &Record, ids: &mut HashSet<String>) -> Result<()> {
+    if !numeric(&record.game_id)
+        || record.title.trim().is_empty()
+        || !ids.insert(record.game_id.clone())
+        || record.media.len() > 100
+    {
+        return Err(bad("Invalid or duplicate game identity"));
+    }
+    if [
+        &record.system,
+        &record.title,
+        &record.regions,
+        &record.languages,
+        &record.version,
+        &record.rating,
+    ]
+    .iter()
+    .any(|s| !bounded(s))
+        || record.verified_at.as_ref().is_some_and(|s| !bounded(s))
+    {
+        return Err(bad("Invalid game metadata"));
+    }
+    if record.players.is_some_and(|n| n == 0 || n > 1000)
+        || record.year.is_some_and(|n| !(1900..=2200).contains(&n))
+        || [
+            &record.ratings.graphics,
+            &record.ratings.sound,
+            &record.ratings.gameplay,
+            &record.ratings.overall,
+        ]
+        .iter()
+        .any(|s| s.is_some_and(|n| !n.is_finite() || !(0.0..=10.0).contains(&n)))
+    {
+        return Err(bad("Invalid player count, year or source rating"));
+    }
+    Ok(())
+}
+
+fn validate_media_variant(media: &Variant, axekin: bool) -> Result<()> {
+    if media.regions.len() > 50
+        || media.languages.len() > 100
+        || media
+            .regions
+            .iter()
+            .chain(media.languages.iter())
+            .any(|s| !bounded(s))
+        || media.verified_at.as_ref().is_some_and(|s| !bounded(s))
+    {
+        return Err(bad("Invalid variant region/language/date"));
+    }
+    if !numeric(&media.media_id)
+        || [&media.filename, &media.version, &media.size, &media.serial]
+            .iter()
+            .any(|s| !bounded(s))
+    {
+        return Err(bad("Invalid media variant"));
+    }
+    if axekin && !media.download_url.is_empty() && !https_url(&media.download_url) {
+        return Err(bad("Invalid mirror URL"));
+    }
+    for (hash, length) in [(&media.crc32, 8), (&media.md5, 32), (&media.sha1, 40)] {
+        if !hash.is_empty()
+            && (hash.len() != length || !hash.bytes().all(|c| c.is_ascii_hexdigit()))
+        {
+            return Err(bad("Invalid media checksum"));
+        }
+    }
+    Ok(())
+}
+
+fn validate_cover(record: &Record, axekin: bool) -> Result<()> {
+    if let Some(cover) = &record.cover {
+        let allowed_source = if axekin {
+            cover.source_url.starts_with("https://www.axekin.com/")
+        } else {
+            cover.source_url == "https://github.com/libretro-thumbnails/"
+        };
+        if cover.data_url.len() > 2_800_000 || !bounded(&cover.credit) || !allowed_source {
+            return Err(bad("Invalid cover provenance or size"));
+        }
+        let (prefix, data) = cover
+            .data_url
+            .split_once(',')
+            .ok_or_else(|| bad("Invalid cover data"))?;
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(data)
+            .map_err(|_| bad("Invalid cover encoding"))?;
+        let valid = match prefix {
+            "data:image/png;base64" => bytes.starts_with(b"\x89PNG\r\n\x1a\n"),
+            "data:image/jpeg;base64" => bytes.starts_with(b"\xff\xd8\xff"),
+            "data:image/avif;base64" => {
+                bytes.get(4..8) == Some(b"ftyp")
+                    && bytes
+                        .get(8..32.min(bytes.len()))
+                        .is_some_and(|b| b.windows(4).any(|w| w == b"avif" || w == b"avis"))
+            }
+            "data:image/webp;base64" => bytes.starts_with(b"RIFF") && bytes.get(8..12) == Some(b"WEBP"),
+            _ => false,
+        };
+        if !valid {
+            return Err(bad("Cover must be a PNG, JPEG, AVIF or WebP image"));
+        }
+    }
+    Ok(())
+}
+
+fn finalize_records(import: &mut Import, imported_at: &str) -> Result<()> {
+    for record in &mut import.games {
+        record.id = format!("{}:{}", import.provider, record.game_id);
+        record.system = system_id(&record.system).to_string();
+        record.exported_at = import.captured_at.clone();
+        record.imported_at = imported_at.to_string();
+        record.provenance = provenance(record)?;
+    }
+    Ok(())
+}
+
+fn validate_vimm(import: &mut Import) -> Result<()> {
+    let (mut ids, imported_at) = validate_shell(import, "vimm")?;
     for system in &import.systems {
-        if !source_url(&system.url)
+        if !vimm_source_url(&system.url)
             || [
                 &system.slug,
                 &system.name,
@@ -191,109 +331,53 @@ fn validate(import: &mut Import) -> Result<()> {
         }
     }
     for record in &mut import.games {
-        if !numeric(&record.game_id)
-            || record.title.trim().is_empty()
-            || !ids.insert(record.game_id.clone())
-            || record.media.len() > 100
-        {
-            return Err(bad("Invalid or duplicate game identity"));
-        }
-        if record.url != format!("https://vimm.net/vault/{}", record.game_id)
-            || [
-                &record.system,
-                &record.title,
-                &record.regions,
-                &record.languages,
-                &record.version,
-                &record.rating,
-            ]
-            .iter()
-            .any(|s| !bounded(s))
-            || record.verified_at.as_ref().is_some_and(|s| !bounded(s))
-        {
+        validate_record_shell(record, &mut ids)?;
+        if record.url != format!("https://vimm.net/vault/{}", record.game_id) {
             return Err(bad("Invalid game metadata or source URL"));
-        }
-        if record.players.is_some_and(|n| n == 0 || n > 1000)
-            || record.year.is_some_and(|n| !(1900..=2200).contains(&n))
-            || [
-                &record.ratings.graphics,
-                &record.ratings.sound,
-                &record.ratings.gameplay,
-                &record.ratings.overall,
-            ]
-            .iter()
-            .any(|s| s.is_some_and(|n| !n.is_finite() || !(0.0..=10.0).contains(&n)))
-        {
-            return Err(bad("Invalid player count, year or source rating"));
         }
         let mut variants = HashSet::new();
         for media in &record.media {
-            if media.regions.len() > 50
-                || media.languages.len() > 100
-                || media
-                    .regions
-                    .iter()
-                    .chain(media.languages.iter())
-                    .any(|s| !bounded(s))
-                || media.verified_at.as_ref().is_some_and(|s| !bounded(s))
-            {
-                return Err(bad("Invalid variant region/language/date"));
-            }
-            if !numeric(&media.media_id)
-                || !variants.insert(media.media_id.clone())
-                || [&media.filename, &media.version, &media.size, &media.serial]
-                    .iter()
-                    .any(|s| !bounded(s))
-            {
+            validate_media_variant(media, false)?;
+            if !variants.insert(media.media_id.clone()) {
                 return Err(bad("Invalid media variant"));
             }
-            for (hash, length) in [(&media.crc32, 8), (&media.md5, 32), (&media.sha1, 40)] {
-                if !hash.is_empty()
-                    && (hash.len() != length || !hash.bytes().all(|c| c.is_ascii_hexdigit()))
-                {
-                    return Err(bad("Invalid media checksum"));
-                }
-            }
         }
-        if let Some(cover) = &record.cover {
-            if cover.data_url.len() > 2_800_000
-                || !bounded(&cover.credit)
-                || cover.source_url != "https://github.com/libretro-thumbnails/"
-            {
-                return Err(bad("Invalid cover provenance or size"));
-            }
-            let (prefix, data) = cover
-                .data_url
-                .split_once(',')
-                .ok_or_else(|| bad("Invalid cover data"))?;
-            let bytes = base64::engine::general_purpose::STANDARD
-                .decode(data)
-                .map_err(|_| bad("Invalid cover encoding"))?;
-            let valid = match prefix {
-                "data:image/png;base64" => bytes.starts_with(b"\x89PNG\r\n\x1a\n"),
-                "data:image/jpeg;base64" => bytes.starts_with(b"\xff\xd8\xff"),
-                "data:image/avif;base64" => {
-                    bytes.get(4..8) == Some(b"ftyp")
-                        && bytes
-                            .get(8..32.min(bytes.len()))
-                            .is_some_and(|b| b.windows(4).any(|w| w == b"avif" || w == b"avis"))
-                }
-                _ => false,
-            };
-            if !valid {
-                return Err(bad("Cover must be a PNG, JPEG or AVIF image"));
-            }
-        }
-        record.id = format!("vimm:{}", record.game_id);
-        record.system = system_id(&record.system).to_string();
-        record.exported_at = import.captured_at.clone();
-        record.imported_at = imported_at.clone();
-        // Generate provenance here rather than trusting attribution supplied by
-        // an import. A v1 export identifies its source page and export time;
-        // it does not establish the original capture time.
-        record.provenance = provenance(record)?;
+        validate_cover(record, false)?;
     }
-    Ok(())
+    finalize_records(import, &imported_at)
+}
+
+fn validate_axekin(import: &mut Import) -> Result<()> {
+    let (mut ids, imported_at) = validate_shell(import, "axekin")?;
+    for system in &import.systems {
+        if !axekin_source_url(&system.url)
+            || [
+                &system.slug,
+                &system.name,
+                &system.category,
+                &system.launch_year,
+            ]
+            .iter()
+            .any(|s| !bounded(s))
+        {
+            return Err(bad("Invalid system metadata"));
+        }
+    }
+    for record in &mut import.games {
+        validate_record_shell(record, &mut ids)?;
+        if !axekin_game_url(&record.url) {
+            return Err(bad("Invalid game metadata or source URL"));
+        }
+        let mut variants = HashSet::new();
+        for media in &record.media {
+            validate_media_variant(media, true)?;
+            if !variants.insert(media.media_id.clone()) {
+                return Err(bad("Invalid media variant"));
+            }
+        }
+        validate_cover(record, true)?;
+    }
+    finalize_records(import, &imported_at)
 }
 
 pub fn import(db: &Db, mut data: Import) -> Result<CatalogueSnapshot> {
@@ -339,7 +423,8 @@ pub fn import(db: &Db, mut data: Import) -> Result<CatalogueSnapshot> {
         tx.execute("INSERT INTO catalogue_records(id,payload) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload", params![record.id, serde_json::to_string(&record)?])?;
     }
     for system in data.systems {
-        tx.execute("INSERT INTO catalogue_systems(id,payload) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload", params![format!("vimm:{}", system.slug), serde_json::to_string(&system)?])?;
+        let system_key = format!("{}:{}", data.provider, system.slug);
+        tx.execute("INSERT INTO catalogue_systems(id,payload) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload", params![system_key, serde_json::to_string(&system)?])?;
     }
     tx.commit()?;
     snapshot(db)
@@ -762,6 +847,25 @@ mod tests {
         .unwrap();
         core.link_catalogue(&id, "vimm:123", "456").unwrap();
         assert!(core.snapshot().unwrap().catalogue.links[0].valid);
+    }
+
+    fn axekin_fixture() -> Import {
+        serde_json::from_value(json!({
+            "schema_version":1,"provider":"axekin","captured_at":"2026-10-21T12:00:00Z",
+            "systems":[{"slug":"switch","name":"Nintendo Switch","category":"Consoles","launch_year":"","url":"https://www.axekin.com/games?platform=switch"}],
+            "games":[{"game_id":"401151","system":"switch","title":"Nightshade","regions":"JP","languages":"","version":"1.0.1","rating":"8.4","url":"https://www.axekin.com/games/010042300C4F6000","has_detail":true,
+                "players":null,"year":2018,"ratings":{"overall":8.4},"rating_votes":null,"verified_at":null,"cover":null,
+                "media":[{"media_id":"1","filename":"pixeldrain.com","version":"base","size":"3 GB","serial":"","crc32":"","md5":"","sha1":"","download_url":"https://pixeldrain.com/u/Y3M5U2GA"}]}]
+        })).unwrap()
+    }
+
+    #[test]
+    fn axekin_import_accepts_mirror_urls() {
+        let db = Db::open_in_memory().unwrap();
+        let snap = import(&db, axekin_fixture()).unwrap();
+        assert_eq!(snap.records[0].id, "axekin:401151");
+        assert_eq!(snap.records[0].media[0].download_url, "https://pixeldrain.com/u/Y3M5U2GA");
+        assert_eq!(snap.systems[0].slug, "switch");
     }
 
     #[test]

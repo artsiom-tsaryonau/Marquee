@@ -17,7 +17,7 @@
 
 {#if record}
   <section class="metadata glass-panel">
-    <h3>Source metadata · Vimm’s Lair</h3>
+    <h3>Source metadata · {record.id.startsWith('axekin:') ? 'Axekin' : "Vimm's Lair"}</h3>
     <p>Saved snapshot. Live availability unknown. {game.source !== 'catalogue' ? `Linked by ${game.metadataMatch === 'sha1' ? 'exact SHA-1' : 'manual confirmation'}.` : 'Catalogue entry only; no local installation is implied.'}</p>
     {#if record.cover}
       <figure class="source-cover-wrap">
@@ -39,6 +39,7 @@
         <dt>Region</dt><dd>{variant?.regions?.join(', ') || game.region || 'Unknown'}</dd><dt>Languages</dt><dd>{variant?.languages?.join(', ') || game.languages?.join(', ') || 'Unknown'}</dd>
         <dt>Revision</dt><dd>{variant?.version || 'Unknown'}</dd><dt>Media ID</dt><dd>{variant?.media_id}</dd>
         <dt>Filename</dt><dd>{variant?.filename || 'Unknown'}</dd><dt>Advertised size</dt><dd>{variant?.size || 'Unknown'}</dd>
+        {#if variant?.download_url}<dt>Mirror</dt><dd><a class="inline-link" href={variant.download_url} target="_blank" rel="noopener noreferrer">{variant.download_url}</a></dd>{/if}
         {#if variant?.serial}<dt>Source serial</dt><dd>{variant.serial}</dd>{/if}
         {#each [['CRC32', variant?.crc32], ['MD5', variant?.md5], ['SHA-1', variant?.sha1]] as [label, value]}{#if value}<dt>{label}</dt><dd>{value}</dd>{/if}{/each}
       </dl>

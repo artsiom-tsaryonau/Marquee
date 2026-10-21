@@ -360,6 +360,7 @@ export interface CatalogueVariant {
   regions?: string[]; languages?: string[]; verified_at?: string | null;
   media_id: string; filename: string; version: string; size: string; serial: string;
   crc32: string; md5: string; sha1: string;
+  download_url?: string;
 }
 export interface CatalogueRecord {
   provenance?: Record<string, { source_url: string; exported_at: string; imported_at: string; method: string }>;
