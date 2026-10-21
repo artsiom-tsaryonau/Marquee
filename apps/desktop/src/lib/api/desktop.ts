@@ -19,7 +19,7 @@ export const desktopApi: LibraryApi = {
   kind: 'desktop',
   ...commands(call),
   async pickArchives() {
-    const selected = await open({ directory:false, multiple:true, title:'Import ZIP or 7z game archives', filters:[{name:'Game archives',extensions:['zip','7z']}] });
+    const selected = await open({ directory:false, multiple:true, title:'Import ZIP, 7z or RAR game archives', filters:[{name:'Game archives',extensions:['zip','7z','rar']}] });
     return typeof selected === 'string' ? [selected] : selected ?? [];
   },
   onArchiveDrop: (handler) => getCurrentWebview().onDragDropEvent((event) => { if (event.payload.type === 'drop') handler(event.payload.paths); }),

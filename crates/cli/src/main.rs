@@ -32,7 +32,7 @@ enum Command {
         #[arg(long)]
         root: Option<String>,
     },
-    /// Unpack downloaded .zip/.7z game archives into the library, then rescan.
+    /// Unpack downloaded .zip/.7z/.rar game archives into the library, then rescan.
     /// Pass archive files or folders that contain them.
     Intake {
         paths: Vec<PathBuf>,
@@ -309,7 +309,7 @@ fn run() -> marquee_core::error::Result<()> {
                     for e in std::fs::read_dir(&p)?.flatten() {
                         let f = e.path();
                         let ext = f.extension().map(|x| x.to_string_lossy().to_lowercase());
-                        if f.is_file() && matches!(ext.as_deref(), Some("zip" | "7z")) {
+                        if f.is_file() && matches!(ext.as_deref(), Some("zip" | "7z" | "rar")) {
                             archives.push(f);
                         }
                     }

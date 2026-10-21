@@ -468,14 +468,14 @@ class AppState {
   async importArchives(paths = this.intakePaths, deleteSource = false) {
     if (this.intakeBusy) return;
     const selected = [...new Set(paths.map((p) => p.trim()).filter(Boolean))];
-    if (!selected.length || selected.length > 50) { this.notify('Choose between 1 and 50 ZIP/7z archives.'); return; }
+    if (!selected.length || selected.length > 50) { this.notify('Choose between 1 and 50 ZIP/7z/RAR archives.'); return; }
     this.intakeBusy = true; this.intakeResults = []; this.intakeScanError = null;
     let scan = false;
     try {
       for (const [index, path] of selected.entries()) {
         this.intakeProgress = `Importing archive ${index + 1} of ${selected.length}`;
-        if (!path.startsWith('/') || path.includes('\0') || path.length > 4096 || !/\.(zip|7z)$/i.test(path)) {
-          this.intakeResults.push({ path, report:null, error:'Choose an absolute ZIP/7z archive path on the Marquee computer. RAR is not supported.' });
+        if (!path.startsWith('/') || path.includes('\0') || path.length > 4096 || !/\.(zip|7z|rar)$/i.test(path)) {
+          this.intakeResults.push({ path, report:null, error:'Choose an absolute ZIP, 7z or RAR archive path on the Marquee computer.' });
           continue;
         }
         try {

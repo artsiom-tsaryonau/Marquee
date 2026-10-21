@@ -69,7 +69,7 @@ export const httpApi: LibraryApi = {
   kind: 'web',
   ...commands(call),
   async pickArchives() {
-    const path = window.prompt('Absolute ZIP/7z archive path on the computer running Marquee (not a browser upload)');
+    const path = window.prompt('Absolute ZIP/7z/RAR archive path on the computer running Marquee (not a browser upload)');
     return path?.trim() ? [path.trim()] : [];
   },
   onArchiveDrop: async () => () => {},

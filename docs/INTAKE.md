@@ -1,16 +1,16 @@
 # Archive intake
 
-Turns a downloaded `.zip` or `.7z` into library files. `marquee intake <archive-or-folder>...` inspects each archive, picks the system from its contents, unpacks into that system's library folder and rescans. Core API: `Core::intake_archive`; JSON command `intake_archive` (`path`, `delete_source`). Code: `crates/core/src/intake.rs`.
+Turns a downloaded `.zip`, `.7z` or `.rar` into library files. `marquee intake <archive-or-folder>...` inspects each archive, picks the system from its contents, unpacks into that system's library folder and rescans. Core API: `Core::intake_archive`; JSON command `intake_archive` (`path`, `delete_source`). Code: `crates/core/src/intake.rs`.
 
 ```sh
-marquee intake ~/Downloads                 # every .zip/.7z in the folder
+marquee intake ~/Downloads                 # every .zip/.7z/.rar in the folder
 marquee intake "Game (USA).7z" --delete    # remove the archive once verified
 marquee intake x.zip --no-scan             # skip the rescan
 ```
 
 ## Desktop and browser UI
 
-Library → Add games → Import ZIP/7z archives opens the importer. A separate
+Library → Add games → Import ZIP/7z/RAR archives opens the importer. A separate
 Library button reopens progress and results. Desktop can select multiple
 archives or drop them onto Library; dropping only queues them for review.
 Browser users enter absolute paths on the Marquee computer, with no browser
@@ -57,7 +57,7 @@ Documents and images in the archive (`.txt`, `.nfo`, `.jpg`, ...) are ignored. A
 
 ## Limits and not done
 
-- `.rar` is not supported (needs a native library); the format is detected by content, not file name.
+- `.rar` is read through the bundled UnRAR library (extraction only; encrypted headers/files and multi-volume sets are refused); the format is detected by content, not file name.
 - Desktop drop/file picking and browser host-path UI are implemented. Watched inbox folders and restart-persistent jobs remain open.
 - System detection is by extension and size; it does not read the disc image to tell PS1 from PS2, and does not verify ROM hashes.
 - Whether a Neo Geo set actually runs depends on its BIOS and parent sets (see `neogeo.rs`).

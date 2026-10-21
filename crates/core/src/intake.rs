@@ -1,4 +1,4 @@
-//! Archive intake: turn a downloaded `.zip` or `.7z` into library files.
+//! Archive intake: turn a downloaded `.zip`, `.7z` or `.rar` into library files.
 //!
 //! The archive is inspected first (nothing is written), the system is chosen
 //! from the contents, and files are unpacked into that system's library root
@@ -9,7 +9,8 @@
 //! Limits: entries must stay inside the destination, symlinks are refused,
 //! entry count and total size are capped, actual bytes written may not exceed
 //! the size an entry declares, and free disk space is checked up front.
-//! `.rar` is not supported.
+//! RAR is read through the bundled UnRAR library (extraction only); encrypted
+//! and multi-volume archives are refused.
 
 use crate::catalog;
 use crate::error::{AppError, Result};
@@ -63,6 +64,7 @@ pub struct IntakeReport {
 enum Kind {
     Zip,
     SevenZ,
+    Rar,
 }
 
 #[derive(Debug, Clone)]
@@ -82,10 +84,12 @@ fn kind_of(path: &Path) -> Result<Kind> {
         Ok(Kind::Zip)
     } else if n >= 6 && magic == [b'7', b'z', 0xBC, 0xAF, 0x27, 0x1C] {
         Ok(Kind::SevenZ)
+    } else if n >= 6 && &magic[..4] == b"Rar!" && magic[4] == 0x1A && magic[5] == 0x07 {
+        Ok(Kind::Rar)
     } else {
         Err(AppError::new(
             "INTAKE_FORMAT",
-            "Only .zip and .7z archives are supported (not .rar).",
+            "Only .zip, .7z and .rar archives are supported.",
         ))
     }
 }
@@ -148,6 +152,40 @@ fn list_entries(path: &Path, kind: Kind) -> Result<Vec<Entry>> {
                     size: f.size(),
                     index: i,
                 });
+            }
+        }
+        Kind::Rar => {
+            let rar_err = |e: unrar::error::UnrarError| {
+                AppError::new("INTAKE_FORMAT", format!("Invalid RAR: {e}"))
+            };
+            let mut cursor = unrar::Archive::new(path)
+                .open_for_listing()
+                .map_err(rar_err)?;
+            if cursor.has_encrypted_headers() {
+                return Err(AppError::new("INTAKE_FORMAT", "Encrypted RAR archives are not supported"));
+            }
+            let mut index = 0usize;
+            while let Some(h) = cursor.next() {
+                let h = h.map_err(rar_err)?;
+                if index >= MAX_ENTRIES {
+                    return Err(AppError::new("INTAKE_LIMIT", "Archive has too many entries"));
+                }
+                let name = h.filename.to_string_lossy().into_owned();
+                if h.is_encrypted() || h.is_split() {
+                    return Err(AppError::new(
+                        "INTAKE_FORMAT",
+                        "Encrypted or multi-volume RAR archives are not supported",
+                    ));
+                }
+                if !h.is_directory() {
+                    // Unix symlinks carry S_IFLNK in the high attribute bits.
+                    if h.file_attr >> 16 & 0o170000 == 0o120000 {
+                        return Err(unsafe_entry(&name));
+                    }
+                    let rel = safe_rel(&name).ok_or_else(|| unsafe_entry(&name))?;
+                    out.push(Entry { raw: name, rel, size: h.unpacked_size, index });
+                }
+                index += 1;
             }
         }
         Kind::SevenZ => {
@@ -279,6 +317,38 @@ fn extract(path: &Path, kind: Kind, wanted: &[(Entry, PathBuf)], staging: &Path)
                     .map_err(|e| AppError::new("INTAKE_FORMAT", format!("Bad ZIP entry: {e}")))?;
                 let mut out = File::create(target(rel_out)?)?;
                 copy_limited(&mut f, &mut out, entry.size)?;
+            }
+        }
+        Kind::Rar => {
+            let rar_err = |e: unrar::error::UnrarError| {
+                AppError::new("INTAKE_FORMAT", format!("RAR error: {e}"))
+            };
+            let mut cursor = unrar::Archive::new(path)
+                .open_for_processing()
+                .map_err(rar_err)?;
+            let mut index = 0usize;
+            let mut done = 0usize;
+            while let Some(header) = cursor.read_header().map_err(rar_err)? {
+                cursor = match wanted.iter().find(|(w, _)| w.index == index) {
+                    Some((entry, rel_out)) => {
+                        let dest = target(rel_out)?;
+                        let next = header.extract_to(&dest).map_err(rar_err)?;
+                        let written = fs::metadata(&dest)?.len();
+                        if written > entry.size {
+                            return Err(AppError::new(
+                                "INTAKE_LIMIT",
+                                "An entry unpacked to more than its declared size",
+                            ));
+                        }
+                        done += 1;
+                        next
+                    }
+                    None => header.skip().map_err(rar_err)?,
+                };
+                index += 1;
+            }
+            if done != wanted.len() {
+                return Err(AppError::new("INTAKE_FORMAT", "RAR archive ended before all entries were read"));
             }
         }
         Kind::SevenZ => {
@@ -702,7 +772,7 @@ mod tests {
     }
 
     #[test]
-    fn rar_is_refused_by_content_not_name() {
+    fn corrupt_rar_is_detected_by_content_and_refused() {
         let tmp = tempfile::tempdir().unwrap();
         let c = core(&tmp.path().join("data"));
         let f = tmp.path().join("x.zip");
