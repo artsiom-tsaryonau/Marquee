@@ -35,7 +35,7 @@ These are implemented capabilities; live acceptance gates are recorded separatel
 | Managed emulators | Catalogue-managed binary lifecycle plus reviewed rootless Podman source recipes for mGBA, melonDS, FBNeo and BlastEm. PS1/PS2, DS, Genesis and Neo Geo have library adapters; other generic adapters and their live acceptance are listed in [EMULATORS](EMULATORS.md). PCSX2 now uses the shared catalogue installer. First-run setup and PS1/PS2 BIOS inbox import remain managed. Controller/save testing and complete Neo Geo set validation remain open. |
 | BIOS management | PS1/PS2 list/import/remove today (folder fallback); target is firmware acquisition jobs from authorized sources. Region identification support. Not evidence of live compatibility |
 | Legacy Lutris bridge | Read-only installed/cache projection and handoffs are explicit opt-in. Tools hides the legacy source by default unless connected or revealed. Saved configurations and all external data are preserved. |
-| Direct Steam/Epic/GOG | Not implemented as end-to-end native store integrations. Command shortcuts and Lutris cache entries do not count as direct integrations |
+| Direct Steam/Epic/GOG | Read-only installed Steam client/library/manifest inspection is implemented ([evidence](STEAM.md)); end-to-end native store integrations remain open. Command shortcuts and Lutris cache entries do not count as direct integrations |
 | Compatibility automation | A narrow [Purple/Aion 2 recipe](PURPLE.md) now provides managed umu/GE-Proton prefix/dependency setup and launcher opening. Live Purple/Aion 2 compatibility is unverified. General runtime lifecycle and arbitrary Windows apps remain planned; other wizard recipes are demos |
 | Metadata and packaging | Serial covers and saved-catalogue metadata import exist: regions/languages/revisions, source artwork/ratings, explicit installation links and raw-ISO SHA-1 matching ([details](CATALOGUE_METADATA.md)). Live provider sync, native gamepad integration, packaged updates and release verification remain separate work |
 
@@ -117,8 +117,8 @@ Extend the existing `api::dispatch` and event hub; browser, desktop, and CLI mus
 ## S1 — Steam
 
 - [x] Move the Lutris bridge behind an explicit optional legacy setting. Fresh setups stay disconnected; Tools reveals it through Legacy integrations. Saved connections and external databases/prefixes remain intact. Available path suggestions do not read game records.
-- [ ] Detect native and Flatpak Steam plus all library folders; no hardcoded single-root scan.
-- [ ] Read manifests with a proper parser, stable app IDs, install states, missing/offline paths, and duplicate-root handling.
+- [x] Implement read-only native/Flatpak Steam detection and registered library enumeration with alias/shared-root reconciliation. [S1A inventory evidence](STEAM.md); native host inspection passed, Flatpak live acceptance remains open.
+- [x] Read manifests with a bounded tested KeyValues parser, app-ID validation, install-state/file separation, explicit offline/incomplete scans, and duplicate/shared roots. This does not yet persist or launch Steam entries.
 - [ ] Persist Steam products/installations without overwriting existing disc/port entries or user edits.
 - [ ] Render real imported games in Library and game pages; artwork lookup cannot gate Play.
 - [ ] Launch through the selected Steam installation; Steam owns its compatibility/runtime settings.

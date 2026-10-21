@@ -29,6 +29,7 @@ pub mod runners;
 pub mod server;
 pub mod sessions;
 pub mod source_builds;
+pub mod steam;
 pub mod transfer;
 pub mod wanted;
 
@@ -436,6 +437,14 @@ impl Core {
     pub fn open_setup(&self, runner_id: &str) -> Result<()> {
         let home = self.paths.pcsx2_xdg_config();
         self.with_db(|db| runners::open_setup(db, runner_id, Some(&home)))
+    }
+
+    pub fn inspect_steam(&self) -> steam::Inventory {
+        if self.discover_host {
+            steam::discover()
+        } else {
+            steam::Inventory::default()
+        }
     }
 
     pub fn lutris_library(&self) -> Result<lutris::Snapshot> {

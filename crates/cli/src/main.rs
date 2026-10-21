@@ -70,6 +70,8 @@ enum Command {
     /// Run Marquee: `run web` serves the UI and API on 127.0.0.1 without a window
     #[command(subcommand)]
     Run(RunCmd),
+    /// Read-only native/Flatpak Steam clients, library folders and installed manifests
+    SteamInspect,
     Health,
 }
 
@@ -567,6 +569,9 @@ fn run() -> marquee_core::error::Result<()> {
             loop {
                 thread::sleep(Duration::from_secs(3600));
             }
+        }
+        Command::SteamInspect => {
+            println!("{}", serde_json::to_string_pretty(&core.inspect_steam())?)
         }
         Command::Health => {
             println!("{}", core.health()?);

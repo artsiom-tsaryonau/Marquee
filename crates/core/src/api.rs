@@ -152,6 +152,7 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
         "list_keys" => out(core.list_keys()?),
         "set_key" => out(core.set_key(&text(&args, "id")?, &text(&args, "value")?)?),
         "clear_key" => out(core.clear_key(&text(&args, "id")?)?),
+        "inspect_steam" => out(core.inspect_steam()),
         "lutris_library" => out(core.lutris_library()?),
         "configure_lutris" => {
             let config = serde_json::from_value(args.get("config").cloned().unwrap_or(Value::Null))

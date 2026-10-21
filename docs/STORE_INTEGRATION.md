@@ -45,7 +45,9 @@ The existing Lutris cache bridge remains in the tree. It is now an explicit opti
 
 Implement groundwork only to the level the next store needs; do not require a broad framework rewrite before the first installed Steam game can launch.
 
-## S1A: installed Steam games — first implementation task
+## S1A: installed Steam games
+
+The first read-only detection/parser increment is implemented; see [Steam inventory evidence and remaining gates](STEAM.md). Persistence, UI projection and client launch follow.
 
 **Prerequisite implemented:** the Lutris bridge is disconnected by default and hidden behind Tools → Legacy integrations unless an explicitly saved connection is enabled. Existing saved configurations, databases, prefixes and accounts are preserved. Available database paths can be suggested without opening them. Tests verify no source reads on a fresh setup, explicit connection/restart/disconnect, and byte-preserved external data. No direct Steam capability is implied.
 
