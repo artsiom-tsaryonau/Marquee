@@ -27,11 +27,13 @@ export const desktopApi: LibraryApi = {
   },
   webUrl: () => invoke<string | null>('web_url'),
   subscribe(handler) {
+    let stopped = false;
     let stop = () => {};
-    listenReady = listen<CoreEvent>('core-event', (event) => handler(event.payload)).then((unlisten) => {
-      stop = unlisten;
+    listenReady = listen<CoreEvent>('core-event', (event) => { if (!stopped) handler(event.payload); }).then((unlisten) => {
+      if (stopped) unlisten();
+      else stop = unlisten;
     });
-    return () => stop();
+    return () => { stopped = true; stop(); };
   },
   whenReady() {
     return listenReady;

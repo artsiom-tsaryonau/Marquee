@@ -205,6 +205,7 @@ fn launch_argv_keeps_metacharacters_inert() {
             "/opt/PCSX2-v2.AppImage",
             "-batch",
             "-fullscreen",
+            "-nogui",
             "--",
             "/games/weird/My Game's (USA) --iso.iso"
         ]

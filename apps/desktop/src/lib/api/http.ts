@@ -79,6 +79,7 @@ export const httpApi: LibraryApi = {
         try {
           const query: string = after === null ? '' : `?after=${after}`;
           const res: { seq: number; events: CoreEvent[] } = await request(`/api/events${query}`);
+          if (stopped) break;
           after = res.seq;
           for (const event of res.events) handler(event);
         } catch {

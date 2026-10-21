@@ -31,7 +31,7 @@
   let now = $state(new Date());
 
   const activeDownloads = $derived(app.downloads.filter((d) => d.state === 'downloading').length);
-  const dur = $derived(app.reduceMotion ? 0 : 260);
+  const dur = $derived(app.motionReduced ? 0 : 260);
 
   // Decorative animation stops when nobody is looking at it: tab hidden, window
   // unfocused, or a game is running on top. Keeps the GPU free for the emulator.
@@ -52,11 +52,16 @@
     const root = document.documentElement;
     root.dataset.theme = app.theme;
     root.dataset.mode = app.mode;
-    root.dataset.motion = app.reduceMotion ? 'reduce' : 'full';
+    root.dataset.motion = app.motionReduced ? 'reduce' : 'full';
+    root.dataset.effects = app.visualEffects;
     root.dataset.idle = away || app.running ? 'yes' : 'no';
   });
 
   onMount(() => {
+    const motion = matchMedia('(prefers-reduced-motion: reduce)');
+    const updateMotion = () => (app.systemReduceMotion = motion.matches);
+    updateMotion();
+    motion.addEventListener('change', updateMotion);
     void app.boot();
     // Dev shortcuts: ?route=library&mode=big&theme=light&splash=0&empty=1
     const q = new URLSearchParams(location.search);
@@ -89,10 +94,12 @@
     };
     window.addEventListener('focus', refreshSources);
     const sourcePoll = setInterval(refreshSources, 60000);
-    const clock = setInterval(() => (now = new Date()), 15000);
-    if (booting) setTimeout(() => (booting = false), app.reduceMotion ? 0 : 1500);
+    const clock = setInterval(() => { if (!document.hidden && document.hasFocus()) now = new Date(); }, 15000);
+    if (booting) setTimeout(() => (booting = false), app.motionReduced ? 0 : 1500);
     return () => {
       stop();
+      app.disconnect();
+      motion.removeEventListener('change', updateMotion);
       clearInterval(clock);
       clearInterval(sourcePoll);
       window.removeEventListener('focus', refreshSources);
@@ -362,8 +369,8 @@
     padding: 5px;
     border-radius: 999px;
     background: var(--field);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: var(--overlay-filter);
+    -webkit-backdrop-filter: var(--overlay-filter);
   }
   .tab {
     border: 0;

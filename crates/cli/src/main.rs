@@ -75,6 +75,12 @@ enum EmulatorsCmd {
     Check,
     /// Install or update an emulator inside Marquee's own folder
     Install { id: String },
+    /// Build a reviewed pinned recipe with rootless Podman; wait and report logs
+    Build { id: String },
+    /// Last source-build status (including interrupted builds)
+    BuildStatus { id: String },
+    /// Restore the previous source-built program, preserving saves
+    Rollback { id: String },
     /// Open an installed emulator's own window
     Open { id: String },
     /// Remove an emulator's program (settings and saves stay unless --purge-data)
@@ -236,6 +242,37 @@ fn run() -> marquee_core::error::Result<()> {
             let list = match cmd {
                 EmulatorsCmd::List => core.list_emulators()?,
                 EmulatorsCmd::Check => core.check_emulator_updates()?,
+                EmulatorsCmd::BuildStatus { id } => {
+                    println!(
+                        "{}",
+                        serde_json::to_string_pretty(
+                            &core.source_builds.status(&core.paths, &id)?
+                        )?
+                    );
+                    return Ok(());
+                }
+                EmulatorsCmd::Rollback { id } => core.rollback_emulator(&id)?,
+                EmulatorsCmd::Build { id } => {
+                    core.build_emulator(&id)?;
+                    let mut last_phase = String::new();
+                    loop {
+                        if let Some(status) = core.source_builds.status(&core.paths, &id)? {
+                            if status.phase != last_phase {
+                                println!("{}", status.message);
+                                last_phase = status.phase.clone();
+                            }
+                            if status.state != "running" {
+                                println!("Log: {}", status.log_path.display());
+                                if status.state != "succeeded" {
+                                    return Err(AppError::new("BUILD_FAILED", status.message));
+                                }
+                                break;
+                            }
+                        }
+                        thread::sleep(Duration::from_millis(500));
+                    }
+                    core.list_emulators()?
+                }
                 EmulatorsCmd::Install { id } => {
                     let sink = Arc::new(FnSink(|event: CoreEvent| match event {
                         CoreEvent::ToolInstallProgress { message, .. } => println!("{message}"),

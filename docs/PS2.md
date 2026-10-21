@@ -87,9 +87,9 @@ Tests must use `--data-dir` / `Core::open_isolated`. Never point them at the rea
 ### Launch argv (structured; no shell)
 
 ```text
-$XDG_DATA_HOME/marquee/runners/pcsx2/current/usr/bin/pcsx2-qt -batch -fullscreen -- /path/to/game.iso
-<pcsx2.AppImage or pcsx2-qt> -batch -fullscreen -- /path/to/game.iso
-flatpak run net.pcsx2.PCSX2 -batch -fullscreen -- /path/to/game.iso
+$XDG_DATA_HOME/marquee/runners/pcsx2/current/usr/bin/pcsx2-qt -batch -fullscreen -nogui -- /path/to/game.iso
+<pcsx2.AppImage or pcsx2-qt> -batch -fullscreen -nogui -- /path/to/game.iso
+flatpak run net.pcsx2.PCSX2 -batch -fullscreen -nogui -- /path/to/game.iso
 ```
 
 ### BIOS / setup status
@@ -209,7 +209,7 @@ Fake-runner tests do **not** close the real-emulator gate.
 
 | Variant | Discovery | Argv | Live launch |
 | --- | --- | --- | --- |
-| Unpacked `runners/pcsx2/current` | Yes (preferred) | `-batch -fullscreen -- <iso>` | Pending |
+| Unpacked `runners/pcsx2/current` | Yes (preferred) | `-batch -fullscreen -nogui -- <iso>` | Pending |
 | AppImage / `pcsx2-qt` | Yes | Same flags | Pending |
 | Flatpak `net.pcsx2.PCSX2` | Yes (optional extra) | Same flags after `flatpak run …` | Pending |
 | `--allow-fake` | Tests only | No PCSX2 flags | Automated; not an emulator gate |
@@ -236,7 +236,7 @@ Marquee **owns** the PCSX2 tree, the same way `cx-script` owns `//DEPS` under `.
 
 Other dialog rows: **Unpack into Marquee** (same as Recommended), **Keep as AppImage** (run the file; may need FUSE), **Flathub** (optional user Flatpak), **Open setup**. Host Flatpak does **not** skip a Marquee unpack. CLI: `marquee runners install [--channel auto|unpacked|appimage|flatpak]` (`auto` = unpacked).
 
-Never downloads BIOS or ISOs. Play uses `-batch -fullscreen` so PCSX2 does not open its first-run wizard for a game launch. Open setup is the GUI for adding BIOS. Provenance is stored as `marquee_installed_pcsx2`.
+Never downloads BIOS or ISOs. Play uses `-batch -fullscreen -nogui` to hide PCSX2's main window while showing the game, then exit on game shutdown. This does not replace completing setup or supplying a BIOS. Open setup is the GUI for adding BIOS. Provenance is stored as `marquee_installed_pcsx2`.
 
 ### Box art (serial lookup)
 

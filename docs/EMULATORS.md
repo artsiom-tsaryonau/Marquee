@@ -13,6 +13,7 @@ Updated 2026-10-21. Marquee installs emulators and holds BIOS images inside its 
 | Azahar | Nintendo 3DS | Managed lifecycle and standalone opening |
 | Cemu | Wii U | Managed lifecycle and standalone opening |
 | xemu | Original Xbox | Managed lifecycle and standalone opening |
+| mGBA | GB / GBC / GBA | Opt-in pinned source-build pilot, Qt/SDL standalone tools; no library adapter |
 
 PCSX2 remains integrated through its dedicated installer. A catalogue entry is implementation of acquisition/opening, not proof of a successful current upstream install, complete configuration isolation, firmware readiness or a playable game. Install requires a matching upstream AppImage with a published checksum; missing or changed packaging must produce an error. Additional platforms still need system descriptors, media import, launch flags, prerequisite checks, save behavior and live acceptance before their games appear as playable library entries. Standalone emulator lifetime is not recorded as game playtime.
 
@@ -46,9 +47,13 @@ Verified against the upstream release on 2026-10-21.
 
 "Verified" means: the release was downloaded, matched its published checksum, unpacked, and started with its own `XDG_CONFIG_HOME`, `XDG_DATA_HOME` and `XDG_CACHE_HOME`; nothing appeared in `~/.config`, `~/.local/share` or `~/.cache`. It does **not** mean a game was played. Only emulators with a runner kind (DuckStation) register as library runners; the rest can be installed, updated, opened and removed, and their systems have no library scanning yet.
 
-Left out on purpose: **mGBA** (its releases publish no checksum, so Marquee would refuse it), **melonDS** (ships a zip around the AppImage, which needs zip support), **Dolphin** (no official Linux AppImage), **shadPS4** (zip, early-stage).
+mGBA's published binary remains excluded by the checksum policy; it now has a separate [managed source-build pilot](SOURCE_BUILDS.md). **melonDS** still needs support for a ZIP-wrapped AppImage, **Dolphin** needs a different acquisition recipe, and **shadPS4** is a ZIP-packaged experimental follow-up. Building a program does not add its systems to library import.
 
-## Layout (all under `~/.local/share/marquee`)
+See [game-only windows versus displayless execution](EMULATOR_PRESENTATION.md). PCSX2 library launches now include `-nogui`; DuckStation already did. Both still show the actual game window.
+
+## Layout (binary recipes under `~/.local/share/marquee`)
+
+The source-build pilot additionally uses rootless Podman's shared image storage; see its [storage and runtime boundary](SOURCE_BUILDS.md#storage-and-runtime-boundary).
 
 | Path | Holds | Removed by |
 | --- | --- | --- |

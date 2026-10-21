@@ -29,6 +29,7 @@ const CATALOGUE: &[&str] = &[
     include_str!("../../../catalog/emulators/ppsspp.json"),
     include_str!("../../../catalog/emulators/xemu.json"),
     include_str!("../../../catalog/emulators/azahar.json"),
+    include_str!("../../../catalog/emulators/mgba.json"),
 ];
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -108,9 +109,30 @@ pub fn clean_args(args: &[String]) -> Result<Vec<String>> {
 }
 
 pub fn set_config(db: &Db, id: &str, args: &[String]) -> Result<Config> {
-    let cfg = Config {
-        args: clean_args(args)?,
-    };
+    let mut args = clean_args(args)?;
+    if id == "mgba" {
+        let mut count = 0;
+        for arg in &mut args {
+            if let Some(folder) = arg.strip_prefix("--marquee-games=") {
+                count += 1;
+                let folder = fs::canonicalize(folder)
+                    .map_err(|_| AppError::new("PATH", "Select an existing game folder"))?;
+                let home = std::env::var_os("HOME").and_then(|h| fs::canonicalize(h).ok());
+                if !folder.is_dir()
+                    || folder.parent().is_none()
+                    || home.as_ref() == Some(&folder)
+                    || folder.to_string_lossy().contains(':')
+                {
+                    return Err(AppError::new("PATH", "Select a specific game folder, not your home or filesystem root, without a colon in its path"));
+                }
+                *arg = format!("--marquee-games={}", folder.display());
+            }
+        }
+        if count > 1 {
+            return Err(AppError::new("BAD_REQUEST", "Select one mGBA game folder"));
+        }
+    }
+    let cfg = Config { args };
     db.set_setting(&config_key(id), &serde_json::to_string(&cfg)?)?;
     Ok(cfg)
 }
@@ -123,6 +145,10 @@ pub struct Installed {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct EmulatorInfo {
+    pub launch_presentation: String,
+    pub source_build: bool,
+    pub source_receipt: Option<serde_json::Value>,
+    pub can_rollback: bool,
     pub id: String,
     pub name: String,
     pub systems: Vec<String>,
@@ -244,6 +270,20 @@ pub fn info(
         _ => "ready",
     };
     EmulatorInfo {
+        launch_presentation: match def.id.as_str() {
+            "duckstation" => "Library Play hides the main window with -nogui and shows the game fullscreen. A display is still required.",
+            "mgba" => "Open uses Qt. To launch only the game window, add --marquee-sdl, -f, then an absolute game path as separate arguments. This is not displayless emulation or an integrated library session.",
+            "rpcs3" => "Upstream supports --no-gui --fullscreen with a boot target, and a separate --headless mode. Marquee currently opens the tool; it has no PS3 game adapter.",
+            _ => "Marquee currently opens this emulator’s own interface. Direct game launch and displayless execution need a separate verified adapter; no generic headless flag is applied.",
+        }.into(),
+        source_build: crate::source_builds::supported(&def.id),
+        source_receipt: fs::read(program_dir(paths, &def.id).join("source-build.json"))
+            .ok()
+            .and_then(|raw| serde_json::from_slice(&raw).ok()),
+        can_rollback: program_dir(paths, &def.id)
+            .with_file_name("previous")
+            .join("installed.json")
+            .is_file(),
         id: def.id.clone(),
         name: def.name.clone(),
         systems: def.systems.clone(),
@@ -337,6 +377,12 @@ fn latest(def: &EmulatorDef) -> Result<Release> {
 
 /// Ask GitHub which version is newest, without downloading anything.
 pub fn latest_version(def: &EmulatorDef) -> Result<String> {
+    if crate::source_builds::supported(&def.id) {
+        return Ok(format!(
+            "source-0.10.5-{}",
+            &crate::source_builds::MGBA_COMMIT[..12]
+        ));
+    }
     Ok(latest(def)?.version)
 }
 
@@ -350,6 +396,12 @@ fn say(sink: &Arc<dyn EventSink>, id: &str, message: impl Into<String>) {
 /// Download, verify against the published checksum, unpack into a staging folder
 /// and only then swap it in, so a failed update leaves the working install alone.
 pub fn install(paths: &Paths, def: &EmulatorDef, sink: &Arc<dyn EventSink>) -> Result<Installed> {
+    if crate::source_builds::supported(&def.id) {
+        return Err(AppError::new(
+            "SOURCE_BUILD_REQUIRED",
+            "Use Build from source for mGBA",
+        ));
+    }
     say(sink, &def.id, format!("Looking up {}…", def.name));
     let release = latest(def)?;
     let prefix = paths.data_dir.join("runners").join(&def.id);
@@ -473,6 +525,7 @@ pub fn open(paths: &Paths, def: &EmulatorDef, installed: &Installed, cfg: &Confi
             format!("{} is not installed", def.name),
         ));
     }
+    crate::source_builds::require_runtime(paths, &def.id)?;
     for dir in ["xdg-config", "xdg-data", "xdg-cache"] {
         fs::create_dir_all(paths.data_dir.join(&def.id).join(dir))?;
     }
@@ -710,6 +763,19 @@ mod tests {
         );
         assert_eq!(cmd.last().unwrap(), "--x");
         assert_eq!(cmd[cmd.len() - 2], "/p/AppRun");
+    }
+
+    #[test]
+    fn source_game_folder_is_explicit_and_invalid_changes_keep_saved_settings() {
+        let t = tempfile::tempdir().unwrap();
+        let folder = t.path().join("Game collection");
+        fs::create_dir(&folder).unwrap();
+        let db = Db::open_in_memory().unwrap();
+        let arg = format!("--marquee-games={}", folder.display());
+        let saved = set_config(&db, "mgba", std::slice::from_ref(&arg)).unwrap();
+        assert!(set_config(&db, "mgba", &["--marquee-games=/".into()]).is_err());
+        assert!(set_config(&db, "mgba", &[arg.clone(), arg]).is_err());
+        assert_eq!(config(&db, "mgba").unwrap(), saved);
     }
 
     #[test]

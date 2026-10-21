@@ -6,6 +6,7 @@
   import Logo from './Logo.svelte';
   import Icon from './Icon.svelte';
   import Mark, { hasMark } from './Mark.svelte';
+  import { onDestroy } from 'svelte';
 
   let {
     game,
@@ -14,22 +15,31 @@
   }: { game: GameEntry; shape?: 'cover' | 'wide'; showTitle?: boolean } = $props();
 
   let el: HTMLButtonElement;
+  let tiltFrame = 0;
 
   // Tilt toward the pointer with a moving glare; skipped when motion is reduced.
   function tilt(e: PointerEvent) {
-    if (app.reduceMotion) return;
-    const r = el.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width;
-    const y = (e.clientY - r.top) / r.height;
-    el.style.setProperty('--rx', `${(0.5 - y) * 10}deg`);
-    el.style.setProperty('--ry', `${(x - 0.5) * 12}deg`);
-    el.style.setProperty('--gx', `${x * 100}%`);
-    el.style.setProperty('--gy', `${y * 100}%`);
+    if (app.motionReduced || app.visualEffects !== 'full' || tiltFrame) return;
+    const { clientX, clientY } = e;
+    tiltFrame = requestAnimationFrame(() => {
+      tiltFrame = 0;
+      if (document.hidden || !document.hasFocus() || app.motionReduced || app.visualEffects !== 'full') return;
+      const r = el.getBoundingClientRect();
+      const x = (clientX - r.left) / r.width;
+      const y = (clientY - r.top) / r.height;
+      el.style.setProperty('--rx', `${(0.5 - y) * 10}deg`);
+      el.style.setProperty('--ry', `${(x - 0.5) * 12}deg`);
+      el.style.setProperty('--gx', `${x * 100}%`);
+      el.style.setProperty('--gy', `${y * 100}%`);
+    });
   }
   function untilt() {
+    cancelAnimationFrame(tiltFrame);
+    tiltFrame = 0;
     el.style.setProperty('--rx', '0deg');
     el.style.setProperty('--ry', '0deg');
   }
+  onDestroy(() => cancelAnimationFrame(tiltFrame));
 
   const status = $derived(
     game.portStatus === 'update'
@@ -54,6 +64,7 @@
   <button
     bind:this={el}
     class="card"
+    class:tiltable={app.visualEffects === 'full' && !app.motionReduced}
     data-nav
     style="--accent-h:{game.art.hue2}"
     onfocus={() => app.preview(game.id)}
@@ -65,7 +76,7 @@
   >
     <div class="art">
       {#if game.coverUrl}
-        <img class="cover-img" src={game.coverUrl} alt="" />
+        <img class="cover-img" src={game.coverUrl} alt="" loading="lazy" decoding="async" />
       {:else}
         <Artwork art={game.art} grain={shape === 'wide'} />
       {/if}
@@ -115,12 +126,13 @@
     cursor: pointer;
     background: hsl(var(--accent-h) 30% 15%);
     box-shadow: 0 10px 30px -12px rgb(0 0 0 / 0.7);
-    transform: perspective(900px) rotateX(var(--rx)) rotateY(var(--ry)) scale(var(--s, 1));
+    transform: scale(var(--s, 1));
     transition:
       transform 220ms var(--ease),
       box-shadow 220ms var(--ease);
     outline: none;
   }
+  .card.tiltable { transform: perspective(900px) rotateX(var(--rx)) rotateY(var(--ry)) scale(var(--s, 1)); }
   .wide .card {
     aspect-ratio: 16 / 9.4;
   }
@@ -132,17 +144,6 @@
       0 0 0 2px hsl(var(--accent-h) 95% 72%),
       0 0 32px 4px hsl(var(--accent-h) 95% 60% / 0.55),
       0 24px 50px -16px rgb(0 0 0 / 0.9);
-  }
-  .card:focus-visible {
-    animation: pulse 2.4s ease-in-out infinite;
-  }
-  @keyframes pulse {
-    50% {
-      box-shadow:
-        0 0 0 2px hsl(var(--accent-h) 95% 80%),
-        0 0 44px 8px hsl(var(--accent-h) 95% 60% / 0.7),
-        0 24px 50px -16px rgb(0 0 0 / 0.9);
-    }
   }
   .art {
     position: absolute;
@@ -181,8 +182,8 @@
     text-transform: uppercase;
     padding: 4px 8px;
     border-radius: 999px;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: var(--badge-filter);
+    -webkit-backdrop-filter: var(--badge-filter);
   }
   .source {
     left: 10px;
@@ -225,7 +226,7 @@
     transition: opacity 200ms;
     mix-blend-mode: overlay;
   }
-  .card:hover .glare {
+  .card.tiltable:hover .glare {
     opacity: 1;
   }
   .caption {

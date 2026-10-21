@@ -6,10 +6,12 @@
   import { systemLabel } from '../labels';
   import Artwork from './Artwork.svelte';
   import Icon from './Icon.svelte';
+  import type { EmulatorBuildStatus } from '../api/contracts';
+  import { pollWhileActive } from '../activity';
 
   const emulator = $derived(app.emulators.find((e) => e.id === app.emulatorDialogId) ?? null);
-  const busy = $derived(emulator ? app.emulatorBusy[emulator.id] : undefined);
-  const dur = $derived(app.reduceMotion ? 0 : 240);
+  const sourceId = $derived(emulator?.source_build ? emulator.id : null);
+  const dur = $derived(app.motionReduced ? 0 : 240);
 
   let args = $state<string[]>([]);
   let loadedFor = $state<string | null>(null);
@@ -17,6 +19,60 @@
   let saving = $state(false);
   let confirmPurge = $state(false);
   let copied = $state<string | null>(null);
+  let buildStatus = $state<EmulatorBuildStatus | null>(null);
+  let startingBuild = $state(false);
+  const busy = $derived(buildStatus?.state === 'running' ? buildStatus.message : emulator ? app.emulatorBusy[emulator.id] : undefined);
+
+  // Backend jobs survive closing the dialog or refreshing the browser. Polling
+  // restores their status and a bounded log tail without tying jobs to a tab.
+  $effect(() => {
+    const id = sourceId;
+    buildStatus = null;
+    if (!id || app.demo) return;
+    let disposed = false;
+    let polling = false;
+    let lastState: string | undefined;
+    async function poll() {
+      if (polling || !id) return;
+      polling = true;
+      try {
+        const status = await app.api.emulatorBuildStatus(id);
+        if (disposed) return;
+        if (JSON.stringify(buildStatus) !== JSON.stringify(status)) buildStatus = status;
+        if (status && status.state !== 'running' && lastState !== status.state) await app.loadEmulators();
+        lastState = status?.state;
+      } catch (err) {
+        if (!disposed) error = (err as Error).message;
+      } finally { polling = false; }
+    }
+    const stop = pollWhileActive(poll, () => buildStatus?.state === 'running' ? 2000 : 15000);
+    return () => { disposed = true; stop(); };
+  });
+
+  async function build() {
+    if (!emulator || startingBuild) return;
+    startingBuild = true;
+    try {
+      await app.buildEmulator(emulator);
+      buildStatus = await app.api.emulatorBuildStatus(emulator.id);
+    } catch (err) { error = (err as Error).message; }
+    finally { startingBuild = false; }
+  }
+
+  async function cancelBuild() {
+    if (!emulator) return;
+    try { await app.api.cancelEmulatorBuild(emulator.id); }
+    catch (err) { error = (err as Error).message; }
+  }
+
+  async function chooseGames() {
+    try {
+      const folder = await app.api.pickRoot();
+      if (!folder) return;
+      args = [...args.filter((a) => !a.startsWith('--marquee-games=')), `--marquee-games=${folder}`];
+      await save();
+    } catch (err) { error = (err as Error).message; }
+  }
 
   // Start from what is saved each time a different emulator opens.
   $effect(() => {
@@ -91,15 +147,39 @@
         {#if busy}<span class="busy" role="status">{busy}</span>{/if}
         <span class="spacer"></span>
         {#if e.status === 'not_installed'}
-          <button class="btn primary small" data-nav disabled={!!busy} onclick={() => app.installEmulator(e)}><Icon name="download" size={15} />Install</button>
+          <button class="btn primary small" data-nav disabled={!!busy || startingBuild} onclick={() => e.source_build ? build() : app.installEmulator(e)}><Icon name="download" size={15} />{e.source_build ? 'Build from source' : 'Install'}</button>
         {:else}
           <button class="btn primary small" data-nav disabled={!!busy} onclick={() => app.openEmulator(e)}><Icon name="play" size={15} />Open</button>
           {#if e.status === 'update'}<button class="btn glass small" data-nav disabled={!!busy} onclick={() => app.installEmulator(e)}>Update</button>{/if}
         {/if}
       </div>
 
+      {#if e.source_build}
+        <section>
+          <h3>Managed source build</h3>
+          <p class="hint">mGBA 0.10.5 · pinned source · Linux x86_64 · rootless Podman + Git. Compiler and runtime dependencies stay in a container. First build downloads dependencies and may take several minutes. Only a game folder you select is mounted read-only; saves use Marquee’s writable folders.</p>
+          <button class="btn glass small" data-nav disabled={!!busy || saving} onclick={chooseGames}>Choose game folder</button>
+          {#if args.some((a) => a.startsWith('--marquee-games='))}<p class="hint">{args.find((a) => a.startsWith('--marquee-games='))?.slice('--marquee-games='.length)}</p>{/if}
+          <div class="arg-actions">
+            {#if busy}<button class="btn glass small" data-nav onclick={cancelBuild}>Cancel build</button>
+            {:else if e.status !== 'not_installed' || buildStatus}
+              <button class="btn glass small" data-nav disabled={startingBuild} onclick={build}>{buildStatus?.state === 'failed' || buildStatus?.state === 'interrupted' || buildStatus?.state === 'cancelled' ? 'Retry build' : 'Rebuild pinned version'}</button>
+            {/if}
+            {#if e.can_rollback}<button class="btn glass small" data-nav disabled={!!busy} onclick={() => app.rollbackEmulator(e)}>Restore previous version</button>{/if}
+          </div>
+          {#if buildStatus}
+            <p class="hint" role="status">{buildStatus.state} · {buildStatus.phase}: {buildStatus.message}</p>
+            <details class="alt"><summary>Build log</summary><p class="hint">{buildStatus.log_path}</p><pre>{buildStatus.log_tail || 'Waiting for output…'}</pre></details>
+          {/if}
+          {#if e.source_receipt}
+            <details class="alt"><summary>Build provenance</summary><p class="hint">Commit: {e.source_receipt.commit}<br />Image: {e.source_receipt.image}<br />{e.source_receipt.validation}</p></details>
+          {/if}
+        </section>
+      {/if}
+
       <section>
         <h3>Launch arguments</h3>
+        {#if e.launch_presentation}<p class="hint">{e.launch_presentation}</p>{/if}
         <p class="hint">Added to every start of {e.name}, from here and from your library{e.integrated ? '' : ' (this emulator is opened on its own for now)'}. One value per field, no shell quoting.</p>
         <div class="args">
           {#each args as _, i (i)}
@@ -155,7 +235,7 @@
 {/if}
 
 <style>
-  .scrim { position: fixed; inset: 0; z-index: 40; background: rgb(0 0 0 / .6); backdrop-filter: blur(6px); }
+  .scrim { position: fixed; inset: 0; z-index: 40; background: rgb(0 0 0 / .6); backdrop-filter: var(--overlay-filter); }
   .dialog { position: fixed; z-index: 41; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(680px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; border-radius: 22px; padding: 0; }
   .banner { position: relative; height: 170px; overflow: hidden; border-radius: 22px 22px 0 0; }
   .banner :global(svg) { width: 100%; height: 100%; object-fit: cover; }
@@ -191,5 +271,6 @@
   .cmd { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
   code { flex: 1; min-width: 0; overflow-wrap: anywhere; font: 11px ui-monospace, monospace; background: var(--field); padding: 8px 10px; border-radius: 8px; color: var(--text-soft); }
   .danger-zone { border-top: 1px solid var(--line); padding-top: 16px; }
+  pre { max-height: 240px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px ui-monospace, monospace; background: var(--field); padding: 10px; border-radius: 8px; }
   .btn.danger:hover, .btn.danger:focus-visible { color: var(--bad); }
 </style>

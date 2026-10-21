@@ -4,6 +4,7 @@
   import { asError } from '../api/core';
   import type { PurpleStatus } from '../api/contracts';
   import Icon from './Icon.svelte';
+  import { pollWhileActive } from '../activity';
 
   let status = $state<PurpleStatus | null>(null);
   let error = $state<string | null>(null);
@@ -17,13 +18,12 @@
     async function refresh() {
       if (polling) return;
       polling = true;
-      try { const next = await app.api.purpleStatus(); if (alive) { status = next; connectionError = null; } }
+      try { const next = await app.api.purpleStatus(); if (alive) { if (JSON.stringify(next) !== JSON.stringify(status)) status = next; connectionError = null; } }
       catch (err) { if (alive) connectionError = asError(err).message; }
       finally { polling = false; }
     }
-    void refresh();
-    const timer = setInterval(() => void refresh(), 1500);
-    return () => { alive = false; clearInterval(timer); };
+    const stop = pollWhileActive(refresh, () => status?.busy || status?.running ? 1500 : 15000);
+    return () => { alive = false; stop(); };
   });
   async function action(kind: 'install' | 'open' | 'cancel') {
     if (pending) return;

@@ -147,6 +147,10 @@ export const demoApi: LibraryApi = {
   async installEmulator() {
     throw { code: 'DEMO', message: 'Install emulators in the desktop app' };
   },
+  async buildEmulator() { throw new Error('Source builds require the desktop app'); },
+  async emulatorBuildStatus() { return null; },
+  async cancelEmulatorBuild() { throw new Error('Source builds require the desktop app'); },
+  async rollbackEmulator() { throw new Error('Source builds require the desktop app'); },
   async uninstallEmulator() {
     throw { code: 'DEMO', message: 'Manage emulators in the desktop app' };
   },

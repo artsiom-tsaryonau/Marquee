@@ -1,0 +1,19 @@
+FROM docker.io/library/debian@sha256:7ff6ba31527b9e336162fa061746c366c4b2032f4d2cff2078bea43f78efe3f8
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake ninja-build pkg-config qtbase5-dev qtmultimedia5-dev \
+    qttools5-dev qtwayland5 libsdl2-dev libepoxy-dev libpng-dev zlib1g-dev \
+    libzip-dev zipcmp zipmerge ziptool libsqlite3-dev libgl1-mesa-dri libegl1 libpulse0 \
+    && rm -rf /var/lib/apt/lists/*
+COPY source /source
+RUN cmake -S /source -B /build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/opt/mgba -DBUILD_QT=ON -DBUILD_SDL=ON \
+    -DBUILD_STATIC=ON -DBUILD_SHARED=OFF -DUSE_FFMPEG=OFF -DUSE_DISCORD_RPC=OFF \
+    -DUSE_LUA=OFF -DUSE_EDITLINE=OFF -DUSE_GDB_STUB=OFF \
+    && cmake --build /build --parallel 2 \
+    && cmake --install /build \
+    && /opt/mgba/bin/mgba --version \
+    && /opt/mgba/bin/mgba-qt --version \
+    && dpkg-query -W > /opt/mgba/packages.txt \
+    && rm -rf /build /source
+ENV PATH="/opt/mgba/bin:${PATH}"
+CMD ["mgba-qt"]

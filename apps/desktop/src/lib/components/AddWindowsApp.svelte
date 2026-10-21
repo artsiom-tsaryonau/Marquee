@@ -72,7 +72,7 @@
     if (g) app.open(g);
   }
 
-  const dur = $derived(app.reduceMotion ? 0 : 240);
+  const dur = $derived(app.motionReduced ? 0 : 240);
 </script>
 
 <div class="scrim" transition:fade={{ duration: dur }} onclick={onclose} role="presentation"></div>
@@ -123,8 +123,8 @@
     inset: 0;
     z-index: 40;
     background: rgb(0 0 0 / 0.55);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: var(--overlay-filter);
+    -webkit-backdrop-filter: var(--overlay-filter);
   }
   .dialog {
     position: fixed;

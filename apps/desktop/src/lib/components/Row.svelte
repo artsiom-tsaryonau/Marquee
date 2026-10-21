@@ -16,15 +16,19 @@
     placeholders?: number;
     onPlaceholder?: () => void;
   } = $props();
+  let visibleCount = $state(24);
 </script>
 
 {#if games.length || placeholders}
   <section class="row">
     <h2>{title} {#if games.length}<span>{games.length}</span>{/if}</h2>
     <div class="scroller" data-nav-row>
-      {#each games as game (game.id)}
+      {#each games.slice(0, visibleCount) as game (game.id)}
         <Cover {game} {shape} />
       {/each}
+      {#if games.length > visibleCount}
+        <button class="more btn glass" data-nav onclick={() => (visibleCount += 24)}>Show more · {visibleCount} of {games.length}</button>
+      {/if}
       {#each Array(placeholders) as _, i (i)}
         <GhostCover {shape} onclick={i === 0 ? onPlaceholder : undefined} />
       {/each}
@@ -64,4 +68,5 @@
   .scroller::-webkit-scrollbar {
     display: none;
   }
+  .more { flex: none; align-self: center; }
 </style>

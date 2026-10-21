@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
-    "test": "node --conditions=browser --import ./tests/register.mjs tests/focus.test.mjs && node --conditions=browser --import ./tests/register.mjs tests/state.test.mjs",
+    "test": "node --conditions=browser --import ./tests/register.mjs tests/focus.test.mjs && node --conditions=browser --import ./tests/register.mjs tests/activity.test.mjs && node --conditions=browser --import ./tests/register.mjs tests/state.test.mjs",
     "tauri": "tauri"
   },
   "devDependencies": {

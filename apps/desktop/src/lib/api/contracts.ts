@@ -200,6 +200,10 @@ export interface LauncherInfo extends LauncherConfig {
 export interface PackageHint { manager: string; command: string; note: string }
 
 export interface EmulatorInfo {
+  launch_presentation?: string;
+  source_build?: boolean;
+  source_receipt?: { commit: string; image: string; recipe: string; validation: string } | null;
+  can_rollback?: boolean;
   id: string;
   name: string;
   systems: string[];
@@ -219,6 +223,14 @@ export interface EmulatorInfo {
 }
 
 export interface BiosFile { system: string; file: string; region: string; version: string }
+export interface EmulatorBuildStatus {
+  state: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'interrupted';
+  phase: string;
+  message: string;
+  commit: string;
+  log_path: string;
+  log_tail: string;
+}
 export interface BiosImport { added: BiosFile[]; ignored: number }
 
 export interface LibraryApi {
@@ -263,6 +275,10 @@ export interface LibraryApi {
   listEmulators(): Promise<EmulatorInfo[]>;
   checkEmulatorUpdates(): Promise<EmulatorInfo[]>;
   installEmulator(id: string): Promise<EmulatorInfo[]>;
+  buildEmulator(id: string): Promise<void>;
+  emulatorBuildStatus(id: string): Promise<EmulatorBuildStatus | null>;
+  cancelEmulatorBuild(id: string): Promise<void>;
+  rollbackEmulator(id: string): Promise<EmulatorInfo[]>;
   uninstallEmulator(id: string, purgeData: boolean): Promise<EmulatorInfo[]>;
   openEmulator(id: string): Promise<void>;
   configureEmulator(id: string, args: string[]): Promise<EmulatorInfo[]>;

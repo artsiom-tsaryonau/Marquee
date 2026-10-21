@@ -16,7 +16,9 @@ beforeEach(() => {
       addEventListener: (type, fn) => (type === 'keydown' ? (keydown = fn) : (listeners[type] = fn)),
       removeEventListener() {},
     },
-    document: { activeElement: { click: () => clicks++ }, querySelectorAll: () => [] },
+    document: { hidden: false, hasFocus: () => true,
+      addEventListener: (type, fn) => (listeners[type] = fn), removeEventListener() {},
+      activeElement: { click: () => clicks++ }, querySelectorAll: () => [] },
     navigator: { getGamepads: () => pads },
     requestAnimationFrame: (fn) => (frame = fn, 1),
     cancelAnimationFrame() {},
@@ -118,6 +120,37 @@ test('no controller means no polling loop at all', () => {
   pads = [null];
   next();
   assert.equal(frame, undefined, 'polling stops once the controller is gone');
+});
+
+test('background controllers cannot activate the launcher and resume on focus', () => {
+  pads = [pad(0, true)];
+  document.hidden = true;
+  connect();
+  assert.equal(frame, undefined);
+  document.hidden = false;
+  listeners.visibilitychange();
+  assert.ok(frame);
+  const pending = frame;
+  frame = undefined;
+  document.hasFocus = () => false;
+  pending();
+  assert.equal(clicks, 0);
+  assert.equal(frame, undefined);
+  document.hasFocus = () => true;
+  listeners.focus();
+  frame();
+  assert.equal(clicks, 1);
+});
+
+test('disposed controller engine cannot schedule work from an already queued frame', () => {
+  pads = [pad(0, true)];
+  connect();
+  const pending = frame;
+  frame = undefined;
+  stop();
+  pending();
+  assert.equal(clicks, 0);
+  assert.equal(frame, undefined);
 });
 
 

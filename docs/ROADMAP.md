@@ -155,6 +155,8 @@ Build the minimum needed alongside Epic, then reuse it for GOG and later standal
 
 ## U1 — Library and UI completion
 
+The [desktop performance correction pass](DESKTOP_PERFORMANCE.md) adds Balanced visual effects by default, bounded Home shelves, active-window polling/input, and lifecycle cleanup. Native frame-time/GPU measurements and visual acceptance remain open; no measured improvement percentage is claimed.
+
 The normalized data model is shared infrastructure, implemented incrementally when S1 needs it rather than a separate store-blocking rewrite. Use the next available schema version; schema v4 is already allocated to PS1 root systems. Preserve legacy IDs through explicit mappings.
 
 - Games → content editions → store products/entitlements → installations → launch profiles; project those into one canonical game page.
@@ -174,6 +176,8 @@ Preserve existing work and correctness gates:
 - [PS2 slice](PS2.md): PCSX2 setup, user-owned ISO/BIOS, live launch/exit/time evidence.
 - [PS1 slice](PS1.md): DuckStation, per-system roots, supported ISO/CHD/CUE, separate live gate.
 - [Managed emulators and BIOS](EMULATORS.md): seven install/open recipes and Tools management; preserve the distinction between a managed program and an integrated game adapter.
+- [Managed source-build pilot](SOURCE_BUILDS.md): mGBA pinned-source Qt/SDL build, rootless container dependencies/runtime, status/logs/cancel/retry, provenance and previous-program rollback are implemented. Binary releases remain the default elsewhere. mGBA library import, interactive game/controller acceptance, managed Podman delivery and cache cleanup remain open; Dolphin is the next recipe candidate, not an implemented build.
+- [Emulator presentation research](EMULATOR_PRESENTATION.md): PCSX2 now joins DuckStation in hiding the main window for normal library Play. Visible game-only windows, displayless execution, save-state resume and streaming are separate capabilities; validate them per adapter.
 - [PS1/PS2 corrections](PS1_PS2_CORRECTIONS_2026-10-21.md): real-collection validation and fixes; original findings are retained in the linked audit.
 - [Expansion catalogue](EXPANSION_CATALOGUE.md): prioritized platforms, port families, legitimate game-data requirements, shelves, streaming, and adapter limits.
 - [Unified-library/OpenGOAL track](UNIFIED_LIBRARY.md): explicit editions/run methods, reference assets, managed Jak extraction and runtime support.

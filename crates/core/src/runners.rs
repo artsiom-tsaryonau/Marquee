@@ -234,13 +234,12 @@ pub fn launch_argv(runner: &Runner, img: &Path, extra: &[String]) -> Result<Vec<
         argv.insert(2, format!("--filesystem={text}:ro"));
     }
     if runner.kind == RunnerKind::Pcsx2 {
-        argv.extend(["-batch".into(), "-fullscreen".into()]);
+        // Hide the main library window while keeping the game's render window.
+        argv.extend(["-batch".into(), "-fullscreen".into(), "-nogui".into()]);
         argv.extend(extra.iter().cloned());
         argv.push("--".into());
     } else {
-        // DuckStation: `-batch` boots without the UI, `-fullscreen` fills the
-        // screen, and `-nogui` keeps it from offering a console UI for disc
-        // images. The image itself is a positional argument.
+        // Batch exits on game shutdown; nogui hides the main library window.
         argv.extend(["-batch".into(), "-fullscreen".into(), "-nogui".into()]);
         argv.extend(extra.iter().cloned());
     }

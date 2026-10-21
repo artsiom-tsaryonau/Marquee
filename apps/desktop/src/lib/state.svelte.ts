@@ -39,6 +39,9 @@ class AppState {
   mode = $state<'desktop' | 'big'>(load('mode', 'desktop'));
   theme = $state<'dark' | 'light'>(load('theme', 'dark'));
   reduceMotion = $state<boolean>(load('reduceMotion', false));
+  visualEffects = $state<'balanced' | 'full'>(load<string>('visualEffects', 'balanced') === 'full' ? 'full' : 'balanced');
+  systemReduceMotion = $state(typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  motionReduced = $derived(this.reduceMotion || this.systemReduceMotion);
   variantPreferences = $state<Record<string, string>>(load('variantPreferences', {}));
   toolSections = $state<string[]>(load('toolSections', ['emulators', 'ports', 'launchers']));
   sounds = $state<boolean>(load('sounds', false));
@@ -99,6 +102,7 @@ class AppState {
       $effect(() => save('mode', this.mode));
       $effect(() => save('theme', this.theme));
       $effect(() => save('reduceMotion', this.reduceMotion));
+      $effect(() => save('visualEffects', this.visualEffects));
       $effect(() => save('sounds', this.sounds));
       $effect(() => save('toolSections', this.toolSections));
       $effect(() => save('variantPreferences', this.variantPreferences));
@@ -106,6 +110,7 @@ class AppState {
   }
 
   async boot() {
+    this.disconnect();
     if (this.demo) { await Promise.all([this.loadLaunchers(), this.loadEmulators()]); return; }
     this.unlisten = this.api.subscribe((event) => this.onEvent(event));
     try {
@@ -121,6 +126,10 @@ class AppState {
   }
 
   private unlisten: (() => void) | undefined;
+  disconnect() {
+    this.unlisten?.();
+    this.unlisten = undefined;
+  }
 
   applySnapshot(snap: LibrarySnapshot) {
     this.roots = snap.roots;
@@ -201,6 +210,11 @@ class AppState {
     if (event.type === 'tool_install_progress' && event.tool_id in this.emulatorBusy) {
       this.emulatorBusy[event.tool_id] = event.message;
     }
+    if ((event.type === 'tool_install_finished' || event.type === 'tool_install_failed')
+      && this.emulators.some((e) => e.id === event.tool_id && e.source_build)) {
+      void this.api.listEmulators().then((list) => (this.emulators = list)).catch(() => {});
+      this.notify(event.type === 'tool_install_failed' ? event.message : 'Source build installed. Open it from Tools.');
+    }
     if (event.type === 'port_progress') {
       if (event.port_id in this.portBusy) this.portBusy[event.port_id] = event.message;
     }
@@ -223,6 +237,7 @@ class AppState {
   /** Hover/focus swaps the backdrop after a short pause, so sweeping across a grid doesn't stack fades. */
   preview(id: string) {
     clearTimeout(this.previewTimer);
+    if (id === this.heroId) return;
     this.previewTimer = setTimeout(() => (this.heroId = id), 120);
   }
 
@@ -635,6 +650,7 @@ class AppState {
   }
 
   async installEmulator(emulator: EmulatorInfo) {
+    if (emulator.source_build) { await this.buildEmulator(emulator); return; }
     await this.emulatorAction(emulator.id, `Installing ${emulator.name}…`, async () => {
       this.emulators = await this.api.installEmulator(emulator.id);
       await this.api.snapshot().then((snap) => this.applySnapshot(snap)).catch(() => {});
@@ -647,6 +663,20 @@ class AppState {
       this.emulators = await this.api.uninstallEmulator(emulator.id, purgeData);
       await this.api.snapshot().then((snap) => this.applySnapshot(snap)).catch(() => {});
       this.notify(purgeData ? `${emulator.name} and its saves were removed` : `${emulator.name} was removed; its settings and saves are kept`);
+    });
+  }
+
+  async buildEmulator(emulator: EmulatorInfo) {
+    await this.emulatorAction(emulator.id, 'Starting source build…', async () => {
+      await this.api.buildEmulator(emulator.id);
+      this.notify(`${emulator.name} source build started. Progress and logs are in its Tools dialog.`);
+    });
+  }
+
+  async rollbackEmulator(emulator: EmulatorInfo) {
+    await this.emulatorAction(emulator.id, 'Restoring previous version…', async () => {
+      this.emulators = await this.api.rollbackEmulator(emulator.id);
+      this.notify(`${emulator.name}: restored the previous program. Saves were kept.`);
     });
   }
 

@@ -19,7 +19,7 @@
   const port = $derived(g?.source === 'port' ? app.ports.find((p) => `port:${p.id}` === g.id) : undefined);
   const shots = $derived(g ? [0, 1, 2, 3].map((i) => ({ ...g.art, hue: (g.art.hue + i * 24) % 360, motif: (['peaks', 'waves', 'grid', 'orbit'] as const)[(i + g.art.hue) % 4] })) : []);
   const similar = $derived(g ? app.games.filter((x) => canonicalId(x) !== canonicalId(g) && (x.genre === g.genre || x.source === g.source)).slice(0, 10) : []);
-  const dur = $derived(app.reduceMotion ? 0 : 360);
+  const dur = $derived(app.motionReduced ? 0 : 360);
   const offline = $derived(!!g && !app.demo && g.source === 'rom' && (g.platform === 'ps1' || g.platform === 'ps2'));
   const emulator = $derived(g?.platform === 'ps1' ? 'DuckStation' : 'PCSX2');
   let editing = $state(false);
@@ -268,8 +268,8 @@
     font: inherit;
     font-weight: 600;
     cursor: pointer;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: var(--overlay-filter);
+    -webkit-backdrop-filter: var(--overlay-filter);
   }
   .tagline {
     margin: 0;

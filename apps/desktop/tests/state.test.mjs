@@ -353,3 +353,73 @@ test('a failed emulator install reports the error and does not stay busy', async
     assert.equal(app.toast, 'offline'); assert.deepEqual(app.emulatorBusy, {});
   } finally { app.api = api; app.demo = demo; }
 });
+
+test('source build starts a backend job without claiming an installed emulator or game session', async () => {
+  const api = app.api, demo = app.demo, emulators = app.emulators;
+  const calls = [];
+  const emulator = { id: 'mgba', name: 'mGBA', source_build: true, status: 'not_installed' };
+  try {
+    app.demo = false;
+    app.emulators = [emulator];
+    app.api = { ...api, buildEmulator: async (id) => { calls.push(id); }, installEmulator: async () => { throw new Error('wrong installation method'); } };
+    await app.installEmulator(emulator);
+    assert.deepEqual(calls, ['mgba']);
+    assert.equal(app.emulators[0].status, 'not_installed');
+    assert.equal(app.running, null);
+    assert.deepEqual(app.emulatorBusy, {});
+    app.demo = true;
+    await app.buildEmulator(emulator);
+    assert.deepEqual(calls, ['mgba']);
+  } finally { app.api = api; app.demo = demo; app.emulators = emulators; }
+});
+
+test('source build status, cancellation and rollback use the shared transport', async () => {
+  const { commands } = await import('../src/lib/api/core');
+  const calls = [];
+  const api = commands(async (cmd, args) => { calls.push([cmd, args]); return null; });
+  await api.buildEmulator('mgba');
+  await api.emulatorBuildStatus('mgba');
+  await api.cancelEmulatorBuild('mgba');
+  await api.rollbackEmulator('mgba');
+  assert.deepEqual(calls.map(([cmd]) => cmd), ['build_emulator', 'emulator_build_status', 'cancel_emulator_build', 'rollback_emulator']);
+  assert.ok(calls.every(([, args]) => args.id === 'mgba'));
+});
+
+test('a completed source build refreshes Tools even after its dialog closes', async () => {
+  const api = app.api, emulators = app.emulators;
+  try {
+    app.emulators = [{ id: 'mgba', source_build: true, status: 'not_installed' }];
+    app.emulatorDialogId = null;
+    app.api = { ...api, listEmulators: async () => [{ id: 'mgba', source_build: true, status: 'ready' }] };
+    app.onEvent({ type: 'tool_install_finished', tool_id: 'mgba', runner_id: null });
+    await Promise.resolve();
+    assert.equal(app.emulators[0].status, 'ready');
+    assert.equal(app.running, null);
+  } finally { app.api = api; app.emulators = emulators; }
+});
+
+test('reduced motion combines the application and operating-system preferences', () => {
+  const reduce = app.reduceMotion, system = app.systemReduceMotion;
+  try {
+    app.reduceMotion = false; app.systemReduceMotion = false;
+    assert.equal(app.motionReduced, false);
+    app.systemReduceMotion = true;
+    assert.equal(app.motionReduced, true);
+    app.systemReduceMotion = false; app.reduceMotion = true;
+    assert.equal(app.motionReduced, true);
+  } finally { app.reduceMotion = reduce; app.systemReduceMotion = system; }
+});
+
+test('remounting the desktop shell replaces its subscription and cleanup releases it', async () => {
+  const api = app.api, demo = app.demo;
+  let subscriptions = 0, releases = 0;
+  try {
+    app.demo = false;
+    app.api = { ...api, snapshot: async () => discSnapshot(), subscribe: () => { subscriptions++; return () => { releases++; }; } };
+    await app.boot(); await app.boot();
+    assert.equal(subscriptions, 2);
+    assert.equal(releases, 1);
+    app.disconnect(); app.disconnect();
+    assert.equal(releases, 2);
+  } finally { app.disconnect(); app.api = api; app.demo = demo; }
+});

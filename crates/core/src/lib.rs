@@ -21,6 +21,7 @@ pub mod purple;
 pub mod runners;
 pub mod server;
 pub mod sessions;
+pub mod source_builds;
 pub mod tools;
 
 use crate::db::Db;
@@ -45,6 +46,7 @@ pub struct Core {
     events: Arc<hub::EventHub>,
     keys: keys::KeyStore,
     pub purple: Arc<purple::Manager>,
+    pub source_builds: source_builds::Manager,
 }
 
 impl Core {
@@ -64,6 +66,7 @@ impl Core {
         let lock = InstanceLock::acquire(&paths.instance_lock())?;
         let db = Db::open(&paths)?;
         let core = Self {
+            source_builds: source_builds::Manager::default(),
             purple: Arc::new(purple::Manager::new(&paths)),
             paths,
             db: Arc::new(Mutex::new(db)),
@@ -587,6 +590,117 @@ impl Core {
         }
     }
 
+    /// Start a persistent-status build job, independent of the requesting window.
+    pub fn build_emulator(self: &Arc<Self>, id: &str) -> Result<()> {
+        emulators::find(id)?;
+        if !source_builds::supported(id) {
+            return Err(AppError::new(
+                "SOURCE_UNSUPPORTED",
+                "No reviewed source recipe for this emulator",
+            ));
+        }
+        if self.with_db(|db| db.running_session())?.is_some() {
+            return Err(AppError::new("LAUNCH_BUSY", "close the running game first"));
+        }
+        let key = format!("emulator:{id}");
+        let mut busy = self
+            .installing_ports
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if !busy.insert(key.clone()) {
+            return Err(AppError::new(
+                "INSTALL_BUSY",
+                "This emulator is already being changed",
+            ));
+        }
+        let cancel = match self.source_builds.reserve(&self.paths, id) {
+            Ok(cancel) => cancel,
+            Err(error) => {
+                busy.remove(&key);
+                return Err(error);
+            }
+        };
+        drop(busy);
+        let core = self.clone();
+        let id = id.to_string();
+        std::thread::spawn(move || {
+            let sink: Arc<dyn EventSink> = core.hub();
+            sink.emit(CoreEvent::ToolInstallStarted {
+                tool_id: id.clone(),
+                channel: "source".into(),
+            });
+            let result = (|| {
+                let prepared = source_builds::build(&core.paths, &id, &cancel, &sink)?;
+                // A game may have started during compilation. Keep it running and
+                // leave the existing program alone rather than replacing it.
+                if core.with_db(|db| db.running_session())?.is_some() {
+                    return Err(AppError::new(
+                        "LAUNCH_BUSY",
+                        "Close the game and retry the build",
+                    ));
+                }
+                if cancel.load(std::sync::atomic::Ordering::SeqCst) {
+                    return Err(AppError::new(
+                        "BUILD_CANCELLED",
+                        "Build cancelled before promotion",
+                    ));
+                }
+                let old = core.with_db(|db| emulators::installed(db, &id))?;
+                source_builds::publish(&core.paths, &id, prepared, old.as_ref(), |installed| {
+                    core.set_setting(
+                        &emulators::setting_key(&id),
+                        &serde_json::to_string(installed)?,
+                    )
+                })?;
+                core.refresh_runners()?;
+                Ok(())
+            })();
+            core.source_builds.finish(&core.paths, &id, &result);
+            core.installing_ports
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .remove(&key);
+            match result {
+                Ok(()) => sink.emit(CoreEvent::ToolInstallFinished {
+                    tool_id: id,
+                    runner_id: None,
+                }),
+                Err(error) => sink.emit(CoreEvent::ToolInstallFailed {
+                    tool_id: id,
+                    message: error.message,
+                }),
+            }
+            sink.emit(CoreEvent::LibraryChanged);
+        });
+        Ok(())
+    }
+
+    pub fn rollback_emulator(&self, id: &str) -> Result<Vec<emulators::EmulatorInfo>> {
+        let busy = self
+            .installing_ports
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if busy.contains(&format!("emulator:{id}")) {
+            return Err(AppError::new(
+                "INSTALL_BUSY",
+                "Wait for the build to finish or cancel it",
+            ));
+        }
+        if self.with_db(|db| db.running_session())?.is_some() {
+            return Err(AppError::new("LAUNCH_BUSY", "close the running game first"));
+        }
+        source_builds::rollback(&self.paths, id, |installed| {
+            self.set_setting(
+                &emulators::setting_key(id),
+                &serde_json::to_string(installed)?,
+            )
+        })?;
+        drop(busy);
+        self.refresh_runners()?;
+        self.events.emit(CoreEvent::LibraryChanged);
+        self.list_emulators()
+    }
+
     /// Save what the user can configure for an emulator (extra launch arguments).
     pub fn configure_emulator(
         &self,
@@ -601,6 +715,16 @@ impl Core {
 
     /// Open an installed emulator's own window (not a game).
     pub fn open_emulator(&self, id: &str) -> Result<()> {
+        let busy = self
+            .installing_ports
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if busy.contains(&format!("emulator:{id}")) {
+            return Err(AppError::new(
+                "INSTALL_BUSY",
+                "Wait for the emulator installation to finish",
+            ));
+        }
         let def = emulators::find(id)?;
         let installed = self
             .with_db(|db| emulators::installed(db, id))?
@@ -618,6 +742,16 @@ impl Core {
         purge_data: bool,
     ) -> Result<Vec<emulators::EmulatorInfo>> {
         let def = emulators::find(id)?;
+        let busy = self
+            .installing_ports
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if busy.contains(&format!("emulator:{id}")) {
+            return Err(AppError::new(
+                "INSTALL_BUSY",
+                "Cancel the build and wait for it to stop before removing the emulator",
+            ));
+        }
         if self.with_db(|db| db.running_session())?.is_some() {
             return Err(AppError::new("LAUNCH_BUSY", "close the running game first"));
         }

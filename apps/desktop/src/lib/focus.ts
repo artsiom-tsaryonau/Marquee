@@ -78,7 +78,11 @@ export function startFocusEngine(opts: { back: () => void; onInput: (label: stri
   // Browser Gamepad API: standard mapping, A=0 B=1 X=2 Y=3, D-pad 12-15.
   const heldByPad = new Map<number, Set<string>>();
   let raf = 0;
+  let stopped = false;
+  const active = () => !document.hidden && document.hasFocus();
   const poll = () => {
+    raf = 0;
+    if (stopped || !active()) return;
     const connected = new Set<number>();
     for (const pad of navigator.getGamepads?.() ?? []) {
       if (!pad) continue;
@@ -113,14 +117,25 @@ export function startFocusEngine(opts: { back: () => void; onInput: (label: stri
     raf = connected.size > 0 ? requestAnimationFrame(poll) : 0;
   };
   const startPolling = () => {
-    if (!raf) raf = requestAnimationFrame(poll);
+    if (!stopped && active() && !raf && (navigator.getGamepads?.() ?? []).some(Boolean)) raf = requestAnimationFrame(poll);
+  };
+  const activityChanged = () => {
+    if (active()) startPolling();
+    else { cancelAnimationFrame(raf); raf = 0; }
   };
   window.addEventListener('gamepadconnected', startPolling);
+  window.addEventListener('focus', activityChanged);
+  window.addEventListener('blur', activityChanged);
+  document.addEventListener('visibilitychange', activityChanged);
   if ((navigator.getGamepads?.() ?? []).some(Boolean)) startPolling();
 
   return () => {
+    stopped = true;
     window.removeEventListener('keydown', onKey);
     window.removeEventListener('gamepadconnected', startPolling);
+    window.removeEventListener('focus', activityChanged);
+    window.removeEventListener('blur', activityChanged);
+    document.removeEventListener('visibilitychange', activityChanged);
     cancelAnimationFrame(raf);
   };
 }

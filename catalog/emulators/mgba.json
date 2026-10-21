@@ -1,0 +1,11 @@
+{
+  "id": "mgba",
+  "name": "mGBA",
+  "systems": ["gb", "gbc", "gba"],
+  "github": "mgba-emu/mgba",
+  "asset_suffix": "",
+  "binary": "AppRun",
+  "config_subdir": "mgba",
+  "requirement": "Source-build pilot: rootless Podman and Git required. Qt and SDL frontends, with managed compiler/runtime dependencies. No BIOS required. Open a user-owned game in mGBA; Marquee library import is not implemented yet.",
+  "packages": []
+}

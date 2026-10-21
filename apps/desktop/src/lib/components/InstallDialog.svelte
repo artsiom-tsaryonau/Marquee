@@ -5,7 +5,7 @@
   import Icon from './Icon.svelte';
 
   const tool = $derived(app.installToolId ? installable(app.installToolId) : undefined);
-  const dur = $derived(app.reduceMotion ? 0 : 240);
+  const dur = $derived(app.motionReduced ? 0 : 240);
   const busy = $derived(app.installingPcsx2);
 
   function run(optionId: string) {
@@ -68,8 +68,8 @@
     inset: 0;
     z-index: 40;
     background: rgb(0 0 0 / 0.55);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: var(--overlay-filter);
+    -webkit-backdrop-filter: var(--overlay-filter);
   }
   .dialog {
     position: fixed;

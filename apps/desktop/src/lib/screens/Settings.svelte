@@ -143,7 +143,14 @@
       </div>
     </div>
     <div class="item">
-      <div><strong>Reduce motion</strong><span>Turns off tilt, cross-fades and pulses</span></div>
+      <div><strong>Visual effects</strong><span>Balanced reduces GPU work. Full enables backdrop blur, grain and pointer tilt.</span></div>
+      <div class="seg" data-nav-row>
+        <button data-nav class:on={app.visualEffects === 'balanced'} onclick={() => (app.visualEffects = 'balanced')}>Balanced</button>
+        <button data-nav class:on={app.visualEffects === 'full'} onclick={() => (app.visualEffects = 'full')}>Full</button>
+      </div>
+    </div>
+    <div class="item">
+      <div><strong>Reduce motion</strong><span>Turns off tilt and cross-fades</span></div>
       <button class="switch" class:on={app.reduceMotion} data-nav role="switch" aria-checked={app.reduceMotion} aria-label="Reduce motion" onclick={() => (app.reduceMotion = !app.reduceMotion)}><i></i></button>
     </div>
     <div class="item">

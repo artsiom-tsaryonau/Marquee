@@ -63,6 +63,12 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
             out(core.refresh_artwork(edition.as_deref(), Some(sink))?)
         }
         "list_emulators" => out(core.list_emulators()?),
+        "build_emulator" => out(core.build_emulator(&text(&args, "id")?)?),
+        "emulator_build_status" => out(core
+            .source_builds
+            .status(&core.paths, &text(&args, "id")?)?),
+        "cancel_emulator_build" => out(core.source_builds.cancel(&text(&args, "id")?)?),
+        "rollback_emulator" => out(core.rollback_emulator(&text(&args, "id")?)?),
         "check_emulator_updates" => out(core.check_emulator_updates()?),
         "install_emulator" => out(core.install_emulator(&text(&args, "id")?, sink)?),
         "configure_emulator" => {

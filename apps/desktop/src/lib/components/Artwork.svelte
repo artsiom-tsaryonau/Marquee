@@ -2,9 +2,11 @@
   // Procedural stand-in for cover and hero images: one 1000×1000 scene,
   // cropped to whatever box it fills (2:3 cover, wide hero).
   import type { Art } from '../types';
+  import { app } from '../state.svelte';
 
   let { art, grain = true }: { art: Art; grain?: boolean } = $props();
   const uid = $props.id();
+  const useGrain = $derived(grain && app.visualEffects === 'full');
 
   const h = $derived(art.hue);
   const h2 = $derived(art.hue2);
@@ -70,7 +72,7 @@
         <rect x="0" y={470 + i * 26} width="1000" height={4 + i * 2.5} fill="#000" />
       {/each}
     </mask>
-    {#if grain}
+    {#if useGrain}
       <filter id="grain-{uid}">
         <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch" />
         <feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.08 0" />
@@ -136,7 +138,7 @@
   {/if}
 
   <rect width="1000" height="1000" fill="url(#fade-{uid})" />
-  {#if grain}
+  {#if useGrain}
     <rect width="1000" height="1000" filter="url(#grain-{uid})" />
   {/if}
 </svg>

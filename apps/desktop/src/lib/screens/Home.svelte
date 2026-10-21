@@ -24,7 +24,7 @@
   const notInstalled = $derived(app.games.filter((g) => !g.installed));
 
   const g = $derived(app.hero);
-  const dur = $derived(app.reduceMotion ? 0 : 320);
+  const dur = $derived(app.motionReduced ? 0 : app.visualEffects === 'balanced' ? 100 : 320);
   const empty = $derived(!g);
   const addFolder = () => app.addPs2Folder();
 </script>
