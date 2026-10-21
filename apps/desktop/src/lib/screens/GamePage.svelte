@@ -19,8 +19,8 @@
   const port = $derived(g?.source === 'port' ? app.ports.find((p) => `port:${p.id}` === g.id) : undefined);
   const similar = $derived(g ? app.games.filter((x) => canonicalId(x) !== canonicalId(g) && (x.genre === g.genre || x.source === g.source)).slice(0, 10) : []);
   const dur = $derived(app.motionReduced ? 0 : 360);
-  const offline = $derived(!!g && g.source === 'rom' && (g.platform === 'ps1' || g.platform === 'ps2'));
-  const emulator = $derived(g?.platform === 'ps1' ? 'DuckStation' : 'PCSX2');
+  const offline = $derived(!!g && g.source === 'rom' && g.platform !== 'unknown');
+  const emulator = $derived(g?.runnerName?.replace(' (Marquee)', '') ?? (g?.platform === 'ps1' ? 'DuckStation' : g?.platform === 'ps2' ? 'PCSX2' : 'its emulator'));
   let editing = $state(false);
   let titleDraft = $state('');
 

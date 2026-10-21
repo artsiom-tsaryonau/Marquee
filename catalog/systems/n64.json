@@ -1,0 +1,13 @@
+{
+  "id": "n64",
+  "display_name": "Nintendo 64",
+  "supported_extensions": [
+    "z64",
+    "n64",
+    "v64"
+  ],
+  "skipped_extensions": [],
+  "runner_kind": "emulator",
+  "emulator": "rmg",
+  "notes": "Cartridge images in any byte order."
+}

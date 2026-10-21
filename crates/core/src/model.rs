@@ -8,6 +8,7 @@ pub const KIND_PS2_ISO: &str = "ps2_iso";
 pub const KIND_PS1_ISO: &str = "ps1_iso";
 pub const KIND_PS1_CHD: &str = "ps1_chd";
 pub const KIND_PS1_CUE: &str = "ps1_cue";
+pub const KIND_ROM: &str = "rom";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -47,6 +48,9 @@ pub enum MediaKind {
     /// `.cue` sheet bound to a PS1 root. The sheet names a `.bin` track next to
     /// it; the emulator is handed the sheet, the serial is read from the track.
     Ps1Cue,
+    /// A cartridge or disc image for a system run by a catalogue emulator. It
+    /// carries no serial; the emulator is handed the file as-is.
+    Rom,
 }
 
 impl MediaKind {
@@ -56,6 +60,7 @@ impl MediaKind {
             Self::Ps1Iso => KIND_PS1_ISO,
             Self::Ps1Chd => KIND_PS1_CHD,
             Self::Ps1Cue => KIND_PS1_CUE,
+            Self::Rom => KIND_ROM,
         }
     }
 
@@ -65,6 +70,7 @@ impl MediaKind {
             KIND_PS1_ISO => Some(Self::Ps1Iso),
             KIND_PS1_CHD => Some(Self::Ps1Chd),
             KIND_PS1_CUE => Some(Self::Ps1Cue),
+            KIND_ROM => Some(Self::Rom),
             _ => None,
         }
     }
@@ -77,13 +83,11 @@ impl MediaKind {
     /// and importing it separately would double-count one disc.
     pub fn for_system_extension(system: &str, ext: &str) -> Option<Self> {
         match ext.to_ascii_lowercase().as_str() {
-            "iso" => Some(if system == SYSTEM_PS1 {
-                Self::Ps1Iso
-            } else {
-                Self::Iso
-            }),
+            "iso" if system == SYSTEM_PS1 => Some(Self::Ps1Iso),
+            "iso" if system == SYSTEM_PS2 => Some(Self::Iso),
             "chd" if system == SYSTEM_PS1 => Some(Self::Ps1Chd),
             "cue" if system == SYSTEM_PS1 => Some(Self::Ps1Cue),
+            _ if system != SYSTEM_PS1 && system != SYSTEM_PS2 => Some(Self::Rom),
             _ => None,
         }
     }
@@ -128,6 +132,8 @@ pub struct Edition {
 pub enum RunnerKind {
     Pcsx2,
     Duckstation,
+    /// A catalogue emulator driven by its `launch` template (Flycast, Mesen, RMG…).
+    Emulator,
     Fake,
 }
 
@@ -136,6 +142,7 @@ impl RunnerKind {
         match self {
             Self::Pcsx2 => "pcsx2",
             Self::Duckstation => "duckstation",
+            Self::Emulator => "emulator",
             Self::Fake => "fake",
         }
     }
@@ -143,6 +150,7 @@ impl RunnerKind {
     pub fn parse(s: &str) -> Self {
         match s {
             "duckstation" => Self::Duckstation,
+            "emulator" => Self::Emulator,
             "fake" => Self::Fake,
             _ => Self::Pcsx2,
         }

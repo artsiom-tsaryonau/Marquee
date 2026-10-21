@@ -1,0 +1,13 @@
+{
+  "id": "dreamcast",
+  "display_name": "Dreamcast",
+  "supported_extensions": [
+    "cdi",
+    "gdi",
+    "chd"
+  ],
+  "skipped_extensions": [],
+  "runner_kind": "emulator",
+  "emulator": "flycast",
+  "notes": "Disc images only; Flycast has a built-in HLE BIOS for most games."
+}

@@ -108,7 +108,18 @@ pub fn preferred_kind(system: &str) -> RunnerKind {
     }
 }
 
+/// The catalogue emulator that runs a generic (cartridge) system, as a runner id.
+pub fn emulator_runner_for(system: &str) -> Option<String> {
+    crate::catalog::by_id(system)
+        .ok()
+        .and_then(|d| d.emulator)
+        .map(|id| crate::emulators::runner_id(&id))
+}
+
 pub fn pick_for_system<'a>(runners: &'a [Runner], system: &str) -> Option<&'a Runner> {
+    if let Some(id) = emulator_runner_for(system) {
+        return runners.iter().find(|r| r.id == id && r.available);
+    }
     let wanted = preferred_kind(system);
     runners
         .iter()
@@ -135,6 +146,12 @@ pub fn selection_for<'a>(
     system: &str,
 ) -> Option<&'a str> {
     let id = selected?;
+    if let Some(runner_id) = emulator_runner_for(system) {
+        return runners
+            .iter()
+            .find(|r| r.id == id && r.id == runner_id)
+            .map(|r| r.id.as_str());
+    }
     let wanted = preferred_kind(system);
     runners
         .iter()
@@ -154,6 +171,17 @@ pub fn launch_argv(runner: &Runner, img: &Path, extra: &[String]) -> Result<Vec<
     if runner.kind == RunnerKind::Fake {
         return Ok(argv);
     }
+    if runner.kind == RunnerKind::Emulator {
+        // The emulator's own catalogue entry says how to start a game; `{rom}`
+        // is replaced by the image path as one argument (no shell involved).
+        let template = emulator_for_runner(&runner.id)
+            .map(|d| d.launch)
+            .unwrap_or_else(|| vec!["{rom}".into()]);
+        argv.extend(extra.iter().cloned());
+        let rom = img.to_string_lossy();
+        argv.extend(template.iter().map(|a| a.replace("{rom}", &rom)));
+        return Ok(argv);
+    }
     if runner.kind == RunnerKind::Pcsx2 {
         // Hide the main library window while keeping the game's render window.
         argv.extend(["-batch".into(), "-fullscreen".into(), "-nogui".into()]);
@@ -166,6 +194,13 @@ pub fn launch_argv(runner: &Runner, img: &Path, extra: &[String]) -> Result<Vec<
     }
     argv.push(img.to_string_lossy().into_owned());
     Ok(argv)
+}
+
+fn emulator_for_runner(runner_id: &str) -> Option<crate::emulators::EmulatorDef> {
+    crate::emulators::catalogue()
+        .ok()?
+        .into_iter()
+        .find(|d| crate::emulators::runner_id(&d.id) == runner_id)
 }
 
 pub fn require_launchable(runner: &Runner) -> Result<()> {

@@ -87,6 +87,20 @@ Emulators appear as picture cards in the Library's style: platform chips (from e
 
 Launch arguments are saved per emulator (`emulator.<id>.config`), validated (at most 16, 512 characters each, no line breaks) and added to the command for both Open and library launches. API: `configure_emulator {id, args}` (no CLI subcommand yet).
 
+## Cartridge and disc systems run by catalogue emulators
+
+Added 2026-10-21. A system with no dedicated runner kind is one file in `catalog/systems/<id>.json` naming a catalogue emulator (`"runner_kind": "emulator"`, `"emulator": "<id>"`). The emulator's own catalogue file says how a game starts: `"kind": "emulator"`, a `launch` argument list where `{rom}` is replaced by the image path as a single argument (no shell), and optional `env`. Scanning such a root imports every supported file as a `rom` media entry with no serial; artwork for these systems is not implemented yet.
+
+| System | Folder scanned | Emulator | Download | Launch arguments |
+| --- | --- | --- | --- | --- |
+| Dreamcast | `.cdi .gdi .chd` | Flycast v2.7 | GitHub AppImage, published SHA-256 | `-config window:fullscreen=yes {rom}` |
+| NES, SNES, Game Boy, Game Boy Color, PC Engine | `.nes .fds .unf`, `.smc .sfc .swc .fig`, `.gb`, `.gbc .gb`, `.pce .sgx` | Mesen 2.1.1 | GitHub `Linux_x64.zip`, published SHA-256; single `Mesen` binary | `--fullscreen {rom}`, run with `LC_ALL=C.UTF-8` |
+| Nintendo 64 | `.z64 .n64 .v64` | Rosalie's Mupen GUI v0.9.0 | GitHub AppImage, published SHA-256 | `--fullscreen --quit-after-emulation --nogui {rom}` |
+
+Verified on this host (2026-10-21): all three installed through `marquee emulators install`, 1,487 images from the local `roms/` folders were scanned into the library (Dreamcast 3, NES 245, SNES 42, GB 26, GBC 1,161, PC Engine 6, N64 4), and one game per emulator was launched with the argument lists above. Flycast (`chroma-circuit`) and RMG (`Kumi-Daiko-Beatoff-64`) stayed running until stopped; Mesen (`1kfrog`) stayed running with a fresh config folder. **Not verified:** the pictures on screen, input, clean exit and playtime for these systems. Mesen exited immediately on one earlier launch and showed a locale-related `std::bad_cast` crash in some of my manual runs (it only stayed up with `LC_ALL=C.UTF-8`); Mesen also hands a game to an already-running instance and exits, so a stray Mesen process makes the next launch quit at once.
+
+Not covered yet, and why: **Sega Genesis/Mega Drive** and **Neo Geo Pocket** have no emulator with a checksummed Linux download that Marquee can fetch (ares publishes no Linux build; mGBA publishes no checksums). They need a source-build recipe or a different emulator. **mGBA** is not used for Game Boy because Mesen covers it. The UI maps these systems to platforms and launches them; "Add folder" buttons for them are not built yet (use `marquee library add-root --system <id> <folder>`).
+
 ## Package managers: not used
 
 Flatpak, distro packages and loose AppImages found on the host are not discovered or run. Runner rows left by older versions (`flatpak`, `native`, `appimage` sources) are kept only because past sessions reference them; Marquee marks them unusable. The optional `packages` hints in catalogue files are display text only and will be removed.

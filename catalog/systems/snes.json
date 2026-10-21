@@ -1,0 +1,14 @@
+{
+  "id": "snes",
+  "display_name": "Super Nintendo",
+  "supported_extensions": [
+    "smc",
+    "sfc",
+    "swc",
+    "fig"
+  ],
+  "skipped_extensions": [],
+  "runner_kind": "emulator",
+  "emulator": "mesen",
+  "notes": "Cartridge images; no serial, so artwork is name-matched."
+}

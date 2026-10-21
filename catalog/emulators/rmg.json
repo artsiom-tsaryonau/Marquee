@@ -1,0 +1,24 @@
+{
+  "id": "rmg",
+  "name": "Rosalie's Mupen GUI",
+  "kind": "emulator",
+  "systems": [
+    "n64"
+  ],
+  "github": "Rosalie241/RMG",
+  "asset_suffix": ".appimage",
+  "asset_excludes": [
+    "arm",
+    "aarch"
+  ],
+  "binary": "AppRun",
+  "config_subdir": "RMG",
+  "launch": [
+    "--fullscreen",
+    "--quit-after-emulation",
+    "--nogui",
+    "{rom}"
+  ],
+  "requirement": "No firmware needed",
+  "packages": []
+}

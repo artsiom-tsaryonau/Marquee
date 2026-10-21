@@ -285,6 +285,7 @@ impl Core {
         let system = match runner.kind {
             RunnerKind::Duckstation => "ps1",
             RunnerKind::Pcsx2 => "ps2",
+            RunnerKind::Emulator => "emulator",
             RunnerKind::Fake => "test",
         };
         self.set_setting(&format!("selected_runner.{system}"), runner_id)?;

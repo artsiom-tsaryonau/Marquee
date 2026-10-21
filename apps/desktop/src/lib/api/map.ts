@@ -7,7 +7,18 @@ import type { Edition, LibraryRoot, LibrarySnapshot, Runner } from './contracts'
 import { isDesktopRuntime } from './desktop';
 import { webToken } from './http';
 
+/** Cartridge/disc systems run by a catalogue emulator (mirrors `catalog/systems/*.json`). */
+const SYSTEM_EMULATOR: Record<string, string> = {
+  dreamcast: 'flycast', nes: 'mesen', snes: 'mesen', gb: 'mesen', gbc: 'mesen', pce: 'mesen', n64: 'rmg',
+};
+/** Backend system id -> UI platform id. */
+const PLATFORM: Record<string, GameEntry['platform']> = {
+  ps1: 'ps1', ps2: 'ps2', dreamcast: 'dreamcast', nes: 'nes', snes: 'snes', gb: 'gb', gbc: 'gbc', pce: 'tg16', n64: 'n64',
+};
+
 function pickRunner(snap: Pick<LibrarySnapshot, 'runners' | 'settings'>, system = 'ps2'): Runner | null {
+  const emulator = SYSTEM_EMULATOR[system];
+  if (emulator) return snap.runners.find((r) => r.id === `runner.${emulator}.marquee` && r.available) ?? null;
   const kind = system === 'ps1' ? 'duckstation' : 'pcsx2';
   const selectedId = snap.settings.selected_runner_ids?.[system] ?? snap.settings.selected_runner_id;
   const matches = (r: Runner) => r.kind === kind || r.kind === 'fake';
@@ -20,7 +31,7 @@ function pickRunner(snap: Pick<LibrarySnapshot, 'runners' | 'settings'>, system 
 
 export function editionToGame(edition: Edition, snap: LibrarySnapshot): GameEntry {
   const runner = pickRunner(snap, edition.system);
-  const platform = edition.system === 'ps1' ? 'ps1' : edition.system === 'ps2' ? 'ps2' : 'unknown';
+  const platform = PLATFORM[edition.system] ?? 'unknown';
   const media = snap.media.find((m) => m.id === edition.media_id);
   const rootOffline = snap.roots.some((r: LibraryRoot) => r.system === edition.system && r.status === 'offline' && !!media && (media.path === r.path || media.path.startsWith(`${r.path}/`))) && !media?.available;
   let setupState: GameEntry['setupState'] = 'runner_missing';
@@ -31,7 +42,7 @@ export function editionToGame(edition: Edition, snap: LibrarySnapshot): GameEntr
     title: edition.title,
     tagline: edition.serial
       ? `${edition.serial}${edition.region ? ` · ${edition.region}` : ''}`
-      : `${platform === 'ps1' ? 'PlayStation' : platform === 'ps2' ? 'PlayStation 2' : 'Unknown platform'} disc`,
+      : platform === 'ps1' ? 'PlayStation disc' : platform === 'ps2' ? 'PlayStation 2 disc' : platform === 'unknown' ? 'Unknown platform' : `${edition.system.toUpperCase()} game`,
     platform,
     source: 'rom',
     installed: !edition.missing,

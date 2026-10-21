@@ -12,6 +12,12 @@
   ],
   "binary": "AppRun",
   "config_subdir": "flycast",
-  "requirement": "Dreamcast BIOS (dc_boot.bin, dc_flash.bin) — automated setup planned; manual copy fallback",
-  "packages": []
+  "requirement": "Built-in HLE BIOS boots most games; a few need real dc_boot.bin/dc_flash.bin (import via bios-inbox planned)",
+  "packages": [],
+  "kind": "emulator",
+  "launch": [
+    "-config",
+    "window:fullscreen=yes",
+    "{rom}"
+  ]
 }

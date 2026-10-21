@@ -1,0 +1,28 @@
+{
+  "id": "mesen",
+  "name": "Mesen",
+  "kind": "emulator",
+  "systems": [
+    "nes",
+    "snes",
+    "gb",
+    "gbc",
+    "pce"
+  ],
+  "github": "SourMesen/Mesen2",
+  "asset_suffix": "linux_x64.zip",
+  "asset_excludes": [
+    "arm"
+  ],
+  "binary": "Mesen",
+  "config_subdir": "Mesen2",
+  "launch": [
+    "--fullscreen",
+    "{rom}"
+  ],
+  "env": [
+    "LC_ALL=C.UTF-8"
+  ],
+  "requirement": "No firmware needed for these systems",
+  "packages": []
+}

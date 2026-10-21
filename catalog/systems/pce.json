@@ -1,0 +1,12 @@
+{
+  "id": "pce",
+  "display_name": "PC Engine / TurboGrafx-16",
+  "supported_extensions": [
+    "pce",
+    "sgx"
+  ],
+  "skipped_extensions": [],
+  "runner_kind": "emulator",
+  "emulator": "mesen",
+  "notes": "HuCard images."
+}

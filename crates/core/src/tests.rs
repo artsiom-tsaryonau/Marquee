@@ -922,3 +922,62 @@ fn failed_process_keeps_attempt_duration_without_crediting_play() {
     assert_eq!(edition.playtime_seconds, 0);
     assert!(edition.last_played_at.is_none());
 }
+
+#[test]
+fn cartridge_systems_scan_pick_their_emulator_and_build_argv() {
+    let dir = tempfile::tempdir().unwrap();
+    let roms = dir.path().join("nes");
+    std::fs::create_dir_all(&roms).unwrap();
+    std::fs::write(roms.join("Frog Quest (PD).nes"), b"NES\x1a").unwrap();
+    std::fs::write(roms.join("notes.txt"), b"x").unwrap();
+    let core = Core::open_isolated(Some(dir.path().join("data")), false).unwrap();
+    core.add_root("nes", roms.clone(), None).unwrap();
+    let report = core.scan(None, None).unwrap();
+    assert_eq!(report.added, 1);
+    let snap = core.snapshot().unwrap();
+    assert_eq!(snap.editions[0].system, "nes");
+    assert_eq!(snap.editions[0].title, "Frog Quest (PD)");
+    assert_eq!(snap.media[0].kind, MediaKind::Rom);
+    assert!(snap.media[0].serial.is_none());
+
+    let runner = |id: &str, source: &str| crate::model::Runner {
+        id: id.into(),
+        kind: RunnerKind::Emulator,
+        display_name: id.into(),
+        command: vec![
+            "/usr/bin/env".into(),
+            "/data/runners/mesen/current/Mesen".into(),
+        ],
+        bios_state: BiosState::Unverified,
+        bios_hint: None,
+        source: source.into(),
+        available: true,
+    };
+    let mesen = runner("runner.mesen.marquee", "marquee");
+    let other = runner("runner.flycast.marquee", "marquee");
+    let runners = vec![other, mesen.clone()];
+    assert_eq!(
+        runners::pick_for_system(&runners, "nes").unwrap().id,
+        "runner.mesen.marquee"
+    );
+    assert_eq!(
+        runners::pick_for_system(&runners, "dreamcast").unwrap().id,
+        "runner.flycast.marquee"
+    );
+    assert_eq!(
+        runners::pick_for_system(&runners, "n64").map(|r| r.id.as_str()),
+        None
+    );
+    let rom = PathBuf::from("/roms/My Game's (USA).nes");
+    let argv = runners::launch_argv(&mesen, &rom, &["--x".into()]).unwrap();
+    assert_eq!(
+        argv,
+        vec![
+            "/usr/bin/env",
+            "/data/runners/mesen/current/Mesen",
+            "--x",
+            "--fullscreen",
+            "/roms/My Game's (USA).nes"
+        ]
+    );
+}

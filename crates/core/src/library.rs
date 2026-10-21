@@ -184,7 +184,7 @@ fn ingest_disc(
                 crate::iso::unresolved()
             }
         },
-        MediaKind::Ps1Chd => crate::iso::unresolved(),
+        MediaKind::Ps1Chd | MediaKind::Rom => crate::iso::unresolved(),
         _ => identify_disc_iso(path)?,
     };
     if identity.serial.is_none() {

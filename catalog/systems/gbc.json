@@ -1,0 +1,12 @@
+{
+  "id": "gbc",
+  "display_name": "Game Boy Color",
+  "supported_extensions": [
+    "gbc",
+    "gb"
+  ],
+  "skipped_extensions": [],
+  "runner_kind": "emulator",
+  "emulator": "mesen",
+  "notes": "Cartridge images; original Game Boy files are accepted in this folder too."
+}

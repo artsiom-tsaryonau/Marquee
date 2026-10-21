@@ -1,0 +1,13 @@
+{
+  "id": "nes",
+  "display_name": "Nintendo Entertainment System",
+  "supported_extensions": [
+    "nes",
+    "fds",
+    "unf"
+  ],
+  "skipped_extensions": [],
+  "runner_kind": "emulator",
+  "emulator": "mesen",
+  "notes": "Cartridge images; no serial, so artwork is name-matched."
+}

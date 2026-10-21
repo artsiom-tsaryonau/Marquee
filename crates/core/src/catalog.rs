@@ -4,6 +4,18 @@ use serde::Deserialize;
 pub const PS2_JSON: &str = include_str!("../../../catalog/systems/ps2.json");
 pub const PS1_JSON: &str = include_str!("../../../catalog/systems/ps1.json");
 
+/// Cartridge and disc systems that run through a catalogue emulator. Adding a
+/// system is one JSON file here plus the emulator it names.
+const GENERIC_JSON: &[&str] = &[
+    include_str!("../../../catalog/systems/dreamcast.json"),
+    include_str!("../../../catalog/systems/nes.json"),
+    include_str!("../../../catalog/systems/snes.json"),
+    include_str!("../../../catalog/systems/gb.json"),
+    include_str!("../../../catalog/systems/gbc.json"),
+    include_str!("../../../catalog/systems/pce.json"),
+    include_str!("../../../catalog/systems/n64.json"),
+];
+
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct SystemDescriptor {
     pub id: String,
@@ -14,6 +26,10 @@ pub struct SystemDescriptor {
     /// Cover URL template with a `${serial}` placeholder, if the system has one.
     #[serde(default)]
     pub covers: Option<String>,
+    /// Catalogue emulator that runs this system (`catalog/emulators/<id>.json`),
+    /// for systems with no dedicated runner kind.
+    #[serde(default)]
+    pub emulator: Option<String>,
 }
 
 impl SystemDescriptor {
@@ -40,17 +56,19 @@ pub fn ps1() -> Result<SystemDescriptor> {
 
 /// Every system Marquee ships a descriptor for.
 pub fn all() -> Result<Vec<SystemDescriptor>> {
-    Ok(vec![ps1()?, ps2()?])
+    let mut all = vec![ps1()?, ps2()?];
+    for json in GENERIC_JSON {
+        all.push(load(json)?);
+    }
+    Ok(all)
 }
 
 /// Look up a descriptor by system id (`ps2`, `ps1`). Unknown ids are a caller error.
 pub fn by_id(system: &str) -> Result<SystemDescriptor> {
-    all()?.into_iter().find(|d| d.id == system).ok_or_else(|| {
-        AppError::new(
-            "ROOT_OFFLINE",
-            format!("unknown system: {system} (known: ps2, ps1)"),
-        )
-    })
+    all()?
+        .into_iter()
+        .find(|d| d.id == system)
+        .ok_or_else(|| AppError::new("ROOT_OFFLINE", format!("unknown system: {system}")))
 }
 
 pub fn load(json: &str) -> Result<SystemDescriptor> {
@@ -90,13 +108,25 @@ mod tests {
     }
 
     #[test]
+    fn every_generic_system_names_a_catalogue_emulator_that_lists_it() {
+        for d in all().unwrap() {
+            if let Some(emu) = d.emulator.as_deref() {
+                let def = crate::emulators::find(emu).unwrap();
+                assert!(def.systems.contains(&d.id), "{emu} does not list {}", d.id);
+                assert_eq!(d.runner_kind, "emulator");
+                assert!(!d.supported_extensions.is_empty());
+            }
+        }
+    }
+
+    #[test]
     fn descriptors_reject_command_fields() {
         assert!(load(r#"{"id":"x","display_name":"X","supported_extensions":[],"skipped_extensions":[],"runner_kind":"k","command":["rm"]}"#).is_err());
     }
 
     #[test]
     fn by_id_unknown_is_error() {
-        assert_eq!(by_id("snes").unwrap_err().code, "ROOT_OFFLINE");
+        assert_eq!(by_id("atari-jaguar").unwrap_err().code, "ROOT_OFFLINE");
         assert_eq!(by_id("ps2").unwrap().display_name, "PlayStation 2");
     }
 }

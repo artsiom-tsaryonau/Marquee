@@ -1,0 +1,11 @@
+{
+  "id": "gb",
+  "display_name": "Game Boy",
+  "supported_extensions": [
+    "gb"
+  ],
+  "skipped_extensions": [],
+  "runner_kind": "emulator",
+  "emulator": "mesen",
+  "notes": "Cartridge images."
+}

@@ -30,6 +30,8 @@ const CATALOGUE: &[&str] = &[
     include_str!("../../../catalog/emulators/xemu.json"),
     include_str!("../../../catalog/emulators/azahar.json"),
     include_str!("../../../catalog/emulators/mgba.json"),
+    include_str!("../../../catalog/emulators/mesen.json"),
+    include_str!("../../../catalog/emulators/rmg.json"),
 ];
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -85,6 +87,17 @@ pub struct EmulatorDef {
     pub requirement: String,
     #[serde(default)]
     pub packages: Vec<PackageHint>,
+    /// Arguments that start a game, with `{rom}` standing for the image path.
+    /// Used by systems that run through this emulator (`kind` = `emulator`).
+    #[serde(default = "default_launch")]
+    pub launch: Vec<String>,
+    /// Extra `NAME=value` environment for every start (for example a locale).
+    #[serde(default)]
+    pub env: Vec<String>,
+}
+
+fn default_launch() -> Vec<String> {
+    vec!["{rom}".into()]
 }
 
 /// What the user can change per emulator.
@@ -577,15 +590,23 @@ pub fn uninstall(paths: &Paths, def: &EmulatorDef, purge_data: bool) -> Result<(
 
 /// `env XDG_*=… <program>`: the isolation travels with the command, so every
 /// way of starting the emulator (library launch, Open button) is contained.
-fn launch_command(paths: &Paths, id: &str, env: &str, bin: &Path, args: &[String]) -> Vec<String> {
+fn launch_command(
+    paths: &Paths,
+    id: &str,
+    env: &str,
+    extra_env: &[String],
+    bin: &Path,
+    args: &[String],
+) -> Vec<String> {
     let root = paths.data_dir.join(id);
     let mut command = vec![
         env.to_string(),
         format!("XDG_CONFIG_HOME={}", config_home(paths, id).display()),
         format!("XDG_DATA_HOME={}", root.join("xdg-data").display()),
         format!("XDG_CACHE_HOME={}", root.join("xdg-cache").display()),
-        bin.to_string_lossy().into_owned(),
     ];
+    command.extend(extra_env.iter().cloned());
+    command.push(bin.to_string_lossy().into_owned());
     command.extend(args.iter().cloned());
     command
 }
@@ -608,7 +629,7 @@ pub fn open(paths: &Paths, def: &EmulatorDef, installed: &Installed, cfg: &Confi
     } else {
         "env"
     };
-    let command = launch_command(paths, &def.id, env, &bin, &cfg.args);
+    let command = launch_command(paths, &def.id, env, &def.env, &bin, &cfg.args);
     let (program, args) = command.split_first().expect("command is never empty");
     let mut child = Command::new(program)
         .args(args)
@@ -658,7 +679,14 @@ pub fn sync_runners(db: &Db, paths: &Paths) -> Result<()> {
             &runner_id(&def.id),
             kind,
             &format!("{} (Marquee)", def.name),
-            &launch_command(paths, &def.id, env, &bin, &config(db, &def.id)?.args),
+            &launch_command(
+                paths,
+                &def.id,
+                env,
+                &def.env,
+                &bin,
+                &config(db, &def.id)?.args,
+            ),
             state,
             hint.as_deref(),
             "marquee",
@@ -821,12 +849,16 @@ mod tests {
         }
         sync_runners(&db, &paths).unwrap();
         let rows = db.list_runners().unwrap();
+        let mut kinds: Vec<_> = rows.iter().map(|r| r.kind.as_str()).collect();
+        kinds.sort();
         assert_eq!(
-            rows.len(),
-            1,
-            "an emulator with no library integration must not be a runner"
+            kinds,
+            ["duckstation", "emulator", "emulator", "emulator"],
+            "only emulators with a library integration become runners"
         );
-        assert_eq!(rows[0].kind, "duckstation");
+        for def in all.iter().filter(|d| d.kind.is_none()) {
+            assert!(rows.iter().all(|r| r.id != runner_id(&def.id)));
+        }
     }
 
     #[test]
@@ -849,6 +881,7 @@ mod tests {
             &paths,
             "duckstation",
             "env",
+            &[],
             Path::new("/p/AppRun"),
             &["--x".into()],
         );
