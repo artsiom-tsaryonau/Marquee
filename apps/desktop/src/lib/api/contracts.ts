@@ -198,9 +198,11 @@ export interface LauncherInfo extends LauncherConfig {
   status: string;
 }
 
-export interface PackageHint { manager: string; command: string; note: string }
+
+export interface FirmwareStatus { name: string; required: boolean; present: boolean; path: string | null; note: string }
 
 export interface EmulatorInfo {
+  firmware?: FirmwareStatus[];
   launch_presentation?: string;
   source_build?: boolean;
   source_receipt?: { commit: string; image: string; recipe: string; validation: string } | null;
@@ -220,7 +222,6 @@ export interface EmulatorInfo {
   bios_dir: string | null;
   icon: string | null;
   args: string[];
-  alternatives: PackageHint[];
 }
 
 export interface BiosFile { system: string; file: string; region: string; version: string }
@@ -249,7 +250,6 @@ export interface LibraryApi {
   scan(rootId?: string): Promise<ScanReport>;
   listRunners(): Promise<Runner[]>;
   selectRunner(id: string): Promise<void>;
-  openSetup(id: string): Promise<void>;
   launch(editionId: string): Promise<Session>;
   setFavourite(editionId: string, favorite: boolean): Promise<void>;
   setDisplayTitle(editionId: string, title: string): Promise<void>;

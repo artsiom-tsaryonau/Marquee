@@ -15,7 +15,7 @@ Updated 2026-10-21. Marquee installs emulators and holds BIOS images inside its 
 | xemu | Original Xbox | Managed lifecycle and standalone opening |
 | mGBA | GB / GBC / GBA | Opt-in pinned source-build pilot, Qt/SDL standalone tools; no library adapter |
 
-PCSX2 is integrated through its dedicated installer (`tools.rs`), which now has one channel: download the official AppImage, verify it, unpack it into Marquee's data folder, then delete the download. A catalogue entry is implementation of acquisition/opening, not proof of a successful current upstream install, complete configuration isolation, firmware readiness or a playable game. Install requires a matching upstream AppImage with a published checksum; missing or changed packaging must produce an error. Additional platforms still need system descriptors, media import, launch flags, prerequisite checks, save behavior and live acceptance before their games appear as playable library entries. Standalone emulator lifetime is not recorded as game playtime.
+PCSX2 is a normal catalogue entry (`catalog/emulators/pcsx2.json`, runner `runner.pcsx2.marquee`): the same verified-download-and-unpack path as every other emulator. The old dedicated installer (`tools.rs`) is gone. An install made by it is adopted as-is on the next refresh (recorded as version `adopted`), and its old `runner.pcsx2.unpacked` row is disabled, so nothing is downloaded twice (checked on this host). The install command `install_pcsx2` remains for the install dialog and delegates to the catalogue. A catalogue entry is implementation of acquisition/opening, not proof of a successful current upstream install, complete configuration isolation, firmware readiness or a playable game. Install requires a matching upstream AppImage with a published checksum; missing or changed packaging must produce an error. Additional platforms still need system descriptors, media import, launch flags, prerequisite checks, save behavior and live acceptance before their games appear as playable library entries. Standalone emulator lifetime is not recorded as game playtime.
 
 ## What is needed to install and manage DuckStation
 
@@ -83,9 +83,9 @@ The same operations are API commands: `list_emulators`, `check_emulator_updates`
 
 ## Tools screen
 
-Emulators appear as picture cards in the Library's style: platform chips (from each emulator's systems), Installed/Updates chips, and the search box. The picture is the emulator's own icon, copied out of the unpacked AppImage into the art cache the first time it is listed, over generated art. Cards open a settings dialog with status, install/update/open, **launch arguments**, install locations, and remove with or without saves.
+Emulators appear as picture cards in the Library's style: platform chips (from each emulator's systems), Installed/Updates chips, and the search box. The picture is the emulator's own icon, copied out of the unpacked AppImage into the art cache the first time it is listed, over generated art. Cards open a dialog with status, install/update/open, firmware status, install locations, and remove with or without saves. The per-emulator launch-argument editor and the "Open setup" buttons were removed from the UI (2026-10-21): Marquee writes each emulator's first-run settings itself. The backend commands (`configure_emulator`, `open_runner_setup`) still exist.
 
-Launch arguments are saved per emulator (`emulator.<id>.config`), validated (at most 16, 512 characters each, no line breaks) and added to the command for both Open and library launches. API: `configure_emulator {id, args}` (no CLI subcommand yet).
+Saved launch arguments (`emulator.<id>.config`, at most 16 values of 512 characters, no line breaks) are still honoured by both Open and library launches and used internally by the mGBA games-folder picker; there is no editor for them. API: `configure_emulator {id, args}`.
 
 ## Cartridge and disc systems run by catalogue emulators
 
@@ -101,9 +101,21 @@ Verified on this host (2026-10-21): all three installed through `marquee emulato
 
 Not covered yet, and why: **Sega Genesis/Mega Drive** and **Neo Geo Pocket** have no emulator with a checksummed Linux download that Marquee can fetch (ares publishes no Linux build; mGBA publishes no checksums). They need a source-build recipe or a different emulator. **mGBA** is not used for Game Boy because Mesen covers it. The UI maps these systems to platforms and launches them; "Add folder" buttons for them are not built yet (use `marquee library add-root --system <id> <folder>`).
 
+## Firmware requirements
+
+A catalogue entry may list `firmware` files taken from the emulator's own source (via the RetroBIOS profiles): `name`, `aliases`, `required`, an exact `size` when the emulator checks one, the isolated folder it belongs in (`root` = `config` or `data`, plus `dir`), and a note. Marquee reports each file as in place or missing (`emulators list`, and a Firmware section in the emulator dialog), and the BIOS inbox copies any matching file, or one inside a dropped zip, into place without overwriting (a wrong-size file under the right name is refused).
+
+| Emulator | File | Required | Where it goes | Still manual |
+| --- | --- | --- | --- | --- |
+| Flycast | `dc_boot.bin` (2 MB; alias `dc_bios.bin`) | optional, HLE fallback | `xdg-data/flycast/` | nothing |
+| RPCS3 | `PS3UPDAT.PUP` | required | `xdg-config/rpcs3/firmware/` | installing it into RPCS3 (File > Install Firmware or `--installfw`) is not automated |
+| xemu | `mcpx_1.0.bin` (512 B), flash ROM (`Complex_4627.bin`, `cerbios.bin`…), `xbox_hdd.qcow2` | required | `xdg-data/xemu/xemu/` | xemu reads the paths from `xemu.toml`; Marquee does not write that file yet |
+
+Verified on this host: the status reports all five as missing (none supplied), and unit tests cover import and the size check. PS1/PS2 BIOS keep their own region-aware import above.
+
 ## Package managers: not used
 
-Flatpak, distro packages and loose AppImages found on the host are not discovered or run. Runner rows left by older versions (`flatpak`, `native`, `appimage` sources) are kept only because past sessions reference them; Marquee marks them unusable. The optional `packages` hints in catalogue files are display text only and will be removed.
+Flatpak, distro packages and loose AppImages found on the host are not discovered or run. Runner rows left by older versions (`flatpak`, `native`, `appimage` sources) are kept only because past sessions reference them; Marquee marks them unusable. The `packages` hints were removed from the catalogue files, the model and the UI.
 
 ## Adding another emulator
 
@@ -117,7 +129,7 @@ Flatpak, distro packages and loose AppImages found on the host are not discovere
 2. List the file in `CATALOGUE` in `crates/core/src/emulators.rs`.
 3. If it is a new emulator family, add a `RunnerKind` in `model.rs`, map its systems in `runners::preferred_kind`, and add its launch flags to `runners::launch_argv`.
 
-Install, update checks, uninstall, runner registration and isolation then come from the catalogue. Limits today: `.zip`/`.tar.gz`/direct-link support is unit-tested for link and checksum handling but no direct-link emulator has been installed end to end; `.7z` and other formats are unsupported; the emulator must honour `XDG_CONFIG_HOME` for its user folder. PCSX2 still uses its older dedicated installer (`tools.rs`); moving it onto the catalogue is a follow-up.
+Install, update checks, uninstall, runner registration and isolation then come from the catalogue. A direct link has been installed end to end: Mesen now uses one (pinned 2.1.1 zip and SHA-256), and a clean `--data-dir` install produced a working `Mesen` binary (2026-10-21). A wrong checksum is refused in code but was not tried against a live download. `.7z` and other formats are unsupported; the emulator must honour `XDG_CONFIG_HOME` for its user folder. 
 
 ## Game-only windows and headless emulation
 

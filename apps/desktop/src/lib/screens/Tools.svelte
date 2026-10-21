@@ -155,7 +155,6 @@
           badge={{ text: isDefault ? 'Default' : r.available ? 'Detected' : 'Unavailable', tone: r.available ? 'ok' : '' }} ready={r.available}>
           {#snippet actions()}
             <button class="btn primary small" data-nav disabled={!r.available || isDefault} onclick={() => app.chooseRunner(r.id)}>Use as default</button>
-            <button class="btn glass small" data-nav disabled={!r.available} onclick={() => app.openSetup(r.id)}>Setup</button>
           {/snippet}
         </ToolCard>
       {:else if item.t === 'launcher'}

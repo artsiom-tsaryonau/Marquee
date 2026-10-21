@@ -50,7 +50,6 @@ export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'su
     scan: (rootId) => call<ScanReport>('scan_library_root', { root_id: rootId ?? null }),
     listRunners: () => call<Runner[]>('list_runners'),
     selectRunner: (runnerId) => call<void>('select_runner', { runner_id: runnerId }),
-    openSetup: (runnerId) => call<void>('open_runner_setup', { runner_id: runnerId }),
     launch: (editionId) => call<Session>('launch_game', { edition_id: editionId }),
     setFavourite: (editionId, favorite) => call<void>('set_favourite', { edition_id: editionId, favorite }),
     setDisplayTitle: (editionId, title) => call<void>('set_display_title', { edition_id: editionId, title }),

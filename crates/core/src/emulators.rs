@@ -23,6 +23,7 @@ use std::time::Duration;
 
 const CATALOGUE: &[&str] = &[
     include_str!("../../../catalog/emulators/duckstation.json"),
+    include_str!("../../../catalog/emulators/pcsx2.json"),
     include_str!("../../../catalog/emulators/flycast.json"),
     include_str!("../../../catalog/emulators/cemu.json"),
     include_str!("../../../catalog/emulators/rpcs3.json"),
@@ -34,11 +35,36 @@ const CATALOGUE: &[&str] = &[
     include_str!("../../../catalog/emulators/rmg.json"),
 ];
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct PackageHint {
-    pub manager: String,
-    pub command: String,
+/// A firmware or BIOS file an emulator reads, from the emulator's own source.
+#[derive(Debug, Clone, Deserialize)]
+pub struct FirmwareDef {
+    pub name: String,
     #[serde(default)]
+    pub aliases: Vec<String>,
+    #[serde(default)]
+    pub required: bool,
+    /// Exact size in bytes, when the emulator checks one.
+    #[serde(default)]
+    pub size: Option<u64>,
+    /// `config` or `data`: which isolated XDG folder holds the file.
+    #[serde(default = "default_root")]
+    pub root: String,
+    /// Folder under that root.
+    pub dir: String,
+    #[serde(default)]
+    pub note: String,
+}
+
+fn default_root() -> String {
+    "config".into()
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct FirmwareStatus {
+    pub name: String,
+    pub required: bool,
+    pub present: bool,
+    pub path: Option<String>,
     pub note: String,
 }
 
@@ -85,8 +111,6 @@ pub struct EmulatorDef {
     pub bios_subdir: Option<String>,
     pub bios_system: Option<String>,
     pub requirement: String,
-    #[serde(default)]
-    pub packages: Vec<PackageHint>,
     /// Arguments that start a game, with `{rom}` standing for the image path.
     /// Used by systems that run through this emulator (`kind` = `emulator`).
     #[serde(default = "default_launch")]
@@ -94,6 +118,9 @@ pub struct EmulatorDef {
     /// Extra `NAME=value` environment for every start (for example a locale).
     #[serde(default)]
     pub env: Vec<String>,
+    /// Firmware or BIOS files this emulator reads, checked and filled from the inbox.
+    #[serde(default)]
+    pub firmware: Vec<FirmwareDef>,
 }
 
 fn default_launch() -> Vec<String> {
@@ -177,6 +204,8 @@ pub struct Installed {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct EmulatorInfo {
+    /// Firmware files this emulator reads and whether each is in place.
+    pub firmware: Vec<FirmwareStatus>,
     pub launch_presentation: String,
     pub source_build: bool,
     pub source_receipt: Option<serde_json::Value>,
@@ -201,8 +230,6 @@ pub struct EmulatorInfo {
     pub icon: Option<PathBuf>,
     /// Extra launch arguments the user configured.
     pub args: Vec<String>,
-    /// Advanced: commands you could run yourself instead. Marquee never runs them.
-    pub alternatives: Vec<PackageHint>,
 }
 
 pub fn catalogue() -> Result<Vec<EmulatorDef>> {
@@ -320,6 +347,7 @@ pub fn info(
         name: def.name.clone(),
         systems: def.systems.clone(),
         integrated: def.kind.is_some(),
+        firmware: firmware_status(paths, def),
         upstream: def
             .download
             .as_ref()
@@ -337,7 +365,6 @@ pub fn info(
             None
         },
         args: cfg.args.clone(),
-        alternatives: def.packages.clone(),
     }
 }
 
@@ -647,8 +674,116 @@ pub fn open(paths: &Paths, def: &EmulatorDef, installed: &Installed, cfg: &Confi
 /// Make each installed emulator available as a launcher, run under its own
 /// isolated config home. The launch command is `env XDG_CONFIG_HOME=… <program>`
 /// so the isolation travels with the runner and the launch code needs no special case.
+fn firmware_dir(paths: &Paths, def: &EmulatorDef, fw: &FirmwareDef) -> PathBuf {
+    let root = if fw.root == "data" {
+        paths.data_dir.join(&def.id).join("xdg-data")
+    } else {
+        config_home(paths, &def.id)
+    };
+    root.join(&fw.dir)
+}
+
+fn name_matches(fw: &FirmwareDef, file: &str) -> bool {
+    std::iter::once(&fw.name)
+        .chain(fw.aliases.iter())
+        .any(|n| n.eq_ignore_ascii_case(file))
+}
+
+/// Which of an emulator's firmware files are in its folder.
+pub fn firmware_status(paths: &Paths, def: &EmulatorDef) -> Vec<FirmwareStatus> {
+    def.firmware
+        .iter()
+        .map(|fw| {
+            let dir = firmware_dir(paths, def, fw);
+            let found = fs::read_dir(&dir).ok().and_then(|entries| {
+                entries.flatten().map(|e| e.path()).find(|p| {
+                    p.file_name()
+                        .and_then(|n| n.to_str())
+                        .is_some_and(|n| name_matches(fw, n))
+                        && fw
+                            .size
+                            .is_none_or(|s| fs::metadata(p).is_ok_and(|m| m.len() == s))
+                })
+            });
+            FirmwareStatus {
+                name: fw.name.clone(),
+                required: fw.required,
+                present: found.is_some(),
+                path: found.map(|p| p.to_string_lossy().into_owned()),
+                note: fw.note.clone(),
+            }
+        })
+        .collect()
+}
+
+/// Copy any file under `source` (up to 3 levels deep) that an emulator's catalogue
+/// entry names as firmware into that emulator's folder. Returns the names added.
+/// Existing files are never overwritten.
+pub fn import_firmware(paths: &Paths, source: &Path) -> Vec<String> {
+    let Ok(defs) = catalogue() else {
+        return Vec::new();
+    };
+    let mut files = Vec::new();
+    collect(source, 3, &mut files);
+    let mut added = Vec::new();
+    for def in &defs {
+        for fw in &def.firmware {
+            let Some(src) = files.iter().find(|p| {
+                p.file_name()
+                    .and_then(|n| n.to_str())
+                    .is_some_and(|n| name_matches(fw, n))
+                    && fw
+                        .size
+                        .is_none_or(|s| fs::metadata(p).is_ok_and(|m| m.len() == s))
+            }) else {
+                continue;
+            };
+            let dir = firmware_dir(paths, def, fw);
+            let target = dir.join(&fw.name);
+            if target.exists() || fs::create_dir_all(&dir).is_err() {
+                continue;
+            }
+            if fs::copy(src, &target).is_ok() {
+                added.push(format!("{} ({})", fw.name, def.name));
+            }
+        }
+    }
+    added
+}
+
+fn collect(root: &Path, depth: u32, out: &mut Vec<PathBuf>) {
+    let Ok(entries) = fs::read_dir(root) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        match entry.file_type() {
+            Ok(t) if t.is_file() => out.push(path),
+            Ok(t) if t.is_dir() && depth > 0 => collect(&path, depth - 1, out),
+            _ => {}
+        }
+    }
+}
+
+/// An install made before this emulator moved into the catalogue (or by hand into
+/// Marquee's own folder) is adopted as-is, so nothing is downloaded twice.
+fn adopt_existing(db: &Db, paths: &Paths, def: &EmulatorDef) -> Result<()> {
+    if installed(db, &def.id)?.is_none() && program_dir(paths, &def.id).join(&def.binary).is_file()
+    {
+        db.set_setting(
+            &setting_key(&def.id),
+            &serde_json::to_string(&Installed {
+                version: "adopted".into(),
+                bin: def.binary.clone(),
+            })?,
+        )?;
+    }
+    Ok(())
+}
+
 pub fn sync_runners(db: &Db, paths: &Paths) -> Result<()> {
     for def in catalogue()? {
+        adopt_existing(db, paths, &def)?;
         let Some(kind) = def.kind.as_deref() else {
             continue;
         };
@@ -699,6 +834,42 @@ pub fn sync_runners(db: &Db, paths: &Paths) -> Result<()> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn firmware_is_reported_and_filled_from_a_folder_without_overwriting() {
+        let t = tempfile::tempdir().unwrap();
+        let paths = Paths::resolve(Some(t.path().join("data"))).unwrap();
+        let def = find("flycast").unwrap();
+        assert!(!firmware_status(&paths, &def)[0].present);
+        let inbox = t.path().join("pack/dc");
+        fs::create_dir_all(&inbox).unwrap();
+        fs::write(inbox.join("DC_BIOS.BIN"), vec![0u8; 2_097_152]).unwrap();
+        fs::write(inbox.join("wrong-size.bin"), b"x").unwrap();
+        let added = import_firmware(&paths, &t.path().join("pack"));
+        assert_eq!(added, ["dc_boot.bin (Flycast)"]);
+        let st = &firmware_status(&paths, &def)[0];
+        assert!(st.present && !st.required);
+        assert!(st
+            .path
+            .as_deref()
+            .unwrap()
+            .ends_with("xdg-data/flycast/dc_boot.bin"));
+        assert!(import_firmware(&paths, &t.path().join("pack")).is_empty());
+        // A file of the wrong size under the right name is not accepted.
+        let other = t.path().join("bad");
+        fs::create_dir_all(&other).unwrap();
+        fs::write(other.join("dc_boot.bin"), b"tiny").unwrap();
+        let fresh = Paths::resolve(Some(t.path().join("data2"))).unwrap();
+        assert!(import_firmware(&fresh, &other).is_empty());
+        let xemu = find("xemu").unwrap();
+        assert_eq!(
+            firmware_status(&paths, &xemu)
+                .iter()
+                .filter(|f| f.required)
+                .count(),
+            3
+        );
+    }
 
     #[test]
     fn a_direct_link_uses_its_pinned_checksum_and_version() {
@@ -835,8 +1006,9 @@ mod tests {
         let paths = Paths::resolve(Some(t.path().join("data"))).unwrap();
         let db = Db::open_in_memory().unwrap();
         for def in &all {
-            fs::create_dir_all(program_dir(&paths, &def.id)).unwrap();
-            fs::write(program_dir(&paths, &def.id).join(&def.binary), "x").unwrap();
+            let bin = program_dir(&paths, &def.id).join(&def.binary);
+            fs::create_dir_all(bin.parent().unwrap()).unwrap();
+            fs::write(&bin, "x").unwrap();
             db.set_setting(
                 &setting_key(&def.id),
                 &serde_json::to_string(&Installed {
@@ -853,7 +1025,7 @@ mod tests {
         kinds.sort();
         assert_eq!(
             kinds,
-            ["duckstation", "emulator", "emulator", "emulator"],
+            ["duckstation", "emulator", "emulator", "emulator", "pcsx2"],
             "only emulators with a library integration become runners"
         );
         for def in all.iter().filter(|d| d.kind.is_none()) {

@@ -363,6 +363,18 @@ pub fn inbox_dirs(paths: &Paths, extra: Option<&str>) -> Vec<std::path::PathBuf>
     dirs
 }
 
+/// Also copy firmware that a catalogue emulator names (Flycast, RPCS3, xemu).
+fn add_firmware(paths: &Paths, from: &Path, total: &mut ImportReport) {
+    for name in crate::emulators::import_firmware(paths, from) {
+        total.added.push(BiosFile {
+            system: "firmware".into(),
+            file: name,
+            region: "n/a".into(),
+            version: "n/a".into(),
+        });
+    }
+}
+
 /// Import every recognisable BIOS from the inbox folders, opening `.zip` files
 /// into a temporary folder first. Never fails a launch: problems are skipped.
 pub fn import_inbox(paths: &Paths, extra: Option<&str>) -> ImportReport {
@@ -373,6 +385,7 @@ pub fn import_inbox(paths: &Paths, extra: Option<&str>) -> ImportReport {
         }
         let mut reports = Vec::new();
         reports.push(import(paths, &dir));
+        add_firmware(paths, &dir, &mut total);
         let mut zips = Vec::new();
         collect_files(&dir, 2, &mut zips);
         for zip_path in zips
@@ -386,6 +399,7 @@ pub fn import_inbox(paths: &Paths, extra: Option<&str>) -> ImportReport {
                     .is_some_and(|mut z| z.extract(tmp.path()).is_ok());
                 if ok {
                     reports.push(import(paths, tmp.path()));
+                    add_firmware(paths, tmp.path(), &mut total);
                 }
             }
         }

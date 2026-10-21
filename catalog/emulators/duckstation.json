@@ -2,21 +2,18 @@
   "id": "duckstation",
   "name": "DuckStation",
   "kind": "duckstation",
-  "systems": ["ps1"],
+  "systems": [
+    "ps1"
+  ],
   "github": "stenzek/duckstation",
   "asset_suffix": "DuckStation-x64.AppImage",
-  "asset_excludes": ["sse2"],
+  "asset_excludes": [
+    "sse2"
+  ],
   "rolling": true,
   "binary": "AppRun",
   "config_subdir": "duckstation",
   "bios_subdir": "duckstation/bios",
   "bios_system": "ps1",
-  "requirement": "PS1 BIOS required — acquisition jobs planned; import folder fallback in Tools",
-  "packages": [
-    {
-      "manager": "flatpak",
-      "command": "flatpak install --user flathub org.duckstation.DuckStation",
-      "note": "Marquee also finds a Flatpak copy, but keeps its own settings and saves separate from it."
-    }
-  ]
+  "requirement": "PS1 BIOS required \u2014 acquisition jobs planned; import folder fallback in Tools"
 }

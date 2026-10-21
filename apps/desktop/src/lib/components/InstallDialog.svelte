@@ -41,14 +41,14 @@
           class="option"
           class:on={app.installOptionId === option.id}
           data-nav
-          disabled={busy && option.run.type !== 'setup'}
+          disabled={busy}
           onclick={() => run(option.id)}
         >
           <span class="mark">
-            {#if busy && app.installOptionId === option.id && option.run.type !== 'setup'}
+            {#if busy && app.installOptionId === option.id}
               <span class="spin"></span>
             {:else}
-              <Icon name={option.run.type === 'setup' ? 'settings' : 'download'} size={18} />
+              <Icon name="download" size={18} />
             {/if}
           </span>
           <span class="copy">

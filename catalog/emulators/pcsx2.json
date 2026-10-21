@@ -1,0 +1,16 @@
+{
+  "id": "pcsx2",
+  "name": "PCSX2",
+  "kind": "pcsx2",
+  "systems": [
+    "ps2"
+  ],
+  "github": "PCSX2/pcsx2",
+  "asset_suffix": "linux-appimage-x64-qt.appimage",
+  "asset_excludes": [],
+  "binary": "usr/bin/pcsx2-qt",
+  "config_subdir": "PCSX2",
+  "bios_subdir": "PCSX2/bios",
+  "bios_system": "ps2",
+  "requirement": "Needs your own PS2 BIOS (drop it in bios-inbox; Marquee picks the one matching each disc's region)"
+}

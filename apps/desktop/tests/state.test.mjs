@@ -86,15 +86,6 @@ test('runner defaults are platform scoped and unavailable pins fall back', () =>
   snap.runners.push({ id: 'dead', kind: 'pcsx2', available: false }); snap.settings.selected_runner_ids.ps2 = 'dead';
   assert.equal(pickRunner(snap, 'ps2').id, 'pcsx2');
 });
-test('setup actions use the game system instead of the global PCSX2 default', async () => {
-  const api = app.api, runners = app.runners, settings = app.runnerSettings;
-  const calls = [], snap = discSnapshot(); snap.runners.push({ id: 'duck', kind: 'duckstation', available: true });
-  try {
- app.runners = snap.runners; app.runnerSettings = snap.settings;
-    app.api = { ...api, openSetup: async (id) => calls.push(id) };
-    await app.openSetup(undefined, 'ps1'); await app.openSetup(undefined, 'ps2'); assert.deepEqual(calls, ['duck', 'pcsx2']);
-  } finally { app.api = api; app.runners = runners; app.runnerSettings = settings; }
-});
 test('missing companion diagnostics reach cards without unrelated offline folders', () => {
   const snap = discSnapshot(); snap.media[0].available = false; snap.media[0].skip_reason = 'Missing CUE track: audio.bin'; snap.editions[0].missing = true;
   snap.roots = [{ system: 'ps2', path: '/other', status: 'offline' }];
@@ -154,11 +145,11 @@ test('back cancels launching without changing the underlying route', () => {
 
 test('install dropdown options are executable actions', () => {
   const pcsx2 = installables.find((tool) => tool.id === 'pcsx2');
-  assert.ok(pcsx2.options.length >= 2);
+  assert.equal(pcsx2.options.length, 1);
   assert.equal(installOption('pcsx2', 'auto').run.channel, 'auto');
   assert.equal(installOption('pcsx2', 'flatpak'), undefined);
   assert.equal(installOption('pcsx2', 'appimage'), undefined);
-  assert.equal(installOption('pcsx2', 'setup').run.type, 'setup');
+  assert.equal(installOption('pcsx2', 'setup'), undefined);
 });
 
 test('back closes the install dialog before leaving the route', () => {
@@ -306,7 +297,7 @@ test('automatic source discovery adds store games and disconnect preserves other
 test('emulator install shows progress, clears it afterwards, and removal asks for saves explicitly', async () => {
   const api = app.api, emulators = app.emulators;
   const calls = [];
-  const info = (status) => [{ id: 'duckstation', name: 'DuckStation', systems: ['ps1'], integrated: true, requirement: 'Needs a BIOS', status, installed_version: status === 'ready' ? 'latest-1' : null, alternatives: [] }];
+  const info = (status) => [{ id: 'duckstation', name: 'DuckStation', systems: ['ps1'], integrated: true, requirement: 'Needs a BIOS', status, installed_version: status === 'ready' ? 'latest-1' : null }];
   const snap = { roots: [], media: [], sessions: [], editions: [], runners: [], settings: {} };
   try {
     app.api = { ...api, snapshot: async () => snap,

@@ -42,7 +42,6 @@
         {#if !runner && system.id === 'ps1'}<span>Install DuckStation from Tools; Marquee downloads and configures it for you.</span>{/if}
       </div><div class="row-actions">
         {#if system.id === 'ps2'}<InstallMenu tone="primary" size="small" />{:else if !runner}<a class="btn glass small" data-nav href="https://github.com/stenzek/duckstation" target="_blank" rel="noreferrer">Get DuckStation ↗</a>{/if}
-        <button class="btn glass small" data-nav onclick={() => app.openSetup(runner?.id, system.id)} disabled={!runner}>Open setup</button>
       </div></div>
       {#if choices.length > 1}<div class="item"><div><strong>Default runner</strong><span>Saved independently for {system.name}</span></div><select data-nav aria-label={`${system.name} default runner`} value={runner?.id || ''} onchange={(e) => app.chooseRunner(e.currentTarget.value)}>{#each choices as choice}<option value={choice.id} disabled={!choice.available}>{choice.display_name}{choice.available ? '' : ' · unavailable'}</option>{/each}</select></div>{/if}
     </section>

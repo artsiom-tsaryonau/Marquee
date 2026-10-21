@@ -597,7 +597,7 @@ fn unpacked_tree_is_a_managed_runner_without_network() {
     assert!(
         runners
             .iter()
-            .any(|r| r.id == "runner.pcsx2.unpacked" && r.available),
+            .any(|r| r.id == "runner.pcsx2.marquee" && r.available),
         "{runners:?}"
     );
 }

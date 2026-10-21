@@ -83,12 +83,12 @@
           {:else}
             <button class="btn primary" data-nav style="--accent-h:{g.art.hue2}" onclick={() => {
               if (g.mediaMissing) app.open(g);
-              else if (g.setupState === 'missing') void app.openSetup(g.runnerId, g.platform);
+              else if (g.setupState === 'missing') app.explainBios();
               else if (g.installed) app.play(g);
               else app.open(g);
             }}>
               <Icon name={g.installed ? 'play' : 'download'} />
-              {g.mediaMissing ? 'Check disc files' : g.setupState === 'missing' ? 'Open emulator setup' : g.installed ? 'Play' : 'Details'}
+              {g.mediaMissing ? 'Check disc files' : g.setupState === 'missing' ? 'BIOS needed' : g.installed ? 'Play' : 'Details'}
             </button>
           {/if}
           <button class="btn glass" data-nav onclick={() => app.open(g)}>Details</button>

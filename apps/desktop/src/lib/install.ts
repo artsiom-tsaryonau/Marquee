@@ -1,8 +1,6 @@
 export type Pcsx2Channel = 'auto' | 'unpacked';
 
-export type InstallRun =
-  | { type: 'pcsx2'; channel: Pcsx2Channel }
-  | { type: 'setup' };
+export type InstallRun = { type: 'pcsx2'; channel: Pcsx2Channel };
 
 export interface InstallOption {
   id: string;
@@ -32,13 +30,6 @@ export const installables: Installable[] = [
         detail: 'Download the official release, verify it, and unpack it into Marquee’s data dir. No Flatpak, no host packages, no setup wizard.',
         hint: 'Managed by Marquee',
         run: { type: 'pcsx2', channel: 'auto' },
-      },
-      {
-        id: 'setup',
-        title: 'Open PCSX2 setup',
-        detail: 'Launch PCSX2 so you can add BIOS files you already own.',
-        hint: 'Never downloaded by Marquee',
-        run: { type: 'setup' },
       },
     ],
   },

@@ -102,15 +102,12 @@
       {:else}
         <button class="btn primary big" data-nav disabled={!!g.mediaMissing} onclick={() => {
           if (g.lutris) void app.openLutrisGame(g);
-          else if (offline && g.setupState === 'missing') app.openSetup(g.runnerId, g.platform);
+          else if (offline && g.setupState === 'missing') app.explainBios();
           else if (g.installed) app.play(g);
         }}>
           <Icon name={g.installed && g.setupState !== 'missing' ? 'play' : 'download'} />
           {playLabel}
         </button>
-      {/if}
-      {#if offline && (g.setupState === 'unverified' || g.setupState === 'runner_missing' || g.setupState === 'missing')}
-        {#if g.runnerId}<button class="btn glass" data-nav onclick={() => app.openSetup(g.runnerId, g.platform)}><Icon name="settings" /> Open {emulator} setup</button>{/if}
       {/if}
       {#if offline && g.serial && !g.coverUrl}
         <button class="btn glass" data-nav onclick={() => app.refreshArtwork(g.id)} disabled={app.fetchingArt}>

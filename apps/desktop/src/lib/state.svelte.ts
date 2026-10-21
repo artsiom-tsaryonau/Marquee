@@ -268,10 +268,6 @@ class AppState {
     if (!option) return;
     this.installToolId = toolId;
     this.installOptionId = optionId;
-    if (option.run.type === 'setup') {
-      await this.openSetup();
-      return;
-    }
     await this.installPcsx2(option.run.channel);
   }
 
@@ -409,17 +405,9 @@ class AppState {
     catch (err) { this.notify((err as { message?: string }).message ?? 'Could not refresh emulators'); }
   }
 
-  async openSetup(id?: string, system = 'ps2') {
-    const runnerId = id ?? this.runnerFor(system)?.id;
-    if (!runnerId) {
-      this.notify(`Set up ${system === 'ps1' ? 'DuckStation' : 'PCSX2'} in Tools, then select your BIOS in the emulator.`);
-      return;
-    }
-    try {
-      await this.api.openSetup(runnerId);
-    } catch (err) {
-      this.notify((err as { message?: string }).message ?? 'Could not open emulator setup');
-    }
+  /** Marquee configures emulators itself; the only thing it cannot supply is the user's own BIOS. */
+  explainBios() {
+    this.notify('Put your BIOS files (or a zip of them) in Marquee’s bios-inbox folder, or use Tools → BIOS import. They are picked up on the next launch.');
   }
 
   async installPcsx2(channel = 'auto') {

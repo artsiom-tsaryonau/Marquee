@@ -1,18 +1,16 @@
 use crate::db::Db;
-use crate::error::{path_display, AppError, Result};
+use crate::error::{AppError, Result};
 use crate::model::{BiosState, Runner, RunnerKind};
 use serde_json::json;
 use std::path::{Path, PathBuf};
 
 const FAKE_RUNNER_ID: &str = "runner.fake";
-const PCSX2_UNPACKED_ID: &str = "runner.pcsx2.unpacked";
+/// The PCSX2 runner as registered by the catalogue.
+const PCSX2_RUNNER_ID: &str = "runner.pcsx2.marquee";
+/// Row id used before PCSX2 moved into the catalogue.
+const LEGACY_PCSX2_ID: &str = "runner.pcsx2.unpacked";
 
-pub fn refresh(
-    db: &Db,
-    allow_fake: bool,
-    extra_appimages: &[PathBuf],
-    marquee_bios: Option<&Path>,
-) -> Result<Vec<Runner>> {
+pub fn refresh(db: &Db, allow_fake: bool) -> Result<Vec<Runner>> {
     if allow_fake {
         db.upsert_runner(
             FAKE_RUNNER_ID,
@@ -24,32 +22,20 @@ pub fn refresh(
             "test",
         )?;
     }
-    if let Some(bin) = find_unpacked_pcsx2(extra_appimages) {
-        let (state, hint) = probe_appimage_bios(&bin, marquee_bios);
-        db.upsert_runner(
-            PCSX2_UNPACKED_ID,
-            RunnerKind::Pcsx2.as_str(),
-            "PCSX2 (Marquee)",
-            &[bin.to_string_lossy().into_owned()],
-            state,
-            hint.as_deref(),
-            "marquee",
-        )?;
-    }
-    // Marquee owns its emulators. Host copies (Flatpak, system packages, loose
-    // AppImages) found by older versions are made unusable, never picked up.
+    // Marquee owns its emulators, all registered from the catalogue. Rows left by
+    // older versions (host Flatpak/system/AppImage copies, the pre-catalogue PCSX2)
+    // are kept only because past sessions reference them; make them unusable.
     for row in db.list_runners()? {
-        if matches!(row.source.as_str(), "flatpak" | "native" | "appimage")
-            && row.command_json != "[]"
-        {
-            // Past sessions reference the row, so keep it but make it unusable.
+        let stale = matches!(row.source.as_str(), "flatpak" | "native" | "appimage")
+            || row.id == LEGACY_PCSX2_ID;
+        if stale && row.command_json != "[]" {
             db.upsert_runner(
                 &row.id,
                 &row.kind.clone(),
                 &row.display_name,
                 &[],
                 BiosState::Unverified,
-                Some("Host install ignored: Marquee manages its own emulators"),
+                Some("Replaced: Marquee manages its own emulators"),
                 &row.source,
             )?;
         }
@@ -81,7 +67,7 @@ pub fn snapshot(db: &Db) -> Result<Vec<Runner>> {
 pub fn pick_default(runners: &[Runner]) -> Option<&Runner> {
     runners
         .iter()
-        .find(|r| r.id == PCSX2_UNPACKED_ID && r.available)
+        .find(|r| r.id == PCSX2_RUNNER_ID && r.available)
         .or_else(|| {
             runners
                 .iter()
@@ -124,7 +110,7 @@ pub fn pick_for_system<'a>(runners: &'a [Runner], system: &str) -> Option<&'a Ru
     runners
         .iter()
         .find(|r| {
-            r.kind == wanted && (r.id == PCSX2_UNPACKED_ID || r.source == "marquee") && r.available
+            r.kind == wanted && (r.id == PCSX2_RUNNER_ID || r.source == "marquee") && r.available
         })
         .or_else(|| runners.iter().find(|r| r.kind == wanted && r.available))
         .or_else(|| {
@@ -160,7 +146,7 @@ pub fn selection_for<'a>(
 }
 
 pub fn uses_marquee_prefix(runner: &Runner) -> bool {
-    runner.source == "marquee" || runner.id == PCSX2_UNPACKED_ID
+    runner.source == "marquee"
 }
 
 pub fn launch_argv(runner: &Runner, img: &Path, extra: &[String]) -> Result<Vec<String>> {
@@ -251,80 +237,6 @@ pub(crate) fn which(bin: &str) -> Option<PathBuf> {
             let candidate = dir.join(bin);
             executable(&candidate).then_some(candidate)
         })
-    })
-}
-
-pub fn find_extracted_bin(root: &Path) -> Option<PathBuf> {
-    for rel in ["usr/bin/pcsx2-qt", "usr/bin/pcsx2", "pcsx2-qt", "AppRun"] {
-        let candidate = root.join(rel);
-        if candidate.is_file() {
-            return Some(candidate);
-        }
-    }
-    None
-}
-
-fn find_unpacked_pcsx2(extra: &[PathBuf]) -> Option<PathBuf> {
-    for extra_path in extra {
-        if extra_path.is_file() {
-            continue;
-        }
-        if let Some(bin) = find_extracted_bin(extra_path) {
-            return Some(bin);
-        }
-        if let Some(bin) = find_extracted_bin(&extra_path.join("pcsx2").join("current")) {
-            return Some(bin);
-        }
-        if let Some(bin) = find_extracted_bin(&extra_path.join("current")) {
-            return Some(bin);
-        }
-    }
-    None
-}
-
-fn probe_appimage_bios(bin: &Path, marquee_bios: Option<&Path>) -> (BiosState, Option<String>) {
-    // Default BIOS folders are hints. An empty default dir is unverified, not missing.
-    let home = std::env::var_os("HOME").map(PathBuf::from);
-    let Some(home) = home else {
-        if let Some(dir) = marquee_bios {
-            if bios_dir_has_files(dir) {
-                return (BiosState::Unverified, Some(path_display(dir)));
-            }
-        }
-        return (
-            BiosState::Unverified,
-            Some("HOME unset; BIOS path unresolved".into()),
-        );
-    };
-    let mut candidates: Vec<PathBuf> = Vec::new();
-    if let Some(dir) = marquee_bios {
-        candidates.push(dir.to_path_buf());
-    }
-    candidates.push(home.join(".config/PCSX2/bios"));
-    if let Some(parent) = bin.parent() {
-        candidates.push(parent.join("bios"));
-    }
-    for dir in candidates {
-        if bios_dir_has_files(&dir) {
-            return (BiosState::Unverified, Some(path_display(&dir)));
-        }
-    }
-    (
-        BiosState::Unverified,
-        Some("PCSX2 BIOS folder was not resolved from config; open setup to confirm".into()),
-    )
-}
-
-fn bios_dir_has_files(dir: &Path) -> bool {
-    let Ok(entries) = std::fs::read_dir(dir) else {
-        return false;
-    };
-    entries.flatten().any(|e| {
-        e.path()
-            .extension()
-            .and_then(|x| x.to_str())
-            .map(|x| x.eq_ignore_ascii_case("bin") || x.eq_ignore_ascii_case("rom"))
-            .unwrap_or(false)
     })
 }
 

@@ -18,7 +18,6 @@
   let error = $state('');
   let saving = $state(false);
   let confirmPurge = $state(false);
-  let copied = $state<string | null>(null);
   let buildStatus = $state<EmulatorBuildStatus | null>(null);
   let startingBuild = $state(false);
   const busy = $derived(buildStatus?.state === 'running' ? buildStatus.message : emulator ? app.emulatorBusy[emulator.id] : undefined);
@@ -86,8 +85,6 @@
     }
   });
 
-  const dirty = $derived(!!emulator && JSON.stringify(args.map((a) => a.trim()).filter(Boolean)) !== JSON.stringify(emulator.args));
-
   async function save() {
     if (!emulator || saving) return;
     saving = true;
@@ -98,15 +95,6 @@
       error = (err as Error).message;
     } finally {
       saving = false;
-    }
-  }
-  async function copy(text: string) {
-    try {
-      await navigator.clipboard.writeText(text);
-      copied = text;
-      setTimeout(() => (copied = copied === text ? null : copied), 1800);
-    } catch {
-      app.notify(text);
     }
   }
   async function remove(purge: boolean) {
@@ -177,24 +165,20 @@
         </section>
       {/if}
 
-      <section>
-        <h3>Launch arguments</h3>
-        {#if e.launch_presentation}<p class="hint">{e.launch_presentation}</p>{/if}
-        <p class="hint">Added to every start of {e.name}, from here and from your library{e.integrated ? '' : ' (this emulator is opened on its own for now)'}. One value per field, no shell quoting.</p>
-        <div class="args">
-          {#each args as _, i (i)}
-            <div class="arg">
-              <input data-nav bind:value={args[i]} placeholder="-example" spellcheck="false" autocomplete="off" aria-label={`Argument ${i + 1}`} />
-              <button class="btn glass small" data-nav onclick={() => (args = args.filter((_, j) => j !== i))} aria-label={`Remove argument ${i + 1}`}><Icon name="x" size={14} /></button>
-            </div>
-          {/each}
-          <div class="arg-actions">
-            <button class="btn glass small" data-nav disabled={args.length >= 16} onclick={() => (args = [...args, ''])}><Icon name="plus" size={14} />Add argument</button>
-            <button class="btn primary small" data-nav disabled={!dirty || saving} onclick={save}>{saving ? 'Saving…' : 'Save'}</button>
-          </div>
-          {#if error}<p class="error" role="alert">{error}</p>{/if}
-        </div>
-      </section>
+      {#if e.launch_presentation}<p class="hint">{e.launch_presentation}</p>{/if}
+      {#if error}<p class="error" role="alert">{error}</p>{/if}
+
+      {#if (e.firmware ?? []).length}
+        <section>
+          <h3>Firmware</h3>
+          <p class="hint">Put the files in Marquee’s bios-inbox folder; they are copied into place on the next launch.</p>
+          <ul class="fw">
+            {#each e.firmware ?? [] as f (f.name)}
+              <li class:missing={!f.present}><strong>{f.name}</strong> <span>{f.present ? 'in place' : f.required ? 'missing (required)' : 'missing (optional)'}</span>{#if f.note}<small>{f.note}</small>{/if}</li>
+            {/each}
+          </ul>
+        </section>
+      {/if}
 
       {#if e.status !== 'not_installed'}
         <section>
@@ -206,17 +190,6 @@
           </dl>
         </section>
       {/if}
-
-      {#each e.alternatives as alt}
-        <details class="alt">
-          <summary>Advanced: use {alt.manager} instead</summary>
-          <p class="hint">{alt.note} Marquee never runs this for you.</p>
-          <div class="cmd">
-            <code>{alt.command}</code>
-            <button class="btn glass small" data-nav onclick={() => copy(alt.command)}>{copied === alt.command ? 'Copied' : 'Copy'}</button>
-          </div>
-        </details>
-      {/each}
 
       {#if e.status !== 'not_installed'}
         <section class="danger-zone">
@@ -259,9 +232,6 @@
   .badge.warn { color: var(--warn); background: rgb(251 191 36 / .1); }
   .ver { font-size: 12px; color: var(--text-dim); }
   .busy { font-size: 12px; color: var(--accent); }
-  .args { display: grid; gap: 8px; margin-top: 10px; }
-  .arg { display: flex; gap: 8px; }
-  .arg input { flex: 1; min-width: 0; }
   .arg-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: space-between; margin-top: 4px; }
   .error { color: var(--bad); font-size: 12px; }
   dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 8px 0 0; font-size: 12px; }
@@ -269,8 +239,10 @@
   dd { margin: 0; font: 11px ui-monospace, monospace; overflow-wrap: anywhere; color: var(--text-soft); }
   .alt { font-size: 12px; color: var(--text-dim); }
   .alt summary { cursor: pointer; }
-  .cmd { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
-  code { flex: 1; min-width: 0; overflow-wrap: anywhere; font: 11px ui-monospace, monospace; background: var(--field); padding: 8px 10px; border-radius: 8px; color: var(--text-soft); }
+  .fw { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+  .fw li { display: grid; gap: 2px; }
+  .fw .missing span { color: var(--warn, #e0a030); }
+  .fw small { color: var(--text-soft); }
   .danger-zone { border-top: 1px solid var(--line); padding-top: 16px; }
   pre { max-height: 240px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px ui-monospace, monospace; background: var(--field); padding: 10px; border-radius: 8px; }
   .btn.danger:hover, .btn.danger:focus-visible { color: var(--bad); }

@@ -24,7 +24,6 @@ pub mod runners;
 pub mod server;
 pub mod sessions;
 pub mod source_builds;
-pub mod tools;
 
 use crate::db::Db;
 use crate::error::{AppError, Result};
@@ -43,7 +42,6 @@ pub struct Core {
     _lock: Arc<InstanceLock>,
     allow_fake: bool,
     discover_host: bool,
-    installing: Mutex<bool>,
     installing_ports: Mutex<std::collections::HashSet<String>>,
     events: Arc<hub::EventHub>,
     keys: keys::KeyStore,
@@ -75,7 +73,6 @@ impl Core {
             _lock: Arc::new(lock),
             allow_fake,
             discover_host,
-            installing: Mutex::new(false),
             installing_ports: Mutex::new(std::collections::HashSet::new()),
             events: Arc::new(hub::EventHub::new()),
             keys,
@@ -142,83 +139,52 @@ impl Core {
     }
 
     pub fn refresh_runners(&self) -> Result<Vec<Runner>> {
-        let unpacked = self.paths.pcsx2_unpacked_current();
-        let appimage = self.paths.pcsx2_appimage_path();
-        let runners_dir = self.paths.data_dir.join("runners");
-        let bios = self.paths.pcsx2_bios_dir();
         self.with_db(|db| {
-            let mut extra = vec![unpacked.clone(), appimage.clone(), runners_dir.clone()];
-            if let Some(path) = db.get_setting("pcsx2_appimage_path")? {
-                extra.push(PathBuf::from(path));
-            }
-            // Marquee owns its emulators: only its own managed installs are discovered.
-            runners::refresh(db, self.allow_fake, &extra, Some(&bios))?;
+            // Marquee owns its emulators: every runner comes from its catalogue.
+            runners::refresh(db, self.allow_fake)?;
             emulators::sync_runners(db, &self.paths)?;
             runners::snapshot(db)
         })
     }
 
+    /// Install PCSX2 through the catalogue (verified download, unpacked into
+    /// Marquee's folder). Kept as its own command for the install dialog; the
+    /// only channel is the managed one.
     pub fn install_pcsx2(&self, channel: &str, sink: Arc<dyn EventSink>) -> Result<Vec<Runner>> {
-        let channel = tools::Pcsx2Channel::parse(channel)?;
-        {
-            let mut flag = self.installing.lock().unwrap_or_else(|e| e.into_inner());
-            if *flag {
-                return Err(AppError::new("INSTALL_BUSY", "PCSX2 is already installing"));
-            }
-            *flag = true;
+        if !matches!(channel, "" | "auto" | "unpacked") {
+            return Err(AppError::new(
+                "RUNNER_MISSING",
+                format!("unknown PCSX2 channel: {channel} (Marquee installs PCSX2 itself)"),
+            ));
         }
-        struct Guard<'a>(&'a Mutex<bool>);
-        impl Drop for Guard<'_> {
-            fn drop(&mut self) {
-                *self.0.lock().unwrap_or_else(|e| e.into_inner()) = false;
-            }
-        }
-        let _guard = Guard(&self.installing);
-
         let existing = self.refresh_runners()?;
-        if tools::already_have(channel, &self.paths, &existing) {
-            let runner_id = existing
+        let have = |runners: &[Runner]| {
+            runners
                 .iter()
                 .find(|r| r.kind == RunnerKind::Pcsx2 && r.available)
-                .map(|r| r.id.clone());
+                .map(|r| r.id.clone())
+        };
+        if let Some(runner_id) = have(&existing) {
             sink.emit(CoreEvent::ToolInstallFinished {
-                tool_id: tools::TOOL_PCSX2.into(),
-                runner_id,
+                tool_id: "pcsx2".into(),
+                runner_id: Some(runner_id),
             });
             return Ok(existing);
         }
-
-        match tools::install_pcsx2(&self.paths, channel, Arc::clone(&sink)) {
-            Ok(outcome) => {
-                match &outcome {
-                    tools::InstallOutcome::Unpacked { bin } => {
-                        self.set_setting("pcsx2_unpacked_path", &bin.to_string_lossy())?;
-                        self.set_setting("marquee_installed_pcsx2", "unpacked")?;
-                    }
-                    tools::InstallOutcome::AlreadyPresent => {}
-                }
+        match self.install_emulator("pcsx2", Arc::clone(&sink)) {
+            Ok(_) => {
                 let runners = self.refresh_runners()?;
                 if let Some(runner) = runners::pick_default(&runners) {
                     self.select_runner(&runner.id)?;
                 }
-                let runner_id = runners
-                    .iter()
-                    .find(|r| r.kind == RunnerKind::Pcsx2 && r.available)
-                    .map(|r| r.id.clone());
                 sink.emit(CoreEvent::ToolInstallFinished {
-                    tool_id: tools::TOOL_PCSX2.into(),
-                    runner_id,
+                    tool_id: "pcsx2".into(),
+                    runner_id: have(&runners),
                 });
                 sink.emit(CoreEvent::LibraryChanged);
                 Ok(runners)
             }
-            Err(err) => {
-                sink.emit(CoreEvent::ToolInstallFailed {
-                    tool_id: tools::TOOL_PCSX2.into(),
-                    message: err.message.clone(),
-                });
-                Err(err)
-            }
+            Err(err) => Err(err),
         }
     }
 
@@ -795,23 +761,8 @@ impl Core {
     /// Delete the PCSX2 Marquee installed. Settings, memory cards, saves and BIOS stay
     /// until removed on purpose.
     pub fn uninstall_pcsx2(&self) -> Result<Vec<Runner>> {
-        if self.with_db(|db| db.running_session())?.is_some() {
-            return Err(AppError::new("LAUNCH_BUSY", "close the running game first"));
-        }
-        let prefix = self.paths.pcsx2_prefix();
-        if prefix.exists() {
-            std::fs::remove_dir_all(&prefix)?;
-        }
-        for key in [
-            "pcsx2_unpacked_path",
-            "pcsx2_appimage_path",
-            "marquee_installed_pcsx2",
-        ] {
-            self.set_setting(key, "")?;
-        }
-        let runners = self.refresh_runners()?;
-        self.events.emit(CoreEvent::LibraryChanged);
-        Ok(runners)
+        self.uninstall_emulator("pcsx2", false)?;
+        self.refresh_runners()
     }
 
     /// Known API keys and where each comes from. Never contains a secret value.

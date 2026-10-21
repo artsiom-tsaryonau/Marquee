@@ -12,6 +12,38 @@
   ],
   "binary": "AppRun",
   "config_subdir": "xemu",
-  "requirement": "Xbox BIOS, MCPX ROM and HDD image — setup jobs planned; manual import fallback",
-  "packages": []
+  "requirement": "Xbox BIOS, MCPX ROM and HDD image \u2014 setup jobs planned; manual import fallback",
+  "firmware": [
+    {
+      "name": "mcpx_1.0.bin",
+      "aliases": [
+        "mcpx.bin",
+        "boot_rom.bin"
+      ],
+      "required": true,
+      "size": 512,
+      "root": "data",
+      "dir": "xemu/xemu",
+      "note": "MCPX boot ROM. xemu reads its path from xemu.toml; Marquee does not write that file yet."
+    },
+    {
+      "name": "Complex_4627.bin",
+      "aliases": [
+        "Complex.bin",
+        "cerbios.bin",
+        "bios.bin"
+      ],
+      "required": true,
+      "root": "data",
+      "dir": "xemu/xemu",
+      "note": "Xbox flash ROM. Needs a matching xemu.toml entry (not written yet)."
+    },
+    {
+      "name": "xbox_hdd.qcow2",
+      "required": true,
+      "root": "data",
+      "dir": "xemu/xemu",
+      "note": "Xbox hard disk image. Needs a matching xemu.toml entry (not written yet)."
+    }
+  ]
 }

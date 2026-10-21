@@ -9,6 +9,5 @@
   "asset_excludes": [],
   "binary": "AppRun",
   "config_subdir": "cemu",
-  "requirement": "Wii U keys and game files — setup jobs planned; manual import fallback",
-  "packages": []
+  "requirement": "Wii U keys and game files \u2014 setup jobs planned; manual import fallback"
 }

@@ -9,6 +9,5 @@
   "asset_excludes": [],
   "binary": "AppRun",
   "config_subdir": "ppsspp",
-  "requirement": "No BIOS. Game files via library jobs when available; folder scan fallback",
-  "packages": []
+  "requirement": "No BIOS. Game files via library jobs when available; folder scan fallback"
 }

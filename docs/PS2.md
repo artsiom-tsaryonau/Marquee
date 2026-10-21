@@ -24,7 +24,7 @@ Marquee does not download BIOS files or commercial games.
 | CLI (`marquee`) | **Works** without GTK. Same core as desktop. Use `--data-dir` for isolation. |
 | Desktop (`./scripts/run.sh desktop`) | Optimized standalone window with embedded UI. NVIDIA/Wayland now defaults to accelerated shared-memory transport; see [live rendering correction](DESKTOP_RENDERING.md). Software mode is an explicit fallback. Native folder-picker / Play clicks are **not live-tested**. |
 | Persistent library | SQLite schema **v4** after the shared PS1 root-system work (artwork v2, session recovery v3) at `$XDG_DATA_HOME/marquee/library.db` (or `--data-dir` / `MARQUEE_DATA_DIR`). `artwork` table + migrate v1→2. Newer `user_version` is rejected. |
-| In-app PCSX2 install | **Built, single channel.** Downloads the official AppImage, verifies it, unpacks it into `$XDG_DATA_HOME/marquee/runners/pcsx2/current` and deletes the download. Flatpak and keep-as-AppImage were removed 2026-10-21; host copies are never discovered. First launch seeds `PCSX2.ini` so no setup wizard appears (see [EMULATORS](EMULATORS.md)). |
+| In-app PCSX2 install | **Built, via the emulator catalogue.** Downloads the official AppImage, verifies it, unpacks it into `$XDG_DATA_HOME/marquee/runners/pcsx2/current`. Flatpak, keep-as-AppImage and the dedicated installer were removed 2026-10-21; host copies are never discovered. First launch seeds `PCSX2.ini` so no setup wizard appears (see [EMULATORS](EMULATORS.md)). |
 | Serial covers | **Built.** xlenore/ps2-covers JPEG cache, `convertFileSrc` + asset protocol. ScreenScraper/SteamGridDB still [follow-up](ENRICHMENT.md#ps2-metadata-matching-and-cached-artwork). |
 | Real PCSX2 Play → quit → duration | **Pending.** Fake runner `/bin/sleep` records duration in tests. That is not the gate. |
 | Controller in Tauri WebView | **Pending.** Browser Gamepad API + focus engine exist; `gilrs` not added. Browser gamepad is not evidence. |
@@ -137,7 +137,7 @@ PS2 vertical slice implemented before the direct-store milestones. Metadata matc
 **In the working tree (not pushed)**
 
 - In-app PCSX2 install: **unpack** the official GitHub AppImage into `runners/pcsx2/current` (only channel). Provenance `marquee_installed_pcsx2`. Isolated `XDG_CONFIG_HOME` under `pcsx2/xdg-config/`.
-- Install **dropdown → dialog of runnable rows** (Recommended / Open setup).
+- Install **dropdown → dialog** with one row (Recommended).
 - Serial covers from xlenore/ps2-covers (`SLUS_209.63` → `SLUS-20963.jpg`), cached JPEG, HTTP outside the DB lock. 404 keeps procedural art.
 - Schema v2 `artwork` table; reject a newer `user_version`; abandon stale `running` sessions on open (no playtime).
 - Tests isolate host PCSX2 (`open_isolated` / `discover_host: false`).
@@ -231,7 +231,7 @@ Marquee **owns** the PCSX2 tree, the same way `cx-script` owns `//DEPS` under `.
 
 **Recommended** downloads the official `linux-appimage-x64-Qt.AppImage` from GitHub, checks the release sha256, and unpacks it with `--appimage-extract` into `$XDG_DATA_HOME/marquee/runners/pcsx2/current`. Play runs `usr/bin/pcsx2-qt` from that folder. No Flatpak, no FUSE, no host packages, no installer wizard. Config/BIOS for that copy live under `$XDG_DATA_HOME/marquee/pcsx2/xdg-config/PCSX2/` (Marquee creates an empty `bios/` dir; you drop files you already own).
 
-Dialog rows: **Recommended** and **Open setup**. CLI: `marquee runners install [--channel auto|unpacked]`; other channels are rejected.
+Dialog row: **Recommended** (there is no Open-setup button any more). CLI: `marquee runners install [--channel auto|unpacked]`; other channels are rejected.
 
 Never downloads BIOS or ISOs. Play uses `-batch -fullscreen -nogui` to hide PCSX2's main window while showing the game, then exit on game shutdown. This does not replace completing setup or supplying a BIOS. Open setup is the GUI for adding BIOS. Provenance is stored as `marquee_installed_pcsx2`.
 
