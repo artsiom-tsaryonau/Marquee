@@ -2,7 +2,6 @@
   import { onMount, tick } from 'svelte';
   import { app } from '../state.svelte';
   import type { EmulatorInfo, LauncherConfig, LauncherInfo, Runner } from '../api/contracts';
-  import type { PortEntry } from '../types';
   import { launcherDraft, launcherMatches, launcherTemplates } from '../launchers';
   import { coverSrc } from '../api/map';
   import { platformLabel, systemLabel } from '../labels';
@@ -21,11 +20,9 @@
     | { t: 'emulator'; key: string; name: string; platforms: string[]; ready: boolean; e: EmulatorInfo }
     | { t: 'runner'; key: string; name: string; platforms: string[]; ready: boolean; r: Runner }
     | { t: 'launcher'; key: string; name: string; platforms: string[]; ready: boolean; l: LauncherInfo }
-    | { t: 'port'; key: string; name: string; platforms: string[]; ready: boolean; p: PortEntry }
     | { t: 'source'; key: string; name: string; platforms: string[]; ready: boolean; src: 'purple' | 'lutris' };
 
-  const norm = (id: string) => (id.startsWith('pc-') ? 'pc' : id);
-  const labelOf = (id: string) => (id === 'pc' ? 'PC' : ((platformLabel as Record<string, string>)[id] ?? systemLabel(id)));
+    const labelOf = (id: string) => (id === 'pc' ? 'PC' : ((platformLabel as Record<string, string>)[id] ?? systemLabel(id)));
   const runnerSystem = (r: Runner) => (r.kind === 'duckstation' ? 'ps1' : 'ps2');
 
   let query = $state('');
@@ -42,14 +39,13 @@
     ...app.emulators.map((e): Item => ({ t: 'emulator', key: `emu:${e.id}`, name: e.name, platforms: e.systems, ready: e.status !== 'not_installed', e })),
     ...app.runners.filter((r) => r.source !== 'marquee').map((r): Item => ({ t: 'runner', key: `run:${r.id}`, name: r.display_name, platforms: [runnerSystem(r)], ready: r.available, r })),
     ...app.launchers.map((l): Item => ({ t: 'launcher', key: `app:${l.id}`, name: l.name, platforms: ['pc'], ready: l.available, l })),
-    ...app.ports.map((p): Item => ({ t: 'port', key: `port:${p.id}`, name: p.name, platforms: [norm(p.platform)], ready: p.status === 'ready' || p.status === 'update', p })),
     { t: 'source', key: 'src:purple', name: 'Purple for Aion 2', platforms: ['pc'], ready: false, src: 'purple' },
     { t: 'source', key: 'src:lutris', name: 'Lutris library', platforms: ['pc'], ready: lutrisOn, src: 'lutris' },
   ]);
   const matchesText = (i: Item) => {
     const q = query.trim().toLowerCase();
     if (!q) return true;
-    const extra = i.t === 'port' ? i.p.game : i.t === 'launcher' ? i.l.executable : '';
+    const extra = i.t === 'launcher' ? i.l.executable : '';
     return `${i.name} ${extra} ${i.platforms.map(labelOf).join(' ')}`.toLowerCase().includes(q);
   };
   const items = $derived(
@@ -93,7 +89,7 @@
 
 <div class="tools">
   <header class="tool-hero">
-    <div class="hero-copy"><h1>Tools</h1><p>Emulators, launchers, native ports and connected libraries, by the platform they run. {ready} ready.</p></div>
+    <div class="hero-copy"><h1>Tools</h1><p>Emulators, launchers and connected libraries, by the platform they run. {ready} ready.</p></div>
     <InstallMenu />
     <button class="btn primary" data-nav onclick={() => edit()}><Icon name="plus" /> Add launcher</button>
   </header>
@@ -121,7 +117,7 @@
   {/if}
 
   <div class="toolbar glass-panel">
-    <label class="search"><Icon name="search" size={18} /><input bind:value={query} data-nav aria-label="Search tools" placeholder="Search emulators, launchers, ports…" /></label>
+    <label class="search"><Icon name="search" size={18} /><input bind:value={query} data-nav aria-label="Search tools" placeholder="Search emulators and launchers…" /></label>
     <button class="chip" class:on={onlyReady} data-nav aria-pressed={onlyReady} onclick={() => (onlyReady = !onlyReady)}>Ready only</button>
     <button class="btn glass small" data-nav disabled={app.launchersLoading} onclick={() => { void app.loadLaunchers(); void app.loadEmulators(); }}><Icon name="refresh" size={16} /> Refresh</button>
   </div>
@@ -170,15 +166,6 @@
             <button class="btn glass small" data-nav onclick={() => edit(l)}>Configure</button>
             {#if l.configured}<button class="text-button" data-nav onclick={() => app.removeLauncher(l.id)}>{l.id.startsWith('detected.') ? 'Reset' : 'Remove'}</button>{/if}
             <button class="pin" class:pinned={l.pinned} data-nav aria-label={`${l.pinned ? 'Unpin' : 'Pin'} ${l.name}`} aria-pressed={l.pinned} onclick={() => pin(l)}><Icon name="star" size={18} filled={l.pinned} /></button>
-          {/snippet}
-        </ToolCard>
-      {:else if item.t === 'port'}
-        {@const p = item.p}
-        <ToolCard seed={`port:${p.id}`} kind="Native port" title={p.name} subtitle={p.game} detail={p.requirement}
-          badge={{ text: p.status.replaceAll('-', ' '), tone: p.status === 'ready' ? 'ok' : p.status === 'update' ? 'warn' : '' }} glyph="puzzle" ready={item.ready || p.status !== 'not-installed'}>
-          {#snippet actions()}
-            <button class="btn glass small" data-nav onclick={() => app.go('ports')}>Manage</button>
-            {#if !app.demo && p.status !== 'not-installed'}<button class="btn glass small" data-nav onclick={() => app.openPortFolder(p)}>Folder</button>{/if}
           {/snippet}
         </ToolCard>
       {:else}

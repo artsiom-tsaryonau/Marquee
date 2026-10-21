@@ -43,7 +43,6 @@ class AppState {
   systemReduceMotion = $state(typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
   motionReduced = $derived(this.reduceMotion || this.systemReduceMotion);
   variantPreferences = $state<Record<string, string>>(load('variantPreferences', {}));
-  toolSections = $state<string[]>(load('toolSections', ['emulators', 'ports', 'launchers']));
   sounds = $state<boolean>(load('sounds', false));
 
   api: LibraryApi = createApi();
@@ -104,7 +103,6 @@ class AppState {
       $effect(() => save('reduceMotion', this.reduceMotion));
       $effect(() => save('visualEffects', this.visualEffects));
       $effect(() => save('sounds', this.sounds));
-      $effect(() => save('toolSections', this.toolSections));
       $effect(() => save('variantPreferences', this.variantPreferences));
     });
   }
