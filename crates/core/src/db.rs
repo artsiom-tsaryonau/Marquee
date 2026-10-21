@@ -248,6 +248,18 @@ impl Db {
                 Some("fullscreen") => "fullscreen".into(),
                 _ => "window".into(),
             },
+            torrents: crate::model::TorrentSettings {
+                enabled: self.get_setting("torrent.enabled")?.as_deref() == Some("1"),
+                seeding: self.get_setting("torrent.seeding")?.as_deref() != Some("0"),
+                upload_kbps: self
+                    .get_setting("torrent.upload_kbps")?
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(0),
+                download_kbps: self
+                    .get_setting("torrent.download_kbps")?
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(0),
+            },
             selected_runner_ids: ["ps1", "ps2"]
                 .into_iter()
                 .filter_map(

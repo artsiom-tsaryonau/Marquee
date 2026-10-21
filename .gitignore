@@ -57,6 +57,7 @@ firmware/
 *.pce
 *.smd
 *.ngp
+*.nds
 
 # Local databases and their backups (the real library lives outside the repo)
 *.db
@@ -75,3 +76,6 @@ coverage/
 # Signing keys and certificates
 *.pem
 *.key
+
+# Torrent files made for the library live in the data dir, not the repo
+*.torrent

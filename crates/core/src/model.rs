@@ -268,6 +268,32 @@ pub struct Settings {
     /// `window` (default) or `fullscreen`: how games open.
     #[serde(default = "default_display_mode")]
     pub display_mode: String,
+    /// Optional library transfer between the user's own devices.
+    #[serde(default)]
+    pub torrents: TorrentSettings,
+}
+
+/// Device-to-device library transfer over BitTorrent. Off by default; when on
+/// it stays private (no public DHT or trackers) unless the user adds peers.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TorrentSettings {
+    pub enabled: bool,
+    /// Serve pieces to your other devices. Off means download-only.
+    pub seeding: bool,
+    /// KiB/s; 0 is unlimited.
+    pub upload_kbps: u32,
+    pub download_kbps: u32,
+}
+
+impl Default for TorrentSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            seeding: true,
+            upload_kbps: 0,
+            download_kbps: 0,
+        }
+    }
 }
 
 fn default_display_mode() -> String {

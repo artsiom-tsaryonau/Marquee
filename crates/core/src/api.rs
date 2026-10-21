@@ -79,6 +79,11 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
             out(core.refresh_artwork(edition.as_deref(), Some(sink))?)
         }
         "set_display_mode" => out(core.set_display_mode(&text(&args, "mode")?)?),
+        "get_torrent_settings" => out(core.torrent_settings()?),
+        "set_torrent_settings" => {
+            let t = serde_json::from_value(args.get("settings").cloned().unwrap_or_default())?;
+            out(core.set_torrent_settings(&t)?)
+        }
         "prune_library" => out(core.prune_missing()?),
         "list_emulators" => out(core.list_emulators()?),
         "build_emulator" => out(core.build_emulator(&text(&args, "id")?)?),

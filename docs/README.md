@@ -27,6 +27,7 @@ The 2026-10-21 direct-store decision supersedes earlier numbered phases, “Lutr
 | [Desktop rendering](DESKTOP_RENDERING.md) | Production launch, renderer modes, Balanced/Full effects, and remaining acceptance |
 | [Enrichment, UI and PS2 metadata](ENRICHMENT.md) | Optional metadata/artwork providers and the ScreenScraper/SteamGridDB follow-up |
 | [Catalogue metadata](CATALOGUE_METADATA.md) | Saved-page import, regional revisions/languages, source artwork and ratings, explicit installation links and raw-ISO SHA-1 matching; schema v5 |
+| [Library transfer (BitTorrent)](TORRENTS.md) | Optional private device-to-device transfer: status, privacy defaults, CLI, next steps |
 | [Cleanup](CLEANUP.md) | What can be deleted (build output, backups, quarantined files), what it costs, and what to keep |
 | [Correction history](CORRECTIONS.md) | Condensed 2026-10-20/21 corrections, PS1/PS2 audit outcomes and open gates |
 

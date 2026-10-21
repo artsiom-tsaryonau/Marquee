@@ -262,6 +262,17 @@ impl Core {
 
     pub fn select_runner(&self, runner_id: &str) -> Result<()> {
         let runners = self.refresh_runners()?;
+    pub fn torrent_settings(&self) -> Result<model::TorrentSettings> {
+        Ok(self.with_db(|db| db.load_settings())?.torrents)
+    }
+
+    pub fn set_torrent_settings(&self, t: &model::TorrentSettings) -> Result<()> {
+        self.set_setting("torrent.enabled", if t.enabled { "1" } else { "0" })?;
+        self.set_setting("torrent.seeding", if t.seeding { "1" } else { "0" })?;
+        self.set_setting("torrent.upload_kbps", &t.upload_kbps.to_string())?;
+        self.set_setting("torrent.download_kbps", &t.download_kbps.to_string())
+    }
+
         let Some(runner) = runners.iter().find(|r| r.id == runner_id && r.available) else {
             return Err(AppError::new(
                 "RUNNER_MISSING",
