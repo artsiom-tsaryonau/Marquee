@@ -10,6 +10,7 @@ pub mod error;
 pub mod http;
 pub mod hub;
 pub mod instance;
+pub mod intake;
 pub mod iso;
 pub mod keys;
 pub mod launchers;

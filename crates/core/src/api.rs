@@ -79,6 +79,11 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
             out(core.refresh_artwork(edition.as_deref(), Some(sink))?)
         }
         "set_display_mode" => out(core.set_display_mode(&text(&args, "mode")?)?),
+        "intake_archive" => {
+            let path = std::path::PathBuf::from(text(&args, "path")?);
+            let delete = args.get("delete_source").and_then(|v| v.as_bool()).unwrap_or(false);
+            out(core.intake_archive(&path, delete)?)
+        }
         "get_torrent_settings" => out(core.torrent_settings()?),
         "set_torrent_settings" => {
             let t = serde_json::from_value(args.get("settings").cloned().unwrap_or_default())?;

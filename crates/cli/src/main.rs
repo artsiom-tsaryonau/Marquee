@@ -32,6 +32,17 @@ enum Command {
         #[arg(long)]
         root: Option<String>,
     },
+    /// Unpack downloaded .zip/.7z game archives into the library, then rescan.
+    /// Pass archive files or folders that contain them.
+    Intake {
+        paths: Vec<PathBuf>,
+        /// Delete each archive after it unpacked and verified
+        #[arg(long)]
+        delete: bool,
+        /// Do not rescan the library afterwards
+        #[arg(long)]
+        no_scan: bool,
+    },
     /// Remove entries whose files are gone (never played, not favourites).
     Prune,
     List {
@@ -270,6 +281,37 @@ fn run() -> marquee_core::error::Result<()> {
             let label = marquee_core::catalog::by_id(&system)?.display_name;
             let root = core.add_root(&system, path, Some(label))?;
             println!("{}", serde_json::to_string_pretty(&root)?);
+        }
+        Command::Intake { paths, delete, no_scan } => {
+            let mut archives = Vec::new();
+            for p in paths {
+                if p.is_dir() {
+                    for e in std::fs::read_dir(&p)?.flatten() {
+                        let f = e.path();
+                        let ext = f.extension().map(|x| x.to_string_lossy().to_lowercase());
+                        if f.is_file() && matches!(ext.as_deref(), Some("zip" | "7z")) {
+                            archives.push(f);
+                        }
+                    }
+                } else {
+                    archives.push(p);
+                }
+            }
+            archives.sort();
+            let mut changed = false;
+            for a in &archives {
+                match core.intake_archive(a, delete) {
+                    Ok(r) => {
+                        changed |= matches!(r.outcome, marquee_core::intake::Outcome::Imported | marquee_core::intake::Outcome::KeptArchive);
+                        println!("{}: {:?}{} - {}", a.display(), r.outcome, r.system.map(|s| format!(" ({s})")).unwrap_or_default(), r.message);
+                    }
+                    Err(e) => println!("{}: error {} - {}", a.display(), e.code, e.message),
+                }
+            }
+            if changed && !no_scan {
+                let report = core.scan(None, None)?;
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            }
         }
         Command::Torrent(command) => torrent(&core, command)?,
         Command::Prune => {
