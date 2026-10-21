@@ -11,7 +11,7 @@ A field is filled once and never overwritten by a later source.
 
 ## Safeguards
 
-- **Quota.** The free key allows about 1,000 lookups a month. Marquee asks only about games with an official retail name (or disc games), at most 60 per run, once per game, remembers it for 30 days, and stops when fewer than 25 lookups are left in the month. Games found are never asked again.
+- **Quota.** The free key allows about 1,000 lookups a month. Marquee asks only about games with an official retail name (or disc games), at most 500 per run, once per game, retries a game that found nothing after 7 days, and stops when fewer than 25 lookups are left in the month. Games found are never asked again.
 - **Same game only.** A result is used only if its title is the same game (`Underground` is not `Underground 2`, `Tetris` is not `Tetris Effect`).
 - **No guesses for homebrew.** Homebrew, public-domain and hacked ROMs are not searched by name.
 - The key is part of TheGamesDB's request URL, so request errors are dropped and never logged or shown.

@@ -27,9 +27,9 @@ use std::sync::Mutex;
 const TGDB: &str = "https://api.thegamesdb.net/v1";
 const FIELDS: [&str; 4] = ["genre", "releaseyear", "developer", "publisher"];
 /// Looked-up games are not asked about again for this long.
-const RETRY_SECS: u64 = 30 * 24 * 3600;
+const RETRY_SECS: u64 = 7 * 24 * 3600;
 /// At most this many TheGamesDB lookups per run.
-const TGDB_BUDGET: usize = 60;
+const TGDB_BUDGET: usize = 500;
 /// Stop asking when the provider says this little of the month is left.
 const TGDB_RESERVE: i64 = 25;
 const DESCRIPTION_MAX: usize = 4000;
@@ -130,11 +130,7 @@ pub fn parse_meta(text: &str, field: &str) -> HashMap<u32, String> {
 fn load_meta(dir: &Path, field: &str, list: &str) -> HashMap<u32, String> {
     let file = dir.join(format!("meta-{field}-{}.dat", romart::thumb_name(list)));
     if !romart::fresh(&file) {
-        let url = format!(
-            "{}/{field}/{}.dat",
-            romart::DB_BASE,
-            romart::encode(list)
-        );
+        let url = format!("{}/{field}/{}.dat", romart::DB_BASE, romart::encode(list));
         match http::get_text_limited(&url, romart::DAT_MAX_BYTES) {
             Ok(text) => {
                 let _ = fs::create_dir_all(dir);
@@ -208,10 +204,11 @@ fn tidy_description(raw: &str) -> Option<String> {
 
 /// Use the first search result that is the same game.
 fn pick_game(json: &Value, wanted: &str, genres: &BTreeMap<u64, String>) -> Option<GameInfo> {
-    let game = json["data"]["games"]
-        .as_array()?
-        .iter()
-        .find(|g| g["game_title"].as_str().is_some_and(|t| romart::names_agree(wanted, t)))?;
+    let game = json["data"]["games"].as_array()?.iter().find(|g| {
+        g["game_title"]
+            .as_str()
+            .is_some_and(|t| romart::names_agree(wanted, t))
+    })?;
     let genre = game["genres"].as_array().and_then(|ids| {
         let names: Vec<&str> = ids
             .iter()
@@ -315,9 +312,11 @@ pub fn run(core: &Core, edition_id: Option<&str>) -> usize {
     let mut pending: Vec<Pending> = Vec::new();
     let mut asked: std::collections::HashSet<String> = Default::default();
 
-    for e in snap.editions.iter().filter(|e| {
-        !e.missing && edition_id.is_none_or(|id| id == e.id)
-    }) {
+    for e in snap
+        .editions
+        .iter()
+        .filter(|e| !e.missing && edition_id.is_none_or(|id| id == e.id))
+    {
         let have = e.info.clone().unwrap_or_default();
         if edition_id.is_none() {
             if have.description.is_some() {
@@ -340,7 +339,9 @@ pub fn run(core: &Core, edition_id: Option<&str>) -> usize {
                 .or_insert_with(|| load_system(&dat_dir, list));
             if let (Some(facts), Some(m)) = (
                 facts.as_ref(),
-                snap.media.iter().find(|m| m.edition_id == e.id && m.available),
+                snap.media
+                    .iter()
+                    .find(|m| m.edition_id == e.id && m.available),
             ) {
                 let path = m.path.to_string_lossy().into_owned();
                 let stamp = (m.size_bytes, m.mtime);
@@ -352,7 +353,8 @@ pub fn run(core: &Core, edition_id: Option<&str>) -> usize {
                         c
                     }
                 };
-                let find = |map: &HashMap<u32, String>| crcs.iter().find_map(|c| map.get(c).cloned());
+                let find =
+                    |map: &HashMap<u32, String>| crcs.iter().find_map(|c| map.get(c).cloned());
                 official = find(&facts.names);
                 let found = GameInfo {
                     genre: find(&facts.genre),
@@ -445,10 +447,12 @@ pub fn run(core: &Core, edition_id: Option<&str>) -> usize {
         if !asked.contains(&p.edition.id) {
             tried.insert(p.edition.id.clone(), (now, false));
         }
-        if p.info != p.edition.info.clone().unwrap_or_default() {
-            if core.with_db(|db| upsert(db, &p.edition.id, &p.info)).is_ok() {
-                changed += 1;
-            }
+        if p.info != p.edition.info.clone().unwrap_or_default()
+            && core
+                .with_db(|db| upsert(db, &p.edition.id, &p.info))
+                .is_ok()
+        {
+            changed += 1;
         }
     }
     romart::save(&crc_file, &crc_cache);
@@ -496,7 +500,12 @@ mod tests {
         assert_eq!(got.genre.as_deref(), Some("Adventure, RPG"));
         assert!(got.description.unwrap().contains("Johto.\nCatch"));
         assert!(pick_game(&json, "Pokemon Gold", &genres).is_none());
-        assert!(pick_game(&serde_json::json!({"data": {"count": 0}}), "Anything Goes", &genres).is_none());
+        assert!(pick_game(
+            &serde_json::json!({"data": {"count": 0}}),
+            "Anything Goes",
+            &genres
+        )
+        .is_none());
     }
 
     #[test]
