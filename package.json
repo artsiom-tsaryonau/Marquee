@@ -4,9 +4,9 @@
   "license": "MIT",
   "scripts": {
     "run:desktop": "scripts/run.sh desktop",
+    "build:desktop": "scripts/run.sh build",
     "run:web": "scripts/run.sh web",
     "run:dev": "scripts/run.sh dev",
-    "run:both": "scripts/run.sh both",
-    "run:tauri": "scripts/run.sh tauri"
+    "run:both": "scripts/run.sh both"
   }
 }

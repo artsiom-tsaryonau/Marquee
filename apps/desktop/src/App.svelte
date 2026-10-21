@@ -1,6 +1,7 @@
 <script lang="ts">
   import { fade, fly, scale } from 'svelte/transition';
   import { onMount } from 'svelte';
+  import { uiIsStale } from './lib/build';
   import { app, type Route } from './lib/state.svelte';
   import { startFocusEngine } from './lib/focus';
   import Backdrop from './lib/components/Backdrop.svelte';
@@ -25,6 +26,8 @@
 
   let booting = $state(new URLSearchParams(location.search).get('splash') !== '0');
   let now = $state(new Date());
+  let stale = $state(false);
+  const checkStale = () => void uiIsStale().then((v) => (stale = v));
 
   const dur = $derived(app.motionReduced ? 0 : 260);
 
@@ -58,6 +61,8 @@
     updateMotion();
     motion.addEventListener('change', updateMotion);
     void app.boot();
+    checkStale();
+    window.addEventListener('focus', checkStale);
     // Dev shortcuts: ?route=library&mode=big&theme=light&splash=0&empty=1
     const q = new URLSearchParams(location.search);
     const r = q.get('route') as Route | null;
@@ -86,6 +91,7 @@
       clearInterval(clock);
       clearInterval(sourcePoll);
       window.removeEventListener('focus', refreshSources);
+      window.removeEventListener('focus', checkStale);
     };
   });
 
@@ -170,6 +176,12 @@
       {/if}
     </div>
   </div>
+{/if}
+
+{#if stale}
+  <button class="stale glass-panel" onclick={() => location.reload()}>
+    Marquee was rebuilt. Reload to match it
+  </button>
 {/if}
 
 {#if app.toast}
@@ -489,6 +501,19 @@
     height: 20px;
     margin-left: 6px;
     background: rgb(255 255 255 / 0.18);
+  }
+
+  .stale {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 70;
+    padding: 10px 18px;
+    border-radius: 14px;
+    font-weight: 700;
+    background: var(--accent);
+    color: #fff;
   }
 
   .toast {

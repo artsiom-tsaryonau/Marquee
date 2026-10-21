@@ -19,7 +19,7 @@ Needs Node 22+, pnpm (`corepack enable pnpm`), and Rust for the desktop/CLI. On 
 ```bash
 ./scripts/setup.sh                # Fedora devel packages, then checks rustc / node / pnpm
 (cd apps/desktop && pnpm install)
-./scripts/run.sh desktop          # or: web | dev | both | tauri  (also pnpm run:desktop …)
+./scripts/run.sh desktop          # or: web | dev | both  (also pnpm run:desktop …)
 (cd apps/desktop && pnpm dev)     # browser demo with sample data · http://localhost:1420
 ```
 
@@ -34,7 +34,7 @@ cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev artwork refresh
 cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev ports install zelda64recomp   # also: ports list | check | launch
 ```
 
-**One app, two surfaces, run separately.** The desktop app is standalone and opens no port by default. Set `MARQUEE_WEB=1` (or `MARQUEE_PORT=<port>`) and it also serves the same UI and library on `127.0.0.1` (default port 47820). For the web alone, run `scripts/run.sh web` (`marquee run web`) with no window. Settings → Web access copies an address ending in `#token=…`; open it in a browser on the same computer and you get the identical UI with the same games, covers, ports and launches, and both surfaces see each other's changes live. Headless: `marquee run web` (after `pnpm build`). While developing, `scripts/run.sh dev` starts the server and Vite together; Vite proxies `/api` to a running Marquee, so a browser at `http://localhost:1420/#token=…` shows real data with hot reload. The server is loopback-only, needs the token for every API and cover request, and rejects foreign `Host` headers. The token lives in `<data dir>/server.token` (mode 600).
+**One app, two surfaces, run separately.** The desktop app is standalone and opens no port by default. Set `MARQUEE_WEB=1` (or `MARQUEE_PORT=<port>`) and it also serves the same UI and library on `127.0.0.1` (default port 47820). For the web alone, run `scripts/run.sh web` (`marquee run web`) with no window. Settings → Web access copies an address ending in `#token=…`; open it in a browser on the same computer and you get the identical UI with the same games, covers, ports and launches, and both surfaces see each other's changes live. Every UI build is stamped; a window or tab left open across a rebuild shows a “Reload” banner instead of silently running old code. Headless: `marquee run web` (after `pnpm build`). While developing, `scripts/run.sh dev` starts the server and Vite together; Vite proxies `/api` to a running Marquee, so a browser at `http://localhost:1420/#token=…` shows real data with hot reload. The server is loopback-only, needs the token for every API and cover request, and rejects foreign `Host` headers. The token lives in `<data dir>/server.token` (mode 600).
 
 **Demo (`pnpm dev`, no token, or `?demo=1`)** still uses invented titles and simulated playtime. Controller input in the browser is not evidence for the Tauri window.
 
