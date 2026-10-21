@@ -1,12 +1,10 @@
 <script lang="ts">
-  // The focused game's art, blurred behind everything; cross-fades on change.
-  import { fade } from 'svelte/transition';
+  // Keep one background layer mounted as the focused game changes.
   import { app } from '../state.svelte';
   import { homeAtmosphere } from '../art';
   import Artwork from './Artwork.svelte';
 
   let { blur = true }: { blur?: boolean } = $props();
-  const dur = $derived(app.motionReduced ? 0 : 450);
   const art = $derived(app.hero?.art ?? homeAtmosphere);
 </script>
 
@@ -14,11 +12,9 @@
   {#if app.visualEffects === 'balanced'}
     <div class="atmosphere" style="--h:{art.hue};--h2:{art.hue2}"></div>
   {:else}
-  {#key app.hero?.id ?? 'atmosphere'}
-    <div class="layer" transition:fade={{ duration: dur }}>
+    <div class="layer">
       <Artwork {art} grain={false} />
     </div>
-  {/key}
   {/if}
   <div class="tint" style="--h:{art.hue}"></div>
 </div>

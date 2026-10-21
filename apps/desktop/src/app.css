@@ -191,6 +191,21 @@ button {
   padding: 0 30px;
   font-size: 17px;
 }
+.btn.play {
+  height: 68px;
+  min-width: 164px;
+  padding: 0 34px;
+  border-radius: 999px;
+  justify-content: center;
+  gap: 12px;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+.btn.play:hover,
+.btn.play:focus-visible,
+.btn.play:active {
+  transform: none;
+}
 .btn.small {
   height: 34px;
   padding: 0 14px;

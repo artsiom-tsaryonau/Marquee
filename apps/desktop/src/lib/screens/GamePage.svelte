@@ -102,12 +102,12 @@
         {#if g.platform === 'ps2'}<InstallMenu tone="primary" size="big" />
         {:else}<button class="btn primary big" data-nav onclick={() => app.go('tools')}><Icon name="settings" /> Set up {g.platform === 'ps1' ? 'DuckStation' : g.platform === 'genesis' ? 'BlastEm' : g.platform === 'ds' ? 'melonDS' : g.platform === 'neogeo' ? 'FinalBurn Neo' : 'emulator'}</button>{/if}
       {:else}
-        <button class="btn primary big" data-nav disabled={!!g.mediaMissing} onclick={() => {
+        <button class="btn primary big" class:play={g.installed && !g.mediaMissing && g.setupState !== 'missing'} data-nav disabled={!!g.mediaMissing} onclick={() => {
           if (g.lutris) void app.openLutrisGame(g);
           else if (offline && g.setupState === 'missing') app.explainBios();
           else if (g.installed) app.play(g);
         }}>
-          <Icon name={g.installed && g.setupState !== 'missing' ? 'play' : 'download'} />
+          <Icon name={g.installed && g.setupState !== 'missing' ? 'play' : 'download'} size={24} />
           {playLabel}
         </button>
       {/if}
@@ -296,6 +296,7 @@
   }
   .actions {
     display: flex;
+    align-items: center;
     flex-wrap: wrap;
     gap: 10px;
     margin-top: 4px;

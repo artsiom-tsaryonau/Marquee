@@ -6,40 +6,12 @@
   import Logo from './Logo.svelte';
   import Icon from './Icon.svelte';
   import Mark, { hasMark } from './Mark.svelte';
-  import { onDestroy } from 'svelte';
 
   let {
     game,
     shape = 'cover',
     showTitle = false,
   }: { game: GameEntry; shape?: 'cover' | 'wide'; showTitle?: boolean } = $props();
-
-  let el: HTMLButtonElement;
-  let tiltFrame = 0;
-
-  // Tilt toward the pointer with a moving glare; skipped when motion is reduced.
-  function tilt(e: PointerEvent) {
-    if (app.motionReduced || app.visualEffects !== 'full' || tiltFrame) return;
-    const { clientX, clientY } = e;
-    tiltFrame = requestAnimationFrame(() => {
-      tiltFrame = 0;
-      if (document.hidden || !document.hasFocus() || app.motionReduced || app.visualEffects !== 'full') return;
-      const r = el.getBoundingClientRect();
-      const x = (clientX - r.left) / r.width;
-      const y = (clientY - r.top) / r.height;
-      el.style.setProperty('--rx', `${(0.5 - y) * 10}deg`);
-      el.style.setProperty('--ry', `${(x - 0.5) * 12}deg`);
-      el.style.setProperty('--gx', `${x * 100}%`);
-      el.style.setProperty('--gy', `${y * 100}%`);
-    });
-  }
-  function untilt() {
-    cancelAnimationFrame(tiltFrame);
-    tiltFrame = 0;
-    el.style.setProperty('--rx', '0deg');
-    el.style.setProperty('--ry', '0deg');
-  }
-  onDestroy(() => cancelAnimationFrame(tiltFrame));
 
   const status = $derived(
     game.portStatus === 'update'
@@ -62,15 +34,11 @@
 
 <div class="wrap {shape}">
   <button
-    bind:this={el}
     class="card"
-    class:tiltable={app.visualEffects === 'full' && !app.motionReduced}
     data-nav
     style="--accent-h:{game.art.hue2}"
     onfocus={() => app.preview(game.id)}
     onpointerenter={() => app.preview(game.id)}
-    onpointermove={tilt}
-    onpointerleave={untilt}
     onclick={() => app.open(game)}
     aria-label={game.title}
   >
@@ -92,7 +60,6 @@
     {:else if status}
       <span class="status {status.tone}">{status.label}</span>
     {/if}
-    <span class="glare"></span>
   </button>
   {#if showTitle}
     <div class="caption">
@@ -111,10 +78,6 @@
     width: calc(var(--cover-w) * 2.1);
   }
   .card {
-    --rx: 0deg;
-    --ry: 0deg;
-    --gx: 50%;
-    --gy: 0%;
     position: relative;
     display: block;
     width: 100%;
@@ -126,19 +89,14 @@
     cursor: pointer;
     background: hsl(var(--accent-h) 30% 15%);
     box-shadow: 0 10px 30px -12px rgb(0 0 0 / 0.7);
-    transform: scale(var(--s, 1));
-    transition:
-      transform 220ms var(--ease),
-      box-shadow 220ms var(--ease);
+    transition: box-shadow 180ms var(--ease);
     outline: none;
   }
-  .card.tiltable { transform: perspective(900px) rotateX(var(--rx)) rotateY(var(--ry)) scale(var(--s, 1)); }
   .wide .card {
     aspect-ratio: 16 / 9.4;
   }
   .card:hover,
   .card:focus-visible {
-    --s: 1.06;
     z-index: 2;
     box-shadow:
       0 0 0 2px hsl(var(--accent-h) 95% 72%),
@@ -148,17 +106,12 @@
   .art {
     position: absolute;
     inset: 0;
-    transition: transform 400ms var(--ease);
   }
   .cover-img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
-  }
-  .card:hover .art,
-  .card:focus-visible .art {
-    transform: scale(1.05);
   }
   .shade {
     position: absolute;
@@ -217,18 +170,6 @@
     color: #fde68a;
   }
   :global(:root[data-effects='full']) .fav { filter: drop-shadow(0 0 6px rgb(253 230 138 / 0.8)); }
-  .glare {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    opacity: 0;
-    background: radial-gradient(circle at var(--gx) var(--gy), rgb(255 255 255 / 0.28), transparent 45%);
-    transition: opacity 200ms;
-    mix-blend-mode: overlay;
-  }
-  .card.tiltable:hover .glare {
-    opacity: 1;
-  }
   .caption {
     display: flex;
     flex-direction: column;
