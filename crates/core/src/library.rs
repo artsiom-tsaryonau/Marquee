@@ -92,6 +92,18 @@ pub fn scan_root(db: &Db, root_id: Option<&str>) -> Result<ScanReport> {
     Ok(report)
 }
 
+/// Drop library entries whose files are gone, keeping any with play history, a
+/// favourite mark or a custom title (those stay and show as missing).
+pub fn prune_missing(db: &Db) -> Result<u32> {
+    let mut removed = 0;
+    for edition in snapshot_editions(db)? {
+        if edition.missing && db.delete_unplayed_edition(&edition.id)? {
+            removed += 1;
+        }
+    }
+    Ok(removed)
+}
+
 fn walk_dir(
     db: &Db,
     dir: &Path,

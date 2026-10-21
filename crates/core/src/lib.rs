@@ -138,6 +138,15 @@ impl Core {
         Ok(report)
     }
 
+    /// Remove library entries whose files no longer exist (never-played ones only).
+    pub fn prune_missing(&self) -> Result<u32> {
+        let removed = self.with_db(library::prune_missing)?;
+        if removed > 0 {
+            self.events.emit(CoreEvent::LibraryChanged);
+        }
+        Ok(removed)
+    }
+
     pub fn refresh_runners(&self) -> Result<Vec<Runner>> {
         self.with_db(|db| {
             // Marquee owns its emulators: every runner comes from its catalogue.

@@ -486,6 +486,32 @@ impl Db {
         Ok(())
     }
 
+    /// Remove an edition and its rows, but only if nothing about it is worth keeping:
+    /// never played, not a favourite, no custom title. Returns whether it was removed.
+    pub fn delete_unplayed_edition(&self, id: &str) -> Result<bool> {
+        let keep: i64 = self.conn.query_row(
+            "SELECT (SELECT COUNT(*) FROM sessions WHERE edition_id = ?1)
+                  + (SELECT COUNT(*) FROM editions WHERE id = ?1
+                       AND (favorite != 0 OR display_title IS NOT NULL OR play_count > 0))",
+            [id],
+            |r| r.get(0),
+        )?;
+        if keep > 0 {
+            return Ok(false);
+        }
+        for sql in [
+            "DELETE FROM artwork WHERE edition_id = ?1",
+            "DELETE FROM catalogue_links WHERE edition_id = ?1",
+            "DELETE FROM launch_profiles WHERE edition_id = ?1",
+            "UPDATE editions SET media_id = NULL WHERE id = ?1",
+            "DELETE FROM media WHERE edition_id = ?1",
+            "DELETE FROM editions WHERE id = ?1",
+        ] {
+            self.conn.execute(sql, [id])?;
+        }
+        Ok(true)
+    }
+
     pub fn delete_runner(&self, id: &str) -> Result<()> {
         self.conn
             .execute("DELETE FROM runners WHERE id = ?1", [id])?;

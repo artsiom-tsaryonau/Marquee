@@ -981,3 +981,44 @@ fn cartridge_systems_scan_pick_their_emulator_and_build_argv() {
         ]
     );
 }
+
+#[test]
+fn prune_removes_only_unplayed_entries_whose_files_are_gone() {
+    let dir = tempfile::tempdir().unwrap();
+    let roms = dir.path().join("nes");
+    std::fs::create_dir_all(&roms).unwrap();
+    for n in ["Keep.nes", "Gone.nes", "Played.nes"] {
+        std::fs::write(roms.join(n), b"NES\x1a").unwrap();
+    }
+    let core = Core::open_isolated(Some(dir.path().join("data")), false).unwrap();
+    core.add_root("nes", roms.clone(), None).unwrap();
+    core.scan(None, None).unwrap();
+    let id_of = |title: &str| {
+        core.snapshot()
+            .unwrap()
+            .editions
+            .into_iter()
+            .find(|e| e.title == title)
+            .unwrap()
+            .id
+    };
+    let played = id_of("Played");
+    core.set_favourite(&played, true).unwrap();
+    std::fs::remove_file(roms.join("Gone.nes")).unwrap();
+    std::fs::remove_file(roms.join("Played.nes")).unwrap();
+    core.scan(None, None).unwrap();
+    assert_eq!(core.prune_missing().unwrap(), 1);
+    let titles: Vec<String> = core
+        .snapshot()
+        .unwrap()
+        .editions
+        .into_iter()
+        .map(|e| e.title)
+        .collect();
+    assert!(titles.contains(&"Keep".to_string()));
+    assert!(
+        titles.contains(&"Played".to_string()),
+        "favourites are kept"
+    );
+    assert!(!titles.contains(&"Gone".to_string()));
+}

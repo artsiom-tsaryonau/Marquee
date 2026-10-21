@@ -32,6 +32,8 @@ enum Command {
         #[arg(long)]
         root: Option<String>,
     },
+    /// Remove entries whose files are gone (never played, not favourites).
+    Prune,
     List {
         #[arg(long)]
         system: Option<String>,
@@ -226,6 +228,9 @@ fn run() -> marquee_core::error::Result<()> {
             let label = marquee_core::catalog::by_id(&system)?.display_name;
             let root = core.add_root(&system, path, Some(label))?;
             println!("{}", serde_json::to_string_pretty(&root)?);
+        }
+        Command::Prune => {
+            println!("removed {}", core.prune_missing()?);
         }
         Command::Scan { root } => {
             let report = core.scan(root.as_deref(), None)?;

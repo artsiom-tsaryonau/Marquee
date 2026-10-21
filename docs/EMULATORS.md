@@ -101,6 +101,12 @@ Verified on this host (2026-10-21): all three installed through `marquee emulato
 
 Not covered yet, and why: **Sega Genesis/Mega Drive** and **Neo Geo Pocket** have no emulator with a checksummed Linux download that Marquee can fetch (ares publishes no Linux build; mGBA publishes no checksums). They need a source-build recipe or a different emulator. **mGBA** is not used for Game Boy because Mesen covers it. The UI maps these systems to platforms and launches them; "Add folder" buttons for them are not built yet (use `marquee library add-root --system <id> <folder>`).
 
+## Keeping the library to real games
+
+`marquee prune` (API `prune_library`) removes library entries whose files no longer exist, but only ones never played, not favourites and without a custom title; anything with history stays and shows as missing. Marquee never deletes game files itself.
+
+On 2026-10-21 the local homebrew folders were cleaned by moving 730 files that are not playable games (demos, test ROMs, music and sound editors, tools and utilities, multi-ROM menus, picture/movie files, e-books, adult material, readme/txt files) into `roms/_removed/<system>/`, with `roms/_removed/MANIFEST.txt` recording each original path and the reason. Moving a file back and rescanning restores it. The classification was by filename, so a few odd entries remain in either direction. The library went from 1,487 to 780 entries (Game Boy Color 1,161 to 457, NES 245 to 239, SNES 42 to 38, Game Boy 26 to 22). Duplicate versions of the same game (for example JetPac V0.01 to V0.04) were kept.
+
 ## Firmware requirements
 
 Catalogue entries can also carry `seed` (config files written before launch when missing, to skip first-run wizards, relative to the emulator's config folder) and `icon_download` (an icon with a pinned SHA-256, for archives that contain none).
