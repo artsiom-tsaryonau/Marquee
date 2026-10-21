@@ -21,7 +21,7 @@ The 2026-10-21 direct-store decision supersedes earlier numbered phases, “Lutr
 | [PS1](PS1.md) | DuckStation slice and schema-v4 root systems; verify its own live gate independently |
 | [Media acquisition](MEDIA_ACQUISITION.md) | Target: automated firmware/disc/port jobs from authorized sources; manual import as fallback |
 | [Media connector priorities](MEDIA_CONNECTOR_PRIORITIES.md) | FMHY-informed tiers: Vimm/Myrient/DAT verification vs do-not-automate ROM hosts |
-| [Managed emulators and BIOS](EMULATORS.md) | Seven managed emulator launchers and Tools UI, BIOS management, game-only window research, and the mGBA source-build pilot |
+| [Managed emulators and BIOS](EMULATORS.md) | Managed catalogue, DS/Genesis/Neo Geo adapters, pinned local builds, BIOS checks, audio/vsync fixes and dated live acceptance |
 | [Purple for Aion 2](PURPLE.md) | Managed setup/open recipe, runtime pins, retry/cancellation, and the unverified live game gate |
 | [Tools, launchers and legacy Lutris bridge](LAUNCHERS.md) | Generic shortcuts and advanced configuration; the deprioritized Lutris cache bridge (automatic discovery stays until made opt-in) |
 | [Launcher branding](LAUNCHER_BRANDING.md) | Official marks, Simple Icons slugs, and UI wiring notes for Steam/Epic/GOG/Lutris/Heroic/Purple/runtimes |
@@ -31,7 +31,7 @@ The 2026-10-21 direct-store decision supersedes earlier numbered phases, “Lutr
 | [Library transfer (BitTorrent)](TORRENTS.md) | Optional private device-to-device transfer: status, privacy defaults, CLI, next steps |
 | [Archive intake](INTAKE.md) | `marquee intake`: unpack `.zip`/`.7z` games into the library; rules, safety limits and gaps |
 | [ROM facts](ROM_FACTS.md) | genre, year, developer, description: sources, TheGamesDB allowance, safeguards |
-| [ROM cover art](ROM_ARTWORK.md) | libretro checksum lookup, SteamGridDB fallback and its safeguards, caching, results |
+| [ROM cover art](ROM_ARTWORK.md) | libretro checksum lookup, guarded artwork/facts enrichment, provider caching and remaining identity/override gaps |
 | [Cleanup](CLEANUP.md) | What can be deleted (build output, backups, quarantined files), what it costs, and what to keep |
 | [Correction history](CORRECTIONS.md) | Condensed 2026-10-20/21 corrections, PS1/PS2 audit outcomes and open gates |
 

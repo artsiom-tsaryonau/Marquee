@@ -15,10 +15,12 @@ marquee intake x.zip --no-scan             # skip the rescan
 | One cartridge image (`.nes`, `.sfc`, `.gb`, `.gbc`, `.pce`, `.z64`, `.nds`, ...) | File goes straight into that system's root |
 | `.cue`/`.chd`/`.pbp`, or `.bin` with a `.cue` | PS1; several files get a folder named after the archive |
 | `.iso` | PS2 if at least 750 MiB, otherwise PS1 (a size guess; check the result) |
-| `.md`/`.gen`/`.smd` | Stored under `roms/genesis`; Marquee has no Genesis emulator yet |
+| `.md`/`.gen`/`.smd` | Extracted into a registered Genesis root; launched through managed BlastEm |
 | ZIP with `.rom` entries or `NNN-` MAME-style names | Arcade (Neo Geo) set copied **unchanged** next to the other sets |
 | Only `.bin` (BIOS), or only text/images | Skipped with a hint; use `marquee bios import` for BIOS |
 | Files for more than one system | Skipped; unpack by hand |
+
+The CLI rescans `AlreadyPresent` results too: files unpacked before their adapter existed can enter the library once support is added. `--no-scan` still suppresses this. The core/JSON intake call itself does not scan; API callers must request a scan.
 
 Documents and images in the archive (`.txt`, `.nfo`, `.jpg`, ...) are ignored. A system with no library folder gets one next to your existing roots and is registered.
 

@@ -1,4 +1,4 @@
-# Cover art for cartridge and disc games
+# Artwork and facts for cartridge and disc games
 
 `Fetch covers` (and the automatic fetch after a scan) fills in covers for games that have none. Code: `crates/core/src/romart.rs`, called from `Core::refresh_artwork`. It never replaces a cover that exists and never blocks Play.
 
@@ -24,5 +24,35 @@ The library is mostly public-domain and homebrew Game Boy Color and NES ROMs, so
 ## Not done
 
 - Disc images are not hashed (too large); PS1/PS2 use the serial, Dreamcast and others only the title.
-- Genesis and Neo Geo arcade sets are not looked up (no emulator for the first, ZIP set names for the second).
-- IGDB and TheGamesDB are not used yet. A key for TheGamesDB is in `.env` but nothing reads it.
+- Genesis now has a launch adapter; Genesis and Neo Geo remain absent from the current artwork source list. Emulator support and enrichment support are separate.
+- IGDB is not used by this path. TheGamesDB is used for optional facts as described below.
+
+
+## Game facts
+
+See also the [game-facts implementation notes](ROM_FACTS.md).
+
+`Core::refresh_artwork` also runs `romfacts.rs`. libretro checksum-keyed
+metadata fills missing genre, release year, developer and publisher. A configured
+`THE_GAMES_DB_API_KEY` (Settings → API keys → TheGamesDB) enables descriptions,
+player counts and missing fields. Requests use a system ID and a conservatively
+matched name: an official retail No-Intro name for cartridges, or the local
+title for supported discs. This is enrichment, not verified release identity.
+Missing or unmatched results leave facts unknown. Same-name release ambiguity
+is not resolved by this search and remains follow-up work.
+
+Facts are stored separately in `edition_info`, projected as `Edition.info` and
+shown on the game page. Fields already present are retained when filling gaps;
+there is no general user-edit/override model yet. The combined `source` label
+identifies participating providers, not the source of every individual field.
+The saved Vimm catalogue's per-field provenance remains separate.
+
+The implementation caches attempts, caps TheGamesDB game lookups per run,
+uses at most three workers and stops near its reported quota reserve. Current
+retry/cap settings are described in [game facts](ROM_FACTS.md); they are
+implementation limits, not guarantees about the provider's allowance. A
+selected-game refresh bypasses the ordinary retry delay. Provider
+outages or missing keys do not prevent Play. Supported systems follow the
+artwork source list; adding a TheGamesDB platform ID alone does not enable a
+system's enrichment. These implementation checks do not establish live provider
+availability or description accuracy for every edition.

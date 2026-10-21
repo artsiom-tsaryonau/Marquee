@@ -35,7 +35,8 @@ language, ROM revision and player-count filters. Search includes those metadata
 labels and serials. Source rating sorting is independent of critic scores.
 All known systems in the supplied index have display labels; a catalogue label
 does not mean that system has a launch adapter. Genesis discovery currently has
-43 entries; Marquee's local disc imports/launches still support PS1 and PS2.
+43 entries. Local adapters now also include DS, Genesis and Neo Geo; see
+[emulator capabilities and acceptance](EMULATORS.md).
 
 Open Addams Family Values to see its saved cover, media variant, filename,
 advertised size, checksums, players, source ratings and vote count, verification
@@ -113,7 +114,9 @@ embedded catalogue PNG/JPEG/AVIF validation still checks signatures and size.
 Remaining enrichment work: persisted cross-provider mappings with explicit
 acceptance evidence; exact artwork asset URLs and per-variant associations;
 general field/artwork override editing and refresh precedence. Artwork credit
-alone is not a verified release mapping. Live provider requests remain deferred.
+alone is not a verified release mapping. Optional ROM artwork/facts now make live provider requests (see
+[ROM enrichment](ROM_ARTWORK.md)); those lookups do not create verified
+Vimm-to-provider release mappings.
 
 Commands: `import_catalogue`, `link_catalogue`, `unlink_catalogue`,
 `match_catalogue`, `clear_catalogue`, `open_catalogue_page`. Library snapshots

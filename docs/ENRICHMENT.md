@@ -2,6 +2,21 @@
 
 Planning notes aligned 2026-10-21. These retain metadata, visual, and controller goals from the earlier roadmap. They are background/follow-up work; [direct Steam → Epic → GOG](ROADMAP.md) is the critical path. Nothing here gates a supported installed game's Play action.
 
+## Implemented baseline (2026-10-21)
+
+Saved Vimm snapshots retain release/media details and field provenance across
+listing-only refreshes. Serial covers validate decoded image bounds and reject
+stale jobs. Optional ROM enrichment now uses libretro checksum metadata,
+libretro thumbnails, guarded SteamGridDB artwork and TheGamesDB game facts;
+see [artwork and matching limits](ROM_ARTWORK.md), [game facts](ROM_FACTS.md)
+and [catalogue provenance](CATALOGUE_METADATA.md).
+
+ScreenScraper is not an active implementation dependency. The provider-specific
+plan below is retained as research, not current runtime behavior. Verified
+cross-provider IDs, artwork edition associations, general field provenance and
+user override editing/precedence remain open. Name-based enrichment must not
+be represented as a verified release mapping or merge installations.
+
 ## Metadata and artwork candidates
 
 | Area | Planned approach |

@@ -1,21 +1,27 @@
 # Managed emulators and BIOS
 
-Updated 2026-10-21. Marquee installs emulators and holds BIOS images inside its own data folder, so everything can be removed on demand. **Policy (2026-10-21):** Marquee installs, configures and runs emulators itself, from archives named in catalogue files. It does not use Flatpak or other package managers, and it no longer discovers host copies of emulators. Setup that an emulator would normally ask the user for is written by Marquee before launch.
+Updated 2026-10-21. Marquee installs emulators and holds BIOS images inside its own data folder, so everything can be removed on demand. **Policy (2026-10-21):** Marquee installs, configures and runs emulators itself, from verified archives or reviewed pinned source recipes named in the catalogue. It does not use Flatpak or other package managers, and it no longer discovers host copies of emulators. Setup that an emulator would normally ask the user for is written by Marquee before launch.
 
 ## Current catalogue and integration boundary
 
 | Emulator | Platform | Current Marquee capability |
 | --- | --- | --- |
+| PCSX2 | PS2 | Managed lifecycle, region-aware BIOS setup and disc launch |
+| Mesen | NES / SNES / GB / GBC / PCE | Generic cartridge adapters; live game acceptance separate |
+| RMG | Nintendo 64 | Generic cartridge adapter; input acceptance pending |
+| BlastEm | Genesis / Mega Drive | Pinned source build and direct cartridge launch; no BIOS |
 | DuckStation | PS1 | Managed lifecycle plus library-disc launch adapter |
 | PPSSPP | PSP | Managed lifecycle and standalone opening |
 | RPCS3 | PS3 | Managed lifecycle and standalone opening |
-| Flycast | Dreamcast | Managed lifecycle and standalone opening |
+| Flycast | Dreamcast | Managed lifecycle and generic disc adapter; live game acceptance separate |
 | Azahar | Nintendo 3DS | Managed lifecycle and standalone opening |
 | Cemu | Wii U | Managed lifecycle and standalone opening |
 | xemu | Original Xbox | Managed lifecycle and standalone opening |
-| mGBA | GB / GBC / GBA | Opt-in pinned source-build pilot, Qt/SDL standalone tools; no library adapter |
+| mGBA | GB / GBC / GBA | Opt-in pinned source build, Qt/SDL standalone tools; no library adapter |
+| melonDS | Nintendo DS | Pinned source build, `.nds` folder scanning and library Play; saves/states isolated |
+| FinalBurn Neo | Neo Geo | Pinned SDL2 source build, intact ZIP scanning, BIOS/legacy-set diagnostics and library adapter; complete matching sets required |
 
-PCSX2 is a normal catalogue entry (`catalog/emulators/pcsx2.json`, runner `runner.pcsx2.marquee`): the same verified-download-and-unpack path as every other emulator. The old dedicated installer (`tools.rs`) is gone. An install made by it is adopted as-is on the next refresh (recorded as version `adopted`), and its old `runner.pcsx2.unpacked` row is disabled, so nothing is downloaded twice (checked on this host). The install command `install_pcsx2` remains for the install dialog and delegates to the catalogue. A catalogue entry is implementation of acquisition/opening, not proof of a successful current upstream install, complete configuration isolation, firmware readiness or a playable game. Install requires a matching upstream AppImage with a published checksum; missing or changed packaging must produce an error. Additional platforms still need system descriptors, media import, launch flags, prerequisite checks, save behavior and live acceptance before their games appear as playable library entries. Standalone emulator lifetime is not recorded as game playtime.
+PCSX2 is a normal catalogue entry (`catalog/emulators/pcsx2.json`, runner `runner.pcsx2.marquee`): the same verified-download-and-unpack path as every other emulator. The old dedicated installer (`tools.rs`) is gone. An install made by it is adopted as-is on the next refresh (recorded as version `adopted`), and its old `runner.pcsx2.unpacked` row is disabled, so nothing is downloaded twice (checked on this host). The install command `install_pcsx2` remains for the install dialog and delegates to the catalogue. A catalogue entry is implementation of acquisition/opening, not proof of a successful current upstream install, complete configuration isolation, firmware readiness or a playable game. Binary installation requires a matching upstream artifact with a published checksum; source recipes instead verify their pinned commit and record image/recipe receipts. Missing or changed packaging produces an error. Additional platforms still need system descriptors, media import, launch flags, prerequisite checks, save behavior and live acceptance before their games appear as playable library entries. Standalone emulator lifetime is not recorded as game playtime.
 
 ## What is needed to install and manage DuckStation
 
@@ -45,9 +51,9 @@ Verified against the upstream release on 2026-10-21.
 | xemu | Xbox | no | same |
 | Azahar | 3DS | no | same |
 
-"Verified" means: the release was downloaded, matched its published checksum, unpacked, and started with its own `XDG_CONFIG_HOME`, `XDG_DATA_HOME` and `XDG_CACHE_HOME`; nothing appeared in `~/.config`, `~/.local/share` or `~/.cache`. It does **not** mean a game was played. Only emulators with a runner kind (DuckStation) register as library runners; the rest can be installed, updated, opened and removed, and their systems have no library scanning yet.
+"Verified" means: the release was downloaded, matched its published checksum, unpacked, and started with its own `XDG_CONFIG_HOME`, `XDG_DATA_HOME` and `XDG_CACHE_HOME`; nothing appeared in `~/.config`, `~/.local/share` or `~/.cache`. It does **not** mean a game was played. This table records the earlier binary-install check. The current integration table above supersedes its adapter coverage; catalogue entries with a configured runner kind can register library runners.
 
-mGBA's published binary remains excluded by the checksum policy; it now has a separate [managed source-build pilot](#source-builds-mgba-pilot). **melonDS** still needs support for a ZIP-wrapped AppImage, **Dolphin** needs a different acquisition recipe, and **shadPS4** is a ZIP-packaged experimental follow-up. Building a program does not add its systems to library import.
+mGBA's published binary remains excluded by the checksum policy; it now has a separate [managed source-build pilot](#source-builds-mgba-pilot). **melonDS** now has a pinned source recipe (and support for its verified ZIP-wrapped AppImage). **Dolphin** needs a different acquisition recipe, and **shadPS4** is a ZIP-packaged experimental follow-up. Building a program does not add its systems to library import.
 
 See [game-only windows versus displayless execution](#game-only-windows-and-headless-emulation). PCSX2 library launches now include `-nogui`; DuckStation already did. Both still show the actual game window.
 
@@ -183,7 +189,7 @@ Next: describe launch presentation as adapter capabilities (`game window`, `main
 
 ## Source builds (mGBA pilot)
 
-Implemented 2026-10-21: an opt-in mGBA pilot on Linux x86_64. The other managed emulators keep checksum-verified GitHub binaries. It does not build every emulator or enable new library platforms.
+Implemented 2026-10-21: reviewed Linux x86_64 source recipes for mGBA, melonDS and FinalBurn Neo. The other managed emulators keep checksum-verified GitHub binaries. Source support does not imply that every system handled upstream has a Marquee library adapter.
 
 **Use**
 
@@ -244,3 +250,117 @@ The program runs in its local OCI image, so Podman stays a runtime prerequisite;
 ## RetroBIOS reference
 
 [Abdess/retrobios](https://github.com/Abdess/retrobios) publishes per-platform BIOS packs and, more usefully, source-verified per-emulator profiles (`emulators/<name>.yml`) listing the files each emulator reads. Findings checked 2026-10-21: PCSX2 accepts any 4-8 MB image with a valid ROM directory and derives its `.rom1/.rom2/.nvm/.mec` names from it; DuckStation identifies images by MD5 across 105 known entries and picks by console region; Flycast has a built-in HLE BIOS and needs real files only for a short list of games and for arcade systems; RPCS3 needs `PS3UPDAT.PUP`; xemu needs four configured files (boot ROM, flash ROM, EEPROM, HDD image). The packs hold copyrighted material (the repository's `NOTICE` says it is not covered by its MIT licence), so Marquee imports files the user supplies and does not fetch them. A per-emulator firmware requirements list built from these profiles is planned work.
+
+
+## Nintendo DS and Neo Geo library adapters
+
+Use **Library → Add Nintendo DS folder** or **Add Neo Geo folder**. DS archives
+must first be extracted to `.nds` files. Neo Geo arcade sets stay zipped, with
+`neogeo.zip` and required parent sets beside the selected game. The BIOS ZIP is
+excluded from playable entries. Readiness is rechecked when taking a snapshot;
+restored dependencies do not require deleting and re-importing an installation.
+A present BIOS file is not proof of checksum/driver compatibility.
+
+```sh
+marquee library add-root --system ds /path/to/ds
+marquee library add-root --system neogeo /path/to/neogeo
+marquee scan
+marquee emulators build melonds
+marquee emulators build fbneo
+```
+
+Both recipes use the existing cancellable rootless Podman builder, keep a
+previous program for rollback and record commit, image, recipe and launcher
+hashes. No host development packages are installed. The source-build Update
+button rebuilds the pinned recipe. A failed build retains the working program.
+
+- melonDS 1.1: `b86390e4428bf38ce4c1ce0e9ca446d6d25955e8`, from
+  <https://github.com/melonDS-emu/melonDS>. Builds the Qt 6/SDL frontend. The
+  first-run config selects DS direct boot with built-in BIOS replacements;
+  DSi and external firmware boot are outside this adapter. Arrow keys move,
+  X/Z are A/B, S/A are X/Y, Q/W are L/R, Return starts, Backspace selects;
+  mouse controls the lower touch screen. Source-launcher saves/states use
+  the emulator's `xdg-data/saves` and `xdg-data/states`, with selected cartridges
+  mounted read-only. Existing config is preserved. Validation uses offscreen
+  `--help`, separately from game boot acceptance.
+- FBNeo SDL2: `15272edc8824997b946f31fbe2306462b7a6624f`, from
+  <https://github.com/finalburnneo/FBNeo>. The recipe records a portability patch
+  replacing two Windows `UINT` menu fields with equivalent `unsigned int`.
+  The upstream Linux release ZIP inspected on this host contains documentation
+  but no executable. The launcher translates a selected ZIP path into a driver
+  name, mounts its sibling ROM directory read-only and preserves data/settings.
+  The build probe is no-ROM usage, which exits before initializing SDL.
+
+The supplied `samsh5nd.zip` is an old split set: graphics and audio-CPU data,
+without main-program or sound-sample ROMs. That name is not a driver in the
+pinned FBNeo revision. Marquee keeps the archive visible with an explanation
+and prevents launch; it does not rename it into a different set. Supply a
+complete ROM set matching the selected FBNeo revision plus its BIOS/dependencies.
+Full DAT/CRC-based validation and guided ROM-set repair remain follow-up work.
+Prune keeps blocked entries while their media files still exist.
+
+
+Live checks on this host (2026-10-21): both pinned source recipes compiled and
+passed their displayless probes. NFS Underground's `SLUS_208.11` ELF executed
+in PCSX2 and a disposable Marquee session ended cleanly after 18 seconds.
+Pokémon Edición Platino reached its Game Freak intro in source-built melonDS,
+with an inspected game-window capture and a clean 20-second Marquee session
+using the X11 backend. These checks do not establish audio/controller quality
+or an in-game save/load round trip. Test history/settings stayed in disposable
+libraries. The actual three game files were registered in the user's library.
+
+Source wrappers preserve the host XDG environment for Podman image lookup,
+then pass isolated emulator XDG directories into the container. They use an
+init process and a private user-owned runtime directory with selected display
+and audio sockets. Managed wrapper changes can be applied without recompiling
+the pinned emulator; receipts are updated, interrupted receipt updates recover,
+and locally edited wrappers are left alone. Save paths in melonDS's first-run
+config are host paths, also mounted at the same locations in the container, so
+they remain meaningful if the previous verified binary is restored.
+
+
+## Genesis / Mega Drive
+
+The `genesis` adapter accepts extracted `.md`, `.gen`, `.smd` and `.bin`
+cartridges. Archive intake recognises `.md`/`.gen`/`.smd` inside ZIP or 7z,
+skips accompanying text and registers a Genesis library root. Source archives
+are kept by default. A bare ambiguous `.bin` archive is not guessed as Genesis.
+
+```sh
+marquee intake "Streets of Rage 2 (USA).zip"
+marquee emulators build blastem
+```
+
+BlastEm's standalone SDL2 frontend is built from the
+[libretro upstream-tracking repository](https://github.com/libretro/blastem),
+pinned to `ab743653ed110eeb7b1fe64d00cc5f9279c2bfec`. This uses the normal
+managed rootless Podman builder, version/help probes and installation receipts.
+No host development packages are installed. Genesis cartridges need no BIOS;
+Sega CD and 32X are outside this adapter. Library Play passes the selected
+cartridge path literally, mounted read-only; fullscreen uses upstream `-f`.
+Arrows move, A/S/D are A/B/C, Enter is Start, and Esc opens BlastEm's menu.
+
+Upstream Linux uses HOME rather than XDG for its files. The launcher maps
+`$HOME/.config` and `$HOME/.local/share` onto Marquee's BlastEm `xdg-config`
+and `xdg-data` folders. Settings live in `xdg-config/blastem/blastem.cfg`;
+saves/states use `xdg-data/blastem/<ROMNAME>/`. Existing settings are preserved.
+
+The managed Genesis wrapper selects BlastEm's `-g` SDL software renderer as
+its portable baseline, avoiding host/container OpenGL driver and swap-interval
+mismatches. No graphics device is exposed for this adapter. Source wrappers
+pre-create the private PulseAudio socket directory as the mapped user with
+mode 0700; otherwise Podman creates a namespace-root parent that libpulse
+rejects, causing SDL to fall back to an unavailable ALSA device.
+
+The pinned revision parses `-g` without applying it. The Containerfile records
+a one-line source patch applying `video.gl = off` in memory before rendering
+initializes when `-g` is present. It leaves persistent user settings untouched.
+The patched recipe has the version label `standalone-sdl`.
+
+Live acceptance on 2026-10-21: the patched production recipe launched the
+supplied Streets of Rage 2 (USA) cartridge through a fresh disposable Marquee
+library. The inspected window reached the opening story sequence, PulseAudio
+reported an uncorked float32 stereo 48 kHz stream, and closing the game window
+ended the 20-second session with exit 0. Neither the SDL audio failure nor the
+OpenGL vsync dialog appeared. Audio quality, controller input and save/load
+round trips remain untested. Test playtime stayed out of the personal library.

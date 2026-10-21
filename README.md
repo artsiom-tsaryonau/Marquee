@@ -8,7 +8,9 @@ One console-style launcher for Fedora/Linux for your Steam, Epic, GOG, emulated,
 
 **Current working tree:** Rust core/CLI, Tauri/Svelte desktop and shared browser surface; PS2/PCSX2, PS1/DuckStation slice, serial covers, session/correction work, five managed native-port recipes, unified-library UI, external launcher shortcuts, and a legacy read-only Lutris bridge. A narrow [Purple for Aion 2](docs/PURPLE.md) integration now automates its umu/GE-Proton setup and launcher opening; actual Purple/Aion 2 Linux compatibility remains unverified. Direct Steam/Epic/GOG integrations and general Windows-app installation are not implemented end to end. Other “Add a Windows app” recipes remain demo-only. Real emulator launch/exit acceptance is tracked in [PS2](docs/PS2.md) and [PS1](docs/PS1.md); demo/fake-runner tests do not close those gates. Existing Lutris cache projection does not count as a direct store connection.
 
-**Tools additions:** managed emulator installation/opening/update/removal for DuckStation, PPSSPP, RPCS3, Flycast, Azahar, Cemu and xemu; BIOS import/list/removal for PS1/PS2. DuckStation connects to PS1 library launch; the other six currently open independently. PCSX2 uses its existing dedicated installer. Catalogue availability does not establish tested game compatibility. See [emulator management](docs/EMULATORS.md) and the [PS1/PS2 correction pass](docs/CORRECTIONS.md).
+**Emulation and metadata:** PS1/PS2 disc adapters are joined by Nintendo DS/melonDS, Genesis/BlastEm and Neo Geo/FinalBurn Neo library adapters. melonDS, BlastEm, FBNeo and mGBA have pinned local source recipes using rootless Podman. ZIP/7z [archive intake](docs/INTAKE.md) extracts cartridges/discs and preserves arcade sets. BIOS import/list/removal remains available for PS1/PS2. Live checks reached NFS Underground's PS2 executable, Pokémon Platino's DS intro and Streets of Rage 2's Genesis intro; full controller/save acceptance remains open. The supplied incomplete Neo Geo set is blocked with a diagnostic. See [emulator management](docs/EMULATORS.md).
+
+Saved Vimm catalogue records retain [field provenance and release identity](docs/CATALOGUE_METADATA.md). Optional [ROM enrichment](docs/ROM_ARTWORK.md) supplies covers and game facts from libretro and configured providers. Title-based enrichment is not a verified release mapping, and artwork credit does not establish shared provider IDs. General field overrides and verified cross-provider mappings remain follow-up work.
 
 Documentation navigation: [docs index](docs/README.md). Broader platform/port ideas remain in the [expansion catalogue](docs/EXPANSION_CATALOGUE.md); [Jak/OpenGOAL and edition/run choices](docs/UNIFIED_LIBRARY.md) remain a separate track. Metadata matching and [ScreenScraper/SteamGridDB](docs/ENRICHMENT.md#ps2-metadata-matching-and-cached-artwork) must never gate Play. **Media goal:** same automation as stores — Marquee should download or copy firmware, discs, and port inputs from authorized sources via jobs; folder import stays a fallback. Today: managed emulators/ports, disc folder scan, BIOS import panel, store adapters and unified download jobs still landing. See [media acquisition](docs/MEDIA_ACQUISITION.md).
 
@@ -33,6 +35,8 @@ cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev scan
 cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev list --system ps2 --json
 cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev runners install --channel auto
 cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev artwork refresh
+cargo run -p marquee-cli -- intake "Game (USA).zip"    # preserves the source archive
+cargo run -p marquee-cli -- emulators build blastem   # Linux x86_64; Git + rootless Podman
 cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev ports install zelda64recomp   # also: ports list | check | launch
 ```
 
