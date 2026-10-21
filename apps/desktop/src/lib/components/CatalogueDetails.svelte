@@ -2,14 +2,14 @@
   import { app } from '../state.svelte';
   import type { GameEntry } from '../types';
   import { platformLabel } from '../labels';
-  import { providerScore } from '../metadata';
+  import { cataloguePlatform, providerScore } from '../metadata';
   let { game }: { game: GameEntry } = $props();
   let selected = $state('');
   let installation = $state('');
   const record = $derived(game.metadata);
   const variants = $derived(record?.media ?? []);
   const variant = $derived(variants.find((m) => m.media_id === (game.source === 'catalogue' ? selected : game.metadataMediaId)) ?? variants[0]);
-  const candidates = $derived(app.games.filter((g) => g.source === 'rom' && record?.system === g.platform && !g.mediaMissing));
+  const candidates = $derived(app.games.filter((g) => g.source === 'rom' && record && cataloguePlatform(record.system) === g.platform && !g.mediaMissing));
   $effect(() => { if (!variants.some((m) => m.media_id === selected)) selected = variants[0]?.media_id ?? ''; });
   const stale = $derived(app.catalogue.links.some((l) => l.edition_id === game.id && !l.valid));
 </script>
@@ -39,6 +39,14 @@
       <dt>Provider game ID</dt><dd>{record.game_id}</dd><dt>Source page</dt><dd>{record.url}</dd>
     </dl>
     {#if record.cover}<p>{record.cover.credit} Attribution: {record.cover.source_url}</p>{/if}
+    {#if record.provenance && Object.keys(record.provenance).length}
+      <details><summary data-nav>Field provenance</summary>
+        <p>Each value retains its source and export date. Export dates do not certify when the source page was captured.</p>
+        <dl>{#each Object.entries(record.provenance) as [field, evidence]}
+          <dt>{field}</dt><dd>{evidence.source_url}<br />Exported: {evidence.exported_at || 'Unknown'} · Imported: {evidence.imported_at || 'Unknown'}<br />{evidence.method === 'saved_snapshot' ? 'Saved source snapshot' : evidence.method}</dd>
+        {/each}</dl>
+      </details>
+    {/if}
     <button class="btn glass small" data-nav onclick={() => app.openCataloguePage(record.id)}>Open source in browser</button>
     {#if game.source === 'catalogue' && variant && candidates.length}
       <div class="linker"><label>Existing {platformLabel[game.platform]} installation<select data-nav bind:value={installation}><option value="">Choose an installation</option>{#each candidates as candidate}<option value={candidate.id}>{candidate.title} · {candidate.serial ?? candidate.id}</option>{/each}</select></label>

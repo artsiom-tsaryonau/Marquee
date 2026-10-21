@@ -350,7 +350,7 @@ class AppState {
     return this.addSystemFolder('ps2');
   }
 
-  /** Pick a folder and import it for a specific system (`ps1`/`ps2`). */
+  /** Pick a folder and import it for a supported system. */
   async addSystemFolder(system: string) {
     const path = await this.api.pickRoot();
     if (!path) return;
@@ -363,7 +363,9 @@ class AppState {
       this.notify(describeScan(report));
       if (this.libraryStatus === 'empty' && report.skipped_unsupported && !report.added) {
         this.notify(
-          system === 'ps1'
+          system === 'ds' ? 'Nothing imported. Extract .nds cartridges from their ZIP/7z archives first.'
+          : system === 'neogeo' ? 'Nothing imported. Keep Neo Geo ROM sets zipped; place neogeo.zip and required parent sets alongside them.'
+          : system === 'ps1'
             ? 'Nothing imported. PS1 supports .iso, .chd and .cue with its referenced tracks. Standalone BIN files need a CUE sheet.'
             : 'Nothing imported. CHD/CUE/BIN/GZ/CSO are not supported yet — add a folder of .iso files.'
         );
@@ -391,8 +393,6 @@ class AppState {
     }
   }
 
-  async setDisplayMode(mode: 'window' | 'fullscreen') {
-    try {
   // ---- Share games with your own other devices (optional, off by default) ----
   transfers = $state<TransferStatus | null>(null);
   private transferWatchers = 0;
@@ -471,6 +471,8 @@ class AppState {
     }
   }
 
+  async setDisplayMode(mode: 'window' | 'fullscreen') {
+    try {
       await this.api.setDisplayMode(mode);
       this.applySnapshot(await this.api.snapshot());
     } catch (err) {

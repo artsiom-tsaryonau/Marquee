@@ -4,7 +4,7 @@ use crate::error::{AppError, Result};
 use crate::sessions::EventSink;
 use crate::{model::CoreEvent, Core};
 use base64::Engine;
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashSet};
 use std::io::Read;
@@ -45,6 +45,13 @@ pub struct Variant {
     pub sha1: String,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FieldProvenance {
+    pub source_url: String,
+    pub exported_at: String,
+    pub imported_at: String,
+    pub method: String,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Record {
     #[serde(default)]
     pub id: String,
@@ -69,6 +76,8 @@ pub struct Record {
     pub exported_at: String,
     #[serde(default)]
     pub imported_at: String,
+    #[serde(default)]
+    pub provenance: BTreeMap<String, FieldProvenance>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct System {
@@ -119,7 +128,7 @@ pub fn system_id(slug: &str) -> &str {
         "Atari5200" => "atari5200",
         "SMS" => "sms",
         "Atari7800" => "atari7800",
-        "TG16" => "tg16",
+        "TG16" | "tg16" => "pce",
         "TGCD" => "tgcd",
         "CDi" => "cdi",
         "SegaCD" => "segacd",
@@ -279,6 +288,10 @@ fn validate(import: &mut Import) -> Result<()> {
         record.system = system_id(&record.system).to_string();
         record.exported_at = import.captured_at.clone();
         record.imported_at = imported_at.clone();
+        // Generate provenance here rather than trusting attribution supplied by
+        // an import. A v1 export identifies its source page and export time;
+        // it does not establish the original capture time.
+        record.provenance = provenance(record)?;
     }
     Ok(())
 }
@@ -289,7 +302,40 @@ pub fn import(db: &Db, mut data: Import) -> Result<CatalogueSnapshot> {
     }
     validate(&mut data)?;
     let tx = db.conn.unchecked_transaction()?;
-    for record in data.games {
+    for mut record in data.games {
+        let previous: Option<String> = tx
+            .query_row(
+                "SELECT payload FROM catalogue_records WHERE id=?1",
+                [&record.id],
+                |r| r.get(0),
+            )
+            .optional()?;
+        if let Some(previous) = previous {
+            let mut previous: Record = serde_json::from_str(&previous)?;
+            if !record.has_detail
+                && previous.has_detail
+                && system_id(&previous.system) == record.system
+            {
+                // A listing did not observe the detail fields. Only a later
+                // detail snapshot can authoritatively replace/remove them.
+                if previous.provenance.is_empty() {
+                    previous.provenance = provenance(&previous)?;
+                }
+                for (key, value) in previous.provenance {
+                    if detail_field(&key) {
+                        record.provenance.insert(key, value);
+                    }
+                }
+                record.has_detail = true;
+                record.media = previous.media;
+                record.players = previous.players;
+                record.year = previous.year;
+                record.ratings = previous.ratings;
+                record.rating_votes = previous.rating_votes;
+                record.verified_at = previous.verified_at;
+                record.cover = previous.cover;
+            }
+        }
         tx.execute("INSERT INTO catalogue_records(id,payload) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload", params![record.id, serde_json::to_string(&record)?])?;
     }
     for system in data.systems {
@@ -299,13 +345,71 @@ pub fn import(db: &Db, mut data: Import) -> Result<CatalogueSnapshot> {
     snapshot(db)
 }
 
+fn detail_field(key: &str) -> bool {
+    matches!(
+        key,
+        "players" | "year" | "rating_votes" | "verified_at" | "cover"
+    ) || key.starts_with("ratings.")
+        || key.starts_with("media.")
+}
+
+fn provenance(record: &Record) -> Result<BTreeMap<String, FieldProvenance>> {
+    let mut result = BTreeMap::new();
+    let payload = serde_json::to_value(record)?;
+    let evidence = FieldProvenance {
+        source_url: record.url.clone(),
+        exported_at: record.exported_at.clone(),
+        imported_at: record.imported_at.clone(),
+        method: "saved_snapshot".into(),
+    };
+    for key in [
+        "title",
+        "regions",
+        "languages",
+        "version",
+        "rating",
+        "players",
+        "year",
+        "rating_votes",
+        "verified_at",
+        "cover",
+    ] {
+        if !payload[key].is_null()
+            && payload[key] != ""
+            && (!detail_field(key) || record.has_detail)
+        {
+            result.insert(key.into(), evidence.clone());
+        }
+    }
+    if record.has_detail {
+        for (key, value) in payload["ratings"].as_object().into_iter().flatten() {
+            if !value.is_null() {
+                result.insert(format!("ratings.{key}"), evidence.clone());
+            }
+        }
+        for media in &record.media {
+            let fields = serde_json::to_value(media)?;
+            for (key, value) in fields.as_object().into_iter().flatten() {
+                if !value.is_null() && value != "" && value != &serde_json::json!([]) {
+                    result.insert(format!("media.{}.{key}", media.media_id), evidence.clone());
+                }
+            }
+        }
+    }
+    Ok(result)
+}
+
 fn records<T: serde::de::DeserializeOwned>(db: &Db, sql: &str) -> Result<Vec<T>> {
     let mut query = db.conn.prepare(sql)?;
     let rows = query.query_map([], |r| r.get::<_, String>(0))?;
     rows.map(|row| Ok(serde_json::from_str(&row?)?)).collect()
 }
 pub fn snapshot(db: &Db) -> Result<CatalogueSnapshot> {
-    let records: Vec<Record> = records(db, "SELECT payload FROM catalogue_records ORDER BY id")?;
+    let mut records: Vec<Record> =
+        records(db, "SELECT payload FROM catalogue_records ORDER BY id")?;
+    for record in &mut records {
+        record.system = system_id(&record.system).to_string();
+    }
     let systems = self::records(db, "SELECT payload FROM catalogue_systems ORDER BY id")?;
     let media: BTreeMap<_, _> = db
         .list_media()?
@@ -578,6 +682,86 @@ mod tests {
         let mut data = fixture();
         data.games[0].media[0].sha1 = format!("{:x}", Sha1::digest(bytes));
         (temp, core, id, data)
+    }
+
+    #[test]
+    fn listing_refresh_keeps_detail_evidence_and_links_but_full_detail_can_remove_it() {
+        let (_temp, core, id, mut data) = library();
+        data.games[0].cover = Some(Cover {
+            data_url: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=".into(),
+            credit: "Saved source credit".into(),
+            source_url: "https://github.com/libretro-thumbnails/".into(),
+        });
+        core.import_catalogue(data.clone()).unwrap();
+        core.match_catalogue(&id).unwrap();
+        let original = core.snapshot().unwrap().catalogue.records.remove(0);
+        let mut listing = data.clone();
+        listing.captured_at = "2026-10-22T12:00:00Z".into();
+        let game = &mut listing.games[0];
+        game.title = "Updated listing title".into();
+        game.has_detail = false;
+        game.media.clear();
+        game.players = None;
+        game.ratings = Ratings::default();
+        game.verified_at = None;
+        game.cover = None;
+        let result = core.import_catalogue(listing).unwrap();
+        let current = &result.records[0];
+        assert_eq!(current.title, "Updated listing title");
+        assert_eq!(current.media.len(), 1);
+        assert_eq!(current.players, Some(1));
+        assert_eq!(
+            current.cover.as_ref().unwrap().credit,
+            "Saved source credit"
+        );
+        assert_eq!(
+            current.provenance["cover"].exported_at,
+            original.exported_at
+        );
+        assert!(result.links[0].valid);
+        assert_eq!(
+            current.provenance["players"].exported_at,
+            original.exported_at
+        );
+        assert_eq!(
+            current.provenance["media.456.sha1"].exported_at,
+            original.exported_at
+        );
+        assert_eq!(current.provenance["title"].exported_at, current.exported_at);
+        let mut detail = data;
+        detail.games[0].media.clear();
+        detail.games[0].players = None;
+        let result = core.import_catalogue(detail).unwrap();
+        assert!(result.records[0].media.is_empty());
+        assert!(!result.records[0].provenance.contains_key("players"));
+        assert!(!result.links[0].valid);
+    }
+
+    #[test]
+    fn old_tg16_records_link_to_local_pce_installations() {
+        let (_temp, core, id, mut data) = library();
+        core.with_db(|db| {
+            db.conn
+                .execute("UPDATE editions SET system='pce' WHERE id=?1", [&id])?;
+            Ok(())
+        })
+        .unwrap();
+        data.games[0].system = "TG16".into();
+        let result = core.import_catalogue(data).unwrap();
+        assert_eq!(result.records[0].system, "pce");
+        // Read-time normalization keeps existing v5 payloads usable too.
+        core.with_db(|db| {
+            let mut legacy = result.records[0].clone();
+            legacy.system = "tg16".into();
+            db.conn.execute(
+                "UPDATE catalogue_records SET payload=?1",
+                [serde_json::to_string(&legacy)?],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+        core.link_catalogue(&id, "vimm:123", "456").unwrap();
+        assert!(core.snapshot().unwrap().catalogue.links[0].valid);
     }
 
     #[test]

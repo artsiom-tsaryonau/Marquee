@@ -7,6 +7,9 @@ pub const PS1_JSON: &str = include_str!("../../../catalog/systems/ps1.json");
 /// Cartridge and disc systems that run through a catalogue emulator. Adding a
 /// system is one JSON file here plus the emulator it names.
 const GENERIC_JSON: &[&str] = &[
+    include_str!("../../../catalog/systems/genesis.json"),
+    include_str!("../../../catalog/systems/ds.json"),
+    include_str!("../../../catalog/systems/neogeo.json"),
     include_str!("../../../catalog/systems/dreamcast.json"),
     include_str!("../../../catalog/systems/nes.json"),
     include_str!("../../../catalog/systems/snes.json"),

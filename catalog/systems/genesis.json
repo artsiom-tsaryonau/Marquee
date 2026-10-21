@@ -1,0 +1,17 @@
+{
+  "id": "genesis",
+  "display_name": "Sega Genesis / Mega Drive",
+  "supported_extensions": [
+    "md",
+    "gen",
+    "smd",
+    "bin"
+  ],
+  "skipped_extensions": [
+    "zip",
+    "7z"
+  ],
+  "runner_kind": "emulator",
+  "emulator": "blastem",
+  "notes": "Extract cartridge archives with archive intake. Genesis cartridges need no BIOS. Sega CD and 32X are outside this adapter."
+}

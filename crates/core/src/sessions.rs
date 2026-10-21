@@ -74,7 +74,10 @@ pub fn launch(
         if media.skip_reason.is_some() {
             return Err(AppError::new(
                 "MEDIA_MISSING",
-                "this disc format is not launched in this milestone",
+                media
+                    .skip_reason
+                    .clone()
+                    .unwrap_or_else(|| "This media cannot be launched".into()),
             ));
         }
         let runners = runners::snapshot(&db)?;

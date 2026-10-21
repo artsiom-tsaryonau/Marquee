@@ -1,0 +1,18 @@
+FROM docker.io/library/debian@sha256:7ff6ba31527b9e336162fa061746c366c4b2032f4d2cff2078bea43f78efe3f8
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential pkg-config libsdl2-dev libsdl2-image-dev libgl-dev \
+    libpng-dev zlib1g-dev libgl1-mesa-dri libpulse0 \
+    && rm -rf /var/lib/apt/lists/*
+COPY source /source
+# The pinned revision uses Windows' UINT typedef in two shared menu fields.
+# Use its identical unsigned-int type on Linux; record this patch in the recipe.
+RUN sed -i 's/UINT menuItemTypeFlag/unsigned int menuItemTypeFlag/;s/UINT menuItemStateFlag/unsigned int menuItemStateFlag/' /source/src/burner/burner.h \
+    && make -C /source sdl2 -j4 \
+    && mkdir -p /opt/fbneo/bin \
+    && cp /source/fbneo /opt/fbneo/bin/fbneo \
+    && cp /source/src/license.txt /opt/fbneo/license.txt \
+    && /opt/fbneo/bin/fbneo \
+    && dpkg-query -W > /opt/fbneo/packages.txt \
+    && rm -rf /source
+ENV PATH="/opt/fbneo/bin:${PATH}"
+CMD ["fbneo", "-menu"]

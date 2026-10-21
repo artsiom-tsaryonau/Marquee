@@ -1,0 +1,14 @@
+{
+  "id": "ds",
+  "display_name": "Nintendo DS",
+  "supported_extensions": [
+    "nds"
+  ],
+  "skipped_extensions": [
+    "zip",
+    "7z"
+  ],
+  "runner_kind": "emulator",
+  "emulator": "melonds",
+  "notes": "Extract DS cartridges before importing. melonDS uses built-in DS BIOS replacements by default; DSi is outside this adapter."
+}

@@ -92,6 +92,11 @@
 
 <div class="library">
   <header class="library-heading"><div><span class="eyebrow">Your collection</span><h1>{collection === 'ps2' ? 'PlayStation 2' : 'Library'}</h1><p>Choose a game, then choose how you play.</p></div><div class="heading-actions"><button class="btn glass small" data-nav onclick={() => app.go('tools')}><Icon name="controller" size={16} /> Tools & launchers</button><button class="btn glass small" data-nav onclick={() => app.addSystemFolder('ps1')}><Icon name="plus" size={16} /> Add PS1 folder</button><button class="btn primary small" data-nav onclick={() => app.addPs2Folder()}><Icon name="plus" size={16} /> Add PS2 folder</button></div></header>
+  <div class="heading-actions" style="margin-bottom:18px">
+    <button class="btn glass small" data-nav onclick={() => app.addSystemFolder('genesis')}><Icon name="plus" size={16} /> Add Genesis folder</button>
+    <button class="btn glass small" data-nav onclick={() => app.addSystemFolder('ds')}><Icon name="plus" size={16} /> Add Nintendo DS folder</button>
+    <button class="btn glass small" data-nav onclick={() => app.addSystemFolder('neogeo')}><Icon name="plus" size={16} /> Add Neo Geo folder</button>
+  </div>
   <div class="categories" data-nav-row aria-label="Game platforms">
     <button class="chip" class:on={!platform} data-nav aria-pressed={!platform} onclick={() => platform = ''}>All platforms</button>
     {#each platforms as p}<button class="chip" class:on={platform === p} data-nav aria-pressed={platform === p} title={platformLabel[p]} onclick={() => platform = p}>{#if hasMark(p)}<Mark id={p} size={18} /><span class="sr">{platformLabel[p]}</span>{:else}{platformLabel[p]}{/if} <span>{app.games.filter((g) => g.platform === p).length}</span></button>{/each}

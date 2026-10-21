@@ -1,0 +1,18 @@
+{
+  "id": "blastem",
+  "name": "BlastEm",
+  "kind": "emulator",
+  "systems": [
+    "genesis"
+  ],
+  "binary": "AppRun",
+  "config_subdir": "blastem",
+  "launch": [
+    "{rom}"
+  ],
+  "fullscreen_args": [
+    "-f"
+  ],
+  "requirement": "Genesis cartridges need no BIOS. Keyboard: arrows, A/S/D for A/B/C, Enter for Start; Esc opens the menu. Built locally from pinned source.",
+  "github": "libretro/blastem"
+}

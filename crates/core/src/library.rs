@@ -97,7 +97,8 @@ pub fn scan_root(db: &Db, root_id: Option<&str>) -> Result<ScanReport> {
 pub fn prune_missing(db: &Db) -> Result<u32> {
     let mut removed = 0;
     for edition in snapshot_editions(db)? {
-        if edition.missing && db.delete_unplayed_edition(&edition.id)? {
+        let file_gone = find_media_for_edition(db, &edition.id)?.is_none_or(|m| !m.path.exists());
+        if edition.missing && file_gone && db.delete_unplayed_edition(&edition.id)? {
             removed += 1;
         }
     }
@@ -136,6 +137,9 @@ fn walk_dir(
         if !meta.is_file() {
             continue;
         }
+        if descriptor.id == "neogeo" && entry.file_name().eq_ignore_ascii_case("neogeo.zip") {
+            continue; // Firmware is a dependency, not a playable game.
+        }
         let ext = path
             .extension()
             .and_then(|e| e.to_str())
@@ -147,6 +151,10 @@ fn walk_dir(
             continue;
         }
         report.scanned += 1;
+        if !descriptor.supports_extension(&ext) {
+            *skip_map.entry(ext).or_default() += 1;
+            continue;
+        }
         let Some(kind) = MediaKind::for_system_extension(&descriptor.id, &ext) else {
             *skip_map.entry(ext).or_default() += 1;
             continue;
@@ -301,6 +309,18 @@ pub fn snapshot_media(db: &Db) -> Result<Vec<MediaFile>> {
                     skip_reason = Some(err.message);
                 }
             }
+            if kind == MediaKind::Rom
+                && available
+                && row
+                    .path
+                    .extension()
+                    .is_some_and(|e| e.eq_ignore_ascii_case("zip"))
+                && db
+                    .edition_by_id(&row.edition_id)?
+                    .is_some_and(|e| e.system == "neogeo")
+            {
+                skip_reason = crate::neogeo::issue(&row.path);
+            }
             Ok(MediaFile {
                 id: row.id,
                 edition_id: row.edition_id,
@@ -321,6 +341,7 @@ pub fn snapshot_media(db: &Db) -> Result<Vec<MediaFile>> {
 pub fn snapshot_editions(db: &Db) -> Result<Vec<Edition>> {
     let media = snapshot_media(db)?;
     let covers: BTreeMap<String, String> = db.list_cover_paths()?.into_iter().collect();
+    let infos = crate::romfacts::list(db)?;
     db.list_editions()?
         .into_iter()
         .map(|row| {
@@ -338,10 +359,10 @@ pub fn snapshot_editions(db: &Db) -> Result<Vec<Edition>> {
                 .and_then(|mid| media.iter().find(|m| &m.id == mid));
             Ok(Edition {
                 cover_path: covers.get(&row.id).map(PathBuf::from),
+                info: infos.get(&row.id).cloned(),
                 id: row.id,
                 system: row.system,
                 title: row
-    let infos = crate::romfacts::list(db)?;
                     .display_title
                     .clone()
                     .unwrap_or_else(|| row.scan_title.clone()),
@@ -359,7 +380,6 @@ pub fn snapshot_editions(db: &Db) -> Result<Vec<Edition>> {
             })
         })
         .collect()
-                info: infos.get(&row.id).cloned(),
 }
 
 pub fn find_media_for_edition(db: &Db, edition_id: &str) -> Result<Option<MediaFile>> {

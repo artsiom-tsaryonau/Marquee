@@ -4,6 +4,20 @@ set -euo pipefail
 dir=$(cd -- "$(dirname -- "$0")" && pwd)
 image=$(cat "$dir/image-id")
 [[ "$image" =~ ^sha256:[a-f0-9]{64}$ ]] || { echo 'Invalid mGBA image receipt' >&2; exit 1; }
+# Podman uses the host's XDG directories for its image store and config.
+# Keep the emulator paths in shell variables and forward them into the container.
+config=${XDG_CONFIG_HOME:-}
+data=${XDG_DATA_HOME:-}
+cache=${XDG_CACHE_HOME:-}
+for name in XDG_CONFIG_HOME XDG_DATA_HOME XDG_CACHE_HOME; do
+    flag="MARQUEE_HOST_${name}_SET"
+    value="MARQUEE_HOST_${name}"
+    if [[ ${!flag:-0} = 1 ]]; then
+        export "$name=${!value}"
+    else
+        unset "$name"
+    fi
+done
 # Version probes need no display, audio, authentication material or host mounts.
 if [[ $# = 1 && $1 = --version ]]; then
     exec podman run --rm --pull=never --network=none "$image" mgba-qt --version
@@ -11,20 +25,23 @@ fi
 if [[ $# = 2 && $1 = --marquee-sdl && $2 = --version ]]; then
     exec podman run --rm --pull=never --network=none "$image" mgba --version
 fi
-config=${XDG_CONFIG_HOME:?Marquee must set XDG_CONFIG_HOME}
-data=${XDG_DATA_HOME:?Marquee must set XDG_DATA_HOME}
-cache=${XDG_CACHE_HOME:?Marquee must set XDG_CACHE_HOME}
+: "${config:?Marquee must set XDG_CONFIG_HOME}" "${data:?Marquee must set XDG_DATA_HOME}" "${cache:?Marquee must set XDG_CACHE_HOME}"
 mkdir -p "$config" "$data/saves" "$data/states" "$cache"
-args=(run --rm --pull=never --network=none --userns=keep-id --cap-drop=all
+args=(run --rm --init --pull=never --network=none --userns=keep-id --cap-drop=all
     --security-opt=no-new-privileges --security-opt=label=disable
     --env HOME=/tmp/marquee-home --env "XDG_CONFIG_HOME=$config" --env "XDG_DATA_HOME=$data"
     --env "XDG_CACHE_HOME=$cache" --env DISPLAY --env WAYLAND_DISPLAY --env XAUTHORITY
-    --env XDG_RUNTIME_DIR --env PULSE_SERVER
+    --env XDG_RUNTIME_DIR --env PULSE_SERVER --env QT_QPA_PLATFORM
     --volume "$config:$config:rw"
     --volume "$data:$data:rw" --volume "$cache:$cache:rw")
 if [[ -d /tmp/.X11-unix ]]; then args+=(--volume /tmp/.X11-unix:/tmp/.X11-unix:ro); fi
 if [[ -n ${XDG_RUNTIME_DIR:-} && -d $XDG_RUNTIME_DIR ]]; then
-    args+=(--tmpfs "$XDG_RUNTIME_DIR:rw,mode=0700,uid=$(id -u),gid=$(id -g)")
+    # A private user-owned runtime directory, with only selected host sockets.
+    # Pre-create pulse as the mapped user; otherwise Podman creates its parent
+    # as namespace root and libpulse refuses the directory as insecure.
+    mkdir -p "$cache/runtime-v2/pulse"
+    chmod 700 "$cache/runtime-v2" "$cache/runtime-v2/pulse"
+    args+=(--volume "$cache/runtime-v2:$XDG_RUNTIME_DIR:rw")
     for socket in "${WAYLAND_DISPLAY:-wayland-0}" pulse/native pipewire-0; do
         if [[ -S $XDG_RUNTIME_DIR/$socket ]]; then
             args+=(--volume "$XDG_RUNTIME_DIR/$socket:$XDG_RUNTIME_DIR/$socket:ro")

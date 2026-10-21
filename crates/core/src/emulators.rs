@@ -22,6 +22,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 const CATALOGUE: &[&str] = &[
+    include_str!("../../../catalog/emulators/blastem.json"),
     include_str!("../../../catalog/emulators/duckstation.json"),
     include_str!("../../../catalog/emulators/pcsx2.json"),
     include_str!("../../../catalog/emulators/flycast.json"),
@@ -33,6 +34,8 @@ const CATALOGUE: &[&str] = &[
     include_str!("../../../catalog/emulators/mgba.json"),
     include_str!("../../../catalog/emulators/mesen.json"),
     include_str!("../../../catalog/emulators/rmg.json"),
+    include_str!("../../../catalog/emulators/melonds.json"),
+    include_str!("../../../catalog/emulators/fbneo.json"),
 ];
 
 /// A file Marquee writes into an emulator's config folder before it starts, only
@@ -138,6 +141,9 @@ pub struct DirectDownload {
     /// Folder inside the archive that holds the program, when it is wrapped in one.
     #[serde(default)]
     pub archive_root: Option<String>,
+    /// AppImage member inside a verified ZIP, unpacked before publication.
+    #[serde(default)]
+    pub appimage: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -404,6 +410,9 @@ pub fn info(
     };
     EmulatorInfo {
         launch_presentation: match def.id.as_str() {
+            "melonds" => "Library Play boots a DS cartridge directly. Mouse controls the touch screen. Source builds keep saves and states in Marquee's isolated data folders; DSi is not configured.",
+            "blastem" => "Library Play boots a Genesis cartridge directly. No BIOS is needed. Arrows move; A/S/D are A/B/C; Enter is Start; Esc opens the menu. Config, saves and states stay in Marquee’s isolated folders.",
+            "fbneo" => "Library Play passes a zipped Neo Geo ROM set to the SDL2 frontend. A matching BIOS and any parent sets must be beside the game. F12 exits; Tab opens in-game controls. A display is required.",
             "duckstation" => "Library Play hides the main window with -nogui and shows the game fullscreen. A display is still required.",
             "mgba" => "Open uses Qt. To launch only the game window, add --marquee-sdl, -f, then an absolute game path as separate arguments. This is not displayless emulation or an integrated library session.",
             "rpcs3" => "Upstream supports --no-gui --fullscreen with a boot target, and a separate --headless mode. Marquee currently opens the tool; it has no PS3 game adapter.",
@@ -533,10 +542,7 @@ fn latest(def: &EmulatorDef) -> Result<Release> {
 /// Ask GitHub which version is newest, without downloading anything.
 pub fn latest_version(def: &EmulatorDef) -> Result<String> {
     if crate::source_builds::supported(&def.id) {
-        return Ok(format!(
-            "source-0.10.5-{}",
-            &crate::source_builds::MGBA_COMMIT[..12]
-        ));
+        return crate::source_builds::version(&def.id);
     }
     Ok(latest(def)?.version)
 }
@@ -554,7 +560,7 @@ pub fn install(paths: &Paths, def: &EmulatorDef, sink: &Arc<dyn EventSink>) -> R
     if crate::source_builds::supported(&def.id) {
         return Err(AppError::new(
             "SOURCE_BUILD_REQUIRED",
-            "Use Build from source for mGBA",
+            "Use Build from source for this emulator",
         ));
     }
     say(sink, &def.id, format!("Looking up {}…", def.name));
@@ -606,6 +612,19 @@ pub fn install(paths: &Paths, def: &EmulatorDef, sink: &Arc<dyn EventSink>) -> R
             Some(sub) if !sub.contains("..") && !sub.starts_with('/') => out.join(sub),
             _ => out,
         };
+        let root = if let Some(member) = def.download.as_ref().and_then(|d| d.appimage.as_deref()) {
+            let path = Path::new(member);
+            if path.is_absolute()
+                || path
+                    .components()
+                    .any(|c| !matches!(c, std::path::Component::Normal(_)))
+            {
+                return Err(AppError::new("NETWORK", "Invalid AppImage member path"));
+            }
+            unpack_appimage(&root.join(path), work.path(), &def.binary)?
+        } else {
+            root
+        };
         if !root.join(&def.binary).is_file() {
             return Err(AppError::new(
                 "SPAWN_FAILED",
@@ -617,32 +636,7 @@ pub fn install(paths: &Paths, def: &EmulatorDef, sink: &Arc<dyn EventSink>) -> R
         }
         root
     } else {
-        set_executable(&part)?;
-        let output = Command::new(&part)
-            .arg("--appimage-extract")
-            .current_dir(work.path())
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::piped())
-            .output()
-            .map_err(|e| AppError::new("SPAWN_FAILED", format!("could not unpack: {e}")))?;
-        // Some AppImages extract to a symlink (`squashfs-root -> ./AppDir`). Use the real
-        // folder, and only if it stays inside the staging area.
-        let root = fs::canonicalize(work.path().join("squashfs-root"))
-            .ok()
-            .filter(|real| real.starts_with(fs::canonicalize(work.path()).unwrap_or_default()))
-            .unwrap_or_else(|| work.path().join("squashfs-root"));
-        if !output.status.success() || !root.join(&def.binary).is_file() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(AppError::new(
-                "SPAWN_FAILED",
-                format!(
-                    "unpacking failed: {}",
-                    stderr.lines().rev().take(4).collect::<Vec<_>>().join(" | ")
-                ),
-            ));
-        }
-        root
+        unpack_appimage(&part, work.path(), &def.binary)?
     };
     let current = prefix.join("current");
     let old = prefix.join(format!(".old-{}", uuid::Uuid::new_v4()));
@@ -665,6 +659,35 @@ pub fn install(paths: &Paths, def: &EmulatorDef, sink: &Arc<dyn EventSink>) -> R
         version: release.version,
         bin: def.binary.clone(),
     })
+}
+
+fn unpack_appimage(part: &Path, work: &Path, binary: &str) -> Result<PathBuf> {
+    set_executable(part)?;
+    let output = Command::new(part)
+        .arg("--appimage-extract")
+        .current_dir(work)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .output()
+        .map_err(|e| AppError::new("SPAWN_FAILED", format!("could not unpack: {e}")))?;
+    // Some AppImages extract to a symlink (`squashfs-root -> ./AppDir`). Use the real
+    // folder, and only if it stays inside the staging area.
+    let root = fs::canonicalize(work.join("squashfs-root"))
+        .ok()
+        .filter(|real| real.starts_with(fs::canonicalize(work).unwrap_or_default()))
+        .unwrap_or_else(|| work.join("squashfs-root"));
+    if !output.status.success() || !root.join(binary).is_file() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(AppError::new(
+            "SPAWN_FAILED",
+            format!(
+                "unpacking failed: {}",
+                stderr.lines().rev().take(4).collect::<Vec<_>>().join(" | ")
+            ),
+        ));
+    }
+    Ok(root)
 }
 
 fn set_executable(path: &Path) -> Result<()> {
@@ -707,6 +730,18 @@ fn launch_command(
         format!("XDG_DATA_HOME={}", root.join("xdg-data").display()),
         format!("XDG_CACHE_HOME={}", root.join("xdg-cache").display()),
     ];
+    if crate::source_builds::supported(id) {
+        for name in ["XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME"] {
+            let value = std::env::var(name).ok();
+            command.push(format!(
+                "MARQUEE_HOST_{name}_SET={}",
+                u8::from(value.is_some())
+            ));
+            if let Some(value) = value {
+                command.push(format!("MARQUEE_HOST_{name}={value}"));
+            }
+        }
+    }
     command.extend(extra_env.iter().cloned());
     command.push(bin.to_string_lossy().into_owned());
     command.extend(args.iter().cloned());
@@ -859,6 +894,7 @@ fn adopt_existing(db: &Db, paths: &Paths, def: &EmulatorDef) -> Result<()> {
 pub fn sync_runners(db: &Db, paths: &Paths) -> Result<()> {
     for def in catalogue()? {
         adopt_existing(db, paths, &def)?;
+        crate::source_builds::refresh_launcher(paths, &def.id)?;
         let Some(kind) = def.kind.as_deref() else {
             continue;
         };
@@ -877,7 +913,7 @@ pub fn sync_runners(db: &Db, paths: &Paths) -> Result<()> {
         let has_bios = bios_dir(paths, &def).is_some_and(|dir| {
             fs::read_dir(dir).is_ok_and(|mut e| e.any(|f| f.is_ok_and(|f| f.path().is_file())))
         });
-        let (state, hint) = if has_bios {
+        let (state, hint) = if has_bios || bios_dir(paths, &def).is_none() {
             (BiosState::Unverified, None)
         } else {
             (
@@ -975,6 +1011,7 @@ mod tests {
             sha256: "A".repeat(64),
             version: "1.2".into(),
             archive_root: Some("Emu-1.2".into()),
+            appimage: None,
         });
         let r = latest(&def).unwrap();
         assert_eq!(r.name, "Emu-1.2.tar.gz");
@@ -1121,7 +1158,16 @@ mod tests {
         kinds.sort();
         assert_eq!(
             kinds,
-            ["duckstation", "emulator", "emulator", "emulator", "pcsx2"],
+            [
+                "duckstation",
+                "emulator",
+                "emulator",
+                "emulator",
+                "emulator",
+                "emulator",
+                "emulator",
+                "pcsx2"
+            ],
             "only emulators with a library integration become runners"
         );
         for def in all.iter().filter(|d| d.kind.is_none()) {

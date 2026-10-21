@@ -1,0 +1,20 @@
+FROM docker.io/library/debian@sha256:7ff6ba31527b9e336162fa061746c366c4b2032f4d2cff2078bea43f78efe3f8
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential python3 pkg-config libsdl2-dev libglew-dev libgl-dev \
+    fontconfig fonts-dejavu-core libgl1-mesa-dri libpulse0 \
+    && rm -rf /var/lib/apt/lists/*
+COPY source /source
+# Upstream parses -g into use_gl but never applies it. Honour the documented
+# renderer flag before render_init reads video.gl; do not overwrite user config.
+RUN python3 -c 'from pathlib import Path; p=Path("/source/blastem.c"); s=p.read_text(); old="render_init(width, height, \"BlastEm\", fullscreen);"; assert s.count(old) == 1; s=s.replace(old, "if (!use_gl) { config = tern_insert_path(config, \"video\\0gl\\0\", (tern_val){.ptrval = \"off\"}, TVAL_PTR); }\n\t\t" + old); p.write_text(s)'
+RUN make -C /source blastem -j4 NOLTO=1 \
+    && mkdir -p /opt/blastem \
+    && cp /source/blastem /source/default.cfg /source/rom.db /source/systems.cfg \
+        /source/gamecontrollerdb.txt /source/COPYING /source/README /opt/blastem/ \
+    && cp -r /source/shaders /source/images /opt/blastem/ \
+    && /opt/blastem/blastem -v && /opt/blastem/blastem -h \
+    && dpkg-query -W > /opt/blastem/packages.txt \
+    && rm -rf /source
+ENV PATH="/opt/blastem:${PATH}"
+WORKDIR /opt/blastem
+CMD ["blastem"]

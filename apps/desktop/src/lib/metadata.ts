@@ -26,12 +26,13 @@ export function metadataMatches(game: GameEntry, region: string, language: strin
     && (!revision || versions(game).includes(revision)) && (!players || String(game.players ?? '') === players);
 }
 export function cataloguePlatform(system: string): Platform {
+  if (system === 'pce') return 'tg16';
   return Object.hasOwn(platformLabel, system) ? system as Platform : 'unknown';
 }
 export function withMetadata(game: GameEntry, record: CatalogueRecord, media?: CatalogueVariant, method?: string): GameEntry {
   return { ...game, metadata: record, metadataMediaId: media?.media_id, metadataMatch: method,
-    region: media?.regions?.length ? media.regions.join(' | ') : media ? record.regions || game.region : [...new Set([...regionValues(record.regions), ...record.media.flatMap(m => m.regions ?? [])])].join(' | ') || game.region,
-    languages: media?.languages?.length ? media.languages : media ? languageValues(record.languages) : [...new Set([...languageValues(record.languages), ...record.media.flatMap(m => m.languages ?? [])])], revision: media?.version,
+    region: media?.regions?.length ? media.regions.join(' | ') : media ? game.region : [...new Set([...regionValues(record.regions), ...record.media.flatMap(m => m.regions ?? [])])].join(' | ') || game.region,
+    languages: media?.languages?.length ? media.languages : media ? game.languages : [...new Set([...languageValues(record.languages), ...record.media.flatMap(m => m.languages ?? [])])], revision: media?.version,
     players: record.players ?? undefined, year: game.year || record.year || 0,
     coverUrl: game.coverUrl ?? record.cover?.data_url,
   };

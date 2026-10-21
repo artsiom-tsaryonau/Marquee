@@ -21,8 +21,72 @@ const CONTAINERFILE: &str = include_str!("../../../catalog/source-builds/mgba/Co
 const LAUNCHER: &str = include_str!("../../../catalog/source-builds/mgba/AppRun");
 const MAX_LOG: u64 = 16 * 1024 * 1024;
 
+pub const MELONDS_COMMIT: &str = "b86390e4428bf38ce4c1ce0e9ca446d6d25955e8";
+pub const FBNEO_COMMIT: &str = "15272edc8824997b946f31fbe2306462b7a6624f";
+pub const BLASTEM_COMMIT: &str = "ab743653ed110eeb7b1fe64d00cc5f9279c2bfec";
+struct Recipe {
+    commit: &'static str,
+    repository: &'static str,
+    version: &'static str,
+    containerfile: &'static str,
+    launcher: &'static str,
+    probes: &'static [&'static [&'static str]],
+    validation: &'static str,
+}
+fn recipe(id: &str) -> Result<Recipe> {
+    match id {
+        "mgba" => Ok(Recipe {
+            commit: MGBA_COMMIT,
+            repository: "https://github.com/mgba-emu/mgba",
+            version: "0.10.5",
+            containerfile: CONTAINERFILE,
+            launcher: LAUNCHER,
+            probes: &[&["mgba", "--version"], &["mgba-qt", "--version"]],
+            validation: "Qt and SDL --version; gameplay not tested",
+        }),
+        "melonds" => Ok(Recipe {
+            commit: MELONDS_COMMIT,
+            repository: "https://github.com/melonDS-emu/melonDS",
+            version: "1.1",
+            containerfile: include_str!("../../../catalog/source-builds/melonds/Containerfile"),
+            launcher: include_str!("../../../catalog/source-builds/melonds/AppRun"),
+            probes: &[&["env", "QT_QPA_PLATFORM=offscreen", "melonDS", "--help"]],
+            validation: "Qt offscreen --help; gameplay not tested",
+        }),
+        "blastem" => Ok(Recipe {
+            commit: BLASTEM_COMMIT,
+            repository: "https://github.com/libretro/blastem",
+            version: "standalone-sdl",
+            containerfile: include_str!("../../../catalog/source-builds/blastem/Containerfile"),
+            launcher: include_str!("../../../catalog/source-builds/blastem/AppRun"),
+            probes: &[&["blastem", "-v"], &["blastem", "-h"]],
+            validation: "Version and help before SDL initialization; gameplay not tested",
+        }),
+        "fbneo" => Ok(Recipe {
+            commit: FBNEO_COMMIT,
+            repository: "https://github.com/finalburnneo/FBNeo",
+            version: "sdl2",
+            containerfile: include_str!("../../../catalog/source-builds/fbneo/Containerfile"),
+            launcher: include_str!("../../../catalog/source-builds/fbneo/AppRun"),
+            probes: &[&["fbneo"]],
+            validation: "No-ROM usage exits before SDL initialization; gameplay not tested",
+        }),
+        _ => Err(AppError::new(
+            "SOURCE_UNSUPPORTED",
+            "No reviewed source recipe for this emulator",
+        )),
+    }
+}
 pub fn supported(id: &str) -> bool {
-    id == "mgba"
+    matches!(id, "mgba" | "fbneo" | "melonds" | "blastem")
+}
+pub fn version(id: &str) -> Result<String> {
+    let recipe = recipe(id)?;
+    Ok(format!(
+        "source-{}-{}",
+        recipe.version,
+        &recipe.commit[..12]
+    ))
 }
 
 fn check_id(id: &str) -> Result<()> {
@@ -124,7 +188,7 @@ fn write_status(paths: &Paths, id: &str, state: &str, phase: &str, message: &str
         state: state.into(),
         phase: phase.into(),
         message: message.into(),
-        commit: MGBA_COMMIT.into(),
+        commit: recipe(id)?.commit.into(),
         log_path: dir.join("build.log"),
         log_tail: String::new(),
     };
@@ -296,7 +360,8 @@ pub fn build(
     let context = work.path().join("context");
     let source = context.join("source");
     fs::create_dir_all(&source)?;
-    phase("fetch", "Fetching mGBA 0.10.5 at its pinned commit…")?;
+    let recipe = recipe(id)?;
+    phase("fetch", "Fetching emulator source at its pinned commit…")?;
     run(
         Command::new("git").args(["init", "--quiet"]).arg(&source),
         &log,
@@ -309,8 +374,8 @@ pub fn build(
             "core.hooksPath=/dev/null",
             "fetch",
             "--depth=1",
-            "https://github.com/mgba-emu/mgba.git",
-            MGBA_COMMIT,
+            recipe.repository,
+            recipe.commit,
         ]),
         &log,
         cancel,
@@ -322,25 +387,25 @@ pub fn build(
             "core.hooksPath=/dev/null",
             "checkout",
             "--detach",
-            MGBA_COMMIT,
+            recipe.commit,
         ]),
         &log,
         cancel,
         Duration::from_secs(30),
     )?;
     let head = fs::read_to_string(source.join(".git/HEAD"))?;
-    if head.trim() != MGBA_COMMIT || source.join(".gitmodules").exists() {
+    if head.trim() != recipe.commit || source.join(".gitmodules").exists() {
         return Err(AppError::new(
             "BUILD_SOURCE",
             "Source identity or submodule layout differs from the reviewed recipe",
         ));
     }
     fs::remove_dir_all(source.join(".git"))?;
-    fs::write(context.join("Containerfile"), CONTAINERFILE)?;
+    fs::write(context.join("Containerfile"), recipe.containerfile)?;
     let image_file = work.path().join("image-id");
     phase(
         "compile",
-        "Installing isolated dependencies and compiling Qt/SDL frontends…",
+        "Installing isolated dependencies and compiling the emulator…",
     )?;
     run(
         Command::new("podman")
@@ -360,19 +425,13 @@ pub fn build(
     }
     phase(
         "validate",
-        "Checking both compiled frontends without starting a game…",
+        "Checking the compiled emulator without starting a game…",
     )?;
-    for frontend in ["mgba", "mgba-qt"] {
+    for probe in recipe.probes {
         run(
-            Command::new("podman").args([
-                "run",
-                "--rm",
-                "--network=none",
-                "--pull=never",
-                &image,
-                frontend,
-                "--version",
-            ]),
+            Command::new("podman")
+                .args(["run", "--rm", "--network=none", "--pull=never", &image])
+                .args(*probe),
             &log,
             cancel,
             Duration::from_secs(30),
@@ -380,12 +439,12 @@ pub fn build(
     }
     let stage = work.path().join("program");
     fs::create_dir(&stage)?;
-    fs::write(stage.join("AppRun"), LAUNCHER)?;
+    fs::write(stage.join("AppRun"), recipe.launcher)?;
     use std::os::unix::fs::PermissionsExt;
     fs::set_permissions(stage.join("AppRun"), fs::Permissions::from_mode(0o755))?;
     fs::write(stage.join("image-id"), &image)?;
     let installed = Installed {
-        version: format!("source-0.10.5-{}", &MGBA_COMMIT[..12]),
+        version: version(id)?,
         bin: "AppRun".into(),
     };
     fs::write(
@@ -395,12 +454,12 @@ pub fn build(
     fs::write(
         stage.join("source-build.json"),
         serde_json::to_vec_pretty(&serde_json::json!({
-            "recipe": "mgba-0.10.5-v1", "repository": "https://github.com/mgba-emu/mgba",
-            "commit": MGBA_COMMIT, "image": image,
-            "containerfile_sha256": format!("{:x}", Sha256::digest(CONTAINERFILE.as_bytes())),
-            "launcher_sha256": format!("{:x}", Sha256::digest(LAUNCHER.as_bytes())),
-            "packages": "/opt/mgba/packages.txt inside the image",
-            "validation": "Qt and SDL --version; gameplay not tested"
+            "recipe": format!("{id}-{}-v1", recipe.version), "repository": recipe.repository,
+            "commit": recipe.commit, "image": image,
+            "containerfile_sha256": format!("{:x}", Sha256::digest(recipe.containerfile.as_bytes())),
+            "launcher_sha256": format!("{:x}", Sha256::digest(recipe.launcher.as_bytes())),
+            "packages": format!("/opt/{id}/packages.txt inside the image"),
+            "validation": recipe.validation
         }))?,
     )?;
     phase(
@@ -422,11 +481,59 @@ fn valid_image(image: &str) -> bool {
     })
 }
 
+/// Upgrade a managed wrapper without recompiling an unchanged pinned emulator.
+/// Preserve hand-edited launchers; interrupted updates can resume if the new
+/// wrapper was written but its receipt was not.
+pub fn refresh_launcher(paths: &Paths, id: &str) -> Result<()> {
+    if !supported(id) {
+        return Ok(());
+    }
+    let program = emulators::program_dir(paths, id);
+    let receipt_path = program.join("source-build.json");
+    if !receipt_path.is_file() {
+        return Ok(());
+    }
+    let recipe = recipe(id)?;
+    let mut receipt: serde_json::Value = serde_json::from_slice(&fs::read(&receipt_path)?)?;
+    if receipt["commit"].as_str() != Some(recipe.commit) {
+        return Ok(());
+    }
+    let actual = format!("{:x}", Sha256::digest(fs::read(program.join("AppRun"))?));
+    let wanted = format!("{:x}", Sha256::digest(recipe.launcher.as_bytes()));
+    if receipt["launcher_sha256"].as_str() == Some(&wanted) && actual == wanted {
+        return Ok(());
+    }
+    if receipt["launcher_sha256"].as_str() != Some(&actual) && actual != wanted {
+        return Ok(());
+    }
+    use std::io::Write;
+    use std::os::unix::fs::PermissionsExt;
+    let mut launcher = tempfile::NamedTempFile::new_in(&program)?;
+    launcher.write_all(recipe.launcher.as_bytes())?;
+    launcher
+        .as_file()
+        .set_permissions(fs::Permissions::from_mode(0o755))?;
+    launcher
+        .persist(program.join("AppRun"))
+        .map_err(|e| AppError::from(e.error))?;
+    receipt["launcher_sha256"] = wanted.into();
+    let mut updated = tempfile::NamedTempFile::new_in(&program)?;
+    updated.write_all(&serde_json::to_vec_pretty(&receipt)?)?;
+    updated
+        .persist(receipt_path)
+        .map_err(|e| AppError::from(e.error))?;
+    Ok(())
+}
+
 pub fn require_runtime(paths: &Paths, id: &str) -> Result<()> {
     if !supported(id) {
         return Ok(());
     }
-    let image = fs::read_to_string(emulators::program_dir(paths, id).join("image-id"))?;
+    let program = emulators::program_dir(paths, id);
+    if !program.join("source-build.json").is_file() {
+        return Ok(());
+    }
+    let image = fs::read_to_string(program.join("image-id"))?;
     if !valid_image(image.trim()) {
         return Err(AppError::new(
             "BUILD_OUTPUT",
@@ -443,7 +550,7 @@ pub fn require_runtime(paths: &Paths, id: &str) -> Result<()> {
     if !exists {
         return Err(AppError::new(
             "BUILD_RUNTIME_MISSING",
-            "The local Podman image is unavailable. Start rootless Podman or rebuild mGBA.",
+            "The local Podman image is unavailable. Start rootless Podman or rebuild this emulator.",
         ));
     }
     Ok(())
@@ -518,6 +625,15 @@ mod tests {
     #[test]
     fn only_reviewed_recipes_and_image_ids_are_accepted() {
         assert!(supported("mgba"));
+        for id in ["mgba", "melonds", "fbneo", "blastem"] {
+            let recipe = recipe(id).unwrap();
+            assert!(supported(id));
+            assert_eq!(recipe.commit.len(), 40);
+            assert!(recipe
+                .containerfile
+                .starts_with("FROM docker.io/library/debian@sha256:"));
+            assert!(!recipe.probes.is_empty());
+        }
         assert!(!supported("../../evil"));
         assert!(valid_image(&format!("sha256:{}", "a".repeat(64))));
         assert!(!valid_image("debian:latest"));
@@ -621,6 +737,135 @@ mod tests {
         .unwrap();
         assert_eq!(fs::read_to_string(current.join("AppRun")).unwrap(), "old");
         assert_eq!(fs::read_to_string(previous.join("AppRun")).unwrap(), "new");
+    }
+
+    #[test]
+    fn managed_launcher_updates_preserve_custom_edits_and_recover_receipts() {
+        let temp = tempfile::tempdir().unwrap();
+        let paths = Paths::resolve(Some(temp.path().join("data"))).unwrap();
+        let program = emulators::program_dir(&paths, "melonds");
+        fs::create_dir_all(&program).unwrap();
+        fs::write(program.join("AppRun"), "old managed wrapper").unwrap();
+        let receipt = serde_json::json!({"commit": MELONDS_COMMIT,
+            "launcher_sha256": format!("{:x}", Sha256::digest(b"old managed wrapper"))});
+        fs::write(
+            program.join("source-build.json"),
+            serde_json::to_vec(&receipt).unwrap(),
+        )
+        .unwrap();
+        refresh_launcher(&paths, "melonds").unwrap();
+        assert_eq!(
+            fs::read_to_string(program.join("AppRun")).unwrap(),
+            recipe("melonds").unwrap().launcher
+        );
+        // Simulate a crash after replacing the launcher, before receipt update.
+        fs::write(
+            program.join("source-build.json"),
+            serde_json::to_vec(&receipt).unwrap(),
+        )
+        .unwrap();
+        refresh_launcher(&paths, "melonds").unwrap();
+        let updated: serde_json::Value =
+            serde_json::from_slice(&fs::read(program.join("source-build.json")).unwrap()).unwrap();
+        assert_ne!(updated["launcher_sha256"], receipt["launcher_sha256"]);
+        fs::write(program.join("AppRun"), "user modifications").unwrap();
+        refresh_launcher(&paths, "melonds").unwrap();
+        assert_eq!(
+            fs::read_to_string(program.join("AppRun")).unwrap(),
+            "user modifications"
+        );
+    }
+
+    #[test]
+    fn cartridge_and_arcade_launchers_mount_media_literally_and_preserve_settings() {
+        use std::os::unix::fs::PermissionsExt;
+        for (id, ext) in [("melonds", "nds"), ("fbneo", "zip"), ("blastem", "md")] {
+            let temp = tempfile::tempdir().unwrap();
+            let root = temp.path();
+            let tools = root.join("tools");
+            let games = root.join("Games with spaces");
+            fs::create_dir(&tools).unwrap();
+            fs::create_dir(&games).unwrap();
+            fs::create_dir(root.join("host-runtime")).unwrap();
+            let game = games.join(format!("Game's $(touch injected).{ext}"));
+            fs::write(&game, "fixture").unwrap();
+            fs::write(root.join("image-id"), format!("sha256:{}", "a".repeat(64))).unwrap();
+            let launcher = root.join("AppRun");
+            fs::write(&launcher, recipe(id).unwrap().launcher).unwrap();
+            let shim = tools.join("podman");
+            fs::write(&shim, "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$ARG_LOG\"\nprintf '%s' \"${XDG_DATA_HOME-unset}\" > \"$ARG_LOG.env\"\n").unwrap();
+            fs::set_permissions(&shim, fs::Permissions::from_mode(0o755)).unwrap();
+            let log = root.join("argv");
+            let mut cmd = Command::new("/bin/bash");
+            cmd.arg(&launcher)
+                .env("PATH", format!("{}:/usr/bin:/bin", tools.display()))
+                .env("ARG_LOG", &log)
+                .env("HOME", root.join("home"))
+                .env("XDG_CONFIG_HOME", root.join("config"))
+                .env("XDG_DATA_HOME", root.join("data"))
+                .env("XDG_CACHE_HOME", root.join("cache"))
+                .env("MARQUEE_HOST_XDG_DATA_HOME_SET", "1")
+                .env("MARQUEE_HOST_XDG_DATA_HOME", root.join("host-data"))
+                .env("XDG_RUNTIME_DIR", root.join("host-runtime"))
+                .env_remove("XAUTHORITY")
+                .arg(&game);
+            assert!(cmd.status().unwrap().success());
+            let argv = fs::read_to_string(&log).unwrap();
+            assert_eq!(
+                fs::read_to_string(root.join("argv.env")).unwrap(),
+                root.join("host-data").to_string_lossy()
+            );
+            assert!(argv.contains("--network=none"));
+            let pulse = root.join("cache/runtime-v2/pulse");
+            assert!(pulse.is_dir());
+            assert_eq!(
+                fs::metadata(&pulse).unwrap().permissions().mode() & 0o777,
+                0o700
+            );
+            assert!(argv.contains(&format!(
+                "{}:{}:rw",
+                root.join("cache/runtime-v2").display(),
+                root.join("host-runtime").display()
+            )));
+            if id != "fbneo" {
+                assert!(argv.contains(&format!("{}:{}:ro", game.display(), game.display())));
+                assert!(argv.ends_with(&format!("{}\n", game.display())));
+            } else {
+                assert!(argv.contains(&format!("{}:/roms:ro", games.display())));
+                assert!(argv.ends_with("Game's $(touch injected)\n"));
+            }
+            let settings = if id == "melonds" {
+                root.join("config/melonDS/melonDS.toml")
+            } else if id == "blastem" {
+                assert!(argv.contains("SDL_RENDER_DRIVER=software"));
+                assert!(argv.contains("blastem\n-g\n"));
+                assert!(!argv.contains("--device"));
+                assert!(argv.contains(&format!(
+                    "{}:/tmp/marquee-home/.config:rw",
+                    root.join("config").display()
+                )));
+                assert!(argv.contains(&format!(
+                    "{}:/tmp/marquee-home/.local/share:rw",
+                    root.join("data").display()
+                )));
+                root.join("config/blastem/blastem.cfg")
+            } else {
+                root.join("data/fbneo/config/fbneo.ini")
+            };
+            fs::write(&settings, "user corrections").unwrap();
+            assert!(cmd.status().unwrap().success());
+            assert_eq!(fs::read_to_string(settings).unwrap(), "user corrections");
+            assert!(!root.join("injected").exists());
+            assert!(Command::new("/bin/bash")
+                .arg(&launcher)
+                .env("PATH", format!("{}:/usr/bin:/bin", tools.display()))
+                .env("ARG_LOG", &log)
+                .arg("--version")
+                .status()
+                .unwrap()
+                .success());
+            assert!(!fs::read_to_string(log).unwrap().contains("--volume"));
+        }
     }
 
     #[test]

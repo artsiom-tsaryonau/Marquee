@@ -356,6 +356,7 @@ export interface CatalogueVariant {
   crc32: string; md5: string; sha1: string;
 }
 export interface CatalogueRecord {
+  provenance?: Record<string, { source_url: string; exported_at: string; imported_at: string; method: string }>;
   id: string; game_id: string; system: string; title: string; regions: string; languages: string;
   version: string; rating: string; url: string; has_detail: boolean; media: CatalogueVariant[];
   players: number | null; year: number | null;

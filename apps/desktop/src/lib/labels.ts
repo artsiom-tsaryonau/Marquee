@@ -27,9 +27,9 @@ export const platformLabel: Record<Platform, string> = {
   '32x': 'Sega 32X', saturn: 'Saturn', jaguarcd: 'Jaguar CD', dreamcast: 'Dreamcast', xbox: 'Xbox',
   xbox360: 'Xbox 360', 'xbox360-digital': 'Xbox 360 Digital', ps3: 'PlayStation 3', wii: 'Wii', wiiware: 'WiiWare',
   wiiu: 'Wii U', gb: 'Game Boy', lynx: 'Lynx', gamegear: 'Game Gear', virtualboy: 'Virtual Boy', gbc: 'Game Boy Color',
-  ds: 'Nintendo DS', psp: 'PSP', '3ds': 'Nintendo 3DS',
+  neogeo: 'Neo Geo', ds: 'Nintendo DS', psp: 'PSP', '3ds': 'Nintendo 3DS',
 };
 
 /** Emulator catalogue system ids, as people say them. */
-const systemNames: Record<string, string> = { ps1: 'PlayStation', ps2: 'PlayStation 2', ps3: 'PlayStation 3', psp: 'PSP', dreamcast: 'Dreamcast', wiiu: 'Wii U', xbox: 'Xbox', '3ds': 'Nintendo 3DS', gb: 'Game Boy', gbc: 'Game Boy Color', gba: 'Game Boy Advance' };
+const systemNames: Record<string, string> = { genesis: 'Genesis / Mega Drive', ds: 'Nintendo DS', neogeo: 'Neo Geo', ps1: 'PlayStation', ps2: 'PlayStation 2', ps3: 'PlayStation 3', psp: 'PSP', dreamcast: 'Dreamcast', wiiu: 'Wii U', xbox: 'Xbox', '3ds': 'Nintendo 3DS', gb: 'Game Boy', gbc: 'Game Boy Color', gba: 'Game Boy Advance' };
 export const systemLabel = (id: string): string => systemNames[id] ?? id.toUpperCase();

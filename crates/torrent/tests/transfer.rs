@@ -54,7 +54,10 @@ fn private_transfer_between_two_engines() {
     let want = std::fs::read(&file).unwrap();
     assert_eq!(got.len(), want.len());
     assert!(got == want, "downloaded bytes differ");
-    assert!(a.progress(seed_id).unwrap().uploaded > 0, "seeder uploaded nothing");
+    assert!(
+        a.progress(seed_id).unwrap().uploaded > 0,
+        "seeder uploaded nothing"
+    );
 
     a.shutdown();
     b.shutdown();

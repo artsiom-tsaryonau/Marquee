@@ -82,7 +82,10 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
         "set_display_mode" => out(core.set_display_mode(&text(&args, "mode")?)?),
         "intake_archive" => {
             let path = std::path::PathBuf::from(text(&args, "path")?);
-            let delete = args.get("delete_source").and_then(|v| v.as_bool()).unwrap_or(false);
+            let delete = args
+                .get("delete_source")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false);
             out(core.intake_archive(&path, delete)?)
         }
         "transfer_status" => out(transfer::status(core)?),

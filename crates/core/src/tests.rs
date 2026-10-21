@@ -622,7 +622,7 @@ fn artwork_refresh_on_empty_library_fetches_nothing() {
 }
 
 #[test]
-fn artwork_refresh_skips_unresolved_serial_without_network() {
+fn unresolved_serial_has_no_disc_artwork_job() {
     let dir = tempfile::tempdir().unwrap();
     let data = dir.path().join("data");
     let games = dir.path().join("games");
@@ -630,10 +630,13 @@ fn artwork_refresh_skips_unresolved_serial_without_network() {
     let core = Core::open(Some(data), true).unwrap();
     let root = core.add_root("ps2", games, Some("PS2".into())).unwrap();
     core.scan(Some(&root.id), None).unwrap();
-    let report = core.refresh_artwork(None, None).unwrap();
-    assert_eq!(report.fetched, 0);
-    assert_eq!(report.failed, 0);
-    assert!(report.skipped >= 1);
+    // Test disc-provider eligibility directly: cross-provider artwork refresh
+    // may now try a title fallback, which deliberately needs the network.
+    let (jobs, skipped) = core
+        .with_db(|db| crate::artwork::pending_jobs(db, &core.paths.cache_dir, None))
+        .unwrap();
+    assert!(jobs.is_empty());
+    assert!(skipped >= 1);
     assert!(core.snapshot().unwrap().editions[0].cover_path.is_none());
 }
 
@@ -1041,4 +1044,151 @@ fn needed_emulators_follow_the_library_folders_and_skip_what_is_installed() {
     );
     core.add_root("nes", roms, None).unwrap();
     assert_eq!(core.needed_emulators().unwrap(), ["mesen"]);
+}
+
+#[test]
+fn ds_and_neogeo_scan_route_to_their_own_runners_and_block_incomplete_sets() {
+    use std::io::Write;
+    let temp = tempfile::tempdir().unwrap();
+    let core = Core::open_isolated(Some(temp.path().join("data")), false).unwrap();
+    for (system, emulator) in [("ds", "melonds"), ("neogeo", "fbneo")] {
+        let root = temp.path().join(system);
+        fs::create_dir(&root).unwrap();
+        if system == "ds" {
+            fs::write(root.join("Pokemon.nds"), b"fixture cartridge").unwrap();
+            fs::write(root.join("not-extracted.zip"), b"fixture archive").unwrap();
+        } else {
+            let mut archive =
+                zip::ZipWriter::new(fs::File::create(root.join("samsh5nd.zip")).unwrap());
+            archive
+                .start_file("ss5_c1.rom", zip::write::SimpleFileOptions::default())
+                .unwrap();
+            archive.write_all(b"partial fixture").unwrap();
+            archive.finish().unwrap();
+            fs::write(root.join("neogeo.zip"), b"BIOS placeholder is not a game").unwrap();
+        }
+        core.add_root(system, root, None).unwrap();
+        let program = crate::emulators::program_dir(&core.paths, emulator);
+        fs::create_dir_all(&program).unwrap();
+        fs::write(program.join("AppRun"), "fixture").unwrap();
+        core.set_setting(
+            &crate::emulators::setting_key(emulator),
+            r#"{"version":"fixture","bin":"AppRun"}"#,
+        )
+        .unwrap();
+    }
+    core.scan(None, None).unwrap();
+    let runners = core.refresh_runners().unwrap();
+    let snapshot = core.snapshot().unwrap();
+    assert_eq!(snapshot.editions.len(), 2); // Firmware was not imported as a game.
+    let ds = snapshot.editions.iter().find(|e| e.system == "ds").unwrap();
+    assert!(!ds.missing);
+    let runner = crate::runners::pick_for_system(&runners, "ds").unwrap();
+    assert_eq!(runner.id, "runner.melonds.marquee");
+    assert_ne!(runner.bios_state, BiosState::Missing);
+    let argv =
+        crate::runners::launch_argv(runner, Path::new("/roms/Pokemon.nds"), &[], false).unwrap();
+    assert_eq!(argv.last().unwrap(), "/roms/Pokemon.nds");
+    assert!(!argv.iter().any(|a| a == "--fullscreen"));
+    let neo = snapshot
+        .editions
+        .iter()
+        .find(|e| e.system == "neogeo")
+        .unwrap();
+    assert!(neo.missing);
+    assert!(snapshot
+        .media
+        .iter()
+        .find(|m| m.edition_id == neo.id)
+        .unwrap()
+        .skip_reason
+        .as_ref()
+        .unwrap()
+        .contains("main program"));
+    assert_eq!(
+        core.launch(&neo.id, &[], Arc::new(NoopSink))
+            .unwrap_err()
+            .code,
+        "MEDIA_MISSING"
+    );
+    assert!(core.snapshot().unwrap().sessions.is_empty());
+    assert_eq!(core.prune_missing().unwrap(), 0); // A blocked set still exists on disk.
+}
+
+#[test]
+fn source_recipe_version_replaces_stale_binary_release_update_hints() {
+    let temp = tempfile::tempdir().unwrap();
+    let core = Core::open_isolated(Some(temp.path().join("data")), false).unwrap();
+    let program = crate::emulators::program_dir(&core.paths, "melonds");
+    fs::create_dir_all(&program).unwrap();
+    fs::write(program.join("AppRun"), "fixture").unwrap();
+    let version = crate::source_builds::version("melonds").unwrap();
+    core.set_setting(
+        &crate::emulators::setting_key("melonds"),
+        &serde_json::to_string(&crate::emulators::Installed {
+            version: version.clone(),
+            bin: "AppRun".into(),
+        })
+        .unwrap(),
+    )
+    .unwrap();
+    core.set_setting(&crate::emulators::latest_key("melonds"), "1.1")
+        .unwrap();
+    let entry = core
+        .list_emulators()
+        .unwrap()
+        .into_iter()
+        .find(|e| e.id == "melonds")
+        .unwrap();
+    assert_eq!(entry.status, "ready");
+    assert_eq!(entry.latest_version, Some(version));
+}
+
+#[test]
+fn genesis_archive_becomes_a_playable_cartridge_with_its_own_bios_free_runner() {
+    use std::io::Write;
+    let temp = tempfile::tempdir().unwrap();
+    let core = Core::open_isolated(Some(temp.path().join("data")), false).unwrap();
+    let archive_path = temp.path().join("Cartridge (USA).zip");
+    let mut archive = zip::ZipWriter::new(fs::File::create(&archive_path).unwrap());
+    archive
+        .start_file(
+            "Cartridge (USA).md",
+            zip::write::SimpleFileOptions::default(),
+        )
+        .unwrap();
+    archive.write_all(b"fixture cartridge").unwrap();
+    archive
+        .start_file("Vimm's Lair.txt", zip::write::SimpleFileOptions::default())
+        .unwrap();
+    archive.write_all(b"fixture text").unwrap();
+    archive.finish().unwrap();
+    let report = core.intake_archive(&archive_path, false).unwrap();
+    assert_eq!(report.outcome, crate::intake::Outcome::Imported);
+    assert_eq!(report.system.as_deref(), Some("genesis"));
+    assert_eq!(report.files, vec!["Cartridge (USA).md"]);
+    assert!(archive_path.exists());
+    let program = crate::emulators::program_dir(&core.paths, "blastem");
+    fs::create_dir_all(&program).unwrap();
+    fs::write(program.join("AppRun"), "fixture").unwrap();
+    core.set_setting(
+        &crate::emulators::setting_key("blastem"),
+        r#"{"version":"fixture","bin":"AppRun"}"#,
+    )
+    .unwrap();
+    core.scan(None, None).unwrap();
+    let snapshot = core.snapshot().unwrap();
+    assert_eq!(snapshot.editions.len(), 1);
+    let edition = &snapshot.editions[0];
+    assert_eq!(edition.system, "genesis");
+    assert!(!edition.missing);
+    let runners = core.refresh_runners().unwrap();
+    let runner = crate::runners::pick_for_system(&runners, "genesis").unwrap();
+    assert_eq!(runner.id, "runner.blastem.marquee");
+    assert_ne!(runner.bios_state, BiosState::Missing);
+    let argv =
+        crate::runners::launch_argv(runner, Path::new("/roms/Cartridge (USA).md"), &[], true)
+            .unwrap();
+    assert!(argv.contains(&"-f".to_string()));
+    assert_eq!(argv.last().unwrap(), "/roms/Cartridge (USA).md");
 }

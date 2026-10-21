@@ -1,0 +1,19 @@
+FROM docker.io/library/debian@sha256:7ff6ba31527b9e336162fa061746c366c4b2032f4d2cff2078bea43f78efe3f8
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake ninja-build pkg-config qt6-base-dev qt6-base-private-dev libqt6opengl6-dev qt6-multimedia-dev \
+    qt6-svg-dev qt6-wayland libsdl2-dev libarchive-dev libzstd-dev libfaad-dev \
+    libenet-dev libslirp-dev libpcap-dev libegl1-mesa-dev libx11-dev \
+    extra-cmake-modules libwayland-dev libgl1-mesa-dri libpulse0 \
+    && rm -rf /var/lib/apt/lists/*
+COPY source /source
+RUN cmake -S /source -B /build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+    -DUSE_QT6=ON -DENABLE_LTO_RELEASE=OFF -DENABLE_GDBSTUB=OFF \
+    && cmake --build /build --parallel 4 \
+    && mkdir -p /opt/melonds/bin \
+    && cp /build/melonDS /opt/melonds/bin/melonDS \
+    && cp /source/LICENSE /opt/melonds/LICENSE \
+    && QT_QPA_PLATFORM=offscreen /opt/melonds/bin/melonDS --help \
+    && dpkg-query -W > /opt/melonds/packages.txt \
+    && rm -rf /build /source
+ENV PATH="/opt/melonds/bin:${PATH}"
+CMD ["melonDS"]

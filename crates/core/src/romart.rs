@@ -22,7 +22,8 @@ use std::io::{Read, Write};
 use std::path::Path;
 use std::time::{Duration, SystemTime};
 
-pub(crate) const DB_BASE: &str = "https://raw.githubusercontent.com/libretro/libretro-database/master/metadat";
+pub(crate) const DB_BASE: &str =
+    "https://raw.githubusercontent.com/libretro/libretro-database/master/metadat";
 const THUMB_BASE: &str = "https://thumbnails.libretro.com";
 const MAX_HASH_BYTES: u64 = 1024 * 1024 * 1024;
 pub(crate) const DAT_MAX_BYTES: u64 = 40 * 1024 * 1024;
@@ -262,22 +263,41 @@ pub fn names_agree(wanted: &str, found: &str) -> bool {
     if a.len() < 4 || b.len() < 4 {
         return false;
     }
-    let (short, long) = if a.len() <= b.len() { (&a, &b) } else { (&b, &a) };
+    let (short, long) = if a.len() <= b.len() {
+        (&a, &b)
+    } else {
+        (&b, &a)
+    };
     // "Tetris" must not stand in for "Tetris Effect".
     // ...and "Underground" must not stand in for "Underground 2".
     a == b
         || (long.contains(short.as_str())
             && short.len() * 10 >= long.len() * 8
-            && !long.replacen(short.as_str(), "", 1).chars().any(|c| c.is_ascii_digit()))
+            && !long
+                .replacen(short.as_str(), "", 1)
+                .chars()
+                .any(|c| c.is_ascii_digit()))
 }
 
 /// No-Intro tags that mark homebrew, prototypes and unlicensed releases.
 /// Those share names with famous games, so a name search would mislead.
 pub fn looks_retail(official: &str) -> bool {
     let l = official.to_lowercase();
-    !["(world)", "(proto", "(beta", "(demo", "(homebrew", "(aftermarket", "(unl", "(pirate", "(hack", "(sample", "(kiosk"]
-        .iter()
-        .any(|t| l.contains(t))
+    ![
+        "(world)",
+        "(proto",
+        "(beta",
+        "(demo",
+        "(homebrew",
+        "(aftermarket",
+        "(unl",
+        "(pirate",
+        "(hack",
+        "(sample",
+        "(kiosk",
+    ]
+    .iter()
+    .any(|t| l.contains(t))
 }
 
 fn thumbnail(system: &Source, name: &str) -> Option<(Vec<u8>, &'static str)> {
@@ -585,8 +605,14 @@ mod tests {
         ));
         assert!(!names_agree("Crazy Taxi", "Crazy Machines 2"));
         assert!(!names_agree("Tetris", "Tetris Effect"));
-        assert!(!names_agree("Need for Speed - Underground (USA)", "Need for Speed: Underground 2"));
-        assert!(names_agree("Need for Speed - Underground (USA)", "Need for Speed: Underground"));
+        assert!(!names_agree(
+            "Need for Speed - Underground (USA)",
+            "Need for Speed: Underground 2"
+        ));
+        assert!(names_agree(
+            "Need for Speed - Underground (USA)",
+            "Need for Speed: Underground"
+        ));
         assert!(looks_retail("Super Mario Bros. (USA)"));
         assert!(!looks_retail("Pitfall! (World) (Homebrew)"));
         assert!(!looks_retail("Alter Ego (World)"));

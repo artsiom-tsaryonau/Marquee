@@ -103,7 +103,11 @@ impl Engine {
             .context("starting the torrent runtime")?;
         std::fs::create_dir_all(&cfg.download_dir)?;
         let mut opts = SessionOptions {
-            dht: if cfg.dht { Some(Default::default()) } else { None },
+            dht: if cfg.dht {
+                Some(Default::default())
+            } else {
+                None
+            },
             disable_trackers: !cfg.trackers,
             disable_local_service_discovery: true,
             disable_upload: !cfg.seeding,
@@ -160,7 +164,11 @@ impl Engine {
     /// (the folder that contains the torrent's top-level file or folder).
     /// Existing data is verified, not re-downloaded.
     pub fn seed(&self, torrent: Vec<u8>, data_root: &Path) -> Result<usize> {
-        self.add(AddTorrent::TorrentFileBytes(torrent.into()), data_root, vec![])
+        self.add(
+            AddTorrent::TorrentFileBytes(torrent.into()),
+            data_root,
+            vec![],
+        )
     }
 
     /// Download from a `.torrent` file's bytes, a magnet link or an http(s) URL,
@@ -231,7 +239,9 @@ impl Engine {
         let ids: Vec<usize> = self
             .session
             .with_torrents(|it| it.map(|(id, _)| id).collect());
-        ids.into_iter().filter_map(|id| self.progress(id).ok()).collect()
+        ids.into_iter()
+            .filter_map(|id| self.progress(id).ok())
+            .collect()
     }
 
     /// Block until the download has finished and verified, or `timeout` passes.

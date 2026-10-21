@@ -1,0 +1,93 @@
+#!/bin/bash
+set -euo pipefail
+# The immutable local image contains both the compiled emulator and its libraries.
+dir=$(cd -- "$(dirname -- "$0")" && pwd)
+image=$(cat "$dir/image-id")
+[[ "$image" =~ ^sha256:[a-f0-9]{64}$ ]] || { echo 'Invalid melonDS image receipt' >&2; exit 1; }
+# Podman uses the host's XDG directories for its image store and config.
+# Keep the emulator paths in shell variables and forward them into the container.
+config=${XDG_CONFIG_HOME:-}
+data=${XDG_DATA_HOME:-}
+cache=${XDG_CACHE_HOME:-}
+for name in XDG_CONFIG_HOME XDG_DATA_HOME XDG_CACHE_HOME; do
+    flag="MARQUEE_HOST_${name}_SET"
+    value="MARQUEE_HOST_${name}"
+    if [[ ${!flag:-0} = 1 ]]; then
+        export "$name=${!value}"
+    else
+        unset "$name"
+    fi
+done
+# Qt's help probe does not initialize a game and needs no host display.
+if [[ $# = 1 && $1 = --version ]]; then
+    exec podman run --rm --pull=never --network=none "$image" env QT_QPA_PLATFORM=offscreen melonDS --help
+fi
+: "${config:?Marquee must set XDG_CONFIG_HOME}" "${data:?Marquee must set XDG_DATA_HOME}" "${cache:?Marquee must set XDG_CACHE_HOME}"
+mkdir -p "$config" "$data/saves" "$data/states" "$cache"
+args=(run --rm --init --pull=never --network=none --userns=keep-id --cap-drop=all
+    --security-opt=no-new-privileges --security-opt=label=disable
+    --env HOME=/tmp/marquee-home --env "XDG_CONFIG_HOME=$config" --env "XDG_DATA_HOME=$data"
+    --env "XDG_CACHE_HOME=$cache" --env DISPLAY --env WAYLAND_DISPLAY --env XAUTHORITY
+    --env XDG_RUNTIME_DIR --env PULSE_SERVER --env QT_QPA_PLATFORM
+    --volume "$config:$config:rw"
+    --volume "$data:$data:rw" --volume "$cache:$cache:rw")
+if [[ -d /tmp/.X11-unix ]]; then args+=(--volume /tmp/.X11-unix:/tmp/.X11-unix:ro); fi
+if [[ -n ${XDG_RUNTIME_DIR:-} && -d $XDG_RUNTIME_DIR ]]; then
+    # A private user-owned runtime directory, with only selected host sockets.
+    # Pre-create pulse as the mapped user; otherwise Podman creates its parent
+    # as namespace root and libpulse refuses the directory as insecure.
+    mkdir -p "$cache/runtime-v2/pulse"
+    chmod 700 "$cache/runtime-v2" "$cache/runtime-v2/pulse"
+    args+=(--volume "$cache/runtime-v2:$XDG_RUNTIME_DIR:rw")
+    for socket in "${WAYLAND_DISPLAY:-wayland-0}" pulse/native pipewire-0; do
+        if [[ -S $XDG_RUNTIME_DIR/$socket ]]; then
+            args+=(--volume "$XDG_RUNTIME_DIR/$socket:$XDG_RUNTIME_DIR/$socket:ro")
+        fi
+    done
+fi
+if [[ -n ${XAUTHORITY:-} && -f $XAUTHORITY ]]; then args+=(--volume "$XAUTHORITY:$XAUTHORITY:ro"); fi
+if [[ -d /dev/dri ]]; then args+=(--device /dev/dri --group-add keep-groups); fi
+# Only the selected cartridge is mounted; saves and states stay in writable data.
+forward=()
+for arg in "$@"; do
+    if [[ $arg = /* && -f $arg ]]; then
+        args+=(--volume "$arg:$arg:ro")
+    fi
+    forward+=("$arg")
+done
+mkdir -p "$config/melonDS" "$data/saves" "$data/states"
+ini="$config/melonDS/melonDS.toml"
+if [[ ! -e $ini ]]; then
+    toml_string() {
+        local value=$1
+        value=${value//\\/\\\\}
+        value=${value//\"/\\\"}
+        value=${value//$'\n'/\\n}
+        value=${value//$'\r'/\\r}
+        value=${value//$'\t'/\\t}
+        printf '"%s"' "$value"
+    }
+    cat > "$ini" <<TOML
+[Emu]
+ConsoleType = 0
+DirectBoot = true
+ExternalBIOSEnable = false
+[Instance0]
+SaveFilePath = $(toml_string "$data/saves")
+SavestatePath = $(toml_string "$data/states")
+[Instance0.Keyboard]
+A = 88
+B = 90
+X = 83
+Y = 65
+L = 81
+R = 87
+Start = 16777220
+Select = 16777219
+Left = 16777234
+Up = 16777235
+Right = 16777236
+Down = 16777237
+TOML
+fi
+exec podman "${args[@]}" "$image" melonDS "${forward[@]}"

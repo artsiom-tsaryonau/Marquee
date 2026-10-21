@@ -1,0 +1,18 @@
+{
+  "id": "fbneo",
+  "name": "FinalBurn Neo",
+  "kind": "emulator",
+  "systems": [
+    "neogeo"
+  ],
+  "binary": "AppRun",
+  "config_subdir": "fbneo",
+  "launch": [
+    "{rom}"
+  ],
+  "fullscreen_args": [
+    "-fullscreen"
+  ],
+  "requirement": "Needs a matching Neo Geo BIOS and complete parent/clone ROM sets. Uses a pinned source build; the current upstream Linux release archive has no executable.",
+  "github": "finalburnneo/FBNeo"
+}

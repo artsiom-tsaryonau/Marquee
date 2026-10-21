@@ -282,7 +282,11 @@ fn run() -> marquee_core::error::Result<()> {
             let root = core.add_root(&system, path, Some(label))?;
             println!("{}", serde_json::to_string_pretty(&root)?);
         }
-        Command::Intake { paths, delete, no_scan } => {
+        Command::Intake {
+            paths,
+            delete,
+            no_scan,
+        } => {
             let mut archives = Vec::new();
             for p in paths {
                 if p.is_dir() {
@@ -302,8 +306,19 @@ fn run() -> marquee_core::error::Result<()> {
             for a in &archives {
                 match core.intake_archive(a, delete) {
                     Ok(r) => {
-                        changed |= matches!(r.outcome, marquee_core::intake::Outcome::Imported | marquee_core::intake::Outcome::KeptArchive);
-                        println!("{}: {:?}{} - {}", a.display(), r.outcome, r.system.map(|s| format!(" ({s})")).unwrap_or_default(), r.message);
+                        changed |= matches!(
+                            r.outcome,
+                            marquee_core::intake::Outcome::Imported
+                                | marquee_core::intake::Outcome::KeptArchive
+                                | marquee_core::intake::Outcome::AlreadyPresent
+                        );
+                        println!(
+                            "{}: {:?}{} - {}",
+                            a.display(),
+                            r.outcome,
+                            r.system.map(|s| format!(" ({s})")).unwrap_or_default(),
+                            r.message
+                        );
                     }
                     Err(e) => println!("{}: error {} - {}", a.display(), e.code, e.message),
                 }
@@ -563,7 +578,10 @@ fn torrent(core: &Core, command: TorrentCmd) -> marquee_core::error::Result<()> 
     let fail = |e: anyhow::Error| AppError::new("TORRENT", format!("{e:#}"));
     let store = core.paths.data_dir.join("torrents");
     match command {
-        TorrentCmd::Status => println!("{}", serde_json::to_string_pretty(&core.torrent_settings()?)?),
+        TorrentCmd::Status => println!(
+            "{}",
+            serde_json::to_string_pretty(&core.torrent_settings()?)?
+        ),
         TorrentCmd::Enable | TorrentCmd::Disable => {
             let mut t = core.torrent_settings()?;
             t.enabled = matches!(command, TorrentCmd::Enable);
@@ -585,7 +603,10 @@ fn torrent(core: &Core, command: TorrentCmd) -> marquee_core::error::Result<()> 
             let cfg = torrent_config(core, &store, "127.0.0.1:0".parse().unwrap())?;
             let engine = marquee_torrent::Engine::start(&cfg).map_err(fail)?;
             let made = engine.create(&path, vec![]).map_err(fail)?;
-            let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+            let name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
             let file = store.join(format!("{name}.torrent"));
             std::fs::write(&file, &made.bytes)?;
             println!("{}\n{}\n{}", file.display(), made.info_hash, made.magnet);
@@ -594,29 +615,47 @@ fn torrent(core: &Core, command: TorrentCmd) -> marquee_core::error::Result<()> 
         TorrentCmd::Seed { path, listen } => {
             let cfg = torrent_config(core, &store, listen)?;
             if !cfg.seeding {
-                return Err(AppError::new("TORRENT_SEEDING_OFF", "Seeding is off. Run `marquee torrent seeding true`."));
+                return Err(AppError::new(
+                    "TORRENT_SEEDING_OFF",
+                    "Seeding is off. Run `marquee torrent seeding true`.",
+                ));
             }
             let engine = marquee_torrent::Engine::start(&cfg).map_err(fail)?;
             let made = engine.create(&path, vec![]).map_err(fail)?;
             let root = path.parent().unwrap_or(std::path::Path::new("."));
             let id = engine.seed(made.bytes.clone(), root).map_err(fail)?;
-            let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+            let name = path
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_default();
             std::fs::create_dir_all(&store)?;
             let file = store.join(format!("{name}.torrent"));
             std::fs::write(&file, &made.bytes)?;
             println!("torrent file: {}", file.display());
             println!("magnet: {}", made.magnet);
             if let Some(a) = engine.listen_addr() {
-                println!("listening on port {} (use --peer <this-host>:{})", a.port(), a.port());
+                println!(
+                    "listening on port {} (use --peer <this-host>:{})",
+                    a.port(),
+                    a.port()
+                );
             }
             loop {
                 std::thread::sleep(std::time::Duration::from_secs(5));
                 if let Ok(p) = engine.progress(id) {
-                    println!("{:?}: {}/{} bytes, uploaded {}", p.state, p.downloaded, p.total, p.uploaded);
+                    println!(
+                        "{:?}: {}/{} bytes, uploaded {}",
+                        p.state, p.downloaded, p.total, p.uploaded
+                    );
                 }
             }
         }
-        TorrentCmd::Get { source, into, peers, timeout_secs } => {
+        TorrentCmd::Get {
+            source,
+            into,
+            peers,
+            timeout_secs,
+        } => {
             let cfg = torrent_config(core, &into, "0.0.0.0:0".parse().unwrap())?;
             let engine = marquee_torrent::Engine::start(&cfg).map_err(fail)?;
             let src = if source.starts_with("magnet:") || source.starts_with("http") {

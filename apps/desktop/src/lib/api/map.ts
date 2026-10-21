@@ -9,11 +9,11 @@ import { webToken } from './http';
 
 /** Cartridge/disc systems run by a catalogue emulator (mirrors `catalog/systems/*.json`). */
 const SYSTEM_EMULATOR: Record<string, string> = {
-  dreamcast: 'flycast', nes: 'mesen', snes: 'mesen', gb: 'mesen', gbc: 'mesen', pce: 'mesen', n64: 'rmg',
+  genesis: 'blastem', ds: 'melonds', neogeo: 'fbneo', dreamcast: 'flycast', nes: 'mesen', snes: 'mesen', gb: 'mesen', gbc: 'mesen', pce: 'mesen', n64: 'rmg',
 };
 /** Backend system id -> UI platform id. */
 const PLATFORM: Record<string, GameEntry['platform']> = {
-  ps1: 'ps1', ps2: 'ps2', dreamcast: 'dreamcast', nes: 'nes', snes: 'snes', gb: 'gb', gbc: 'gbc', pce: 'tg16', n64: 'n64',
+  ps1: 'ps1', ps2: 'ps2', ds: 'ds', neogeo: 'neogeo', dreamcast: 'dreamcast', nes: 'nes', snes: 'snes', gb: 'gb', gbc: 'gbc', pce: 'tg16', n64: 'n64',
 };
 
 function pickRunner(snap: Pick<LibrarySnapshot, 'runners' | 'settings'>, system = 'ps2'): Runner | null {

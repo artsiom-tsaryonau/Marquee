@@ -79,7 +79,7 @@
         </div>
         <div class="actions">
           {#if g.setupState === 'runner_missing'}
-            {#if g.platform === 'ps1'}<button class="btn primary" data-nav onclick={() => app.go('tools')}>Set up DuckStation</button>{:else}<InstallMenu tone="primary" />{/if}
+            {#if g.platform === 'ps2'}<InstallMenu tone="primary" />{:else}<button class="btn primary" data-nav onclick={() => app.go('tools')}>Set up {g.platform === 'ps1' ? 'DuckStation' : g.platform === 'genesis' ? 'BlastEm' : g.platform === 'ds' ? 'melonDS' : g.platform === 'neogeo' ? 'FinalBurn Neo' : 'emulator'}</button>{/if}
           {:else}
             <button class="btn primary" data-nav style="--accent-h:{g.art.hue2}" onclick={() => {
               if (g.mediaMissing) app.open(g);

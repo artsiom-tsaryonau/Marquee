@@ -69,6 +69,21 @@ test('region language revision and player filters match one concrete entry with 
   assert.equal(metadataMatches(game,'Europe','fr','2.0','1'),false);
   assert.ok(metadataMatches(game,'USA','en','2.0','1'));
 });
+test('linked variants without locale evidence keep local identity instead of catalogue-wide labels', () => {
+  const snap=discSnapshot(); snap.editions[1].region='USA';
+  const record=catalogueFixture(); record.media[0].regions=[]; record.media[0].languages=[];
+  snap.catalogue={records:[record],systems:[],links:[{edition_id:'e2',record_id:record.id,media_id:'456',method:'manual',valid:true}]};
+  const local=gamesFromSnapshot(snap).find(g=>g.id==='e2');
+  assert.equal(local.region,'USA'); assert.equal(local.languages,undefined);
+  assert.equal(metadataMatches(local,'Europe','','',''),false);
+  const discovery=gamesFromSnapshot(snap).find(g=>g.source==='catalogue');
+  assert.equal(discovery.region,'Europe | USA');
+});
+test('canonical pce catalogue identity displays on the TurboGrafx platform', () => {
+  const snap=discSnapshot(); const record=catalogueFixture(); record.system='pce';
+  snap.catalogue={records:[record],systems:[],links:[]};
+  assert.equal(gamesFromSnapshot(snap).find(g=>g.source==='catalogue').platform,'tg16');
+});
 function discSnapshot() {
   return { roots: [], media: [{ id: 'm1', path: '/roms/ps1/game.cue', available: true, skip_reason: null }, { id: 'm2', path: '/roms/ps2/game.iso', available: true, skip_reason: null }], sessions: [],
     editions: [{ id: 'e1', system: 'ps1', title: 'Metal Gear Solid', media_id: 'm1', missing: false, cover_path: null, playtime_seconds: 0 }, { id: 'e2', system: 'ps2', title: 'Vice City', media_id: 'm2', missing: false, cover_path: null, playtime_seconds: 0 }],
@@ -78,6 +93,17 @@ test('mixed disc library keeps PS1 categories and setup separate from PS2', () =
   const [ps1, ps2] = gamesFromSnapshot(discSnapshot());
   assert.equal(ps1.platform, 'ps1'); assert.equal(ps1.genre, 'PS1'); assert.equal(ps1.setupState, 'runner_missing'); assert.equal(ps1.runnerId, undefined);
   assert.equal(ps2.platform, 'ps2'); assert.equal(ps2.runnerId, 'pcsx2');
+});
+test('DS and Neo Geo entries use their own platforms and runner readiness', () => {
+  const snap=discSnapshot();
+  snap.editions[0].system='ds'; snap.editions[1].system='neogeo';
+  snap.editions[1].missing=true; snap.media[1].skip_reason='Legacy split set needs parent ROMs';
+  snap.runners=[{id:'runner.melonds.marquee',kind:'emulator',display_name:'melonDS',available:true,bios_state:'unverified'},
+    {id:'runner.fbneo.marquee',kind:'emulator',display_name:'FinalBurn Neo',available:true,bios_state:'unverified'}];
+  const [ds,neo]=gamesFromSnapshot(snap);
+  assert.equal(ds.platform,'ds'); assert.equal(ds.runnerName,'melonDS'); assert.equal(ds.setupState,'unverified');
+  assert.equal(neo.platform,'neogeo'); assert.equal(neo.runnerName,'FinalBurn Neo'); assert.equal(neo.installed,false);
+  assert.equal(neo.mediaIssue,'Legacy split set needs parent ROMs');
 });
 test('runner defaults are platform scoped and unavailable pins fall back', () => {
   const snap = discSnapshot(); snap.runners.push({ id: 'duck', kind: 'duckstation', display_name: 'DuckStation', available: true, bios_state: 'unverified' });

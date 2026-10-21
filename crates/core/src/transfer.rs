@@ -160,7 +160,9 @@ fn parse_link(link: &str) -> Result<Link> {
     let q = link.trim().strip_prefix("magnet:?").ok_or_else(bad)?;
     let (mut hash, mut name, mut system, mut peers) = (None, String::new(), None, Vec::new());
     for part in q.split('&') {
-        let Some((k, v)) = part.split_once('=') else { continue };
+        let Some((k, v)) = part.split_once('=') else {
+            continue;
+        };
         let v = decode(v);
         match k {
             "xt" => hash = v.strip_prefix("urn:btih:").map(str::to_lowercase),
@@ -177,7 +179,12 @@ fn parse_link(link: &str) -> Result<Link> {
     let hash = hash
         .filter(|h| h.len() == 40 && h.bytes().all(|c| c.is_ascii_hexdigit()))
         .ok_or_else(bad)?;
-    Ok(Link { hash, name, system, peers })
+    Ok(Link {
+        hash,
+        name,
+        system,
+        peers,
+    })
 }
 
 impl Transfers {
@@ -205,7 +212,12 @@ impl Transfers {
 
     /// Stop the engine; it restarts on next use with the new settings.
     pub fn reset(&self, t: &TorrentSettings) {
-        let old = self.inner.engine.lock().unwrap_or_else(|e| e.into_inner()).take();
+        let old = self
+            .inner
+            .engine
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .take();
         if let Some(engine) = old {
             engine.cancel();
             std::thread::spawn(move || drop(engine));
@@ -235,7 +247,10 @@ impl Inner {
             .unwrap_or_default();
         let r = f(&mut v);
         let _ = std::fs::create_dir_all(&self.dir);
-        let _ = std::fs::write(self.entries_path(), serde_json::to_vec_pretty(&v).unwrap_or_default());
+        let _ = std::fs::write(
+            self.entries_path(),
+            serde_json::to_vec_pretty(&v).unwrap_or_default(),
+        );
         r
     }
 
@@ -324,7 +339,11 @@ pub fn status(core: &Arc<Core>) -> Result<TransferStatus> {
         };
         if e.kind == "get" && !e.scanned && p.is_some_and(|p| p.finished) {
             let hash = e.info_hash.clone();
-            inner.update(|v| v.iter_mut().filter(|x| x.info_hash == hash).for_each(|x| x.scanned = true));
+            inner.update(|v| {
+                v.iter_mut()
+                    .filter(|x| x.info_hash == hash)
+                    .for_each(|x| x.scanned = true)
+            });
             let core = Arc::clone(core);
             std::thread::spawn(move || {
                 let _ = core.scan(None, None);
@@ -351,7 +370,12 @@ pub fn status(core: &Arc<Core>) -> Result<TransferStatus> {
             name: j.name.clone(),
             kind: "share".into(),
             edition_id: Some(j.edition_id.clone()),
-            state: if j.error.is_some() { "error" } else { "preparing" }.into(),
+            state: if j.error.is_some() {
+                "error"
+            } else {
+                "preparing"
+            }
+            .into(),
             downloaded: 0,
             total: 0,
             uploaded: 0,
@@ -359,7 +383,11 @@ pub fn status(core: &Arc<Core>) -> Result<TransferStatus> {
             error: j.error.clone(),
         });
     }
-    Ok(TransferStatus { enabled: t.enabled, seeding: t.seeding, items })
+    Ok(TransferStatus {
+        enabled: t.enabled,
+        seeding: t.seeding,
+        items,
+    })
 }
 
 /// Make a torrent for a game in the library and start sharing it. Returns at
@@ -376,7 +404,11 @@ pub fn share(core: &Arc<Core>, edition_id: &str) -> Result<()> {
         ));
     }
     let inner = Arc::clone(&core.transfers.inner);
-    if inner.load().iter().any(|e| e.edition_id.as_deref() == Some(edition_id)) {
+    if inner
+        .load()
+        .iter()
+        .any(|e| e.edition_id.as_deref() == Some(edition_id))
+    {
         return Ok(());
     }
     let snap = core.snapshot()?;
@@ -396,7 +428,8 @@ pub fn share(core: &Arc<Core>, edition_id: &str) -> Result<()> {
         .filter(|r| media.path.starts_with(&r.path))
         .max_by_key(|r| r.path.as_os_str().len());
     // A game that lives in its own folder (cue + bin) is shared as the folder.
-    let target = match root.and_then(|r| media.path.strip_prefix(&r.path).ok().map(|rel| (r, rel))) {
+    let target = match root.and_then(|r| media.path.strip_prefix(&r.path).ok().map(|rel| (r, rel)))
+    {
         Some((r, rel)) if rel.components().count() > 1 => {
             r.path.join(rel.components().next().unwrap())
         }
@@ -408,11 +441,15 @@ pub fn share(core: &Arc<Core>, edition_id: &str) -> Result<()> {
         .map(|n| n.to_string_lossy().into_owned())
         .unwrap_or_default();
     let system = edition.system.clone();
-    inner.jobs.lock().unwrap_or_else(|e| e.into_inner()).push(Job {
-        edition_id: edition_id.to_string(),
-        name: name.clone(),
-        error: None,
-    });
+    inner
+        .jobs
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .push(Job {
+            edition_id: edition_id.to_string(),
+            name: name.clone(),
+            error: None,
+        });
     let edition_id = edition_id.to_string();
     std::thread::spawn(move || {
         let result: Result<()> = (|| {
@@ -471,7 +508,14 @@ pub fn get(core: &Arc<Core>, link: &str) -> Result<()> {
             l.peers.clone(),
         )
         .map_err(fail)?;
-    let (hash, name) = (l.hash.clone(), if l.name.is_empty() { l.hash.clone() } else { l.name.clone() });
+    let (hash, name) = (
+        l.hash.clone(),
+        if l.name.is_empty() {
+            l.hash.clone()
+        } else {
+            l.name.clone()
+        },
+    );
     core.transfers.inner.update(|v| {
         v.retain(|e| e.info_hash != hash);
         v.push(Entry {
@@ -491,7 +535,11 @@ pub fn get(core: &Arc<Core>, link: &str) -> Result<()> {
 /// Stop sharing or fetching. Never deletes game files.
 pub fn stop(core: &Arc<Core>, info_hash: &str) -> Result<()> {
     let inner = &core.transfers.inner;
-    let live = inner.engine.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    let live = inner
+        .engine
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone();
     if let Some(engine) = live {
         if let Some(p) = engine.list().into_iter().find(|p| p.info_hash == info_hash) {
             engine.remove(p.id, false).map_err(fail)?;
@@ -509,7 +557,12 @@ mod tests {
     #[test]
     fn link_round_trips() {
         let h = "4927b4f8762d3727d8be7d48e754485c7f091436";
-        let l = make_link(h, "Grand Theft Auto (USA) [v4].iso", Some("ps2"), Some("192.168.1.20:51413"));
+        let l = make_link(
+            h,
+            "Grand Theft Auto (USA) [v4].iso",
+            Some("ps2"),
+            Some("192.168.1.20:51413"),
+        );
         let p = parse_link(&l).unwrap();
         assert_eq!(p.hash, h);
         assert_eq!(p.name, "Grand Theft Auto (USA) [v4].iso");
@@ -546,26 +599,39 @@ mod tests {
         // A has a DS game in its library.
         let lib = tmp.path().join("a-roms/ds");
         std::fs::create_dir_all(&lib).unwrap();
-        let bytes: Vec<u8> = (0..3_000_000u32).map(|i| (i.wrapping_mul(2654435761) >> 13) as u8).collect();
+        let bytes: Vec<u8> = (0..3_000_000u32)
+            .map(|i| (i.wrapping_mul(2654435761) >> 13) as u8)
+            .collect();
         std::fs::write(lib.join("Test Game (Spain).nds"), &bytes).unwrap();
         a.add_root("ds", lib.clone(), None).unwrap();
         a.scan(None, None).unwrap();
         let edition = a.snapshot().unwrap().editions[0].id.clone();
 
         share(&a, &edition).unwrap();
-        let s = wait(&a, |s| s.items.iter().any(|i| i.state == "sharing" && i.link.is_some()));
+        let s = wait(&a, |s| {
+            s.items
+                .iter()
+                .any(|i| i.state == "sharing" && i.link.is_some())
+        });
         let link = s.items[0].link.clone().unwrap();
         assert!(link.contains("x.mq=ds") && link.contains("x.pe=127.0.0.1:"));
 
         get(&b, &link).unwrap();
-        wait(&b, |s| s.items.iter().any(|i| i.kind == "get" && i.state == "sharing"));
+        wait(&b, |s| {
+            s.items
+                .iter()
+                .any(|i| i.kind == "get" && i.state == "sharing")
+        });
         let got = b.paths.data_dir.join("roms/ds/Test Game (Spain).nds");
         assert_eq!(std::fs::read(got).unwrap(), bytes);
         assert!(wait(&a, |s| s.items[0].uploaded > 0).items[0].uploaded > 0);
 
         stop(&a, &s.items[0].info_hash).unwrap();
         assert!(status(&a).unwrap().items.is_empty());
-        assert!(lib.join("Test Game (Spain).nds").exists(), "stopping must keep the game");
+        assert!(
+            lib.join("Test Game (Spain).nds").exists(),
+            "stopping must keep the game"
+        );
     }
 
     #[test]
@@ -573,7 +639,15 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let c = Arc::new(Core::open_isolated(Some(tmp.path().to_path_buf()), true).unwrap());
         assert_eq!(share(&c, "x").unwrap_err().code, "TORRENT_OFF");
-        assert_eq!(get(&c, "magnet:?xt=urn:btih:4927b4f8762d3727d8be7d48e754485c7f091436&x.pe=127.0.0.1:1").unwrap_err().code, "TORRENT_OFF");
+        assert_eq!(
+            get(
+                &c,
+                "magnet:?xt=urn:btih:4927b4f8762d3727d8be7d48e754485c7f091436&x.pe=127.0.0.1:1"
+            )
+            .unwrap_err()
+            .code,
+            "TORRENT_OFF"
+        );
         assert!(!status(&c).unwrap().enabled);
     }
 

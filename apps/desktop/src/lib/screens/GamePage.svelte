@@ -100,7 +100,7 @@
         <button class="btn primary big" data-nav onclick={() => g.metadata && app.openCataloguePage(g.metadata.id)}>Open source page in browser</button>
       {:else if offline && g.setupState === 'runner_missing'}
         {#if g.platform === 'ps2'}<InstallMenu tone="primary" size="big" />
-        {:else}<button class="btn primary big" data-nav onclick={() => app.go('tools')}><Icon name="settings" /> Set up DuckStation</button>{/if}
+        {:else}<button class="btn primary big" data-nav onclick={() => app.go('tools')}><Icon name="settings" /> Set up {g.platform === 'ps1' ? 'DuckStation' : g.platform === 'genesis' ? 'BlastEm' : g.platform === 'ds' ? 'melonDS' : g.platform === 'neogeo' ? 'FinalBurn Neo' : 'emulator'}</button>{/if}
       {:else}
         <button class="btn primary big" data-nav disabled={!!g.mediaMissing} onclick={() => {
           if (g.lutris) void app.openLutrisGame(g);

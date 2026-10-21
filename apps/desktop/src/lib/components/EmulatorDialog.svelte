@@ -138,15 +138,15 @@
           <button class="btn primary small" data-nav disabled={!!busy || startingBuild} onclick={() => e.source_build ? build() : app.installEmulator(e)}><Icon name="download" size={15} />{e.source_build ? 'Build from source' : 'Install'}</button>
         {:else}
           <button class="btn primary small" data-nav disabled={!!busy} onclick={() => app.openEmulator(e)}><Icon name="play" size={15} />Open</button>
-          {#if e.status === 'update'}<button class="btn glass small" data-nav disabled={!!busy} onclick={() => app.installEmulator(e)}>Update</button>{/if}
+          {#if e.status === 'update'}<button class="btn glass small" data-nav disabled={!!busy} onclick={() => e.source_build ? build() : app.installEmulator(e)}>Update</button>{/if}
         {/if}
       </div>
 
       {#if e.source_build}
         <section>
           <h3>Managed source build</h3>
-          <p class="hint">mGBA 0.10.5 · pinned source · Linux x86_64 · rootless Podman + Git. Compiler and runtime dependencies stay in a container. First build downloads dependencies and may take several minutes. Only a game folder you select is mounted read-only; saves use Marquee’s writable folders.</p>
-          <button class="btn glass small" data-nav disabled={!!busy || saving} onclick={chooseGames}>Choose game folder</button>
+          <p class="hint">{e.name} · pinned source · Linux x86_64 · rootless Podman + Git. Compiler and runtime dependencies stay in a container. First build downloads dependencies and may take several minutes. Selected game media is mounted read-only; saves use Marquee’s writable folders.</p>
+          {#if e.id === 'mgba'}<button class="btn glass small" data-nav disabled={!!busy || saving} onclick={chooseGames}>Choose game folder</button>{/if}
           {#if args.some((a) => a.startsWith('--marquee-games='))}<p class="hint">{args.find((a) => a.startsWith('--marquee-games='))?.slice('--marquee-games='.length)}</p>{/if}
           <div class="arg-actions">
             {#if busy}<button class="btn glass small" data-nav onclick={cancelBuild}>Cancel build</button>

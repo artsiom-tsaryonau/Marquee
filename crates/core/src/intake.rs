@@ -126,7 +126,10 @@ fn list_entries(path: &Path, kind: Kind) -> Result<Vec<Entry>> {
             let mut zip = zip::ZipArchive::new(File::open(path)?)
                 .map_err(|e| AppError::new("INTAKE_FORMAT", format!("Invalid ZIP: {e}")))?;
             if zip.len() > MAX_ENTRIES {
-                return Err(AppError::new("INTAKE_LIMIT", "Archive has too many entries"));
+                return Err(AppError::new(
+                    "INTAKE_LIMIT",
+                    "Archive has too many entries",
+                ));
             }
             for i in 0..zip.len() {
                 let f = zip
@@ -152,11 +155,13 @@ fn list_entries(path: &Path, kind: Kind) -> Result<Vec<Entry>> {
                 .map_err(|e| AppError::new("INTAKE_FORMAT", format!("Invalid 7z: {e}")))?;
             let files = &reader.archive().files;
             if files.len() > MAX_ENTRIES {
-                return Err(AppError::new("INTAKE_LIMIT", "Archive has too many entries"));
+                return Err(AppError::new(
+                    "INTAKE_LIMIT",
+                    "Archive has too many entries",
+                ));
             }
             for (i, f) in files.iter().enumerate() {
-                if f.is_directory() || !f.has_stream() && f.size() == 0 && f.name().ends_with('/')
-                {
+                if f.is_directory() || !f.has_stream() && f.size() == 0 && f.name().ends_with('/') {
                     continue;
                 }
                 let rel = safe_rel(f.name()).ok_or_else(|| unsafe_entry(f.name()))?;
@@ -323,9 +328,9 @@ fn possible_duplicates(dir: &Path, wanted: &[(Entry, PathBuf)]) -> Vec<String> {
                     stack.push((p, depth + 1));
                 }
             } else if meta.len() >= 64 * 1024 * 1024 && !fresh.contains(&p) {
-                let hit = wanted.iter().any(|(en, rel)| {
-                    en.size == meta.len() && ext_of(rel) == ext_of(&p)
-                });
+                let hit = wanted
+                    .iter()
+                    .any(|(en, rel)| en.size == meta.len() && ext_of(rel) == ext_of(&p));
                 if hit {
                     found.insert(p.strip_prefix(dir).unwrap_or(&p).display().to_string());
                 }
@@ -472,16 +477,20 @@ impl Core {
             let first = playable[0].rel.components().next();
             first.filter(|f| {
                 playable.len() > 1
-                    && playable
-                        .iter()
-                        .all(|e| e.rel.components().count() > 1 && e.rel.components().next() == Some(*f))
+                    && playable.iter().all(|e| {
+                        e.rel.components().count() > 1 && e.rel.components().next() == Some(*f)
+                    })
             })
         };
         let wanted: Vec<(Entry, PathBuf)> = playable
             .iter()
             .map(|e| {
                 let rel: PathBuf = match (folder, common_top) {
-                    (false, _) => e.rel.file_name().map(PathBuf::from).unwrap_or_else(|| e.rel.clone()),
+                    (false, _) => e
+                        .rel
+                        .file_name()
+                        .map(PathBuf::from)
+                        .unwrap_or_else(|| e.rel.clone()),
                     (true, Some(_)) => e.rel.clone(),
                     (true, None) => Path::new(&stem).join(&e.rel),
                 };
@@ -506,16 +515,17 @@ impl Core {
 
         let pending: Vec<&(Entry, PathBuf)> = wanted
             .iter()
-            .filter(|(e, rel)| {
-                fs::metadata(dest_dir.join(rel)).map_or(true, |m| m.len() != e.size)
-            })
+            .filter(|(e, rel)| fs::metadata(dest_dir.join(rel)).map_or(true, |m| m.len() != e.size))
             .collect();
         if pending.is_empty() {
             return Ok(report(
                 Outcome::AlreadyPresent,
                 Some(system),
                 Some(dest_dir),
-                wanted.iter().map(|(_, r)| r.display().to_string()).collect(),
+                wanted
+                    .iter()
+                    .map(|(_, r)| r.display().to_string())
+                    .collect(),
                 "Everything in this archive is already in the library.".into(),
             ));
         }
@@ -537,20 +547,35 @@ impl Core {
         let _ = fs::remove_dir_all(&staging);
         result?;
 
-        let files: Vec<String> = wanted.iter().map(|(_, r)| r.display().to_string()).collect();
+        let files: Vec<String> = wanted
+            .iter()
+            .map(|(_, r)| r.display().to_string())
+            .collect();
         let (outcome, message) = if supported {
-            (Outcome::Imported, format!("Unpacked {} file(s).", files.len()))
+            (
+                Outcome::Imported,
+                format!("Unpacked {} file(s).", files.len()),
+            )
         } else {
             (
                 Outcome::StoredNoEmulator,
-                format!("Stored {} file(s) under {system}, but Marquee has no emulator for it yet.", files.len()),
+                format!(
+                    "Stored {} file(s) under {system}, but Marquee has no emulator for it yet.",
+                    files.len()
+                ),
             )
         };
         let message = match possible_duplicates(&dest_dir, &wanted) {
             d if d.is_empty() => message,
             d => format!("{message} Possible duplicate of: {}.", d.join(", ")),
         };
-        let mut rep = report(outcome, Some(system), Some(dest_dir.clone()), files, message);
+        let mut rep = report(
+            outcome,
+            Some(system),
+            Some(dest_dir.clone()),
+            files,
+            message,
+        );
         if delete_source {
             let verified = wanted
                 .iter()
@@ -596,7 +621,10 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let c = core(&tmp.path().join("data"));
         let zip = tmp.path().join("Game (Spain).zip");
-        make_zip(&zip, &[("Game (Spain).nds", b"nds-bytes"), ("readme.txt", b"hi")]);
+        make_zip(
+            &zip,
+            &[("Game (Spain).nds", b"nds-bytes"), ("readme.txt", b"hi")],
+        );
         let r = c.intake_archive(&zip, true).unwrap();
         assert_eq!(r.outcome, Outcome::Imported);
         assert_eq!(r.system.as_deref(), Some("ds"));
@@ -615,15 +643,21 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let c = core(&tmp.path().join("data"));
         let zip = tmp.path().join("Disc (USA).zip");
-        make_zip(&zip, &[("Disc (USA).cue", b"FILE \"Disc (USA).bin\" BINARY"), ("Disc (USA).bin", b"xx")]);
+        make_zip(
+            &zip,
+            &[
+                ("Disc (USA).cue", b"FILE \"Disc (USA).bin\" BINARY"),
+                ("Disc (USA).bin", b"xx"),
+            ],
+        );
         let r = c.intake_archive(&zip, false).unwrap();
         assert_eq!(r.system.as_deref(), Some("ps1"));
         let dest = r.dest.unwrap();
         assert!(dest.join("Disc (USA)/Disc (USA).cue").is_file());
-        assert!(fs::read_dir(&dest)
-            .unwrap()
-            .flatten()
-            .all(|e| !e.file_name().to_string_lossy().starts_with(".marquee-intake")));
+        assert!(fs::read_dir(&dest).unwrap().flatten().all(|e| !e
+            .file_name()
+            .to_string_lossy()
+            .starts_with(".marquee-intake")));
         assert!(zip.exists());
     }
 
@@ -655,10 +689,16 @@ mod tests {
         let c = core(&tmp.path().join("data"));
         let bios = tmp.path().join("bios.zip");
         make_zip(&bios, &[("SCPH-70012.bin", b"b")]);
-        assert_eq!(c.intake_archive(&bios, false).unwrap().outcome, Outcome::Skipped);
+        assert_eq!(
+            c.intake_archive(&bios, false).unwrap().outcome,
+            Outcome::Skipped
+        );
         let docs = tmp.path().join("docs.zip");
         make_zip(&docs, &[("readme.txt", b"b")]);
-        assert_eq!(c.intake_archive(&docs, false).unwrap().outcome, Outcome::Skipped);
+        assert_eq!(
+            c.intake_archive(&docs, false).unwrap().outcome,
+            Outcome::Skipped
+        );
     }
 
     #[test]
@@ -667,6 +707,9 @@ mod tests {
         let c = core(&tmp.path().join("data"));
         let f = tmp.path().join("x.zip");
         fs::write(&f, b"Rar!\x1a\x07\x00 not a zip").unwrap();
-        assert_eq!(c.intake_archive(&f, false).unwrap_err().code, "INTAKE_FORMAT");
+        assert_eq!(
+            c.intake_archive(&f, false).unwrap_err().code,
+            "INTAKE_FORMAT"
+        );
     }
 }

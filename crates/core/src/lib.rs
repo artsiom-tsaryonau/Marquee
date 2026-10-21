@@ -18,18 +18,18 @@ pub mod library;
 pub mod lutris;
 pub mod metadata;
 pub mod model;
+pub mod neogeo;
 pub mod paths;
 pub mod ports;
 pub mod purple;
-pub mod runners;
 pub mod romart;
 pub mod romfacts;
 pub mod runners;
 pub mod server;
 pub mod sessions;
 pub mod source_builds;
-
 pub mod transfer;
+
 use crate::db::Db;
 use crate::error::{AppError, Result};
 use crate::instance::InstanceLock;
@@ -52,8 +52,8 @@ pub struct Core {
     keys: keys::KeyStore,
     pub purple: Arc<purple::Manager>,
     pub source_builds: source_builds::Manager,
-}
     pub(crate) transfers: transfer::Transfers,
+}
 
 impl Core {
     pub fn open(data_dir: Option<PathBuf>, allow_fake: bool) -> Result<Self> {
@@ -73,8 +73,8 @@ impl Core {
         let db = Db::open(&paths)?;
         let core = Self {
             source_builds: source_builds::Manager::default(),
-            purple: Arc::new(purple::Manager::new(&paths)),
             transfers: transfer::Transfers::new(&paths.data_dir),
+            purple: Arc::new(purple::Manager::new(&paths)),
             paths,
             db: Arc::new(Mutex::new(db)),
             _lock: Arc::new(lock),
@@ -90,10 +90,10 @@ impl Core {
             core._lock.clone(),
         )?;
         core.refresh_runners()?;
-        Ok(core)
         if let Ok(t) = core.torrent_settings() {
             core.transfers.autostart(&t);
         }
+        Ok(core)
     }
 
     fn with_db<T>(&self, f: impl FnOnce(&Db) -> Result<T>) -> Result<T> {
@@ -222,16 +222,16 @@ impl Core {
             match artwork::fetch_cover(&job.url)
                 .and_then(|bytes| self.with_db(|db| artwork::store_jpeg(db, &job, &bytes)))
             {
-                Ok(()) => report.fetched += 1,
+                Ok(true) => report.fetched += 1,
+                Ok(false) => report.skipped += 1,
                 Err(err) if err.code == "NOT_FOUND" => report.skipped += 1,
                 Err(_) => report.failed += 1,
             }
         }
-        Ok(artwork::finish(report, sink))
         romart::run(self, edition_id, &mut report);
         romfacts::run(self, edition_id);
+        Ok(artwork::finish(report, sink))
     }
-        romart::run(self, edition_id, &mut report);
 
     pub fn launch(
         &self,
@@ -273,8 +273,6 @@ impl Core {
         self.set_setting("display_mode", mode)
     }
 
-    pub fn select_runner(&self, runner_id: &str) -> Result<()> {
-        let runners = self.refresh_runners()?;
     pub fn torrent_settings(&self) -> Result<model::TorrentSettings> {
         Ok(self.with_db(|db| db.load_settings())?.torrents)
     }
@@ -288,6 +286,8 @@ impl Core {
         Ok(())
     }
 
+    pub fn select_runner(&self, runner_id: &str) -> Result<()> {
+        let runners = self.refresh_runners()?;
         let Some(runner) = runners.iter().find(|r| r.id == runner_id && r.available) else {
             return Err(AppError::new(
                 "RUNNER_MISSING",
@@ -518,7 +518,11 @@ impl Core {
             .iter()
             .map(|def| {
                 let installed = self.with_db(|db| emulators::installed(db, &def.id))?;
-                let latest = self.with_db(|db| db.get_setting(&emulators::latest_key(&def.id)))?;
+                let latest = if source_builds::supported(&def.id) {
+                    Some(source_builds::version(&def.id)?)
+                } else {
+                    self.with_db(|db| db.get_setting(&emulators::latest_key(&def.id)))?
+                };
                 let cfg = self.with_db(|db| emulators::config(db, &def.id))?;
                 Ok(emulators::info(
                     &self.paths,

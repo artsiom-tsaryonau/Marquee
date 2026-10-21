@@ -1,0 +1,11 @@
+{
+  "id": "neogeo",
+  "display_name": "Neo Geo",
+  "supported_extensions": [
+    "zip"
+  ],
+  "skipped_extensions": [],
+  "runner_kind": "emulator",
+  "emulator": "fbneo",
+  "notes": "Keep arcade ZIP sets intact. BIOS and parent dependencies must match the supported FBNeo set."
+}
