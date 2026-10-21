@@ -17,14 +17,10 @@ Documentation navigation: [docs index](docs/README.md). Broader platform/port id
 Needs Node 22+, pnpm (`corepack enable pnpm`), and Rust for the desktop/CLI. On Fedora, install WebKit and the other Tauri devel packages first:
 
 ```bash
-./scripts/fedora-deps.sh          # webkit2gtk4.1-devel, dbus-devel, …
-./scripts/bootstrap.sh            # same, then checks rustc / node / pnpm
-cd apps/desktop
-pnpm install
-pnpm dev              # browser demo with sample data · http://localhost:1420
-pnpm tauri dev        # real library; existing legacy sources may also appear
-# NVIDIA + Wayland:
-./scripts/run.sh desktop      # or: web | dev | both  (also pnpm run:desktop …)
+./scripts/setup.sh                # Fedora devel packages, then checks rustc / node / pnpm
+(cd apps/desktop && pnpm install)
+./scripts/run.sh desktop          # or: web | dev | both  (also pnpm run:desktop …)
+(cd apps/desktop && pnpm dev)     # browser demo with sample data · http://localhost:1420
 ```
 
 CLI (same core; use `--data-dir` for an isolated database):
@@ -55,7 +51,7 @@ apps/desktop/   Svelte 5 + TypeScript + Vite UI and Tauri 2 shell
 crates/core/    library DB, ISO scan, PCSX2 unpack/argv, serial covers, sessions, ports, command layer (`api`), event hub, local web server
 crates/cli/     `marquee` diagnostics over the same core
 catalog/        PS2/PS1 system descriptors, ports/ (one JSON per port)
-scripts/        fedora-deps.sh, bootstrap.sh, check.sh, make-icon.py, run.sh
+scripts/        setup.sh, run.sh, check.sh, make-icon.py
 docs/           ROADMAP.md, STORE_INTEGRATION.md, PS2.md, PS1.md, UNIFIED_LIBRARY.md, and supporting notes
 ```
 

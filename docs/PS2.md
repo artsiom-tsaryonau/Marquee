@@ -46,7 +46,7 @@ ScreenScraper, SteamGridDB, Steam/Lutris, other emulators, BIN/CUE/CHD play, who
 ### Prerequisites
 
 - Fedora (or similar) with Rust, Node 22+, pnpm
-- For the desktop window: `./scripts/fedora-deps.sh` (WebKit 4.1, DBus, and the rest of the [Tauri Fedora list](https://v2.tauri.app/start/prerequisites/))
+- For the desktop window: `./scripts/setup.sh` (WebKit 4.1, DBus, and the rest of the [Tauri Fedora list](https://v2.tauri.app/start/prerequisites/))
 - A folder of `.iso` files you already own
 - PCSX2 (Install in the app unpacks the official AppImage into Marquee; an existing AppImage / Flatpak `net.pcsx2.PCSX2` is optional), then add BIOS inside PCSX2 yourself
 
@@ -134,7 +134,7 @@ PS2 vertical slice implemented before the direct-store milestones. Metadata matc
 - PCSX2 discovery (unpacked tree / AppImage / `pcsx2-qt` / Flatpak). One session, flock lock, spawn without `sh -c`, playtime on successful exit only.
 - Tauri 2 + dialog + single-instance. Desktop vs explicit demo API. Empty library never sample-falls-back.
 - `catalog/systems/ps2.json` built-in registry (no command fields).
-- `scripts/fedora-deps.sh` / `scripts/bootstrap.sh` for WebKit 4.1 and DBus devel.
+- `scripts/setup.sh` for WebKit 4.1 and DBus devel.
 
 **In the working tree (not pushed)**
 

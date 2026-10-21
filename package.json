@@ -1,15 +1,11 @@
 {
-  "name": "Marquee",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "marquee",
+  "private": true,
+  "license": "MIT",
   "scripts": {
     "run:desktop": "scripts/run.sh desktop",
     "run:web": "scripts/run.sh web",
     "run:dev": "scripts/run.sh dev",
     "run:both": "scripts/run.sh both"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+  }
 }
