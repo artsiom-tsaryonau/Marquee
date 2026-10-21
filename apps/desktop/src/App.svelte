@@ -136,7 +136,10 @@
 
   <main>
     {#key app.route + (app.route === 'game' ? app.gameId : '')}
-      <div class="screen" in:fly={{ y: 16, duration: dur, delay: dur / 3 }} out:fade={{ duration: dur / 2 }}>
+      <!-- Keep navigation opaque and replace the page immediately. A delayed
+           whole-page fade exposes the backdrop and composites two large pages
+           at once; on the desktop this looks like a window flash. -->
+      <div class="screen">
         {#if app.route === 'home'}<Home />
         {:else if app.route === 'library'}<Library />
         {:else if app.route === 'ps2'}<Library collection="ps2" />

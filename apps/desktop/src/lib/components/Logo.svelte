@@ -20,6 +20,8 @@
     -webkit-background-clip: text;
     background-clip: text;
     -webkit-text-fill-color: transparent;
+  }
+  :global(:root[data-effects='full']) .logo {
     filter: drop-shadow(0 4px 24px hsl(var(--h) 90% 40% / 0.55)) drop-shadow(0 2px 2px rgb(0 0 0 / 0.5));
   }
   .wide {

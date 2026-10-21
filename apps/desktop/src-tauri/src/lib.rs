@@ -32,6 +32,30 @@ fn web_assets(handle: tauri::AppHandle) -> Assets {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // This must happen before GTK opens a display or starts a WebKit process.
+    #[cfg(target_os = "linux")]
+    {
+        let requested = std::env::var("MARQUEE_RENDERER").ok();
+        let disable = std::env::var("WEBKIT_DISABLE_DMABUF_RENDERER").ok();
+        let shm = std::env::var("WEBKIT_DMABUF_RENDERER_FORCE_SHM").ok();
+        let mode = marquee_core::desktop_rendering::select(
+            requested.as_deref(),
+            disable.as_deref(),
+            shm.as_deref(),
+            marquee_core::desktop_rendering::nvidia_wayland(),
+        )
+        .unwrap_or_else(|error| {
+            eprintln!("{error}");
+            std::process::exit(2);
+        });
+        for (key, value) in mode.environment() {
+            std::env::set_var(key, value);
+        }
+        eprintln!(
+            "Marquee renderer: {} (MARQUEE_RENDERER=auto|gpu|shared-memory|software|x11)",
+            mode.name()
+        );
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             if let Some(window) = app.get_webview_window("main") {

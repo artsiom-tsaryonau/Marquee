@@ -240,7 +240,8 @@
   .banner { position: relative; height: 170px; overflow: hidden; border-radius: 22px 22px 0 0; }
   .banner :global(svg) { width: 100%; height: 100%; object-fit: cover; }
   .shade { position: absolute; inset: 0; background: linear-gradient(to top, rgb(8 8 14 / .85), transparent 70%); }
-  .icon { position: absolute; top: 24px; left: 28px; width: 84px; height: 84px; object-fit: contain; filter: drop-shadow(0 8px 18px rgb(0 0 0 / .5)); }
+  .icon { position: absolute; top: 24px; left: 28px; width: 84px; height: 84px; object-fit: contain; }
+  :global(:root[data-effects='full']) .icon { filter: drop-shadow(0 8px 18px rgb(0 0 0 / .5)); }
   .icon.fallback { display: grid; place-items: center; border-radius: 22px; background: rgb(0 0 0 / .35); color: #fff; }
   .close { position: absolute; top: 16px; right: 16px; }
   .titles { position: absolute; left: 28px; right: 28px; bottom: 16px; }

@@ -215,8 +215,8 @@
     right: 10px;
     bottom: 10px;
     color: #fde68a;
-    filter: drop-shadow(0 0 6px rgb(253 230 138 / 0.8));
   }
+  :global(:root[data-effects='full']) .fav { filter: drop-shadow(0 0 6px rgb(253 230 138 / 0.8)); }
   .glare {
     position: absolute;
     inset: 0;

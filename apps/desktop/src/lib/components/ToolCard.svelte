@@ -66,12 +66,13 @@
 <style>
   .card { padding: 0; border-radius: 18px; display: flex; flex-direction: column; min-width: 0; overflow: hidden; transition: border-color .2s; }
   .card:hover { border-color: rgb(139 92 246 / .45); }
-  .card.dim .tile { filter: saturate(.55); }
+  :global(:root[data-effects='full']) .card.dim .tile { filter: saturate(.55); }
   .tile { position: relative; display: block; width: 100%; height: 140px; padding: 0; border: 0; overflow: hidden; background: none; color: inherit; font: inherit; }
   button.tile { cursor: pointer; }
   .tile :global(svg) { position: absolute; inset: 0; width: 100%; height: 100%; }
   .shade { position: absolute; inset: 0; background: linear-gradient(to top, rgb(8 8 14 / .7), transparent 65%); }
-  .pic { position: absolute; left: 50%; top: 50%; width: 72px; height: 72px; transform: translate(-50%, -52%); object-fit: contain; filter: drop-shadow(0 8px 16px rgb(0 0 0 / .5)); transition: transform .25s; }
+  .pic { position: absolute; left: 50%; top: 50%; width: 72px; height: 72px; transform: translate(-50%, -52%); object-fit: contain; transition: transform .25s; }
+  :global(:root[data-effects='full']) .pic { filter: drop-shadow(0 8px 16px rgb(0 0 0 / .5)); }
   button.tile:hover .pic { transform: translate(-50%, -52%) scale(1.08); }
   .pic.fallback { display: grid; place-items: center; border-radius: 20px; background: rgb(0 0 0 / .3); color: #fff; }
   .kind, .badge { position: absolute; bottom: 10px; padding: 4px 8px; border-radius: 6px; font-size: 11px; color: var(--text-soft); background: rgb(0 0 0 / .45); backdrop-filter: var(--overlay-filter); }

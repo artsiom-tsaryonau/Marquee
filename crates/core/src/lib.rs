@@ -4,6 +4,7 @@ pub mod bios;
 pub mod catalog;
 pub mod cue;
 pub mod db;
+pub mod desktop_rendering;
 pub mod emulators;
 pub mod error;
 pub mod http;
