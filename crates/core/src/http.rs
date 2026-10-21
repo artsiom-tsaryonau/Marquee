@@ -106,3 +106,33 @@ fn call(url: &str, timeout: Duration) -> Result<ureq::Response> {
     }
     Ok(resp)
 }
+
+/// GET JSON with a bearer token (used for provider APIs that need a key).
+pub fn get_json_bearer(url: &str, token: &str) -> Result<serde_json::Value> {
+    let resp = ureq::get(url)
+        .set("User-Agent", USER_AGENT)
+        .set("Authorization", &format!("Bearer {token}"))
+        .timeout(Duration::from_secs(30))
+        .call()
+        .map_err(|err| match err {
+            ureq::Error::Status(401 | 403, _) => {
+                AppError::new("NETWORK", "The provider rejected the API key")
+            }
+            ureq::Error::Status(404, _) => AppError::new("NOT_FOUND", format!("not found: {url}")),
+            other => AppError::new("NETWORK", other.to_string()),
+        })?;
+    let mut buf = Vec::new();
+    resp.into_reader()
+        .take(JSON_MAX_BYTES + 1)
+        .read_to_end(&mut buf)?;
+    if buf.len() as u64 > JSON_MAX_BYTES {
+        return Err(AppError::new("NETWORK", "response too large"));
+    }
+    Ok(serde_json::from_slice(&buf)?)
+}
+
+/// Download a text file (for example a database list) up to `max_bytes`.
+pub fn get_text_limited(url: &str, max_bytes: u64) -> Result<String> {
+    let bytes = read_limited(url, max_bytes, Duration::from_secs(120))?;
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
