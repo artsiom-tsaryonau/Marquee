@@ -247,7 +247,7 @@ fn wait_and_finish(
     session_id: String,
     _edition_id: String,
     _runner_id: String,
-    _runner_kind: RunnerKind,
+    runner_kind: RunnerKind,
     mut child: std::process::Child,
     identity: Option<ProcessIdentity>,
     _lease: Arc<crate::instance::InstanceLock>,
@@ -277,7 +277,17 @@ fn wait_and_finish(
     let (exit_code, state, error) = match status {
         Ok(st) => {
             let code = st.code();
-            if st.success() {
+            if st.success() && runner_kind != RunnerKind::Fake && duration < EARLY_EXIT_SECS {
+                // A clean exit this soon means the emulator quit by itself before
+                // anything could be played (wrong config, unsupported file, no window).
+                (
+                    code,
+                    "failed",
+                    Some(format!(
+                        "the emulator closed itself after {duration}s without a game being played"
+                    )),
+                )
+            } else if st.success() {
                 (code, "ended", None)
             } else {
                 (
@@ -315,6 +325,9 @@ fn wait_and_finish(
         }
     }
 }
+
+/// A normal exit sooner than this after launch is a failed start, not a played session.
+const EARLY_EXIT_SECS: i64 = 10;
 
 // Linux process identity includes the boot and kernel start time, so a reused PID
 // can never be mistaken for the emulator. Uptime excludes suspend just like Instant.
