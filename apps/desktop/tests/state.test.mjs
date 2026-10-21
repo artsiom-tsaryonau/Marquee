@@ -17,6 +17,9 @@ const initialPorts = [fixturePort('opengoal')];
 beforeEach(() => {
   app.games = structuredClone(initialGames);
   app.ports = structuredClone(initialPorts);
+  app.portDialogId = null;
+  app.portErrors = {};
+  app.portBusy = {};
   app.history = [];
   app.route = 'home';
   app.gameId = null;
@@ -450,4 +453,33 @@ test('emulator profiles use the shared desktop/browser command contract', async 
   const config = { mode:'custom', custom:{renderer:'Automatic',resolution_scale:2,vsync:true} };
   await api.emulatorProfile('duckstation'); await api.configureEmulatorProfile('duckstation',config);
   assert.deepEqual(calls,[{name:'emulator_profile',args:{id:'duckstation'}},{name:'configure_emulator_profile',args:{id:'duckstation',config}}]);
+});
+
+
+test('port dialog closes before navigation and retains the underlying Tools page', () => {
+  app.route='tools'; app.portDialogId='shipwright';
+  app.history=[{route:'home',gameId:null,heroId:null}];
+  app.back(); assert.equal(app.portDialogId,null); assert.equal(app.route,'tools'); assert.equal(app.history.length,1);
+});
+
+test('shared port actions dispatch by availability without inventing a game session', async () => {
+  const api=app.api; const calls=[];
+  try {
+    app.api={...api,openPortFolder:async id=>calls.push(['folder',id]),launchPort:async id=>calls.push(['launch',id]),installPort:async id=>{calls.push(['install',id]);return [];}};
+    await app.runPortAction(fixturePort('missing-data',{status:'needs-data'}));
+    await app.runPortAction(fixturePort('missing-rom',{status:'needs-rom'}));
+    await app.runPortAction(fixturePort('installed',{status:'installed'}));
+    await app.runPortAction(fixturePort('new',{status:'not-installed'}));
+    assert.deepEqual(calls,[['folder','missing-data'],['folder','missing-rom'],['launch','installed'],['install','new']]);
+    assert.equal(app.launching,null); assert.equal(app.running,null);
+  } finally {app.api=api;}
+});
+
+test('port installation errors remain visible after busy clears and successful retry clears the error', async () => {
+  const api=app.api; const port=fixturePort('shipwright',{status:'not-installed'}); let fail=true;
+  try {
+    app.api={...api,installPort:async()=>{if(fail)throw new Error('Download interrupted');return [];}};
+    await app.runPortAction(port); assert.equal(app.portErrors.shipwright,'Download interrupted'); assert.equal(app.portBusy.shipwright,undefined);
+    fail=false; await app.runPortAction(port); assert.equal(app.portErrors.shipwright,undefined);
+  } finally {app.api=api;}
 });

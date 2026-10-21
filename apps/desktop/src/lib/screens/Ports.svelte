@@ -1,26 +1,14 @@
 <script lang="ts">
   import { app } from '../state.svelte';
   import { platformLabel } from '../labels';
-  import { portAction } from '../presentation';
-  import type { PortEntry, PortStatus } from '../types';
+  import { portAction, portStatusLabel } from '../presentation';
   import Artwork from '../components/Artwork.svelte';
   import Icon from '../components/Icon.svelte';
 
-  const statusLabel: Record<PortStatus, string> = {
-    installed: 'Installed · game files unchecked', ready: 'Ready to play', update: 'Update available', 'needs-rom': 'Game files required',
-    'needs-data': 'Game files required', 'not-installed': 'Not installed',
-  };
   let filter = $state<'all' | 'setup' | 'installed' | 'update' | 'not-installed'>('all');
   let refreshing = $state(false);
   const filters = [ ['all', 'All ports'], ['installed', 'Installed'], ['setup', 'Needs setup'], ['update', 'Updates'], ['not-installed', 'Not installed'] ] as const;
   const shown = $derived(app.ports.filter((p) => filter === 'all' || (filter === 'setup' ? p.status === 'installed' || p.status === 'needs-rom' || p.status === 'needs-data' : filter === 'installed' ? p.status !== 'not-installed' : p.status === filter)));
-  async function primary(p: PortEntry) {
-    if (p.id in app.portBusy) return;
-    const operation = portAction(p).operation;
-    if (operation === 'launch') await app.launchPort(p);
-    else if (operation === 'folder') await app.openPortFolder(p);
-    else await app.installPort(p);
-  }
   async function refresh() {
     refreshing = true;
     try { await app.loadPorts(); } finally { refreshing = false; }
@@ -49,14 +37,15 @@
       <article class="port glass-panel">
         <div class="thumb"><Artwork art={p.art} /><span>{platformLabel[p.platform]}</span></div>
         <div class="text">
-          <span class="status" class:ready={p.status === 'ready'} class:needs-files={needsFiles}>{statusLabel[p.status]}</span>
+          <span class="status" class:ready={p.status === 'ready'} class:needs-files={needsFiles}>{portStatusLabel(p)}</span>
           <h2>{p.name}</h2><p class="game">{p.game}</p>
           <p class="requirement">{p.requirement}</p>
           {#if p.status === 'installed' || p.status === 'update'}<p class="setup">The port is installed. Marquee has not verified its game files; open it to finish setup.</p>{/if}
           {#if needsFiles}<p class="setup">Add the required files to the port folder, then open the port to finish setup. Some ports finish setup in their own window.</p>{/if}
+          {#if app.portErrors[p.id]}<p class="error" role="alert">{app.portErrors[p.id]}</p>{/if}
           {#if app.portBusy[p.id]}<p class="progress" role="status">{app.portBusy[p.id]}</p>{/if}
           <div class="actions">
-            <button class="btn primary small" data-nav disabled={p.id in app.portBusy} onclick={() => primary(p)}><Icon name={portAction(p).operation === 'folder' ? 'folder' : p.status === 'ready' ? 'play' : 'download'} size={16} />{p.id in app.portBusy ? 'Working…' : portAction(p).label}</button>
+            <button class="btn primary small" data-nav disabled={p.id in app.portBusy} onclick={() => app.runPortAction(p)}><Icon name={portAction(p).operation === 'folder' ? 'folder' : p.status === 'ready' ? 'play' : 'download'} size={16} />{p.id in app.portBusy ? 'Working…' : portAction(p).label}</button>
             {#if p.status === 'update'}<button class="btn glass small" data-nav disabled={p.id in app.portBusy} onclick={() => app.launchPort(p)}><Icon name="play" size={16} />Open port</button>{/if}
             {#if p.status === 'ready'}<button class="btn glass small" data-nav onclick={() => app.go('library')}>View library</button>{/if}
           </div>
@@ -91,6 +80,7 @@
   .status.ready { color:var(--ok); } .status.needs-files { color:var(--warn); }
   .game { margin:0 0 4px; font-size:15px; }
   .requirement, .setup { font-size:14px; } .setup { color:var(--warn); }
+  .error { color:var(--bad); }
   .progress { font-size:14px; color:var(--accent); }
   .actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:auto; padding-top:16px; }
   details { border-top:1px solid var(--line); margin-top:16px; padding-top:14px; width:100%; font-size:13px; }

@@ -1,4 +1,7 @@
 <script lang="ts">
+  import type { PortEntry } from '../types';
+  import { portAction, portStatusLabel } from '../presentation';
+  import PortDialog from '../components/PortDialog.svelte';
   import { modal } from '../modal';
   import { onMount, tick } from 'svelte';
   import { app } from '../state.svelte';
@@ -8,7 +11,6 @@
   import { coverSrc } from '../api/map';
   import { platformLabel, systemLabel } from '../labels';
   import EmulatorDialog from '../components/EmulatorDialog.svelte';
-  import InstallMenu from '../components/InstallMenu.svelte';
   import LutrisSource from '../components/LutrisSource.svelte';
   import PurpleLauncher from '../components/PurpleLauncher.svelte';
   import Mark, { hasMark } from '../components/Mark.svelte';
@@ -19,6 +21,7 @@
   // them is the platform they serve, exactly like the Library.
   type Item =
     | { t: 'emulator'; key: string; name: string; platforms: string[]; ready: boolean; e: EmulatorInfo }
+    | { t: 'port'; key: string; name: string; platforms: string[]; ready: boolean; p: PortEntry }
     | { t: 'runner'; key: string; name: string; platforms: string[]; ready: boolean; r: Runner }
     | { t: 'launcher'; key: string; name: string; platforms: string[]; ready: boolean; l: LauncherInfo }
     | { t: 'source'; key: string; name: string; platforms: string[]; ready: boolean; src: 'purple' | 'lutris' }
@@ -72,6 +75,7 @@
       ...app.emulators.map((e): Item => ({ t: 'emulator', key: `emu:${e.id}`, name: e.name, platforms: e.systems, ready: e.status !== 'not_installed', e })),
       ...app.runners.filter((r) => r.source !== 'marquee').map((r): Item => ({ t: 'runner', key: `run:${r.id}`, name: r.display_name, platforms: [runnerSystem(r)], ready: r.available, r })),
       ...app.launchers.map((l): Item => ({ t: 'launcher', key: `app:${l.id}`, name: l.name, platforms: ['pc'], ready: l.available, l })),
+      ...app.ports.map((p): Item => ({ t:'port', key:`port:${p.id}`, name:p.name, platforms:[p.platform], ready:p.status !== 'not-installed', p })),
       ...biosItems,
       { t: 'source', key: 'src:purple', name: 'Purple for Aion 2', platforms: ['pc'], ready: false, src: 'purple' },
       { t: 'source', key: 'src:lutris', name: 'Lutris library', platforms: ['pc'], ready: lutrisOn, src: 'lutris' },
@@ -80,6 +84,7 @@
   const matchesText = (i: Item) => {
     const q = query.trim().toLowerCase();
     if (!q) return true;
+    if (i.t === 'port') return `${i.name} ${i.p.game} ${i.p.family} ${i.platforms.map(labelOf).join(' ')}`.toLowerCase().includes(q);
     if (i.t === 'launcher') {
       return `${i.name} ${i.l.executable} ${i.platforms.map(labelOf).join(' ')}`.toLowerCase().includes(q);
     }
@@ -95,14 +100,14 @@
   };
   const items = $derived(
     all
-      .filter((i) => matchesText(i) && (!onlyReady || i.ready) && (!platform || i.platforms.includes(platform)) && (!kind || i.t === kind || (kind === 'bios' && i.t === 'bios-empty')) && (!attentionOnly || !i.ready || (i.t === 'emulator' && (i.e.status === 'update' || i.e.firmware?.some((f) => f.required && !f.present)))))
+      .filter((i) => matchesText(i) && (!onlyReady || i.ready) && (!platform || i.platforms.includes(platform)) && (!kind || i.t === kind || (kind === 'bios' && i.t === 'bios-empty')) && (!attentionOnly || !i.ready || (i.t === 'port' && i.p.status !== 'ready') || (i.t === 'emulator' && (i.e.status === 'update' || i.e.firmware?.some((f) => f.required && !f.present)))))
       .sort((a, b) => Number(b.ready) - Number(a.ready) || a.name.localeCompare(b.name)),
   );
   const platforms = $derived(
     [...new Set(all.flatMap((i) => i.platforms))].sort((a, b) => labelOf(a).localeCompare(labelOf(b))),
   );
   const ready = $derived(all.filter((i) => i.ready).length);
-  onMount(() => { void app.loadLaunchers(); void app.loadEmulators(); void app.loadBios(); });
+  onMount(() => { void app.loadLaunchers(); void app.loadEmulators(); void app.loadBios(); void app.loadPorts(); });
 
   async function dropBios(system: string) {
     if (biosConfirm !== `bios:${system}`) {
@@ -144,7 +149,6 @@
 <div class="tools" class:compact>
   <header class="tool-hero">
     <div class="hero-copy"><h1>Tools</h1><p>Manage the software and firmware your games need. {ready} available tools and resources.</p></div>
-    <InstallMenu />
     {#if app.neededEmulators.length}
       <button class="btn glass" data-nav onclick={() => app.installNeededEmulators()} title={app.neededEmulators.map((e) => e.name).join(', ')}><Icon name="download" /> Install what my library needs ({app.neededEmulators.length})</button>
     {/if}
@@ -174,13 +178,13 @@
   {/if}
 
   <div class="toolbar glass-panel">
-    <label class="search"><Icon name="search" size={18} /><input bind:value={query} data-nav aria-label="Search tools" placeholder="Search emulators, launchers, BIOS…" /></label>
+    <label class="search"><Icon name="search" size={18} /><input bind:value={query} data-nav aria-label="Search tools" placeholder="Search emulators, ports, launchers, firmware…" /></label>
     <button class="chip" class:on={onlyReady} data-nav aria-pressed={onlyReady} onclick={() => (onlyReady = !onlyReady)}>Available only</button>
     <button class="chip" class:on={attentionOnly} data-nav aria-pressed={attentionOnly} onclick={() => (attentionOnly = !attentionOnly)}>Needs attention</button>
-    <select class="ui-select" data-nav aria-label="Tool type" bind:value={kind}><option value="">All types</option><option value="emulator">Emulators</option><option value="launcher">Launchers</option><option value="source">Library connections</option><option value="bios">Firmware</option><option value="runner">External emulators</option></select>
+    <select class="ui-select" data-nav aria-label="Tool type" bind:value={kind}><option value="">All types</option><option value="emulator">Emulators</option><option value="launcher">Launchers</option><option value="port">Native ports</option><option value="source">Library connections</option><option value="bios">Firmware</option><option value="runner">External emulators</option></select>
     <button class="chip" data-nav aria-pressed={compact} onclick={() => (compact = !compact)}>Compact view</button>
     <button class="btn glass small" data-nav disabled={app.biosBusy} onclick={() => app.importBios()}><Icon name="folder" size={16} />{app.biosBusy ? 'Importing…' : 'Import BIOS'}</button>
-    <button class="btn glass small" data-nav disabled={app.launchersLoading} onclick={() => { void app.loadLaunchers(); void app.loadEmulators(); void app.loadBios(); }}><Icon name="refresh" size={16} /> Refresh</button>
+    <button class="btn glass small" data-nav disabled={app.launchersLoading} onclick={() => { void app.loadLaunchers(); void app.loadEmulators(); void app.loadBios(); void app.loadPorts(); }}><Icon name="refresh" size={16} /> Refresh</button>
   </div>
   <div class="filters" data-nav-row aria-label="Platforms">
     <button class="chip" class:on={!platform} data-nav aria-pressed={!platform} onclick={() => (platform = '')}>All platforms <span>{all.length}</span></button>
@@ -206,6 +210,18 @@
               <button class="btn primary small" data-nav disabled={!!busy} onclick={() => app.openEmulator(e)}><Icon name="play" size={15} />Open</button>
             {/if}
             <button class="btn glass small" data-nav onclick={() => (app.emulatorDialogId = e.id)}><Icon name="settings" size={15} />Configure</button>
+          {/snippet}
+        </ToolCard>
+      {:else if item.t === 'port'}
+        {@const p = item.p}
+        <ToolCard seed={`port:${p.id}`} kind="Native port" title={p.name} subtitle={`${p.game} · ${labelOf(p.platform)}`}
+          detail="Engine and game files are separate. Configure to review setup requirements."
+          badge={{ text:portStatusLabel(p), tone:p.status === 'ready' ? 'ok' : p.status === 'not-installed' ? '' : 'warn' }}
+          glyph="puzzle" ready={item.ready} busy={app.portBusy[p.id]} onopen={() => (app.portDialogId = p.id)}>
+          {#snippet actions()}
+            {#if app.portErrors[p.id]}<p class="error" role="alert">{app.portErrors[p.id]}</p>{/if}
+            <button class="btn primary small" data-nav disabled={p.id in app.portBusy} onclick={() => app.runPortAction(p)}>{p.id in app.portBusy ? 'Working…' : portAction(p).label}</button>
+            <button class="btn glass small" data-nav onclick={() => (app.portDialogId = p.id)}><Icon name="settings" size={15} />Configure</button>
           {/snippet}
         </ToolCard>
       {:else if item.t === 'runner'}
@@ -289,6 +305,7 @@
   </div>
 
   <EmulatorDialog />
+  <PortDialog />
 
   {#if sourceDialog}
     <div class="modal-wrap" use:modal={() => (sourceDialog = null)} role="dialog" aria-modal="true" aria-label="Source setup" tabindex="-1" onkeydown={(e) => { if (e.key === 'Escape') sourceDialog = null; }} onclick={(e) => { if (e.target === e.currentTarget) sourceDialog = null; }}>

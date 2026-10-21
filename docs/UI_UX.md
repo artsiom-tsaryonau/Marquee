@@ -52,6 +52,19 @@ compatibility/Epic, then GOG remain the store milestones.
   media, matching the backend capability. Other formats can use manual linking
   through Catalogue discovery. Checksums remain optional and never gate Play.
 
+## Shared Tools catalogue follow-up
+
+Roadmap Tools priority 2 brings native ports into the same ToolCard grid as
+managed PCSX2/other emulators and launchers. Platform filtering stays primary;
+Native ports is an optional type filter. Search includes game and port names.
+Configure opens a contained modal with requirements, installation/version,
+engine-versus-data status, appropriate install/update/open/folder actions,
+progress and visible retryable errors. The old PCSX2-specific Tools header
+installer is removed in favor of shared catalogue actions. Ports discovery and
+Library game entries are preserved. Shared action dispatch prevents missing-data
+states from accidentally reinstalling an engine. No new data-validation or
+verified gameplay capability is implied.
+
 ## Port readiness contract
 
 The current Rust port service reports `ready` when the engine is installed.

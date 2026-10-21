@@ -37,3 +37,7 @@ export function portAction(port: Pick<PortEntry, 'status'>): { label: string; op
     default: return { label: 'Install', operation: 'install' };
   }
 }
+
+export function portStatusLabel(port: Pick<PortEntry, 'status'>): string {
+  return { installed:'Installed · setup unchecked', ready:'Ready to play', update:'Update available · setup unchecked', 'needs-rom':'Game files required', 'needs-data':'Game files required', 'not-installed':'Not installed' }[port.status];
+}

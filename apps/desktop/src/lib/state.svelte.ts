@@ -5,6 +5,7 @@ import { nativePortGame, canonicalId } from './unified';
 import { lutrisToGame } from './lutris';
 import { artFromSeed } from './art';
 import { libraryView } from './libraryView.svelte';
+import { portAction } from './presentation';
 import { describeScan } from './format';
 import { installOption } from './install';
 import type { GameEntry, PortEntry } from './types';
@@ -58,6 +59,8 @@ class AppState {
   emulatorBusy = $state<Record<string, string>>({});
   biosBusy = $state(false);
   /** Emulator whose settings dialog is open. */
+  portDialogId = $state<string | null>(null);
+  portErrors = $state<Record<string, string>>({});
   emulatorDialogId = $state<string | null>(null);
   launchers = $state<LauncherInfo[]>([]);
   lutrisSource = $state<LutrisSnapshot | null>(null);
@@ -289,6 +292,7 @@ class AppState {
   }
 
   back() {
+    if (this.portDialogId) { this.portDialogId = null; return; }
     if (this.emulatorDialogId) { this.emulatorDialogId = null; return; }
     if (this.closeLauncherEditor) { this.closeLauncherEditor(); return; }
     if (this.installToolId) {
@@ -827,33 +831,47 @@ class AppState {
     }
   }
 
+  async runPortAction(port: PortEntry) {
+    if (port.id in this.portBusy) return;
+    const operation = portAction(port).operation;
+    if (operation === 'install') await this.installPort(port);
+    else if (operation === 'folder') await this.openPortFolder(port);
+    else await this.launchPort(port);
+  }
+
   async installPort(port: PortEntry) {
     if (port.id in this.portBusy) return;
+    delete this.portErrors[port.id];
     this.portBusy[port.id] = `Installing ${port.name}…`;
     try {
       this.applyPorts(await this.api.installPort(port.id));
       this.notify(`${port.name} is installed. ${port.requirement}`);
     } catch (err) {
-      this.notify((err as { message?: string }).message ?? `Could not install ${port.name}`);
+      this.portErrors[port.id] = (err as { message?: string }).message ?? `Could not install ${port.name}`;
+      this.notify(this.portErrors[port.id]);
     } finally {
       delete this.portBusy[port.id];
     }
   }
 
   async launchPort(port: PortEntry) {
+    delete this.portErrors[port.id];
     try {
       await this.api.launchPort(port.id);
       this.notify(`Starting ${port.name}…`);
     } catch (err) {
-      this.notify((err as { message?: string }).message ?? `Could not start ${port.name}`);
+      this.portErrors[port.id] = (err as { message?: string }).message ?? `Could not start ${port.name}`;
+      this.notify(this.portErrors[port.id]);
     }
   }
 
   async openPortFolder(port: PortEntry) {
+    delete this.portErrors[port.id];
     try {
       await this.api.openPortFolder(port.id);
     } catch (err) {
-      this.notify((err as { message?: string }).message ?? 'Could not open the folder');
+      this.portErrors[port.id] = (err as { message?: string }).message ?? 'Could not open the folder';
+      this.notify(this.portErrors[port.id]);
     }
   }
 
