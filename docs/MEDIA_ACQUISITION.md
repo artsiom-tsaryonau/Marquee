@@ -35,6 +35,7 @@ Manual import, **Open folder**, and external emulators stay available for edge c
 
 ## Related docs
 
+- [Media connector priorities](MEDIA_CONNECTOR_PRIORITIES.md) — which ROM/preservation sources to automate (FMHY-informed tiers; Vimm first)
 - [Roadmap](ROADMAP.md) — work order and store milestones
 - [Direct store integration](STORE_INTEGRATION.md) — owned-game download jobs
 - [Managed emulators and BIOS](EMULATORS.md) — current BIOS panel and runner install

@@ -52,7 +52,7 @@ These are implemented capabilities; live acceptance gates are recorded separatel
 
 ### Media acquisition (parallel track)
 
-Orchestrate firmware, discs, and port inputs through the same job model as store installs ([MEDIA_ACQUISITION.md](MEDIA_ACQUISITION.md)). Folder import, `library add-root`, and `bios import` remain fallbacks. The `scripts/vimm/` POC explores connector-style ROM acquisition (one file at a time, headed browser). Wiring into Downloads/Tools is follow-up work.
+Orchestrate firmware, discs, and port inputs through the same job model as store installs ([MEDIA_ACQUISITION.md](MEDIA_ACQUISITION.md)). Folder import, `library add-root`, and `bios import` remain fallbacks. The `scripts/vimm/` POC explores connector-style ROM acquisition (one file at a time, headed browser). Wiring into Downloads/Tools is follow-up work; source ranking is in [media connector priorities](MEDIA_CONNECTOR_PRIORITIES.md).
 
 ### Next for Tools and emulators
 

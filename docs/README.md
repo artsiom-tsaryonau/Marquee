@@ -20,6 +20,7 @@ The 2026-10-21 direct-store decision supersedes earlier numbered phases, “Lutr
 | [PS2](PS2.md) | PCSX2/offline-disc slice, setup, and its still-open live acceptance gate |
 | [PS1](PS1.md) | DuckStation slice and schema-v4 root systems; verify its own live gate independently |
 | [Media acquisition](MEDIA_ACQUISITION.md) | Target: automated firmware/disc/port jobs from authorized sources; manual import as fallback |
+| [Media connector priorities](MEDIA_CONNECTOR_PRIORITIES.md) | FMHY-informed tiers: Vimm/Myrient/DAT verification vs do-not-automate ROM hosts |
 | [Managed emulators and BIOS](EMULATORS.md) | Seven managed emulator launchers and Tools UI, BIOS management, game-only window research, and the mGBA source-build pilot |
 | [Purple for Aion 2](PURPLE.md) | Managed setup/open recipe, runtime pins, retry/cancellation, and the unverified live game gate |
 | [Tools, launchers and legacy Lutris bridge](LAUNCHERS.md) | Generic shortcuts and advanced configuration; the deprioritized Lutris cache bridge (automatic discovery stays until made opt-in) |
