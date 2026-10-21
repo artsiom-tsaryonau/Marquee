@@ -17,6 +17,19 @@ Open Library → **Catalogue metadata** → select
 larger catalogues need multiple exports/batches. Imports accumulate records;
 absence from a later batch does not delete older entries.
 
+Listing-only refreshes (`has_detail: false`) update listing fields while retaining
+previously imported media variants, artwork, players, year, detail ratings and
+verification dates for the same platform. A full detail snapshot remains
+authoritative: it can remove variants and invalidate their links. A platform
+change does not inherit the previous platform's details.
+
+New imports record field-level provenance in the record's `provenance` map:
+canonical provider page, export date, backend import date and `saved_snapshot`
+method. **Field provenance** in the details view exposes that evidence. Retained
+detail fields keep their own older dates when a newer listing arrives. Older
+records acquire provenance when re-imported; capture times and verified
+cross-provider identity are not inferred from export dates or artwork credits.
+
 The Library has a Catalogue source filter, platform categories, region,
 language, ROM revision and player-count filters. Search includes those metadata
 labels and serials. Source rating sorting is independent of critic scores.
@@ -68,8 +81,11 @@ verification or protection against intentionally preserved filesystem timestamps
 ROM revisions, regions and languages are properties of media variants. They
 remain separate from content editions such as Anniversary and from launch
 methods such as emulation/native. Variant region/language labels extracted from
-GoodTitle filenames are derived metadata, with catalogue-level fallback where
-those labels are absent. Filters evaluate region/language/revision together on
+GoodTitle filenames are derived metadata. Linked installations retain their
+local locale labels when the selected variant has none; catalogue-wide labels
+do not establish a particular installation's region or language. Discovery
+filters retain catalogue-level fallback where variant labels are absent.
+Filters evaluate region/language/revision together on
 one variant, rather than combining attributes from unrelated variants.
 
 Source ratings remain on their 0–10 scale with available vote counts. Source
@@ -86,6 +102,18 @@ Records use a typed, validated JSON payload; links reference existing edition
 IDs. The migration is additive and transactional. It does not rewrite editions,
 media, launch profiles or sessions. Future normalized game/edition migrations
 must use the next available schema number after v5.
+
+Downloaded serial JPEG covers now pass bounded decoding (4096 pixels per side,
+64 MiB decode allocation, 8 MiB download) before atomic publication. Refresh
+retries corrupt cache files. Jobs recheck the installation identity and existing
+artwork row before publication, so a rescan or intervening artwork correction
+discards stale results. These protections apply to downloaded serial JPEGs;
+embedded catalogue PNG/JPEG/AVIF validation still checks signatures and size.
+
+Remaining enrichment work: persisted cross-provider mappings with explicit
+acceptance evidence; exact artwork asset URLs and per-variant associations;
+general field/artwork override editing and refresh precedence. Artwork credit
+alone is not a verified release mapping. Live provider requests remain deferred.
 
 Commands: `import_catalogue`, `link_catalogue`, `unlink_catalogue`,
 `match_catalogue`, `clear_catalogue`, `open_catalogue_page`. Library snapshots
