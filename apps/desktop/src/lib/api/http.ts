@@ -68,9 +68,14 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export const httpApi: LibraryApi = {
   kind: 'web',
   ...commands(call),
+  async pickArchives() {
+    const path = window.prompt('Absolute ZIP/7z archive path on the computer running Marquee (not a browser upload)');
+    return path?.trim() ? [path.trim()] : [];
+  },
+  onArchiveDrop: async () => () => {},
   async pickRoot() {
     // A browser cannot open a native folder dialog; the path is on the machine running Marquee.
-    const path = window.prompt('Folder on the Marquee machine that holds your PS2 .iso files');
+    const path = window.prompt('Folder on the Marquee machine that holds your game files');
     return path && path.trim() ? path.trim() : null;
   },
   async pickExecutable() {

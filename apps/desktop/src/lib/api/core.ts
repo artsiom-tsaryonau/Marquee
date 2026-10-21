@@ -38,8 +38,9 @@ export function asError(err: unknown): AppError {
 }
 
 /** The commands are identical on every surface; only the transport (`call`) differs. */
-export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable'> {
+export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable' | 'pickArchives' | 'onArchiveDrop'> {
   return {
+    intakeArchive: (path, deleteSource = false) => call('intake_archive', { path, delete_source: deleteSource }),
     emulatorProfile: (id) => call('emulator_profile', { id }),
     configureEmulatorProfile: (id, config) => call('configure_emulator_profile', { id, config }),
     importCatalogue: (snapshot) => call('import_catalogue', { snapshot }),

@@ -1,3 +1,4 @@
+import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -17,8 +18,13 @@ let listenReady: Promise<void> = Promise.resolve();
 export const desktopApi: LibraryApi = {
   kind: 'desktop',
   ...commands(call),
+  async pickArchives() {
+    const selected = await open({ directory:false, multiple:true, title:'Import ZIP or 7z game archives', filters:[{name:'Game archives',extensions:['zip','7z']}] });
+    return typeof selected === 'string' ? [selected] : selected ?? [];
+  },
+  onArchiveDrop: (handler) => getCurrentWebview().onDragDropEvent((event) => { if (event.payload.type === 'drop') handler(event.payload.paths); }),
   async pickRoot() {
-    const selected = await open({ directory: true, multiple: false, title: 'Choose a game disc folder' });
+    const selected = await open({ directory: true, multiple: false, title: 'Choose a folder of game files' });
     return typeof selected === 'string' ? selected : null;
   },
   async pickExecutable() {

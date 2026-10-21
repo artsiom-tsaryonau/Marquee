@@ -1,6 +1,6 @@
 import { createApi, type LibraryApi } from './api';
 import { gamesFromSnapshot, pickRunner } from './api/map';
-import type { BiosFile, CoreEvent, TorrentSettings, TransferItem, TransferStatus, EmulatorInfo, KeyInfo, LauncherConfig, LauncherInfo, LutrisConfig, LutrisSnapshot, LibraryRoot, LibrarySnapshot, PortInfo, Runner, ScanReport, Session } from './api/contracts';
+import type { BiosFile, CoreEvent, IntakeResult, TorrentSettings, TransferItem, TransferStatus, EmulatorInfo, KeyInfo, LauncherConfig, LauncherInfo, LutrisConfig, LutrisSnapshot, LibraryRoot, LibrarySnapshot, PortInfo, Runner, ScanReport, Session } from './api/contracts';
 import { nativePortGame, canonicalId } from './unified';
 import { lutrisToGame } from './lutris';
 import { artFromSeed } from './art';
@@ -59,6 +59,13 @@ class AppState {
   emulatorBusy = $state<Record<string, string>>({});
   biosBusy = $state(false);
   /** Emulator whose settings dialog is open. */
+  intakeOpen = $state(false);
+  intakeBusy = $state(false);
+  intakePaths = $state<string[]>([]);
+  intakeDelete = $state(false);
+  intakeResults = $state<IntakeResult[]>([]);
+  intakeProgress = $state('');
+  intakeScanError = $state<string | null>(null);
   portDialogId = $state<string | null>(null);
   portErrors = $state<Record<string, string>>({});
   emulatorDialogId = $state<string | null>(null);
@@ -292,6 +299,7 @@ class AppState {
   }
 
   back() {
+    if (this.intakeOpen) { this.intakeOpen = false; return; }
     if (this.portDialogId) { this.portDialogId = null; return; }
     if (this.emulatorDialogId) { this.emulatorDialogId = null; return; }
     if (this.closeLauncherEditor) { this.closeLauncherEditor(); return; }
@@ -444,6 +452,57 @@ class AppState {
     } finally {
       this.scanning = false;
     }
+  }
+
+  queueArchives(paths: string[]) {
+    this.intakeOpen = true;
+    if (this.intakeBusy) { this.notify('An archive import is already running. Add more files after it finishes.'); return; }
+    const merged = [...new Set([...this.intakePaths, ...paths.map((p) => p.trim()).filter(Boolean)])];
+    if (merged.length > 50) { this.notify('Choose at most 50 archives per batch. No new paths were added.'); return; }
+    this.intakePaths = merged;
+    this.intakeDelete = false;
+  }
+
+  async importArchives(paths = this.intakePaths, deleteSource = false) {
+    if (this.intakeBusy) return;
+    const selected = [...new Set(paths.map((p) => p.trim()).filter(Boolean))];
+    if (!selected.length || selected.length > 50) { this.notify('Choose between 1 and 50 ZIP/7z archives.'); return; }
+    this.intakeBusy = true; this.intakeResults = []; this.intakeScanError = null;
+    let scan = false;
+    try {
+      for (const [index, path] of selected.entries()) {
+        this.intakeProgress = `Importing archive ${index + 1} of ${selected.length}`;
+        if (!path.startsWith('/') || path.includes('\0') || path.length > 4096 || !/\.(zip|7z)$/i.test(path)) {
+          this.intakeResults.push({ path, report:null, error:'Choose an absolute ZIP/7z archive path on the Marquee computer. RAR is not supported.' });
+          continue;
+        }
+        try {
+          const report = await this.api.intakeArchive(path, deleteSource);
+          this.intakeResults.push({ path, report, error:null });
+          scan ||= ['imported', 'kept_archive', 'already_present'].includes(report.outcome);
+        } catch (err) {
+          this.intakeResults.push({ path, report:null, error:(err as {message?:string}).message ?? 'Archive import failed' });
+        }
+      }
+      if (scan) {
+        this.intakeProgress = 'Scanning imported game files…';
+        await this.refreshImportedGames();
+      }
+      this.intakePaths = this.intakeResults.filter((r) => !!r.error).map((r) => r.path);
+      const failed = this.intakeResults.filter((r) => r.error).length;
+      this.intakeProgress = failed ? `Import finished · ${failed} ${failed === 1 ? 'archive needs' : 'archives need'} attention` : 'Archive import finished';
+      this.notify(this.intakeProgress);
+    } finally { this.intakeBusy = false; this.intakeDelete = false; }
+  }
+
+  async refreshImportedGames() {
+    const wasBusy = this.intakeBusy;
+    this.intakeBusy = true; this.intakeScanError = null;
+    try {
+      this.lastScan = await this.api.scan();
+      this.applySnapshot(await this.api.snapshot());
+    } catch (err) { this.intakeScanError = (err as {message?:string}).message ?? 'Library refresh failed. Rescan folders to retry.'; }
+    finally { this.intakeBusy = wasBusy; }
   }
 
   // ---- Share games with your own other devices (optional, off by default) ----

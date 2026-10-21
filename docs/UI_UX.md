@@ -15,7 +15,7 @@ compatibility/Epic, then GOG remain the store milestones.
   remain shared, with distinct catalogue/ownership language.
 - Global Add games opens the Library system picker instead of assuming PS2.
   Existing folder imports remain the supported flow; this pass does not add
-  store connections or an archive-import wizard.
+  store connections. A subsequent roadmap step adds the [archive importer](INTAKE.md).
 - Cards show readable titles underneath, with calmer generated art. Offline
   drives, missing files, missing emulators, missing firmware, wishlists,
   catalogue records and uninstalled entries keep distinct status text.

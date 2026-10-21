@@ -101,6 +101,17 @@ export interface SkipCount {
   count: number;
 }
 
+export interface IntakeReport {
+  archive: string;
+  outcome: 'imported' | 'kept_archive' | 'stored_no_emulator' | 'already_present' | 'skipped';
+  system: string | null;
+  dest: string | null;
+  files: string[];
+  message: string;
+  source_removed: boolean;
+}
+export interface IntakeResult { path: string; report: IntakeReport | null; error: string | null }
+
 export interface ScanReport {
   scanned: number;
   added: number;
@@ -294,6 +305,9 @@ export interface EmulatorBuildStatus {
 export interface BiosImport { added: BiosFile[]; ignored: number }
 
 export interface LibraryApi {
+  intakeArchive(path: string, deleteSource?: boolean): Promise<IntakeReport>;
+  pickArchives(): Promise<string[]>;
+  onArchiveDrop(handler: (paths: string[]) => void): Promise<() => void>;
   emulatorProfile(id: string): Promise<EmulatorProfileStatus>;
   configureEmulatorProfile(id: string, config: EmulatorProfileConfig): Promise<EmulatorProfileStatus>;
   importCatalogue(snapshot: unknown): Promise<CatalogueSnapshot>;

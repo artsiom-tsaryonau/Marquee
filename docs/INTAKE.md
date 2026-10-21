@@ -8,6 +8,28 @@ marquee intake "Game (USA).7z" --delete    # remove the archive once verified
 marquee intake x.zip --no-scan             # skip the rescan
 ```
 
+## Desktop and browser UI
+
+Library → Add games → Import ZIP/7z archives opens the importer. A separate
+Library button reopens progress and results. Desktop can select multiple
+archives or drop them onto Library; dropping only queues them for review.
+Browser users enter absolute paths on the Marquee computer, with no browser
+upload or assumed local-file path. Folder import remains separate.
+
+Batches contain up to 50 unique archives, processed sequentially. Each archive
+reports its detected system, destination, outcome, filenames and retained or
+removed source. A failed archive does not hide later results. Successful and
+AlreadyPresent outcomes trigger one real scan and snapshot refresh after the
+batch. Scan failures remain separate from extraction, with a retry that does
+not re-extract successful archives. Original archives are kept unless source
+removal is explicitly selected for that batch; the choice resets afterwards.
+
+The UI shows archive-count and scan phases, not fabricated byte percentages.
+It can be closed while work continues in that window. Byte progress,
+cancellation, watched inboxes and restart-persistent import jobs are not yet
+implemented. Native drop/file-picker and rendered interaction still need live
+acceptance; tests cover shared dispatch and batch failure/recovery behavior.
+
 ## What it decides
 
 | Contents | Result |
@@ -36,6 +58,6 @@ Documents and images in the archive (`.txt`, `.nfo`, `.jpg`, ...) are ignored. A
 ## Limits and not done
 
 - `.rar` is not supported (needs a native library); the format is detected by content, not file name.
-- No UI yet: no drop target or watched inbox folder.
+- Desktop drop/file picking and browser host-path UI are implemented. Watched inbox folders and restart-persistent jobs remain open.
 - System detection is by extension and size; it does not read the disc image to tell PS1 from PS2, and does not verify ROM hashes.
 - Whether a Neo Geo set actually runs depends on its BIOS and parent sets (see `neogeo.rs`).

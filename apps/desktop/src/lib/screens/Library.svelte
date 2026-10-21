@@ -13,6 +13,7 @@
   import GhostCover from '../components/GhostCover.svelte';
   import Icon from '../components/Icon.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
+  import ArchiveImport from '../components/ArchiveImport.svelte';
   import CatalogueImport from '../components/CatalogueImport.svelte';
   import { metadataMatches, playerModeLabel, regionValues, versions, providerScore } from '../metadata';
 
@@ -158,6 +159,7 @@
         <div class="add-list glass-panel" role="menu" aria-label="Add a folder of games">
           <span class="add-hint">Pick the system, then the folder that holds its games.</span>
           {#each addTargets as t (t.id)}<button class="add-item" role="menuitem" data-nav onclick={() => addFolder(t.id)}>{t.label}</button>{/each}
+          <button class="add-item" role="menuitem" data-nav onclick={() => { addMenu.open = false; app.intakeOpen = true; }}>Import ZIP/7z archives…</button>
           <hr />
           <span class="add-hint">Don't have the files yet?</span>
           <button class="add-item" role="menuitem" data-nav onclick={startAddGame}>Add a game without files…</button>
@@ -169,6 +171,7 @@
     <button class="chip" class:on={!view.discovery} data-nav aria-pressed={!view.discovery} onclick={() => changeScope(false)}>Your library</button>
     <button class="chip" class:on={view.discovery} data-nav aria-pressed={view.discovery} onclick={() => changeScope(true)}>Catalogue discovery</button>
   </div>
+  <div class="archive-entry"><button class="btn glass small" data-nav onclick={() => (app.intakeOpen = true)}><Icon name="download" size={16} />{app.intakeBusy ? app.intakeProgress : app.intakeResults.length ? 'Review archive import' : 'Import ZIP/7z archives'}</button><span>{app.api.kind === 'desktop' ? 'You can also drop archives onto Library.' : 'Imports use paths on the Marquee computer.'}</span></div>
   {#if adding}
     <form class="add-game glass-panel" onsubmit={(e) => { e.preventDefault(); void saveGame(); }}>
       <strong>Add a game without files</strong>
@@ -268,9 +271,12 @@
     {#key view.visibleCount}<div class="load-more" use:nearEnd><button class="btn glass" data-nav onclick={() => (view.visibleCount += PAGE)}>Show more · {view.visibleCount} of {grouped.length}</button></div>{/key}
   {/if}
   {#if view.discovery}<CatalogueImport />{/if}
+  <ArchiveImport />
 </div>
 
 <style>
+  .archive-entry { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-bottom:20px; }
+  .archive-entry span { font-size:13px; color:var(--text-dim); }
   .scope { display:flex; gap:8px; margin-bottom:20px; }
   .categories { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
   .categories .chip { display:inline-flex; align-items:center; gap:6px; }

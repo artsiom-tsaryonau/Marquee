@@ -20,6 +20,7 @@ beforeEach(() => {
   app.portDialogId = null;
   app.portErrors = {};
   app.portBusy = {};
+  app.intakeOpen=false; app.intakeBusy=false; app.intakePaths=[]; app.intakeResults=[]; app.intakeDelete=false; app.intakeScanError=null;
   app.history = [];
   app.route = 'home';
   app.gameId = null;
@@ -482,4 +483,65 @@ test('port installation errors remain visible after busy clears and successful r
     await app.runPortAction(port); assert.equal(app.portErrors.shipwright,'Download interrupted'); assert.equal(app.portBusy.shipwright,undefined);
     fail=false; await app.runPortAction(port); assert.equal(app.portErrors.shipwright,undefined);
   } finally {app.api=api;}
+});
+
+const intakeReport = (path, outcome = 'imported') => ({ archive:path, outcome, system:'nes',dest:'/games/nes',files:['Game.nes'],message:'Imported',source_removed:false });
+const scanReport = () => ({scanned:1,added:1,updated:0,skipped_unsupported:0,skipped_by_kind:[],unresolved_serial:0,missing:0});
+
+test('archive batches deduplicate paths, continue after failures and scan once after extraction', async () => {
+  const api=app.api; let scans=0; const calls=[];
+  try {
+    app.api={...api,intakeArchive:async(path,remove)=>{calls.push([path,remove]);if(path.endsWith('bad.zip'))throw new Error('Unsafe archive');return intakeReport(path);},scan:async()=>{scans++;return scanReport();},snapshot:async()=>discSnapshot()};
+    await app.importArchives(['/archives/bad.zip','/archives/game.zip','/archives/game.zip']);
+    assert.deepEqual(calls,[['/archives/bad.zip',false],['/archives/game.zip',false]]);
+    assert.equal(scans,1); assert.equal(app.intakeResults.length,2); assert.equal(app.intakeResults[0].error,'Unsafe archive');
+    assert.deepEqual(app.intakePaths,['/archives/bad.zip']); assert.equal(app.intakeBusy,false);
+  } finally {app.api=api;}
+});
+
+test('existing archive files are rescanned while skipped archives and invalid host paths are not', async () => {
+  const api=app.api; let scans=0,imports=0;
+  try {
+    app.api={...api,intakeArchive:async(path)=>{imports++;return intakeReport(path,'already_present');},scan:async()=>{scans++;return scanReport();},snapshot:async()=>discSnapshot()};
+    await app.importArchives(['/archives/old.7z']); assert.equal(scans,1);
+    await app.importArchives(['relative.zip','/archives/no.rar']); assert.equal(imports,1); assert.equal(scans,1);
+    app.api={...app.api,intakeArchive:async(path)=>intakeReport(path,'skipped')};
+    await app.importArchives(['/archives/docs.zip']); assert.equal(scans,1);
+  } finally {app.api=api;}
+});
+
+test('failed post-import scan is distinct from extraction and can be retried without reimporting', async () => {
+  const api=app.api; let imports=0,fail=true;
+  try {
+    app.api={...api,intakeArchive:async(path)=>{imports++;return intakeReport(path);},scan:async()=>{if(fail)throw new Error('Drive offline');return scanReport();},snapshot:async()=>discSnapshot()};
+    await app.importArchives(['/archives/game.zip']);
+    assert.equal(app.intakeResults[0].report.outcome,'imported'); assert.equal(app.intakeScanError,'Drive offline');
+    fail=false; await app.refreshImportedGames(); assert.equal(app.intakeScanError,null); assert.equal(imports,1);
+  } finally {app.api=api;}
+});
+
+test('a pending batch blocks duplicate execution and queueing does not imply extraction', async () => {
+  const api=app.api; let resolve,imports=0;
+  try {
+    app.intakePaths=[]; app.queueArchives(['/archives/game.zip']); assert.equal(imports,0); assert.equal(app.intakeDelete,false);
+    app.api={...api,intakeArchive:async()=>{imports++;return new Promise(done=>{resolve=done;});}};
+    const pending=app.importArchives(); await app.importArchives(); assert.equal(imports,1);
+    resolve(intakeReport('/archives/game.zip','skipped')); await pending;
+  } finally {app.api=api;}
+});
+
+test('source removal requires an explicit batch choice and resets before the next batch', async () => {
+  const api=app.api; const deletes=[];
+  try {
+    app.api={...api,intakeArchive:async(path,remove)=>{deletes.push(remove);return intakeReport(path,'skipped');}};
+    app.intakeDelete=true; await app.importArchives(['/archives/game.zip'],true); assert.equal(app.intakeDelete,false);
+    await app.importArchives(['/archives/next.zip']); assert.deepEqual(deletes,[true,false]);
+  } finally {app.api=api;}
+});
+
+test('archive transport defaults to retaining source files on both surfaces', async () => {
+  const { commands }=await import('../src/lib/api/core'); const calls=[];
+  const api=commands(async(name,args)=>{calls.push({name,args});});
+  await api.intakeArchive('/archives/game.zip'); await api.intakeArchive('/archives/game.7z',true);
+  assert.deepEqual(calls,[{name:'intake_archive',args:{path:'/archives/game.zip',delete_source:false}},{name:'intake_archive',args:{path:'/archives/game.7z',delete_source:true}}]);
 });
