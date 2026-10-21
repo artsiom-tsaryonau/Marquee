@@ -1,7 +1,6 @@
 use serde::Serialize;
 use std::fmt;
 use std::io;
-use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct AppError {
@@ -56,8 +55,4 @@ pub type Result<T> = std::result::Result<T, AppError>;
 
 pub fn path_display(path: &std::path::Path) -> String {
     path.to_string_lossy().into_owned()
-}
-
-pub fn path_not_found(path: PathBuf) -> AppError {
-    AppError::new("PATH", format!("not found: {}", path_display(&path)))
 }

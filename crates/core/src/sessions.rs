@@ -305,17 +305,6 @@ fn wait_and_finish(
     }
 }
 
-pub fn require_iso_exists(path: &Path) -> Result<()> {
-    if path.is_file() {
-        Ok(())
-    } else {
-        Err(AppError::new(
-            "MEDIA_MISSING",
-            format!("disc file is missing: {}", path_display(path)),
-        ))
-    }
-}
-
 // Linux process identity includes the boot and kernel start time, so a reused PID
 // can never be mistaken for the emulator. Uptime excludes suspend just like Instant.
 #[derive(serde::Serialize, serde::Deserialize)]

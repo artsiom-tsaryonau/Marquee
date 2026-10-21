@@ -69,13 +69,6 @@ impl MediaKind {
         }
     }
 
-    /// True when the file itself is ISO9660 and can be read for a serial. `.cue`
-    /// points at a sibling track and `.chd` is compressed, so both resolve their
-    /// serial another way.
-    pub fn is_readable_image(&self) -> bool {
-        matches!(self, Self::Iso | Self::Ps1Iso)
-    }
-
     /// Extension-to-kind within a known system. `.iso` is a supported image for
     /// every system Marquee ships; `.chd` and `.cue` only for systems whose
     /// runner reads them (PS1/DuckStation).

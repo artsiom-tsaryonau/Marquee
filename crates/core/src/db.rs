@@ -335,17 +335,6 @@ impl Db {
             .optional()?)
     }
 
-    pub fn edition_id_for_path(&self, path: &std::path::Path) -> Result<Option<String>> {
-        Ok(self
-            .conn
-            .query_row(
-                "SELECT edition_id FROM media WHERE path = ?1",
-                [path_bytes(path)],
-                |r| r.get(0),
-            )
-            .optional()?)
-    }
-
     #[allow(clippy::too_many_arguments)]
     pub fn upsert_media(
         &self,
@@ -499,27 +488,6 @@ impl Db {
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
-    pub fn runner_by_id(&self, id: &str) -> Result<Option<RunnerRow>> {
-        Ok(self
-            .conn
-            .query_row(
-                "SELECT id, kind, display_name, command_json, bios_state, bios_hint, source FROM runners WHERE id = ?1",
-                [id],
-                |r| {
-                    Ok(RunnerRow {
-                        id: r.get(0)?,
-                        kind: r.get(1)?,
-                        display_name: r.get(2)?,
-                        command_json: r.get(3)?,
-                        bios_state: r.get(4)?,
-                        bios_hint: r.get(5)?,
-                        source: r.get(6)?,
-                    })
-                },
-            )
-            .optional()?)
-    }
-
     pub fn set_bios_state(&self, runner_id: &str, state: BiosState) -> Result<()> {
         self.conn.execute(
             "UPDATE runners SET bios_state = ?2 WHERE id = ?1",
@@ -614,14 +582,6 @@ impl Db {
                 },
             )
             .optional()?)
-    }
-
-    pub fn add_playtime(&self, edition_id: &str, seconds: i64, when: &str) -> Result<()> {
-        self.conn.execute(
-            "UPDATE editions SET playtime_seconds = playtime_seconds + ?2, play_count = play_count + 1, last_played_at = ?3 WHERE id = ?1",
-            params![edition_id, seconds, when],
-        )?;
-        Ok(())
     }
 
     pub fn set_profile(&self, edition_id: &str, runner_id: &str) -> Result<()> {
@@ -787,13 +747,6 @@ pub fn now_rfc3339() -> String {
     format_unix(secs)
 }
 
-pub fn now_unix() -> i64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0)
-}
-
 pub fn format_unix(secs: i64) -> String {
     // keep ISO-ish without extra crates
     let days = secs / 86400;
@@ -818,8 +771,4 @@ fn civil_from_days(days: i32) -> (i32, u32, u32) {
     let m = if mp < 10 { mp + 3 } else { mp - 9 };
     let y = if m <= 2 { y + 1 } else { y };
     (y, m, d)
-}
-
-pub fn json_pretty(value: impl serde::Serialize) -> Result<String> {
-    Ok(serde_json::to_string_pretty(&value)?)
 }
