@@ -97,7 +97,11 @@
       </div>
     {/if}
     <div class="actions">
-      {#if g.source === 'catalogue'}
+      {#if g.wanted}
+        <button class="btn primary big" data-nav disabled><Icon name="download" /> Play · no files yet</button>
+        <button class="btn glass" data-nav onclick={() => app.setWantedStatus(g, g.wanted === 'wishlist' ? 'owned' : 'wishlist')}>{g.wanted === 'wishlist' ? 'I own this' : 'Move to wishlist'}</button>
+        <button class="btn glass" data-nav onclick={() => app.removeWantedGame(g)}><Icon name="x" /> Remove</button>
+      {:else if g.source === 'catalogue'}
         <p class="catalogue-note" role="status">Not in your library — catalogue discovery only. Open the source page from the facts panel when you want to browse Vimm’s Lair.</p>
       {:else if offline && g.setupState === 'runner_missing'}
         {#if g.platform === 'ps2'}<InstallMenu tone="primary" size="big" />
@@ -119,7 +123,7 @@
           {#if !playReady}{playLabel}{/if}
         </button>
       {/if}
-      {#if offline && g.serial && !g.coverUrl}
+      {#if offline && (g.serial || g.wanted) && !g.coverUrl}
         <button class="btn glass" data-nav onclick={() => app.refreshArtwork(g.id)} disabled={app.fetchingArt}>
           <Icon name="image" /> {app.fetchingArt ? 'Fetching cover…' : 'Fetch cover'}
         </button>
@@ -146,6 +150,7 @@
         <button class="btn glass" data-nav onclick={() => app.openPortFolder(port)}><Icon name="folder" /> Folder</button>
       {/if}
     </div>
+    {#if g.wanted}<p class="tagline" role="status">{g.wanted === 'wishlist' ? 'On your wishlist.' : 'You own this game.'} Play unlocks when a file for it is added: scan a folder that contains it, or use archive intake. It attaches to this entry automatically.</p>{/if}
     {#if offline && share}<p class="tagline" role="status">{transferLine(share)}</p>{/if}
     {#if offline && (g.mediaIssue || g.setupState === 'runner_missing')}<p class="tagline" role="status">{g.mediaIssue || `${emulator} is not installed or available for this platform. Open Tools to set it up.`}</p>{/if}
   </div>

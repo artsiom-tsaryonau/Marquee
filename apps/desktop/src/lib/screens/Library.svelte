@@ -45,6 +45,7 @@
   let addMenu: HTMLDetailsElement;
 
   const allSources = $derived([...new Set(app.games.map((g) => g.source))]);
+  const noFilesCount = $derived(inScope.filter((g) => g.wanted || g.mediaMissing).length);
   const secondaryActive = $derived([view.sourceFilter, view.region, view.language, view.revision, view.playerMode].filter(Boolean).length);
 
   const shown = $derived.by(() => {
@@ -55,6 +56,7 @@
         metadataMatches(g, view.region, view.language, view.revision, view.playerMode) &&
         (!view.sourceFilter || g.source === view.sourceFilter) &&
         (!view.installedOnly || g.installed) &&
+        (!view.noFiles || !!g.wanted || !!g.mediaMissing) &&
         (!view.favOnly || g.favorite),
     );
     const query = view.query;
@@ -90,13 +92,13 @@
 
   // A changed search or filter starts again at the top; a restored one must not.
   $effect(() => {
-    const signature = JSON.stringify([view.query, view.platform, view.sourceFilter, view.region, view.language, view.revision, view.playerMode, view.installedOnly, view.favOnly, view.sort, collection]);
+    const signature = JSON.stringify([view.query, view.platform, view.sourceFilter, view.region, view.language, view.revision, view.playerMode, view.installedOnly, view.noFiles, view.favOnly, view.sort, collection]);
     untrack(() => { if (view.signature !== signature) { view.signature = signature; view.visibleCount = PAGE; } });
   });
   const grouped = $derived(groupGames(shown, app.variantPreferences));
 
-  const filtering = $derived(!!view.query || !!view.platform || !!view.sourceFilter || !!view.region || !!view.language || !!view.revision || !!view.playerMode || view.installedOnly || view.favOnly);
-  function clearFilters() { Object.assign(view, { query: '', platform: '', sourceFilter: '', region: '', language: '', revision: '', playerMode: '', installedOnly: false, favOnly: false }); }
+  const filtering = $derived(!!view.query || !!view.platform || !!view.sourceFilter || !!view.region || !!view.language || !!view.revision || !!view.playerMode || view.installedOnly || view.noFiles || view.favOnly);
+  function clearFilters() { Object.assign(view, { query: '', platform: '', sourceFilter: '', region: '', language: '', revision: '', playerMode: '', installedOnly: false, noFiles: false, favOnly: false }); }
   const dur = $derived(app.motionReduced || app.visualEffects === 'balanced' ? 0 : 260);
 
   // Cards load as the end of the list comes near; the button stays as a fallback.
@@ -119,11 +121,28 @@
     return () => window.removeEventListener('click', close);
   });
 
+  let adding = $state(false);
+  let draft = $state({ title: '', system: 'ps2', status: 'wishlist' as 'wishlist' | 'owned' });
+  let savingGame = $state(false);
+  const systemOptions = [
+    { id: 'ps2', label: 'PlayStation 2' }, { id: 'ps1', label: 'PlayStation' }, { id: 'dreamcast', label: 'Dreamcast' },
+    { id: 'genesis', label: 'Sega Genesis' }, { id: 'snes', label: 'Super Nintendo' }, { id: 'nes', label: 'NES' },
+    { id: 'n64', label: 'Nintendo 64' }, { id: 'ds', label: 'Nintendo DS' }, { id: 'gbc', label: 'Game Boy Color' },
+    { id: 'gb', label: 'Game Boy' }, { id: 'pce', label: 'PC Engine / TurboGrafx-16' }, { id: 'neogeo', label: 'Neo Geo' },
+  ];
+  async function saveGame() {
+    if (!draft.title.trim() || savingGame) return;
+    savingGame = true;
+    const id = await app.addWantedGame(draft.system, draft.title, draft.status);
+    savingGame = false;
+    if (id) { draft.title = ''; adding = false; view.noFiles = true; }
+  }
   const addTargets: { id: string; label: string }[] = [
     { id: 'ps2', label: 'PlayStation 2' }, { id: 'ps1', label: 'PlayStation' }, { id: 'genesis', label: 'Sega Genesis' },
     { id: 'ds', label: 'Nintendo DS' }, { id: 'neogeo', label: 'Neo Geo' },
   ];
   function addFolder(system: string) { addMenu.open = false; void app.addSystemFolder(system); }
+  function startAddGame() { addMenu.open = false; adding = true; }
 </script>
 
 <svelte:window onkeydown={onKey} onscroll={onScroll} />
@@ -138,10 +157,25 @@
         <div class="add-list glass-panel" role="menu" aria-label="Add a folder of games">
           <span class="add-hint">Pick the system, then the folder that holds its games.</span>
           {#each addTargets as t (t.id)}<button class="add-item" role="menuitem" data-nav onclick={() => addFolder(t.id)}>{t.label}</button>{/each}
+          <hr />
+          <span class="add-hint">Don't have the files yet?</span>
+          <button class="add-item" role="menuitem" data-nav onclick={startAddGame}>Add a game without files…</button>
         </div>
       </details>
     </div>
   </header>
+  {#if adding}
+    <form class="add-game glass-panel" onsubmit={(e) => { e.preventDefault(); void saveGame(); }}>
+      <strong>Add a game without files</strong>
+      <p>It appears in your library with Play disabled. Its cover and details are looked up by name, and the files attach by themselves when you scan or import a matching game.</p>
+      <div class="add-fields">
+        <label>Title<input data-nav bind:value={draft.title} placeholder="e.g. Super Metroid" maxlength="200" required /></label>
+        <label>System<select class="ui-select" data-nav bind:value={draft.system}>{#each systemOptions as o (o.id)}<option value={o.id}>{o.label}</option>{/each}</select></label>
+        <label>Status<select class="ui-select" data-nav bind:value={draft.status}><option value="wishlist">Wishlist</option><option value="owned">I own it (files elsewhere)</option></select></label>
+      </div>
+      <div class="add-actions"><button class="btn primary small" data-nav type="submit" disabled={savingGame || !draft.title.trim()}>Add game</button><button class="btn glass small" data-nav type="button" onclick={() => (adding = false)}>Cancel</button></div>
+    </form>
+  {/if}
   <div class="categories" data-nav-row aria-label="Game platforms">
     <button class="chip" class:on={!view.platform} data-nav aria-pressed={!view.platform} onclick={() => view.platform = ''}>All platforms <span>{inScope.length}</span></button>
     {#each platforms as p}<button class="chip" class:on={view.platform === p} data-nav aria-pressed={view.platform === p} onclick={() => view.platform = p}>{#if hasMark(p)}<Mark id={p} size={16} />{/if}<b>{chipLabel(p)}</b> <span>{counts.get(p)}</span></button>{/each}
@@ -154,6 +188,7 @@
     </label>
     <div class="chips" data-nav-row>
       <button class="chip" class:on={view.installedOnly} data-nav aria-pressed={view.installedOnly} onclick={() => (view.installedOnly = !view.installedOnly)}>Installed</button>
+      <button class="chip" class:on={view.noFiles} data-nav aria-pressed={view.noFiles} onclick={() => (view.noFiles = !view.noFiles)} title="Wishlist and games whose files are not here">Without files{#if noFilesCount} <span>{noFilesCount}</span>{/if}</button>
       <button class="chip" class:on={view.favOnly} data-nav aria-pressed={view.favOnly} onclick={() => (view.favOnly = !view.favOnly)}><Icon name="star" size={14} filled={view.favOnly} /> Favourites</button>
       <button class="chip" class:on={secondaryActive > 0} data-nav aria-expanded={view.filtersOpen} aria-controls="more-filters" onclick={() => (view.filtersOpen = !view.filtersOpen)}>Filters{#if secondaryActive}<span class="badge">{secondaryActive}</span>{/if}</button>
       <select class="ui-select" bind:value={view.sort} data-nav aria-label="Sort by">
@@ -240,6 +275,13 @@
   .add-menu summary { list-style:none; display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
   .add-menu summary::-webkit-details-marker { display:none; }
   .add-list { position:absolute; right:0; top:calc(100% + 8px); z-index:30; display:grid; gap:2px; min-width:230px; padding:8px; border-radius:14px; background:#16131f; border:1px solid var(--line); box-shadow:0 18px 40px -12px rgb(0 0 0 / .8); }
+  .add-list hr { border:0; border-top:1px solid var(--line); margin:6px 0; width:100%; }
+  .add-game { display:grid; gap:10px; padding:16px; border-radius:16px; margin-bottom:18px; }
+  .add-game p { margin:0; font-size:13px; color:var(--text-soft); line-height:1.5; }
+  .add-fields { display:flex; flex-wrap:wrap; gap:12px; }
+  .add-fields label { display:grid; gap:6px; font-size:12px; color:var(--text-soft); flex:1 1 200px; }
+  .add-fields input { background:var(--field); border:1px solid var(--line); border-radius:8px; padding:10px; font:inherit; color:var(--text); }
+  .add-actions { display:flex; gap:8px; }
   .add-hint { font-size:12px; color:var(--text-dim); padding:6px 10px 8px; }
   .add-item { text-align:left; border:0; background:none; color:var(--text); font:inherit; padding:10px; border-radius:8px; cursor:pointer; }
   .add-item:hover, .add-item:focus-visible { background:var(--field); outline:none; }

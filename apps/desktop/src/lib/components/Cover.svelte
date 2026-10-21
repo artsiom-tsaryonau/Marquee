@@ -21,6 +21,8 @@
         ? { label: game.installed ? 'Native port' : 'Not installed', tone: game.installed ? 'ok' : 'dim' }
         : game.source === 'catalogue'
           ? { label: 'Not in library', tone: 'dim' }
+          : game.wanted
+          ? { label: game.wanted === 'wishlist' ? 'Wishlist' : 'No files', tone: 'note' }
           : game.rootOffline
           ? { label: 'Drive offline', tone: 'dim' }
           : game.mediaMissing
@@ -164,6 +166,10 @@
   .status.icon {
     padding: 4px;
     display: grid;
+  }
+  .status.note {
+    background: rgb(99 102 241 / 0.88);
+    color: #fff;
   }
   .status.dim {
     background: rgb(0 0 0 / 0.45);

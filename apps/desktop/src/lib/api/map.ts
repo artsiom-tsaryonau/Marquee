@@ -60,6 +60,7 @@ export function editionToGame(edition: Edition, snap: LibrarySnapshot): GameEntr
     serial: edition.serial ?? undefined,
     region: edition.region ?? undefined,
     mediaMissing: edition.missing,
+    wanted: edition.wanted ?? undefined,
     rootOffline,
     setupState,
     runnerId: runner?.id,

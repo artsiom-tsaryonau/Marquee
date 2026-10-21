@@ -24,6 +24,7 @@ pub mod ports;
 pub mod purple;
 pub mod romart;
 pub mod romfacts;
+pub mod wanted;
 pub mod runners;
 pub mod server;
 pub mod sessions;

@@ -93,7 +93,13 @@ class AppState {
   toast = $state<string | null>(null);
   lastInput = $state<string>('—');
 
-  hero = $derived(this.games.find((g) => g.id === this.heroId) ?? this.games[0] ?? null);
+  hero = $derived(this.games.find((g) => g.id === this.heroId) ?? this.defaultHero());
+
+  /** What the home page opens on: what you played last, else a favourite, else a game with a cover. */
+  defaultHero(): GameEntry | null {
+    const played = this.games.filter((g) => g.lastPlayed).sort((a, b) => b.lastPlayed!.localeCompare(a.lastPlayed!));
+    return played[0] ?? this.games.find((g) => g.favorite) ?? this.games.find((g) => g.coverUrl) ?? this.games[0] ?? null;
+  }
   current = $derived(this.games.find((g) => g.id === this.gameId) ?? null);
 
   constructor() {
@@ -138,9 +144,9 @@ class AppState {
     this.libraryStatus = this.games.length ? 'loaded' : 'empty';
     this.loadError = null;
     if (this.heroId && !this.games.some((g) => g.id === this.heroId)) {
-      this.heroId = this.games[0]?.id ?? null;
+      this.heroId = this.defaultHero()?.id ?? null;
     } else if (!this.heroId) {
-      this.heroId = this.games[0]?.id ?? null;
+      this.heroId = this.defaultHero()?.id ?? null;
     }
     const active = snap.sessions.find((s: Session) => s.state === 'running');
     if (active) {
@@ -343,6 +349,38 @@ class AppState {
     } catch (err) {
       entry.title = previous;
       this.notify((err as { message?: string }).message ?? 'Could not rename');
+    }
+  }
+
+  /** Add a game that has no files yet; its cover and facts are looked up by name. */
+  async addWantedGame(system: string, title: string, status: 'wishlist' | 'owned') {
+    try {
+      const id = await this.api.addWantedGame(system, title, status);
+      this.applySnapshot(await this.api.snapshot());
+      void this.refreshArtwork(id);
+      return id;
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? 'Could not add the game');
+      return null;
+    }
+  }
+
+  async setWantedStatus(game: GameEntry, status: 'wishlist' | 'owned') {
+    try {
+      await this.api.setWantedStatus(game.id, status);
+      this.applySnapshot(await this.api.snapshot());
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? 'Could not change the status');
+    }
+  }
+
+  async removeWantedGame(game: GameEntry) {
+    try {
+      await this.api.removeWantedGame(game.id);
+      this.applySnapshot(await this.api.snapshot());
+      this.back();
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? 'Could not remove the game');
     }
   }
 

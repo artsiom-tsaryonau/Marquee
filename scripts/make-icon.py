@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rasterize the sidebar brand mark (M on the conic gradient) to a square PNG.
+"""Rasterize the sidebar brand mark (M on a muted slate gradient) to a square PNG.
 
 Writes apps/desktop/app-icon.png (source) and src-tauri/icons/icon.png.
 Then: cd apps/desktop && pnpm tauri icon app-icon.png
@@ -16,11 +16,11 @@ SIZE = 1024
 # Match .mark in App.svelte: 36px box, 11px radius.
 RADIUS = round(SIZE * 11 / 36)
 FONT = "/usr/share/fonts/rsms-inter-fonts/Inter-ExtraBold.ttf"
+# Quiet slate, matching .mark in App.svelte (the mark should not compete with the games).
 STOPS = (
-    (0.0, (244, 114, 182)),  # #f472b6
-    (1 / 3, (139, 92, 246)),  # #8b5cf6
-    (2 / 3, (34, 211, 238)),  # #22d3ee
-    (1.0, (244, 114, 182)),
+    (0.0, (75, 74, 104)),  # #4b4a68
+    (0.5, (42, 41, 64)),  # #2a2940
+    (1.0, (75, 74, 104)),
 )
 # CSS conic-gradient(from 200deg, …): 0deg is 12 o'clock, clockwise.
 FROM_DEG = 200.0
@@ -73,7 +73,7 @@ def draw_m(img: Image.Image) -> None:
     w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
     x = (SIZE - w) / 2 - bbox[0]
     y = (SIZE - h) / 2 - bbox[1] - SIZE * 0.02
-    draw.text((x, y), letter, font=font, fill=(255, 255, 255, 255))
+    draw.text((x, y), letter, font=font, fill=(230, 228, 242, 255))
 
 
 def main() -> None:
@@ -86,10 +86,10 @@ def main() -> None:
     mask = rounded_mask(SIZE, RADIUS)
     fill.putalpha(mask)
 
-    # Soft violet drop shadow, same idea as the sidebar mark.
+    # Soft dark drop shadow, same idea as the sidebar mark.
     shadow = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
     ImageDraw.Draw(shadow).rounded_rectangle(
-        (0, 0, SIZE - 1, SIZE - 1), radius=RADIUS, fill=(139, 92, 246, 180)
+        (0, 0, SIZE - 1, SIZE - 1), radius=RADIUS, fill=(0, 0, 0, 150)
     )
     shadow = shadow.filter(ImageFilter.GaussianBlur(radius=SIZE // 28))
     canvas = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))

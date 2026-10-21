@@ -316,3 +316,5 @@ select[data-nav]:disabled,
   color: var(--text);
   background: var(--field-strong);
 }
+
+.btn:disabled { opacity: 0.5; cursor: not-allowed; filter: saturate(0.6); }

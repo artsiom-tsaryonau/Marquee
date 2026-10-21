@@ -68,6 +68,15 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
                 .ok_or_else(|| AppError::new("BAD_REQUEST", "missing argument: favorite"))?;
             out(core.set_favourite(&text(&args, "edition_id")?, favorite)?)
         }
+        "add_wanted_game" => out(core.add_wanted(
+            &text(&args, "system")?,
+            &text(&args, "title")?,
+            &text(&args, "status")?,
+        )?),
+        "set_wanted_status" => {
+            out(core.set_wanted_status(&text(&args, "edition_id")?, &text(&args, "status")?)?)
+        }
+        "remove_wanted_game" => out(core.remove_wanted(&text(&args, "edition_id")?)?),
         "set_display_title" => {
             out(core.set_display_title(&text(&args, "edition_id")?, &text(&args, "title")?)?)
         }

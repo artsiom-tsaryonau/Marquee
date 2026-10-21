@@ -9,6 +9,8 @@
   import InstallMenu from '../components/InstallMenu.svelte';
   import { homeAtmosphere } from '../art';
   import type { Art } from '../types';
+  import { libraryView } from '../libraryView.svelte';
+
 
   const continuePlaying = $derived(
     app.games.filter((g) => g.lastPlayed).sort((a, b) => b.lastPlayed!.localeCompare(a.lastPlayed!)).slice(0, 10),
@@ -22,6 +24,19 @@
     app.games.filter((g) => g.timeToBeat && g.timeToBeat[0] <= 6).sort((a, b) => a.timeToBeat![0] - b.timeToBeat![0]),
   );
   const notInstalled = $derived(app.games.filter((g) => !g.installed));
+  const wanted = $derived(app.games.filter((g) => g.wanted));
+  const stats = $derived([
+    { n: app.games.length, label: 'games' },
+    { n: app.games.filter((g) => g.lastPlayed || g.playtimeMin).length, label: 'played' },
+    { n: favorites.length, label: 'favourites' },
+    { n: wanted.length, label: 'without files' },
+  ].filter((x) => x.n > 0));
+  const topPlatforms = $derived.by(() => {
+    const m = new Map<string, number>();
+    for (const x of app.games) if (x.platform !== 'unknown') m.set(x.platform, (m.get(x.platform) ?? 0) + 1);
+    return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10) as [import('../types').Platform, number][];
+  });
+  function browse(p: import('../types').Platform) { libraryView('all').platform = p; app.go('library'); }
 
   const g = $derived(app.hero);
   // Keep the previous image until the latest selection is decoded. Cancelling
@@ -44,6 +59,8 @@
     return () => { cancelled = true; };
   });
   const empty = $derived(!g);
+  const wide = $derived(!!g?.heroUrl);
+  const poster = $derived(!wide ? (preview.url ?? undefined) : undefined);
   const addFolder = () => app.addPs2Folder();
   const playReady = $derived(
     !!g && g.installed && !g.mediaMissing && g.setupState !== 'missing',
@@ -51,7 +68,7 @@
 </script>
 
 <div class="home">
-  <div class="hero-art" aria-hidden="true">
+  <div class="hero-art" class:blurred={!wide} aria-hidden="true">
     <div class="hero-layer">
       {#if preview.url}
         <img class="hero-cover" src={preview.url} alt="" />
@@ -65,7 +82,7 @@
       <div class="info">
         <p class="eyebrow"><span class="pill">Your game library</span></p>
         <Logo game={{ title: 'Marquee', art: homeAtmosphere }} size="xl" />
-        <p class="tagline">Add PS1 ISO, CHD or CUE sets, or PS2 ISO files. Each platform uses its own emulator setup.</p>
+        <p class="tagline">Add a folder of games for each system. Marquee sets up the emulator, finds covers and details, and launches from here.</p>
         {#if app.libraryStatus === 'failed'}
           <p class="tagline">{app.loadError}</p>
         {/if}
@@ -73,32 +90,34 @@
           <p class="tagline">{app.installProgress}</p>
         {/if}
         <div class="actions">
-          <button class="btn glass" data-nav onclick={() => app.addSystemFolder('ps1')}><Icon name="plus" /> Add PS1 folder</button>
           <button class="btn primary" data-nav onclick={addFolder}>
             <Icon name="plus" /> Add PS2 folder
           </button>
+          <button class="btn glass" data-nav onclick={() => app.addSystemFolder('ps1')}><Icon name="plus" /> Add PS1 folder</button>
+          <button class="btn glass" data-nav onclick={() => app.go('library')}>Other systems…</button>
           <InstallMenu />
           <button class="btn glass" data-nav onclick={() => app.go('settings')}>Settings</button>
         </div>
       </div>
     {:else if g}
       <div class="info">
-        <div class="hero-title" title={g.title}>
-          <div class="eyebrow">
-            <span class="pill">{sourceLabel[g.source]}</span>
-            <span>{platformLabel[g.platform]}</span>
-            {#if g.genre}<span class="dot">•</span><span>{g.genre}</span>{/if}
-            {#if g.year}<span class="dot">•</span><span>{g.year}</span>{/if}
-          </div>
-          <Logo game={g} size="lg" />
+        <div class="eyebrow">
+          <span class="kicker">{g.lastPlayed && g.id === app.defaultHero()?.id ? 'Pick up where you left off' : 'Selected'}</span>
+          <span class="pill">{sourceLabel[g.source]}</span>
+          {#if g.platform !== 'unknown'}<span>{platformLabel[g.platform]}</span>{/if}
+          {#if g.genre}<span class="dot">•</span><span>{g.genre}</span>{/if}
+          {#if g.year}<span class="dot">•</span><span>{g.year}</span>{/if}
         </div>
-        <p class="tagline">{g.tagline}</p>
+        <h1 class="title" title={g.title}>{g.title}</h1>
+        <p class="tagline">{g.description ?? g.tagline}</p>
         <div class="meta">
           {#if g.playtimeMin}<span><Icon name="clock" size={16} /> {hours(g.playtimeMin)}</span>{/if}
           {#if g.lastPlayed}<span>Last played {ago(g.lastPlayed)}</span>{/if}
         </div>
         <div class="actions">
-          {#if g.setupState === 'runner_missing'}
+          {#if g.wanted}
+            <button class="btn primary" data-nav disabled><Icon name="download" size={24} /> Play · no files yet</button>
+          {:else if g.setupState === 'runner_missing'}
             {#if g.platform === 'ps2'}<InstallMenu tone="primary" />{:else}<button class="btn primary" data-nav onclick={() => app.go('tools')}>Set up {g.platform === 'ps1' ? 'DuckStation' : g.platform === 'genesis' ? 'BlastEm' : g.platform === 'ds' ? 'melonDS' : g.platform === 'neogeo' ? 'FinalBurn Neo' : 'emulator'}</button>{/if}
           {:else}
             <button
@@ -126,13 +145,27 @@
           </button>
         </div>
       </div>
+      {#if poster}<img class="poster" src={poster} alt="" />{/if}
     {/if}
   </header>
 
+  {#if !empty}
+    <nav class="strip" aria-label="Library overview">
+      <div class="stats">
+        {#each stats as s (s.label)}<span><b>{s.n.toLocaleString()}</b> {s.label}</span>{/each}
+      </div>
+      <div class="plats" data-nav-row>
+        {#each topPlatforms as [p, n] (p)}<button class="chip" data-nav onclick={() => browse(p)}>{platformLabel[p]} <span>{n}</span></button>{/each}
+        <button class="chip all" data-nav onclick={() => app.go('library')}>Browse everything →</button>
+      </div>
+    </nav>
+  {/if}
+
   <Row title="Continue playing" games={continuePlaying} shape="wide" placeholders={empty ? 4 : 0} onPlaceholder={addFolder} />
   <Row title="Favourites" games={favorites} placeholders={empty ? 6 : 0} />
+  <Row title="Wishlist and games without files" games={wanted} />
   <Row title="Recently added" games={recentlyAdded} placeholders={empty ? 8 : 0} onPlaceholder={addFolder} />
-  <Row title="PlayStation 2" games={emulated} placeholders={empty ? 8 : 0} onPlaceholder={addFolder} />
+  <Row title="Emulated games" games={emulated} placeholders={empty ? 8 : 0} onPlaceholder={addFolder} />
 </div>
 
 <style>
@@ -157,6 +190,10 @@
     position: absolute;
     inset: 0;
   }
+  /* A cover or generated art is not a wide picture: show it as a dim, soft backdrop and
+     keep the sharp version for the poster. */
+  .hero-art.blurred .hero-layer { filter: blur(36px) saturate(0.7) brightness(0.5); transform: scale(1.25); }
+  .hero-art.blurred { -webkit-mask-image: linear-gradient(180deg, #000 50%, transparent); mask-image: linear-gradient(180deg, #000 50%, transparent); }
   .hero-cover {
     width: 100%;
     height: 100%;
@@ -166,10 +203,11 @@
   .hero {
     position: relative;
     z-index: 1;
-    min-height: max(var(--hero-h), 440px);
+    min-height: max(calc(var(--hero-h) * 0.62), 320px);
+    gap: 32px;
     display: flex;
     align-items: flex-end;
-    padding: 0 var(--gutter) 28px;
+    padding: 56px var(--gutter) 24px;
   }
   .info {
     width: min(720px, 100%);
@@ -177,21 +215,47 @@
     flex-direction: column;
     gap: 14px;
   }
-  .hero-title {
-    height: calc(clamp(36px, 5vw, 64px) * 2.85 + 36px);
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    align-items: flex-start;
-    gap: 14px;
-  }
-  .hero-title :global(.logo) {
+  .title {
+    margin: 0;
+    font-size: clamp(30px, 4.2vw, 56px);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    font-weight: 800;
+    color: var(--text);
     display: -webkit-box;
     -webkit-box-orient: vertical;
-    -webkit-line-clamp: 3;
-    line-clamp: 3;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
     overflow: hidden;
+    text-wrap: balance;
   }
+  .kicker { color: var(--text); letter-spacing: 0.06em; text-transform: uppercase; font-size: 11px; }
+  .poster {
+    flex: none;
+    margin-left: auto;
+    align-self: flex-end;
+    width: clamp(120px, 14vw, 190px);
+    aspect-ratio: 2 / 3;
+    object-fit: cover;
+    border-radius: var(--radius);
+    box-shadow: 0 24px 50px -16px rgb(0 0 0 / 0.9), 0 0 0 1px rgb(255 255 255 / 0.08);
+  }
+  @media (max-width: 760px) { .poster { display: none; } }
+  .strip {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 24px;
+    padding: 8px var(--gutter) 14px;
+  }
+  .stats { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 13px; color: var(--text-dim); }
+  .stats b { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .plats { display: flex; flex-wrap: wrap; gap: 8px; }
+  .plats .chip span { opacity: 0.6; margin-left: 4px; font-variant-numeric: tabular-nums; }
+  .plats .chip.all { color: var(--text-soft); }
   .eyebrow {
     display: flex;
     align-items: center;

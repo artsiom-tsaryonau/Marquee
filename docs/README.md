@@ -30,6 +30,7 @@ The 2026-10-21 direct-store decision supersedes earlier numbered phases, “Lutr
 | [Catalogue metadata](CATALOGUE_METADATA.md) | Saved-page import, regional revisions/languages, source artwork and ratings, explicit installation links and raw-ISO SHA-1 matching; schema v5 |
 | [Library transfer (BitTorrent)](TORRENTS.md) | Optional private device-to-device transfer: status, privacy defaults, CLI, next steps |
 | [Archive intake](INTAKE.md) | `marquee intake`: unpack `.zip`/`.7z` games into the library; rules, safety limits and gaps |
+| [Games without files](WANTED_GAMES.md) | Wishlist / "owned elsewhere" entries: disabled Play, name-matched cover and facts, files attach on scan |
 | [ROM facts](ROM_FACTS.md) | genre, year, developer, description: sources, TheGamesDB allowance, safeguards |
 | [ROM cover art](ROM_ARTWORK.md) | libretro checksum lookup, guarded artwork/facts enrichment, provider caching and remaining identity/override gaps |
 | [Cleanup](CLEANUP.md) | What can be deleted (build output, backups, quarantined files), what it costs, and what to keep |

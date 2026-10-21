@@ -38,6 +38,8 @@ export interface GameEntry {
   languages?: string[];
   revision?: string;
   players?: number;
+  /** A game added without files; Play is disabled until a matching file is scanned. */
+  wanted?: 'wishlist' | 'owned';
   developer?: string;
   publisher?: string;
   /** Plain text, from TheGamesDB. */

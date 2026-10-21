@@ -413,7 +413,7 @@ pub fn run(core: &Core, edition_id: Option<&str>, report: &mut ArtworkReport) {
     let wanted: Vec<&Edition> = snap
         .editions
         .iter()
-        .filter(|e| !e.missing && edition_id.is_none_or(|id| id == e.id))
+        .filter(|e| (!e.missing || e.wanted.is_some()) && edition_id.is_none_or(|id| id == e.id))
         .filter(|e| !e.cover_path.as_ref().is_some_and(|p| p.is_file()))
         .collect();
     let (crc_file, names_file, miss_file) = (
@@ -464,6 +464,16 @@ pub fn run(core: &Core, edition_id: Option<&str>, report: &mut ArtworkReport) {
                     };
                     official = crcs.iter().find_map(|c| map.get(c).cloned());
                 }
+            } else if e.wanted.is_some() {
+                // No file to hash: find the typed title in the official list.
+                let map = dats
+                    .entry(dat)
+                    .or_insert_with(|| load_dat(&dat_dir, dat).ok());
+                let title = e.display_title.as_deref().unwrap_or(&e.scan_title);
+                official = map
+                    .as_ref()
+                    .and_then(|m| crate::wanted::best_match(m, title))
+                    .map(|(_, name)| name);
             }
         }
         if let Some(n) = &official {

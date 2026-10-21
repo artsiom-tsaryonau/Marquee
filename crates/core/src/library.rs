@@ -212,7 +212,11 @@ fn ingest_disc(
     }
     let edition_id = match existing.as_ref() {
         Some(row) => row.edition_id.clone(),
-        None => Uuid::new_v4().to_string(),
+        // A game added without files takes this file when it is the same game.
+        None => match crate::wanted::claim(db, &descriptor.id, &title_from_filename(path))? {
+            Some(id) => id,
+            None => Uuid::new_v4().to_string(),
+        },
     };
     let media_id = match existing.as_ref() {
         Some(row) => row.id.clone(),
@@ -342,6 +346,7 @@ pub fn snapshot_editions(db: &Db) -> Result<Vec<Edition>> {
     let media = snapshot_media(db)?;
     let covers: BTreeMap<String, String> = db.list_cover_paths()?.into_iter().collect();
     let infos = crate::romfacts::list(db)?;
+    let wanted = crate::wanted::statuses(db)?;
     db.list_editions()?
         .into_iter()
         .map(|row| {
@@ -360,6 +365,7 @@ pub fn snapshot_editions(db: &Db) -> Result<Vec<Edition>> {
             Ok(Edition {
                 cover_path: covers.get(&row.id).map(PathBuf::from),
                 info: infos.get(&row.id).cloned(),
+                wanted: wanted.get(&row.id).cloned(),
                 id: row.id,
                 system: row.system,
                 title: row

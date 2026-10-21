@@ -254,9 +254,10 @@
     display: grid;
     place-items: center;
     font-weight: 800;
-    color: #fff;
-    background: conic-gradient(from 200deg, #f472b6, #8b5cf6, #22d3ee, #f472b6);
-    box-shadow: 0 6px 20px -4px rgb(139 92 246 / 0.7);
+    color: #e6e4f2;
+    /* Quiet slate: the mark should not compete with the games. */
+    background: linear-gradient(150deg, #4b4a68, #2a2940);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.12), 0 4px 12px -4px rgb(0 0 0 / 0.6);
   }
   .word {
     font-weight: 800;

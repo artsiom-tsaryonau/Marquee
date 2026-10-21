@@ -18,6 +18,7 @@ export interface LibraryView {
   revision: string;
   playerMode: PlayerMode;
   installedOnly: boolean;
+  noFiles: boolean;
   favOnly: boolean;
   sort: SortKey;
   filtersOpen: boolean;
@@ -33,7 +34,7 @@ const views = new Map<string, LibraryView>();
 function fresh(): LibraryView {
   const view = $state<LibraryView>({
     query: '', platform: '', sourceFilter: '', region: '', language: '', revision: '', playerMode: '',
-    installedOnly: false, favOnly: false, sort: 'title', filtersOpen: false,
+    installedOnly: false, noFiles: false, favOnly: false, sort: 'title', filtersOpen: false,
     visibleCount: PAGE, scrollY: 0, signature: '',
   });
   return view;

@@ -315,7 +315,7 @@ pub fn run(core: &Core, edition_id: Option<&str>) -> usize {
     for e in snap
         .editions
         .iter()
-        .filter(|e| !e.missing && edition_id.is_none_or(|id| id == e.id))
+        .filter(|e| (!e.missing || e.wanted.is_some()) && edition_id.is_none_or(|id| id == e.id))
     {
         let have = e.info.clone().unwrap_or_default();
         if edition_id.is_none() {
@@ -337,21 +337,32 @@ pub fn run(core: &Core, edition_id: Option<&str>) -> usize {
             let facts = systems
                 .entry(list)
                 .or_insert_with(|| load_system(&dat_dir, list));
-            if let (Some(facts), Some(m)) = (
-                facts.as_ref(),
-                snap.media
-                    .iter()
-                    .find(|m| m.edition_id == e.id && m.available),
-            ) {
-                let path = m.path.to_string_lossy().into_owned();
-                let stamp = (m.size_bytes, m.mtime);
-                let crcs = match crc_cache.0.get(&path) {
-                    Some((s, t, c)) if (*s, *t) == stamp => c.clone(),
-                    _ => {
-                        let c = romart::crcs_of(&m.path).unwrap_or_default();
-                        crc_cache.0.insert(path, (stamp.0, stamp.1, c.clone()));
-                        c
+            let media = snap
+                .media
+                .iter()
+                .find(|m| m.edition_id == e.id && m.available);
+            if let Some(facts) = facts.as_ref() {
+                let crcs: Vec<u32> = match media {
+                    Some(m) => {
+                        let path = m.path.to_string_lossy().into_owned();
+                        let stamp = (m.size_bytes, m.mtime);
+                        match crc_cache.0.get(&path) {
+                            Some((s, t, c)) if (*s, *t) == stamp => c.clone(),
+                            _ => {
+                                let c = romart::crcs_of(&m.path).unwrap_or_default();
+                                crc_cache.0.insert(path, (stamp.0, stamp.1, c.clone()));
+                                c
+                            }
+                        }
                     }
+                    // A game without files: the typed title picks the list entry.
+                    None if e.wanted.is_some() => {
+                        let title = e.display_title.as_deref().unwrap_or(&e.scan_title);
+                        crate::wanted::best_match(&facts.names, title)
+                            .map(|(crc, _)| vec![crc])
+                            .unwrap_or_default()
+                    }
+                    None => vec![],
                 };
                 let find =
                     |map: &HashMap<u32, String>| crcs.iter().find_map(|c| map.get(c).cloned());

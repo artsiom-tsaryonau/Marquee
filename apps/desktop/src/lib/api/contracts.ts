@@ -44,6 +44,8 @@ export interface Edition {
   region: string | null;
   cover_path: string | null;
   info?: GameInfo | null;
+  /** `wishlist` or `owned` for a game that has no files yet. */
+  wanted?: 'wishlist' | 'owned' | null;
 }
 
 /** Genre, year, developer, publisher, players and description, from libretro and TheGamesDB. */
@@ -303,6 +305,10 @@ export interface LibraryApi {
   launch(editionId: string): Promise<Session>;
   setFavourite(editionId: string, favorite: boolean): Promise<void>;
   setDisplayTitle(editionId: string, title: string): Promise<void>;
+  /** A game without files: Play stays disabled until a matching file is scanned. Returns its edition id. */
+  addWantedGame(system: string, title: string, status: 'wishlist' | 'owned'): Promise<string>;
+  setWantedStatus(editionId: string, status: 'wishlist' | 'owned'): Promise<void>;
+  removeWantedGame(editionId: string): Promise<void>;
   subscribe(handler: (event: CoreEvent) => void): () => void;
   whenReady(): Promise<void>;
   /** Address that opens this same library in a browser (desktop only). */

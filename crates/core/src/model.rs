@@ -140,6 +140,9 @@ pub struct Edition {
     pub cover_path: Option<PathBuf>,
     #[serde(default)]
     pub info: Option<GameInfo>,
+    /// `wishlist` or `owned` for a game that has no files yet.
+    #[serde(default)]
+    pub wanted: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
