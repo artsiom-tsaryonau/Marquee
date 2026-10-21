@@ -2,10 +2,10 @@
   import { fly } from 'svelte/transition';
   import { app } from '../state.svelte';
   import { platformLabel, sourceLabel } from '../labels';
-  import { canonicalId, editionKey, editionLabel, launchMethod, methodLabel } from '../unified';
-  import { ago, hours, transferLine } from '../format';
+  import { canonicalId, groupGames, editionKey, editionLabel, launchMethod, methodLabel } from '../unified';
+  import { canPlay, emulatorName, gameStatus, portAction } from '../presentation';
+  import { cleanTitle, ago, hours, transferLine } from '../format';
   import Artwork from '../components/Artwork.svelte';
-  import Logo from '../components/Logo.svelte';
   import Icon from '../components/Icon.svelte';
   import Row from '../components/Row.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
@@ -17,10 +17,11 @@
   const choices = $derived(g ? variants.filter((x) => editionKey(x) === editionKey(g)) : []);
   function choose(id: string) { app.chooseVariant(id); }
   const port = $derived(g?.source === 'port' ? app.ports.find((p) => `port:${p.id}` === g.id) : undefined);
-  const similar = $derived(g ? app.games.filter((x) => canonicalId(x) !== canonicalId(g) && ((!!g.genre && x.genre === g.genre) || x.source === g.source)).slice(0, 10) : []);
+  const similar = $derived(g?.genre ? groupGames(app.games.filter((x) => canonicalId(x) !== canonicalId(g) && x.genre === g.genre && canPlay(x))).map((group) => group.game).slice(0, 10) : []);
   const dur = $derived(app.motionReduced ? 0 : 360);
   const offline = $derived(!!g && g.source === 'rom' && g.platform !== 'unknown');
-  const emulator = $derived(g?.runnerName?.replace(' (Marquee)', '') ?? (g?.platform === 'ps1' ? 'DuckStation' : g?.platform === 'ps2' ? 'PCSX2' : 'its emulator'));
+  const emulator = $derived(g ? emulatorName(g) : 'emulator');
+  const status = $derived(g ? gameStatus(g) : null);
   const share = $derived(g && offline ? app.transferFor(g.id) : undefined);
   $effect(() => { if (app.torrentsOn) return app.watchTransfers(); });
   let editing = $state(false);
@@ -40,19 +41,24 @@
       : '',
   );
 
-  const playLabel = $derived(
-    !g
-      ? 'Play'
-      : g.lutris ? (g.mediaMissing ? 'Files unavailable' : g.installed ? 'Play via Lutris' : 'Install in Lutris')
-      : g.setupState === 'missing'
-        ? `Open ${emulator} setup`
-        : g.mediaMissing
-          ? 'Disc files unavailable'
-          : g.installed
-            ? 'Play'
-            : 'Reconnect',
-  );
-  const playReady = $derived(!!g && g.installed && !g.mediaMissing && g.setupState !== 'missing');
+  const playReady = $derived(!!g && canPlay(g));
+  const playLabel = $derived(!g ? 'Play' : g.rootOffline || g.mediaMissing ? 'Review library files' :
+    g.setupState === 'missing' ? 'Add firmware' : port ? port.status === 'update' ? 'Open port' : portAction(port).label :
+    g.lutris && !g.installed ? 'Install in Lutris' : playReady ? 'Play' : 'View setup in Tools');
+  function primary() {
+    if (!g) return;
+    if (g.rootOffline || g.mediaMissing) { app.go('library'); return; }
+    if (g.setupState === 'missing') { void app.importBios(); return; }
+    if (port && !playReady) {
+      if (portAction(port).operation === 'launch' || port.status === 'update') void app.launchPort(port);
+      else if (portAction(port).operation === 'folder') void app.openPortFolder(port);
+      else void app.installPort(port);
+      return;
+    }
+    if (g.lutris) { void app.openLutrisGame(g); return; }
+    if (playReady) app.play(g);
+    else app.go('tools');
+  }
 </script>
 
 {#if !g}
@@ -64,7 +70,7 @@
   </article>
 {:else}
 <article class="page" style="--accent-h:{g.art.hue2}">
-  <div class="banner">
+  <div class="banner" class:cover-backdrop={!g.heroUrl}>
     {#if g.heroUrl || g.coverUrl}
       <img class="banner-cover" src={g.heroUrl ?? g.coverUrl} alt="" />
     {:else}
@@ -76,11 +82,14 @@
   <div class="head" in:fly={{ y: 20, duration: dur }}>
     <button class="back" data-nav onclick={() => app.back()}><Icon name="back" size={18} /> Back</button>
     {#if editing && offline}
-      <input class="rename" data-nav bind:value={titleDraft} onkeydown={(e) => { if (e.key === 'Enter') { void app.rename(g, titleDraft); editing = false; } if (e.key === 'Escape') editing = false; }} />
+      <label class="rename-label">Game title<input class="rename" data-nav bind:value={titleDraft} onkeydown={(e) => { if (e.key === 'Enter') { void app.rename(g, titleDraft); editing = false; } if (e.key === 'Escape') { editing = false; e.stopPropagation(); } }} /></label>
+      <div class="rename-actions"><button class="btn glass small" data-nav onclick={() => { void app.rename(g, titleDraft); editing = false; }}>Save title</button><button class="btn glass small" data-nav onclick={() => (editing = false)}>Cancel</button></div>
     {:else}
-      <Logo game={g} size="lg" />
+      <h1 title={g.title}>{cleanTitle(g.title)}</h1>
     {/if}
-    <p class="tagline">{g.tagline}</p>
+    {#if !g.heroUrl && g.coverUrl}<img class="detail-poster" src={g.coverUrl} alt="" />{/if}
+    <p class="tagline">{platformLabel[g.platform]}{g.region ? ` · ${g.region}` : ''}{g.revision ? ` · Revision ${g.revision}` : ''}</p>
+    {#if status}<p class="availability" role="status">{status.label}</p>{/if}
     {#if variants.length > 1 || g.editionLabel}
       <div class="variant-picker glass-panel">
         <label>Edition
@@ -98,7 +107,7 @@
     {/if}
     <div class="actions">
       {#if g.wanted}
-        <button class="btn primary big" data-nav disabled><Icon name="download" /> Play · no files yet</button>
+        <button class="btn primary big" data-nav onclick={() => app.addGames()}><Icon name="folder" /> Add game files</button>
         <button class="btn glass" data-nav onclick={() => app.setWantedStatus(g, g.wanted === 'wishlist' ? 'owned' : 'wishlist')}>{g.wanted === 'wishlist' ? 'I own this' : 'Move to wishlist'}</button>
         <button class="btn glass" data-nav onclick={() => app.removeWantedGame(g)}><Icon name="x" /> Remove</button>
       {:else if g.source === 'catalogue'}
@@ -107,20 +116,8 @@
         {#if g.platform === 'ps2'}<InstallMenu tone="primary" size="big" />
         {:else}<button class="btn primary big" data-nav onclick={() => app.go('tools')}><Icon name="settings" /> Set up {g.platform === 'ps1' ? 'DuckStation' : g.platform === 'genesis' ? 'BlastEm' : g.platform === 'ds' ? 'melonDS' : g.platform === 'neogeo' ? 'FinalBurn Neo' : 'emulator'}</button>{/if}
       {:else}
-        <button
-          class="btn primary big"
-          class:play={playReady}
-          data-nav
-          disabled={!!g.mediaMissing}
-          aria-label={playReady ? playLabel : undefined}
-          onclick={() => {
-            if (g.lutris) void app.openLutrisGame(g);
-            else if (offline && g.setupState === 'missing') app.explainBios();
-            else if (g.installed) app.play(g);
-          }}
-        >
-          <Icon name={g.installed && g.setupState !== 'missing' ? 'play' : 'download'} size={playReady ? 28 : 24} />
-          {#if !playReady}{playLabel}{/if}
+        <button class="btn primary big" data-nav onclick={primary}>
+          <Icon name={playReady ? 'play' : 'folder'} size={24} /> {playLabel}
         </button>
       {/if}
       {#if offline && (g.serial || g.wanted) && !g.coverUrl}
@@ -131,11 +128,16 @@
       {#if g.portStatus === 'update'}
         <button class="btn glass" data-nav onclick={() => port && app.installPort(port)}><Icon name="refresh" /> Update</button>
       {/if}
-      <button class="btn glass icon" data-nav aria-label="Favourite" disabled={g.source === 'port' || g.source === 'catalogue' || !!g.lutris} onclick={() => app.toggleFavorite(g)}>
+      <button class="btn glass icon" data-nav aria-label="Favourite" aria-pressed={g.favorite} disabled={g.source === 'port' || g.source === 'catalogue' || !!g.lutris} onclick={() => app.toggleFavorite(g)}>
         <Icon name="star" filled={g.favorite} />
       </button>
       {#if offline}
-        <button class="btn glass" data-nav onclick={() => { titleDraft = g.title; editing = true; }}><Icon name="image" /> Rename</button>
+        <details class="manage-menu"><summary class="btn glass" data-nav>Manage game <Icon name="chevron" size={16} /></summary>
+          <div class="manage-actions glass-panel">
+            <button class="btn glass small" data-nav onclick={() => { titleDraft = g.title; editing = true; }}>Edit title</button>
+            <button class="btn glass small" data-nav onclick={() => app.go('tools')}>Emulator settings</button>
+          </div>
+        </details>
         {#if app.torrentsOn && app.torrentSettings.seeding}
           {#if !share}
             <button class="btn glass" data-nav onclick={() => app.shareGame(g)}><Icon name="share" /> Share</button>
@@ -160,11 +162,11 @@
       {#if g.description}
         <h3>About</h3>
         <p class="about">{g.description}</p>
-        <p class="media-credit">Description from TheGamesDB.</p>
+        {#if g.descriptionSource}<p class="media-credit">Description source: {g.descriptionSource}</p>{/if}
       {/if}
-      <CatalogueDetails game={g} />
+      {#if g.metadata || g.source === 'rom' && app.catalogue.records.length}<details class="technical"><summary data-nav>Game identification and metadata</summary><CatalogueDetails game={g} /></details>{/if}
       {#if g.screenshots?.length}
-      <h3>Screenshots · OpenGOAL</h3>
+      <h3>Screenshots</h3>
       <div class="shots" data-nav-row>
         {#each g.screenshots as shot}<a class="shot" href={shot.url} target="_blank" rel="noreferrer" data-nav aria-label={shot.caption}><img src={shot.url} alt={shot.caption} loading="lazy" /></a>{/each}
       </div>
@@ -185,8 +187,8 @@
 
     <aside class="facts glass-panel">
       <dl>
-        <dt>Source</dt>
-        <dd><span class="pill">{sourceLabel[g.source]}</span></dd>
+        <dt>{g.source === 'rom' || g.source === 'port' ? 'Run method' : 'Library source'}</dt>
+        <dd><span class="pill">{g.source === 'rom' || g.source === 'port' ? methodLabel[launchMethod(g)] : sourceLabel[g.source]}</span></dd>
         {#if g.metadata?.url}
           <dt>Source page</dt>
           <dd><button type="button" class="facts-link" data-nav onclick={() => app.openCataloguePage(g.metadata!.id)}>Open in browser</button></dd>
@@ -214,7 +216,7 @@
         {/if}
         {#if g.setupState}
           <dt>{emulator}</dt>
-          <dd>{g.setupState.replace('_', ' ')}</dd>
+          <dd>{{ runner_missing: 'Not installed', missing: 'Firmware required', unverified: 'Firmware not yet checked', launch_tested: 'Previously started' }[g.setupState]}</dd>
         {/if}
         {#if g.steam && !offline}
           <dt>Players now</dt>
@@ -226,13 +228,13 @@
         {/if}
         {#if !offline && g.platform === 'pc-windows' && g.source !== 'steam'}
           <dt>Compatibility</dt>
-          <dd><span class="badge gold">ProtonDB Gold</span> <span class="badge ok">No anti-cheat</span></dd>
+          <dd>Unknown · no verified report</dd>
         {/if}
       </dl>
     </aside>
   </div>
 
-  <Row title="More like this" games={similar} />
+  <Row title="More in this genre" games={similar} />
 </article>
 {/if}
 
@@ -251,10 +253,24 @@
   .banner {
     position: absolute;
     inset: 0 0 auto;
-    height: min(62vh, 620px);
+    height: clamp(320px, 48vh, 480px);
     z-index: -1;
     overflow: hidden;
   }
+  .cover-backdrop .banner-cover { filter:blur(32px) saturate(.55) brightness(.45); transform:scale(1.15); }
+  h1 { margin:0; font-size:clamp(30px, 4vw, 54px); line-height:1.12; letter-spacing:-.03em; text-wrap:balance; max-width:22ch; }
+  .detail-poster { position:absolute; right:var(--gutter); bottom:28px; width:140px; aspect-ratio:2/3; object-fit:contain; border-radius:12px; box-shadow:0 16px 40px rgb(0 0 0 / .4); }
+  @media(min-width:1100px) { .head:has(.detail-poster) { padding-right:210px; } }
+  @media(max-width:1099px) { .detail-poster { display:none; } }
+  .head { position:relative; }
+  .availability { margin:0; color:var(--warn); font-size:14px; }
+  .technical { margin-top:24px; }
+  .technical > summary { cursor:pointer; padding:14px 0; color:var(--text-soft); }
+  .manage-menu { position:relative; }
+  .manage-menu summary { list-style:none; cursor:pointer; }
+  .manage-actions { position:absolute; top:calc(100% + 8px); left:0; z-index:10; display:grid; gap:8px; min-width:210px; border-radius:12px; padding:10px; background:var(--surface-strong); }
+  .rename-label { display:grid; gap:8px; }
+  .rename-actions { display:flex; gap:8px; }
   .banner-cover {
     width: 100%;
     height: 100%;
@@ -269,8 +285,8 @@
       linear-gradient(180deg, transparent 40%, var(--bg));
   }
   .head {
-    min-height: min(62vh, 620px);
-    padding: 24px var(--gutter) 28px;
+    min-height: clamp(280px, 42vh, 430px);
+    padding: 84px var(--gutter) 28px;
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
@@ -309,7 +325,7 @@
     border: 1px solid var(--line);
     border-radius: 12px;
     padding: 8px 12px;
-    max-width: 16ch;
+    width:min(100%, 640px);
   }
   .actions {
     display: flex;

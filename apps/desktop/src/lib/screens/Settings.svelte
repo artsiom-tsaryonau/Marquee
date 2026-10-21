@@ -6,6 +6,8 @@
   import Icon from '../components/Icon.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
 
+  const categories = [['appearance', 'Appearance'], ['games', 'Games and controls'], ['library', 'Library locations'], ['providers', 'Artwork and API keys'], ['devices', 'Device sharing']] as const;
+  let category = $state<string>('appearance');
   let drafts = $state<Record<string, string>>({});
   let link = $state('');
   $effect(() => { if (app.torrentsOn) return app.watchTransfers(); });
@@ -14,8 +16,8 @@
   const sourceLabel = (k: KeyInfo) =>
     ({
       app: `Saved in Marquee · ${k.preview}`,
-      env: `From the environment · ${k.preview} · saving here overrides it`,
-      dot_env: `From a .env file · ${k.preview} · saving here overrides it`,
+      env: `From the environment · ${k.preview} · save here to use a different key`,
+      dot_env: `From a .env file · ${k.preview} · save here to use a different key`,
       none: 'Not set',
     })[k.source];
 
@@ -29,37 +31,42 @@
 
 <div class="settings">
   <h1>Settings</h1>
+  <div class="settings-layout">
+    <nav class="settings-nav" aria-label="Settings categories">
+      {#each categories as [id, label]}<button data-nav class:on={category === id} aria-pressed={category === id} onclick={() => (category = id)}>{label}</button>{/each}
+    </nav>
+    <div class="settings-content">
 
   {#each [{ id: 'ps1', name: 'PlayStation', emulator: 'DuckStation', kind: 'duckstation' }, { id: 'ps2', name: 'PlayStation 2', emulator: 'PCSX2', kind: 'pcsx2' }] as system}
     {@const runner = app.runnerFor(system.id)}
     {@const choices = app.runners.filter((r) => r.kind === system.kind)}
-    <section class="glass-panel">
+    <section class="glass-panel" hidden={category !== 'library'}>
       <h2>{system.name}</h2>
       <div class="item"><div><strong>Disc folders</strong>
         {#each app.roots.filter((r) => r.system === system.id) as root}<span>{root.path} · {root.status}</span>{:else}<span>No folder selected</span>{/each}
-        <span>{app.games.filter((g) => g.source === 'rom' && g.platform === system.id).length} disc/image entries · {system.id === 'ps1' ? 'ISO, CHD, CUE with its tracks' : 'ISO'}</span>
+        <span>{app.games.filter((g) => g.source === 'rom' && g.platform === system.id).length} games found · {system.id === 'ps1' ? 'ISO, CHD, CUE with its tracks' : 'ISO'}</span>
       </div><button class="btn glass small" data-nav onclick={() => app.addSystemFolder(system.id)}><Icon name="folder" size={16} /> Add folder</button></div>
-      <div class="item"><div><strong>{system.emulator}</strong><span>{runner ? `${runner.display_name} · ${runner.bios_state === 'launch_tested' ? 'previously launched' : runner.bios_state}` : 'No available emulator detected'}</span>
+      <div class="item"><div><strong>{system.emulator}</strong><span>{runner ? `${runner.display_name} · ${runner.bios_state === 'launch_tested' ? 'previously started' : runner.bios_state === 'unverified' ? 'firmware not yet checked' : runner.bios_state === 'missing' ? 'firmware required' : runner.bios_state}` : 'No available emulator detected'}</span>
         {#if runner?.bios_hint}<span>{runner.bios_hint}</span>{/if}
         {#if system.id === 'ps2' && app.installingPcsx2}<span>{app.installProgress || 'Installing…'}</span>{/if}
         {#if !runner && system.id === 'ps1'}<span>Install DuckStation from Tools; Marquee downloads and configures it for you.</span>{/if}
       </div><div class="row-actions">
-        {#if system.id === 'ps2'}<InstallMenu tone="primary" size="small" />{:else if !runner}<a class="btn glass small" data-nav href="https://github.com/stenzek/duckstation" target="_blank" rel="noreferrer">Get DuckStation ↗</a>{/if}
+        {#if system.id === 'ps2'}<InstallMenu tone="primary" size="small" />{:else if !runner}<button class="btn glass small" data-nav onclick={() => app.go('tools')}>Set up in Tools</button>{/if}
       </div></div>
-      {#if choices.length > 1}<div class="item"><div><strong>Default runner</strong><span>Saved independently for {system.name}</span></div><select data-nav aria-label={`${system.name} default runner`} value={runner?.id || ''} onchange={(e) => app.chooseRunner(e.currentTarget.value)}>{#each choices as choice}<option value={choice.id} disabled={!choice.available}>{choice.display_name}{choice.available ? '' : ' · unavailable'}</option>{/each}</select></div>{/if}
+      {#if choices.length > 1}<div class="item"><div><strong>Default emulator</strong><span>Saved independently for {system.name}</span></div><select data-nav aria-label={`${system.name} default emulator`} value={runner?.id || ''} onchange={(e) => app.chooseRunner(e.currentTarget.value)}>{#each choices as choice}<option value={choice.id} disabled={!choice.available}>{choice.display_name}{choice.available ? '' : ' · unavailable'}</option>{/each}</select></div>{/if}
     </section>
   {/each}
-  <section class="glass-panel">
+  <section class="glass-panel" hidden={category !== 'library'}>
     <h2>Disc library maintenance</h2>
-    <div class="item"><div><strong>Last import</strong><span>{app.lastScan ? `${app.lastScan.added} added · ${app.lastScan.skipped_unsupported} companion or unsupported files` : 'Not scanned in this window'}</span></div><button class="btn glass small" data-nav onclick={() => app.rescan()} disabled={app.scanning}>{app.scanning ? 'Scanning…' : 'Rescan folders'}</button></div>
+    <div class="item"><div><strong>Last import</strong><span>{app.lastScan ? `${app.lastScan.added} added · ${app.lastScan.skipped_unsupported} companion or unsupported files` : 'No scan results available in this session'}</span></div><button class="btn glass small" data-nav onclick={() => app.rescan()} disabled={app.scanning}>{app.scanning ? 'Scanning…' : 'Rescan folders'}</button></div>
     <div class="item"><div><strong>Emulator detection</strong><span>Refresh after installing or moving an emulator.</span></div><button class="btn glass small" data-nav onclick={() => app.refreshRunners()}>Refresh emulators</button></div>
     <div class="item"><div><strong>Box art</strong><span>Looks up PS1 and PS2 covers by disc serial. Missing artwork never blocks Play.</span></div><button class="btn glass small" data-nav onclick={() => app.refreshArtwork()} disabled={app.fetchingArt || !app.games.length}>{app.fetchingArt ? 'Fetching…' : 'Fetch covers'}</button></div>
   </section>
 
-  <section class="glass-panel">
+  <section class="glass-panel" hidden={category !== 'providers'}>
     <h2>API keys</h2>
     <p class="hint">
-      Saved on this computer in a file only you can read. After you save a secret, Marquee shows only where it comes from and its last four characters, never the value. A value saved here beats the environment and any .env file.
+      Optional provider keys enable artwork and supported library features. Secrets stay on this computer; only their last four characters are shown after saving. Installed games do not require an artwork key.
     </p>
     {#each app.keys as k (k.id)}
       <div class="item key">
@@ -88,7 +95,7 @@
     {/each}
   </section>
 
-  <section class="glass-panel">
+  <section class="glass-panel" hidden={category !== 'games'}>
     <h2>Games</h2>
     <div class="item">
       <div>
@@ -102,7 +109,7 @@
     </div>
   </section>
 
-  <section class="glass-panel">
+  <section class="glass-panel" hidden={category !== 'devices'}>
     <h2>Share games between your devices</h2>
     <div class="item">
       <div>
@@ -160,7 +167,7 @@
   </section>
 
   {#if app.webUrl}
-  <section class="glass-panel">
+  <section class="glass-panel" hidden={category !== 'devices'}>
     <h2>Web access</h2>
     <div class="item">
       <div>
@@ -175,27 +182,28 @@
   {/if}
 
 
-  <section class="glass-panel">
+  <section class="glass-panel" hidden={category !== 'appearance'}>
     <h2>Look and feel</h2>
     <div class="item">
-      <div><strong>Mode</strong><span>Big Screen is fullscreen, controller-first, larger everything</span></div>
+      <div><strong>Mode</strong><span>Big Screen uses larger cards and controller navigation. Native controller support depends on your environment.</span></div>
       <div class="seg" data-nav-row>
-        <button data-nav class:on={app.mode === 'desktop'} onclick={() => (app.mode = 'desktop')}><Icon name="monitor" size={16} /> Desktop</button>
-        <button data-nav class:on={app.mode === 'big'} onclick={() => (app.mode = 'big')}><Icon name="tv" size={16} /> Big Screen</button>
+        <button data-nav aria-pressed={app.mode === 'desktop'} class:on={app.mode === 'desktop'} onclick={() => (app.mode = 'desktop')}><Icon name="monitor" size={16} /> Desktop</button>
+        <button data-nav aria-pressed={app.mode === 'big'} class:on={app.mode === 'big'} onclick={() => (app.mode = 'big')}><Icon name="tv" size={16} /> Big Screen</button>
       </div>
     </div>
+    <div class="item"><div><strong>Keep navigation expanded</strong><span>Show sidebar labels in desktop mode.</span></div><button class="switch" class:on={app.sidebarExpanded} data-nav role="switch" aria-checked={app.sidebarExpanded} aria-label="Keep navigation expanded" onclick={() => (app.sidebarExpanded = !app.sidebarExpanded)}><i></i></button></div>
     <div class="item">
       <div><strong>Theme</strong><span>Dark is the default</span></div>
       <div class="seg" data-nav-row>
-        <button data-nav class:on={app.theme === 'dark'} onclick={() => (app.theme = 'dark')}><Icon name="moon" size={16} /> Dark</button>
-        <button data-nav class:on={app.theme === 'light'} onclick={() => (app.theme = 'light')}><Icon name="sun" size={16} /> Light</button>
+        <button data-nav aria-pressed={app.theme === 'dark'} class:on={app.theme === 'dark'} onclick={() => (app.theme = 'dark')}><Icon name="moon" size={16} /> Dark</button>
+        <button data-nav aria-pressed={app.theme === 'light'} class:on={app.theme === 'light'} onclick={() => (app.theme = 'light')}><Icon name="sun" size={16} /> Light</button>
       </div>
     </div>
     <div class="item">
       <div><strong>Visual effects</strong><span>Balanced reduces GPU work. Full enables backdrop blur, grain and pointer tilt.</span></div>
       <div class="seg" data-nav-row>
-        <button data-nav class:on={app.visualEffects === 'balanced'} onclick={() => (app.visualEffects = 'balanced')}>Balanced</button>
-        <button data-nav class:on={app.visualEffects === 'full'} onclick={() => (app.visualEffects = 'full')}>Full</button>
+        <button data-nav aria-pressed={app.visualEffects === 'balanced'} class:on={app.visualEffects === 'balanced'} onclick={() => (app.visualEffects = 'balanced')}>Balanced</button>
+        <button data-nav aria-pressed={app.visualEffects === 'full'} class:on={app.visualEffects === 'full'} onclick={() => (app.visualEffects = 'full')}>Full</button>
       </div>
     </div>
     <div class="item">
@@ -208,7 +216,7 @@
     </div>
   </section>
 
-  <section class="glass-panel">
+  <section class="glass-panel" hidden={category !== 'games'}>
     <h2>Controller</h2>
     <div class="item">
       <div><strong>Last input</strong><span>Arrow keys, Enter and Esc work like a D-pad, A and B</span></div>
@@ -216,15 +224,26 @@
     </div>
   </section>
 
+    </div>
+  </div>
 </div>
 
 <style>
   .settings {
     padding: 36px var(--gutter);
-    max-width: 860px;
+    max-width: 1400px;
+    width:100%;
+    margin:auto;
     display: grid;
     gap: 18px;
   }
+  .settings-layout { display:grid; grid-template-columns:220px minmax(0,860px); gap:32px; align-items:start; }
+  .settings-nav { display:grid; gap:6px; position:sticky; top:24px; }
+  .settings-nav button { text-align:left; border:0; border-radius:10px; padding:14px 16px; background:none; color:var(--text-soft); font:inherit; cursor:pointer; }
+  .settings-nav button.on { background:var(--field-strong); color:var(--text); font-weight:700; }
+  .settings-content { display:grid; gap:18px; min-width:0; }
+  section[hidden] { display:none; }
+  @media(max-width:900px) { .settings-layout { grid-template-columns:1fr; gap:18px; } .settings-nav { display:flex; flex-wrap:wrap; position:static; } }
   h1 {
     font-size: 32px;
     margin: 0 0 4px;

@@ -8,5 +8,5 @@
   "asset_suffix": "_linux.zip",
   "asset_excludes": [],
   "binary": "sm64coopdx",
-  "requirement": "baserom.us.z64 — detection/setup job planned; Open folder fallback"
+  "requirement": "Requires a compatible US Super Mario 64 ROM named baserom.us.z64 in the port folder."
 }

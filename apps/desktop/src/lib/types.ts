@@ -35,6 +35,8 @@ export interface GameEntry {
   metadata?: import('./api/contracts').CatalogueRecord;
   metadataMediaId?: string;
   metadataMatch?: string;
+  /** Backend raw-ISO matcher capability for this concrete media file. */
+  catalogueMatchSupported?: boolean;
   languages?: string[];
   revision?: string;
   players?: number;
@@ -103,7 +105,7 @@ export interface Ratings {
   steamReviews: { percent: number; count: number } | null;
 }
 
-export type PortStatus = 'ready' | 'needs-rom' | 'needs-data' | 'update' | 'not-installed';
+export type PortStatus = 'installed' | 'ready' | 'needs-rom' | 'needs-data' | 'update' | 'not-installed';
 
 export interface PortEntry {
   id: string;

@@ -8,5 +8,5 @@
   "asset_suffix": "x86_64.appimage",
   "asset_excludes": ["zsync", "mac", "windows"],
   "binary": null,
-  "requirement": "Doom WAD or Freedoom — setup job should offer both; manual pick fallback"
+  "requirement": "Requires a compatible Doom WAD or Freedoom game data in the port folder."
 }

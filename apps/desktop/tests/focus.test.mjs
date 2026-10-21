@@ -167,3 +167,23 @@ test('spatial navigation skips disabled launcher controls', () => {
   move('down');
   assert.equal(focused, 'enabled');
 });
+
+test('holding a direction repeats after a delay while A remains a single activation', () => {
+  const previousNow = Date.now;
+  let now = 1000, focusMoves = 0;
+  Date.now = () => now;
+  document.querySelectorAll = () => [{
+    closest: () => null, matches: () => false, getAttribute: () => null,
+    getBoundingClientRect: () => ({ width: 100, height: 40 }), focus: () => focusMoves++,
+  }];
+  try {
+    pads = [pad(0, true)]; pads[0].buttons[15].pressed = true;
+    connect(); frame();
+    assert.equal(focusMoves, 1); assert.equal(clicks, 1);
+    now = 1399; frame(); assert.equal(focusMoves, 1);
+    now = 1400; frame(); assert.equal(focusMoves, 2);
+    now = 1520; frame(); assert.equal(focusMoves, 3); assert.equal(clicks, 1);
+    pads[0].buttons[15].pressed = false; frame();
+    pads[0].buttons[15].pressed = true; frame(); assert.equal(focusMoves, 4);
+  } finally { Date.now = previousNow; }
+});

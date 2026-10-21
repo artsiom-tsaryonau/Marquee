@@ -44,7 +44,7 @@ cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev ports install zelda64rec
 
 **Demo (`pnpm dev`, no token, or `?demo=1`)** still uses invented titles and simulated playtime. Controller input in the browser is not evidence for the Tauri window.
 
-**Desktop** uses the real library and the same Home/Library/Tools/Ports/Downloads/Settings chrome as the demo. With no imported media or enabled source it is empty; existing code can also auto-discover a legacy Lutris library, pending the opt-in change described below. Install PCSX2 from Home, Library, or Settings: Marquee downloads the official AppImage and unpacks it into its own data dir (no Flatpak wizard). Point library roots at your disc folders (automated acquisition jobs are the target); covers are looked up by disc serial and cached. **Ports** install engine binaries from GitHub; retail data should eventually flow from store/detection jobs, with **Open folder** as fallback today. **Tools → Purple for Aion 2** provides managed setup and opening with progress, stop/retry and private diagnostics; Purple performs account sign-in, game downloads and patching. This is an unverified Linux compatibility recipe. Downloads on desktop is still empty chrome; Purple progress is on its Tools card. Other Windows-app recipes remain demo-only.
+**Desktop** uses the real library and the same Home/Library/Tools/Ports/Settings chrome as the demo. With no imported media or enabled source it is empty; existing code can also auto-discover a legacy Lutris library, pending the opt-in change described below. Install PCSX2 from Home, Library, or Settings: Marquee downloads the official AppImage and unpacks it into its own data dir (no Flatpak wizard). Point library roots at your disc folders (automated acquisition jobs are the target); covers are looked up by disc serial and cached. **Ports** install engine binaries from GitHub; retail data should eventually flow from store/detection jobs, with **Open folder** as fallback today. **Tools → Purple for Aion 2** provides managed setup and opening with progress, stop/retry and private diagnostics; Purple performs account sign-in, game downloads and patching. This is an unverified Linux compatibility recipe. A persistent Downloads screen is not implemented; Purple progress is on its Tools card. Other Windows-app recipes remain demo-only.
 
 Dev URL params: `?route=library`, `?mode=big`, `?theme=light`, `?game=<id suffix>`, `?add=1`, `?splash=0`, `?motion=0`, `?empty=1` (demo with no sample games, for the empty desktop look).
 
@@ -72,6 +72,10 @@ Keys (SteamGridDB, Steam Web API, SteamID, IGDB/Twitch, RAWG) are managed in **S
 ## Unified library and correction pass
 
 See [the unified-library model, Jak/OpenGOAL example, and next implementation milestone](docs/UNIFIED_LIBRARY.md) and [the correction report](docs/CORRECTIONS.md). The browser demo now includes a Jak edition/run selector; the real library includes installed native ports alongside discs.
+
+## UI and navigation
+
+See the [UI/UX implementation record and remaining visual acceptance](docs/UI_UX.md). Home contains personal library entries; catalogue records have their own discovery view. Installed port engines are labeled as needing unchecked game setup rather than automatically Ready to play. Settings groups everyday preferences separately from provider keys and library maintenance.
 
 ## Tools and launchers
 

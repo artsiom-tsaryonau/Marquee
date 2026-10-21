@@ -41,6 +41,8 @@ These are implemented capabilities; live acceptance gates are recorded separatel
 
 ## Completed increments — 2026-10-21
 
+- [x] [UI/UX implementation pass](UI_UX.md): explicit installation availability, personal/catalogue scope, title/artwork hierarchy, Tools/Settings organization and modal focus. Real port engine installation remains distinct from verified game-data readiness; visual/native controller acceptance remains open. This does not close store, job or emulator live gates.
+
 - [x] Correct mixed PS1/PS2 categorization, per-system setup/defaults, CUE availability and identity refresh, root-conflict reporting, and failed-launch accounting. The real collection validates as 9 PS1 + 2 PS2 entries with stable IDs.
 - [x] Add Purple installation/opening with managed umu/GE-Proton, dependency checkpoints, cancellation and diagnostics. Aion 2 sign-in/gameplay is unverified.
 - [x] Add seven managed emulator catalogue entries and the Tools install/open/update/remove panel, plus BIOS import/management. Native/Flatpak discovery was removed 2026-10-21.

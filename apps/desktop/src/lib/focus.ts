@@ -77,6 +77,7 @@ export function startFocusEngine(opts: { back: () => void; onInput: (label: stri
 
   // Browser Gamepad API: standard mapping, A=0 B=1 X=2 Y=3, D-pad 12-15.
   const heldByPad = new Map<number, Set<string>>();
+  const repeatByPad = new Map<number, Map<string, number>>();
   let raf = 0;
   let stopped = false;
   const active = () => !document.hidden && document.hasFocus();
@@ -89,6 +90,9 @@ export function startFocusEngine(opts: { back: () => void; onInput: (label: stri
       connected.add(pad.index);
       let held = heldByPad.get(pad.index);
       if (!held) heldByPad.set(pad.index, (held = new Set()));
+      let repeats = repeatByPad.get(pad.index);
+      if (!repeats) repeatByPad.set(pad.index, (repeats = new Map()));
+      const now = Date.now();
       const pressed = (i: number) => pad.buttons[i]?.pressed;
       const ax = pad.axes[0] ?? 0;
       const ay = pad.axes[1] ?? 0;
@@ -106,12 +110,14 @@ export function startFocusEngine(opts: { back: () => void; onInput: (label: stri
           opts.onInput(`Pad ${k.toUpperCase()}`);
           if (k === 'a') (document.activeElement as HTMLElement | null)?.click();
           else if (k === 'b') opts.back();
-          else move(k as Dir);
-        } else if (!on) held.delete(k);
+          else { move(k as Dir); repeats.set(k, now + 400); }
+        } else if (on && k !== 'a' && k !== 'b' && now >= (repeats.get(k) ?? Infinity)) {
+          move(k as Dir); repeats.set(k, now + 120);
+        } else if (!on) { held.delete(k); repeats.delete(k); }
       }
     }
     for (const index of heldByPad.keys()) {
-      if (!connected.has(index)) heldByPad.delete(index);
+      if (!connected.has(index)) { heldByPad.delete(index); repeatByPad.delete(index); }
     }
     // No controller connected: stop polling (no 60 fps wake-ups) until one appears.
     raf = connected.size > 0 ? requestAnimationFrame(poll) : 0;

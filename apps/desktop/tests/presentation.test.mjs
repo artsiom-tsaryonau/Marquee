@@ -1,0 +1,40 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { canPlay, gameStatus, portAction, emulatorName } from '../src/lib/presentation';
+
+const game = (overrides = {}) => ({ source: 'rom', platform: 'ps2', installed: true, ...overrides });
+
+test('files on disk do not imply a playable installation', () => {
+  for (const overrides of [
+    { source: 'catalogue' }, { wanted: 'owned' }, { wanted: 'wishlist' }, { rootOffline: true },
+    { mediaMissing: true }, { setupState: 'missing' }, { setupState: 'runner_missing' },
+    { source: 'port', portStatus: 'needs-rom' }, { source: 'port', portStatus: 'needs-data' },
+    { source: 'port', portStatus: 'installed' }, { source: 'port', portStatus: 'update' }, { installed: false },
+  ]) assert.equal(canPlay(game(overrides)), false, JSON.stringify(overrides));
+  assert.equal(canPlay(game({ setupState: 'unverified' })), true, 'optional verification never gates launch');
+  assert.equal(canPlay(game({ source: 'port', portStatus: 'ready' })), true);
+});
+
+test('an offline drive and a missing file retain different recovery states', () => {
+  assert.equal(gameStatus(game({ rootOffline: true, mediaMissing: true })).label, 'Drive unavailable');
+  assert.equal(gameStatus(game({ mediaMissing: true })).label, 'Files unavailable');
+  assert.equal(gameStatus(game({ installed: false })).label, 'Not installed');
+  assert.equal(gameStatus(game({ source: 'catalogue', installed: false })).label, 'Catalogue only');
+});
+
+test('missing port data never dispatches to engine installation', () => {
+  for (const status of ['needs-rom', 'needs-data']) {
+    assert.equal(portAction({ status }).operation, 'folder');
+    assert.match(portAction({ status }).label, /folder/);
+  }
+  assert.equal(portAction({ status: 'not-installed' }).operation, 'install');
+  assert.equal(portAction({ status: 'update' }).operation, 'install');
+  assert.deepEqual(portAction({ status: 'installed' }), { label: 'Open port', operation: 'launch' });
+  assert.deepEqual(portAction({ status: 'ready' }), { label: 'Play', operation: 'launch' });
+});
+
+test('launch names follow the selected emulator rather than defaulting every ROM to PCSX2', () => {
+  assert.equal(emulatorName(game({ platform: 'ps1' })), 'DuckStation');
+  assert.equal(emulatorName(game({ platform: 'ds' })), 'melonDS');
+  assert.equal(emulatorName(game({ platform: 'ps2', runnerName: 'Custom PCSX2 (Marquee)' })), 'Custom PCSX2');
+});

@@ -8,5 +8,5 @@
   "asset_suffix": "-linux-x64.tar.gz",
   "asset_excludes": [],
   "binary": "fallout2-ce",
-  "requirement": "GOG/Steam install detection should copy data files; Open folder fallback"
+  "requirement": "Requires Fallout 2 game data from your existing installation. Add the required files to the port folder."
 }

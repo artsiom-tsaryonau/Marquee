@@ -1,6 +1,7 @@
 <script lang="ts">
   import { fade, fly, scale } from 'svelte/transition';
   import { onMount } from 'svelte';
+  import { emulatorName } from './lib/presentation';
   import { uiIsStale } from './lib/build';
   import { app, type Route } from './lib/state.svelte';
   import { startFocusEngine } from './lib/focus';
@@ -19,7 +20,7 @@
   const nav: { route: Route; label: string; icon: IconName }[] = [
     { route: 'home', label: 'Home', icon: 'home' },
     { route: 'library', label: 'Library', icon: 'grid' },
-    { route: 'tools', label: 'Tools', icon: 'settings' },
+    { route: 'tools', label: 'Tools', icon: 'controller' },
     { route: 'ports', label: 'Ports', icon: 'puzzle' },
     { route: 'settings', label: 'Settings', icon: 'settings' },
   ];
@@ -102,17 +103,17 @@
 
 <div class="shell" inert={!!(app.launching || app.running || app.installToolId)}>
   {#if app.mode === 'desktop'}
-    <nav class="side glass-panel" aria-label="Main">
+    <nav class="side glass-panel" class:expanded={app.sidebarExpanded} aria-label="Main">
       <div class="brand"><span class="mark">M</span><span class="word">Marquee</span></div>
       {#each nav as n (n.route)}
-        <button class="nav" class:on={app.route === n.route} data-nav onclick={() => app.go(n.route)}>
+        <button class="nav" class:on={app.route === n.route} aria-current={app.route === n.route ? 'page' : undefined} data-nav onclick={() => app.go(n.route)}>
           <Icon name={n.icon} size={22} />
           <span>{n.label}</span>
         </button>
       {/each}
       <div class="spacer"></div>
-      <button class="nav add" data-nav onclick={() => app.addPs2Folder()}>
-        <Icon name="plus" size={22} /><span>Add PS2 folder</span>
+      <button class="nav add" data-nav onclick={() => app.addGames()}>
+        <Icon name="plus" size={22} /><span>Add games</span>
       </button>
       <button class="nav" data-nav onclick={() => (app.mode = 'big')}>
         <Icon name="tv" size={22} /><span>Big Screen</span>
@@ -123,11 +124,11 @@
       <div class="brand"><span class="mark">M</span></div>
       <div class="tabs" data-nav-row>
         {#each nav as n (n.route)}
-          <button class="tab" class:on={app.route === n.route} data-nav onclick={() => app.go(n.route)}>{n.label}</button>
+          <button class="tab" class:on={app.route === n.route} aria-current={app.route === n.route ? 'page' : undefined} data-nav onclick={() => app.go(n.route)}>{n.label}</button>
         {/each}
       </div>
       <div class="status">
-        <button class="tab" data-nav onclick={() => app.addPs2Folder()} aria-label="Add PS2 folder"><Icon name="plus" size={20} /></button>
+        <button class="tab" data-nav onclick={() => app.addGames()} aria-label="Add games"><Icon name="plus" size={20} /></button>
         <button class="tab" data-nav onclick={() => (app.mode = 'desktop')} aria-label="Desktop mode"><Icon name="monitor" size={20} /></button>
         <span class="time">{time}</span>
       </div>
@@ -155,7 +156,6 @@
     <footer class="hints">
       <span><kbd class="a">A</kbd> Select</span>
       <span><kbd class="b">B</kbd> Back</span>
-      <span><kbd>☰</kbd> Menu</span>
     </footer>
   {/if}
 </div>
@@ -172,10 +172,10 @@
       <Logo game={g} size="xl" />
       {#if app.launching}
         <div class="loader"><span></span></div>
-        <p>Starting via {g.source === 'steam' ? 'Steam' : g.source === 'port' ? 'native port' : g.source === 'rom' ? 'PCSX2' : 'Lutris'}…</p>
+        <p>Starting via {g.source === 'steam' ? 'Steam' : g.source === 'port' ? 'native port' : g.source === 'rom' ? emulatorName(g) : 'Lutris'}…</p>
       {:else}
         <p class="running"><span class="live"></span> Playing now</p>
-        <button class="btn glass" onclick={() => (app.dismissOverlay())}>Return to Marquee <kbd>Esc</kbd></button>
+        <button class="btn glass" data-nav onclick={() => (app.dismissOverlay())}>Return to Marquee <kbd>Esc</kbd></button>
       {/if}
     </div>
   </div>
@@ -233,6 +233,7 @@
     overflow: hidden;
     transition: width var(--side-close-duration) var(--ease);
   }
+  .side.expanded,
   .side:hover,
   .side:focus-within {
     width: 220px;
@@ -291,6 +292,7 @@
     opacity: 0;
     transition: opacity 160ms var(--ease);
   }
+  .side.expanded :is(.nav span, .word),
   .side:hover :is(.nav span, .word),
   .side:focus-within :is(.nav span, .word) {
     opacity: 1;

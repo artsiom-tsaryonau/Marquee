@@ -8,5 +8,5 @@
   "asset_suffix": ".appimage",
   "asset_excludes": ["mac", "win"],
   "binary": null,
-  "requirement": "Ocarina of Time ROM — setup job or first-launch picker (automation target)"
+  "requirement": "Requires compatible The Legend of Zelda: Ocarina of Time game files. Add your ROM to the port folder or use the port’s setup window."
 }

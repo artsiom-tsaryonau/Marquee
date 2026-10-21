@@ -73,9 +73,9 @@
     {#if app.catalogueError}<p role="alert">{app.catalogueError}</p>{/if}
   </section>
 {:else if game.source === 'rom' && app.catalogue.records.length}
-  <section class="metadata glass-panel"><h3>Match source metadata</h3>
-    <p>{stale ? 'The linked file or source variant changed. Its metadata is no longer applied.' : 'Match this raw ISO against imported SHA-1 values. Archives, CHD and CUE sets need content-aware matching and are not hashed here.'}</p>
-    <button class="btn glass small" data-nav disabled={app.catalogueBusy} onclick={() => app.catalogueAction(() => app.api.matchCatalogue(game.id), 'Exact SHA-1 metadata match linked')}>{app.catalogueBusy ? 'Working…' : 'Match raw ISO by SHA-1'}</button>
+  <section class="metadata glass-panel"><h3>Find game details</h3>
+    <p>{stale ? 'The linked file or source variant changed. Its metadata is no longer applied.' : 'Find an exact match in your imported catalogue to add release details and artwork. Only raw ISO files support this check.'}</p>
+    {#if game.catalogueMatchSupported}<button class="btn glass small" data-nav disabled={app.catalogueBusy} onclick={() => app.catalogueAction(() => app.api.matchCatalogue(game.id), 'Exact SHA-1 metadata match linked')}>{app.catalogueBusy ? 'Working…' : 'Find an exact match'}</button>{:else}<p>Exact matching is unavailable for this file. You can link a compatible catalogue entry manually in Catalogue discovery.</p>{/if}
     {#if stale}<button class="btn glass small" data-nav disabled={app.catalogueBusy} onclick={() => app.catalogueAction(() => app.api.unlinkCatalogue(game.id), 'Stale link removed')}>Remove stale link</button>{/if}
     {#if app.catalogueError}<p role="alert">{app.catalogueError}</p>{/if}
   </section>

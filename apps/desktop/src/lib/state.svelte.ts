@@ -4,6 +4,7 @@ import type { BiosFile, CoreEvent, TorrentSettings, TransferItem, TransferStatus
 import { nativePortGame, canonicalId } from './unified';
 import { lutrisToGame } from './lutris';
 import { artFromSeed } from './art';
+import { libraryView } from './libraryView.svelte';
 import { describeScan } from './format';
 import { installOption } from './install';
 import type { GameEntry, PortEntry } from './types';
@@ -39,6 +40,7 @@ class AppState {
   heroId = $state<string | null>(null);
 
   mode = $state<'desktop' | 'big'>(load('mode', 'desktop'));
+  sidebarExpanded = $state(load('sidebarExpanded', false));
   theme = $state<'dark' | 'light'>(load('theme', 'dark'));
   reduceMotion = $state<boolean>(load('reduceMotion', false));
   visualEffects = $state<'balanced' | 'full'>(load<string>('visualEffects', 'balanced') === 'full' ? 'full' : 'balanced');
@@ -97,8 +99,9 @@ class AppState {
 
   /** What the home page opens on: what you played last, else a favourite, else a game with a cover. */
   defaultHero(): GameEntry | null {
-    const played = this.games.filter((g) => g.lastPlayed).sort((a, b) => b.lastPlayed!.localeCompare(a.lastPlayed!));
-    return played[0] ?? this.games.find((g) => g.favorite) ?? this.games.find((g) => g.coverUrl) ?? this.games[0] ?? null;
+    const games = this.games.filter((g) => g.source !== 'catalogue');
+    const played = games.filter((g) => g.lastPlayed).sort((a, b) => b.lastPlayed!.localeCompare(a.lastPlayed!));
+    return played[0] ?? games.find((g) => g.favorite) ?? games.find((g) => g.coverUrl) ?? games[0] ?? null;
   }
   current = $derived(this.games.find((g) => g.id === this.gameId) ?? null);
 
@@ -106,6 +109,7 @@ class AppState {
     $effect.root(() => {
       $effect(() => save('mode', this.mode));
       $effect(() => save('theme', this.theme));
+      $effect(() => save('sidebarExpanded', this.sidebarExpanded));
       $effect(() => save('reduceMotion', this.reduceMotion));
       $effect(() => save('visualEffects', this.visualEffects));
       $effect(() => save('sounds', this.sounds));
@@ -238,7 +242,14 @@ class AppState {
 
   private previewTimer: ReturnType<typeof setTimeout> | undefined;
 
-  /** Hover/focus swaps the backdrop after a short pause, so sweeping across a grid doesn't stack fades. */
+  /** Open the supported system picker from any screen. */
+  addGames() {
+    libraryView('all').discovery = false;
+    libraryView('all').addMenuOpen = true;
+    this.go('library');
+  }
+
+  /** Big Screen focus previews the selected game after a short pause. */
   preview(id: string) {
     clearTimeout(this.previewTimer);
     if (id === this.heroId) return;
@@ -573,7 +584,7 @@ class AppState {
       platform: p.platform as PortEntry['platform'],
       upstream: p.upstream,
       version: p.installed_version ?? p.latest_version ?? '',
-      status: p.status === 'not_installed' ? 'not-installed' : p.status,
+      status: p.status === 'not_installed' ? 'not-installed' : p.status === 'ready' ? 'installed' : p.status,
       requirement:
         p.status === 'update' && p.latest_version
           ? `Update ${p.installed_version} → ${p.latest_version}. ${p.requirement}`

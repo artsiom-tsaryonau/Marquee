@@ -7,7 +7,7 @@
   --line: rgb(255 255 255 / 0.1);
   --text: #f4f3ff;
   --text-soft: rgb(244 243 255 / 0.82);
-  --text-dim: rgb(244 243 255 / 0.56);
+  --text-dim: rgb(244 243 255 / 0.68);
   --accent: #8b5cf6;
   --ok: #34d399;
   --warn: #fbbf24;
@@ -60,7 +60,7 @@
   --line: rgb(10 12 30 / 0.1);
   --text: #12131f;
   --text-soft: rgb(18 19 31 / 0.8);
-  --text-dim: rgb(18 19 31 / 0.56);
+  --text-dim: rgb(18 19 31 / 0.68);
   --accent: #7c3aed;
   --ok: #059669;
   --warn: #b45309;
@@ -209,7 +209,7 @@ button {
   gap: 0;
   flex-shrink: 0;
 }
-.btn.play :global(svg) {
+.btn.play svg {
   margin: 0;
 }
 .btn.play:hover,
@@ -318,3 +318,9 @@ select[data-nav]:disabled,
 }
 
 .btn:disabled { opacity: 0.5; cursor: not-allowed; filter: saturate(0.6); }
+
+/* Big Screen controls must scale with the cards, including secondary actions. */
+:root[data-mode='big'] .btn { min-height:56px; height:auto; padding:14px 22px; font-size:18px; }
+:root[data-mode='big'] .chip { min-height:44px; font-size:16px; }
+:root[data-mode='big'] .ui-select { min-height:48px; font-size:17px; }
+:root[data-mode='big'] input { min-height:48px; font-size:18px; }

@@ -66,6 +66,7 @@ export function editionToGame(edition: Edition, snap: LibrarySnapshot): GameEntr
     runnerId: runner?.id,
     runnerName: runner?.display_name,
     mediaIssue: media?.skip_reason ?? undefined,
+    catalogueMatchSupported: !!media?.available && (media.kind === 'ps1_iso' || media.kind === 'ps2_iso'),
     ratings: { critic: null, criticCount: 0, user: null, steamReviews: null },
     timeToBeat: null,
     achievements: null,

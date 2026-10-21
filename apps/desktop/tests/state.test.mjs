@@ -412,3 +412,33 @@ test('remounting the desktop shell replaces its subscription and cleanup release
     assert.equal(releases, 2);
   } finally { app.disconnect(); app.api = api; }
 });
+
+
+test('Home never promotes catalogue discoveries to the personal default hero', () => {
+  app.games = [fixtureGame('discovery', { source: 'catalogue', installed: false, lastPlayed: '2099-01-01', favorite: true, coverUrl: '/cover.jpg' }), fixtureGame('personal')];
+  assert.equal(app.defaultHero().id, 'personal');
+  app.games = app.games.slice(0, 1);
+  assert.equal(app.defaultHero(), null);
+});
+
+test('installed port engines retain unchecked game-data state after refresh', async () => {
+  const api = app.api;
+  try {
+    app.api = { ...api, listPorts: async () => [{ id: 'shipwright', name: 'Ship of Harkinian', game: 'Ocarina of Time', family: 'Native', platform: 'n64', upstream: 'HarbourMasters/Shipwright', installed_version: '1', latest_version: null, status: 'ready', requirement: 'Supply your data', folder: '/test' }], checkPortUpdates: async () => app.api.listPorts() };
+    await app.loadPorts();
+    assert.equal(app.ports[0].status, 'installed');
+    assert.equal(app.games.find((g) => g.id === 'port:shipwright').portStatus, 'installed');
+  } finally { app.api = api; }
+});
+
+
+test('exact catalogue matching is offered only for available raw ISO media', () => {
+  const snap = discSnapshot();
+  snap.media[0].kind = 'ps1_cue'; snap.media[1].kind = 'ps2_iso';
+  let entries = gamesFromSnapshot(snap);
+  assert.equal(entries.find((g) => g.id === 'e1').catalogueMatchSupported, false);
+  assert.equal(entries.find((g) => g.id === 'e2').catalogueMatchSupported, true);
+  snap.media[1].available = false;
+  entries = gamesFromSnapshot(snap);
+  assert.equal(entries.find((g) => g.id === 'e2').catalogueMatchSupported, false);
+});

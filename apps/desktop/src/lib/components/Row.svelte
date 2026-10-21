@@ -17,14 +17,16 @@
     onPlaceholder?: () => void;
   } = $props();
   let visibleCount = $state(24);
+  let scroller = $state<HTMLDivElement>();
+  function scroll(direction: number) { scroller?.scrollBy({ left: direction * scroller.clientWidth * .8, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); }
 </script>
 
 {#if games.length || placeholders}
   <section class="row">
-    <h2>{title} {#if games.length}<span>{games.length}</span>{/if}</h2>
-    <div class="scroller" data-nav-row>
+    <div class="heading"><h2>{title} {#if games.length}<span>{games.length}</span>{/if}</h2><div class="row-actions"><button data-nav aria-label={`Scroll ${title} left`} onclick={() => scroll(-1)}>←</button><button data-nav aria-label={`Scroll ${title} right`} onclick={() => scroll(1)}>→</button></div></div>
+    <div bind:this={scroller} class="scroller" data-nav-row>
       {#each games.slice(0, visibleCount) as game (game.id)}
-        <Cover {game} {shape} />
+        <Cover {game} {shape} showTitle />
       {/each}
       {#if games.length > visibleCount}
         <button class="more btn glass" data-nav onclick={() => (visibleCount += 24)}>Show more · {visibleCount} of {games.length}</button>
@@ -42,6 +44,10 @@
     z-index: 1;
     margin-bottom: 18px;
   }
+  .heading { display:flex; align-items:center; justify-content:space-between; gap:16px; padding-right:var(--gutter); }
+  .row-actions { display:flex; gap:6px; }
+  .row-actions button { border:1px solid var(--line); background:var(--field); color:var(--text); border-radius:8px; min-width:36px; min-height:32px; cursor:pointer; font:inherit; }
+  :global([data-mode='big']) .row-actions button { min-width:48px; min-height:48px; }
   h2 {
     margin: 0 0 4px;
     padding: 0 var(--gutter);
@@ -61,12 +67,12 @@
     overflow-x: auto;
     padding: 16px var(--gutter) 22px;
     scroll-padding: 0 var(--gutter);
-    scrollbar-width: none;
+    scrollbar-width: thin;
     -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 calc(var(--gutter) * 0.6), #000 calc(100% - var(--gutter) * 0.6), transparent);
     mask-image: linear-gradient(90deg, transparent 0, #000 calc(var(--gutter) * 0.6), #000 calc(100% - var(--gutter) * 0.6), transparent);
   }
   .scroller::-webkit-scrollbar {
-    display: none;
+    height: 6px;
   }
   .more { flex: none; align-self: center; }
 </style>

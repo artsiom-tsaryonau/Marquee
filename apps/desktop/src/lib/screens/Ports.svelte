@@ -1,261 +1,100 @@
 <script lang="ts">
   import { app } from '../state.svelte';
   import { platformLabel } from '../labels';
+  import { portAction } from '../presentation';
   import type { PortEntry, PortStatus } from '../types';
   import Artwork from '../components/Artwork.svelte';
-  import Logo from '../components/Logo.svelte';
   import Icon from '../components/Icon.svelte';
-  import { portsAtmosphere } from '../art';
 
   const statusLabel: Record<PortStatus, string> = {
-    ready: 'Ready',
-    update: 'Update available',
-    'needs-rom': 'Needs your ROM',
-    'needs-data': 'Needs game data',
-    'not-installed': 'Not installed',
+    installed: 'Installed · game files unchecked', ready: 'Ready to play', update: 'Update available', 'needs-rom': 'Game files required',
+    'needs-data': 'Game files required', 'not-installed': 'Not installed',
   };
-
-  const shortLabel: Record<PortStatus, string> = {
-    ready: 'Ready',
-    update: 'Update',
-    'needs-rom': 'Needs ROM',
-    'needs-data': 'Needs data',
-    'not-installed': 'Get',
-  };
-
-  let filter = $state<'all' | PortStatus>('all');
-  const shown = $derived(app.ports.filter((p) => filter === 'all' || p.status === filter));
-  const featured = $derived(app.ports.find((p) => p.status === 'update') ?? app.ports[0]);
-
-  function primary(p: PortEntry) {
+  let filter = $state<'all' | 'setup' | 'installed' | 'update' | 'not-installed'>('all');
+  let refreshing = $state(false);
+  const filters = [ ['all', 'All ports'], ['installed', 'Installed'], ['setup', 'Needs setup'], ['update', 'Updates'], ['not-installed', 'Not installed'] ] as const;
+  const shown = $derived(app.ports.filter((p) => filter === 'all' || (filter === 'setup' ? p.status === 'installed' || p.status === 'needs-rom' || p.status === 'needs-data' : filter === 'installed' ? p.status !== 'not-installed' : p.status === filter)));
+  async function primary(p: PortEntry) {
     if (p.id in app.portBusy) return;
-    if (p.status === 'ready') void app.launchPort(p);
-    else void app.installPort(p);
+    const operation = portAction(p).operation;
+    if (operation === 'launch') await app.launchPort(p);
+    else if (operation === 'folder') await app.openPortFolder(p);
+    else await app.installPort(p);
   }
-
-  const action = (p: PortEntry) =>
-    p.id in app.portBusy
-      ? 'Installing…'
-      : ({ ready: 'Play', update: 'Update', 'needs-rom': 'Choose ROM', 'needs-data': 'Find data', 'not-installed': 'Install' })[p.status];
-  const filters = ['all', 'ready', 'update', 'not-installed'] as const;
+  async function refresh() {
+    refreshing = true;
+    try { await app.loadPorts(); } finally { refreshing = false; }
+  }
 </script>
 
 <div class="ports">
-  {#if featured}
-  <section class="feature" style="--accent-h:{featured.art.hue2}">
-    <div class="feature-art"><Artwork art={featured.art} /></div>
-    <div class="feature-fade"></div>
-    <div class="feature-text">
-      <span class="eyebrow">Featured port · {featured.family}</span>
-      <Logo game={{ title: featured.name, art: featured.art }} size="lg" />
-      <p>Native {platformLabel[featured.platform]}-era classic rebuilt for modern PCs: {featured.game}, widescreen, high frame rate, mods.</p>
-      <button class="btn primary" data-nav onclick={() => primary(featured)}>
-        <Icon name={featured.status === 'ready' ? 'play' : 'download'} />
-        {action(featured)}
-      </button>
-    </div>
-  </section>
-  {:else}
-  <section class="feature" style="--accent-h:{portsAtmosphere.hue2}">
-    <div class="feature-art"><Artwork art={portsAtmosphere} /></div>
-    <div class="feature-fade"></div>
-    <div class="feature-text">
-      <span class="eyebrow">Native ports</span>
-      <Logo game={{ title: 'Ports', art: portsAtmosphere }} size="lg" />
-      <p>No ports could be loaded. PS2 games stay in Library. Engines install from GitHub; game data should be filled by setup jobs (Open folder is the fallback).</p>
-      <button class="btn primary" data-nav onclick={() => app.go('library')}>
-        <Icon name="grid" /> Open library
-      </button>
-    </div>
-  </section>
-  {/if}
-
-  <div class="filters" data-nav-row>
-    {#each filters as f (f)}
-      <button class="chip" class:on={filter === f} data-nav onclick={() => (filter = f)}>{f === 'all' ? 'All ports' : statusLabel[f]}</button>
+  <header class="heading">
+    <div><span class="eyebrow">Discover ways to play</span><h1>Native ports</h1>
+      <p>Set up native versions of classic games. Installed ports appear in your Library.</p></div>
+    <button class="btn glass" data-nav disabled={refreshing} onclick={refresh}><Icon name="refresh" />{refreshing ? 'Checking…' : 'Refresh status'}</button>
+  </header>
+  <div class="intro glass-panel">
+    <Icon name="info" size={24} />
+    <p>Install a port, add the compatible game files it requires, then play from your Library. Installing a port does not include the original game.</p>
+  </div>
+  <div class="filters" data-nav-row aria-label="Port availability">
+    {#each filters as [value, label]}
+      <button class="chip" class:on={filter === value} aria-pressed={filter === value} data-nav onclick={() => (filter = value)}>{label}</button>
     {/each}
   </div>
-
+  <p class="count" aria-live="polite">{shown.length} {shown.length === 1 ? 'port' : 'ports'}</p>
   <div class="grid">
     {#each shown as p (p.id)}
-      <article class="port glass-panel" style="--accent-h:{p.art.hue2}">
-        <div class="thumb"><Artwork art={p.art} /><Logo game={{ title: p.name, art: p.art }} size="sm" /></div>
+      {@const needsFiles = p.status === 'needs-rom' || p.status === 'needs-data'}
+      <article class="port glass-panel">
+        <div class="thumb"><Artwork art={p.art} /><span>{platformLabel[p.platform]}</span></div>
         <div class="text">
-          <div class="top">
-            <h3>{p.name}</h3>
-            <span class="st {p.status}" title={statusLabel[p.status]}>{shortLabel[p.status]}</span>
+          <span class="status" class:ready={p.status === 'ready'} class:needs-files={needsFiles}>{statusLabel[p.status]}</span>
+          <h2>{p.name}</h2><p class="game">{p.game}</p>
+          <p class="requirement">{p.requirement}</p>
+          {#if p.status === 'installed' || p.status === 'update'}<p class="setup">The port is installed. Marquee has not verified its game files; open it to finish setup.</p>{/if}
+          {#if needsFiles}<p class="setup">Add the required files to the port folder, then open the port to finish setup. Some ports finish setup in their own window.</p>{/if}
+          {#if app.portBusy[p.id]}<p class="progress" role="status">{app.portBusy[p.id]}</p>{/if}
+          <div class="actions">
+            <button class="btn primary small" data-nav disabled={p.id in app.portBusy} onclick={() => primary(p)}><Icon name={portAction(p).operation === 'folder' ? 'folder' : p.status === 'ready' ? 'play' : 'download'} size={16} />{p.id in app.portBusy ? 'Working…' : portAction(p).label}</button>
+            {#if p.status === 'update'}<button class="btn glass small" data-nav disabled={p.id in app.portBusy} onclick={() => app.launchPort(p)}><Icon name="play" size={16} />Open port</button>{/if}
+            {#if p.status === 'ready'}<button class="btn glass small" data-nav onclick={() => app.go('library')}>View library</button>{/if}
           </div>
-          <p class="game">{p.game} · {platformLabel[p.platform]}</p>
-          <p class="req">
-            <Icon name={p.status === 'needs-rom' || p.status === 'needs-data' ? 'alert' : 'check'} size={15} />
-            {p.requirement}
-          </p>
-          <div class="foot">
-            <code>{app.portBusy[p.id] ?? p.upstream}</code>
-            {#if p.status !== 'not-installed'}
-              <button class="btn small" data-nav onclick={() => app.openPortFolder(p)} title="Open the port folder to add your own ROM or game files">Open folder</button>
-            {/if}
-            <button class="btn small" disabled={p.id in app.portBusy} class:primary={p.status !== 'ready'} data-nav onclick={() => primary(p)}>{action(p)}</button>
-          </div>
+          <details><summary data-nav>Installation details</summary><p>{p.version ? `Version ${p.version}` : 'No version installed'}</p><p class="upstream">{p.upstream}</p>
+            {#if p.status !== 'not-installed' && !needsFiles}<button class="btn glass small" data-nav onclick={() => app.openPortFolder(p)}>Open folder</button>{/if}
+          </details>
         </div>
       </article>
+    {:else}
+      <div class="empty glass-panel"><h2>No ports to show</h2><p>{app.ports.length ? 'Try another availability filter.' : 'Check again to load available ports.'}</p><button class="btn glass" data-nav onclick={() => { filter = 'all'; void refresh(); }}>Show all ports</button></div>
     {/each}
   </div>
-  <p class="note">Marquee installs port engines from GitHub. Retail data should come from automated setup (store detection, extractors); use Open folder when a port still needs files manually.</p>
 </div>
 
 <style>
-  .ports {
-    padding: 28px var(--gutter) 40px;
-  }
-  .feature {
-    position: relative;
-    border-radius: 24px;
-    overflow: hidden;
-    min-height: 340px;
-    display: flex;
-    align-items: flex-end;
-    box-shadow: 0 30px 80px -30px hsl(var(--accent-h) 80% 40% / 0.6);
-  }
-  .feature-art {
-    position: absolute;
-    inset: 0;
-  }
-  .feature-fade {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(90deg, rgb(0 0 0 / 0.75), transparent 70%);
-  }
-  .feature-text {
-    position: relative;
-    padding: 32px;
-    max-width: 560px;
-    display: grid;
-    gap: 12px;
-    justify-items: start;
-    color: #fff;
-  }
-  .feature-text p {
-    margin: 0;
-    color: rgb(255 255 255 / 0.8);
-  }
-  .eyebrow {
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: hsl(var(--accent-h) 90% 80%);
-  }
-  .filters {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin: 26px 0 18px;
-  }
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-    gap: 16px;
-  }
-  .port {
-    display: grid;
-    grid-template-columns: 120px 1fr;
-    border-radius: 18px;
-    overflow: hidden;
-    transition: transform 200ms var(--ease), box-shadow 200ms;
-  }
-  .port:focus-within,
-  .port:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 0 0 1.5px hsl(var(--accent-h) 90% 70% / 0.8), 0 16px 40px -14px hsl(var(--accent-h) 90% 50% / 0.6);
-  }
-  .thumb {
-    position: relative;
-    min-height: 160px;
-  }
-  .thumb :global(.logo) {
-    position: absolute;
-    left: 10px;
-    right: 10px;
-    bottom: 10px;
-  }
-  .text {
-    padding: 14px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    min-width: 0;
-  }
-  .top {
-    display: flex;
-    justify-content: space-between;
-    gap: 8px;
-    align-items: start;
-  }
-  h3 {
-    margin: 0;
-    min-width: 0;
-    font-size: 16px;
-    overflow-wrap: anywhere;
-  }
-  .st {
-    flex: none;
-    font-size: 10.5px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: 3px 8px;
-    border-radius: 999px;
-    background: var(--field);
-    color: var(--text-dim);
-  }
-  .st.ready {
-    background: rgb(52 211 153 / 0.18);
-    color: var(--ok);
-  }
-  .st.update {
-    background: rgb(251 191 36 / 0.18);
-    color: var(--warn);
-  }
-  .st.needs-rom,
-  .st.needs-data {
-    background: rgb(248 113 113 / 0.16);
-    color: var(--bad);
-  }
-  .game {
-    margin: 0;
-    color: var(--text-dim);
-    font-size: 13px;
-  }
-  .req {
-    margin: 0;
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    font-size: 13px;
-    color: var(--text-soft);
-  }
-  .foot {
-    margin-top: auto;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-  }
-  .foot .btn {
-    flex: none;
-    white-space: nowrap;
-  }
-  code {
-    font-size: 11.5px;
-    color: var(--text-dim);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .note {
-    margin-top: 24px;
-    color: var(--text-dim);
-    font-size: 13px;
-  }
+  .ports { padding:32px var(--gutter) 64px; max-width:1600px; margin:auto; }
+  .heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:20px; margin-bottom:24px; }
+  .eyebrow { color:var(--text-dim); font-size:13px; }
+  h1 { margin:6px 0 10px; font-size:clamp(30px,3vw,40px); letter-spacing:-.03em; }
+  p { color:var(--text-soft); line-height:1.6; margin:8px 0; }
+  .intro { display:flex; align-items:center; gap:16px; padding:16px 20px; border-radius:16px; }
+  .intro :global(svg) { flex:none; color:var(--accent); }
+  .filters { display:flex; flex-wrap:wrap; gap:8px; margin:24px 0 12px; }
+  .count { font-size:13px; color:var(--text-dim); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr)); gap:20px; }
+  .port { overflow:hidden; border-radius:18px; display:flex; flex-direction:column; min-width:0; }
+  .thumb { height:110px; position:relative; overflow:hidden; filter:saturate(.55); }
+  .thumb span { position:absolute; left:20px; bottom:12px; background:rgb(0 0 0 / .6); color:#fff; padding:4px 8px; border-radius:6px; font-size:12px; }
+  .text { padding:20px; display:flex; flex:1; flex-direction:column; align-items:start; gap:6px; }
+  h2 { font-size:21px; margin:4px 0 0; }
+  .status { font-size:12px; color:var(--text-soft); }
+  .status.ready { color:var(--ok); } .status.needs-files { color:var(--warn); }
+  .game { margin:0 0 4px; font-size:15px; }
+  .requirement, .setup { font-size:14px; } .setup { color:var(--warn); }
+  .progress { font-size:14px; color:var(--accent); }
+  .actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:auto; padding-top:16px; }
+  details { border-top:1px solid var(--line); margin-top:16px; padding-top:14px; width:100%; font-size:13px; }
+  summary { cursor:pointer; color:var(--text-dim); padding:4px 0; }
+  .upstream { overflow-wrap:anywhere; }
+  .empty { border-radius:16px; padding:24px; grid-column:1/-1; }
 </style>

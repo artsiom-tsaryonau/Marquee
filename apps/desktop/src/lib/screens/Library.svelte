@@ -7,7 +7,7 @@
   import Mark, { hasMark } from '../components/Mark.svelte';
   import { fuzzy } from '../format';
   import { libraryView, PAGE } from '../libraryView.svelte';
-  import { groupGames, launchMethod, matchesVariant, methodLabel } from '../unified';
+  import { canonicalId, groupGames, launchMethod, matchesVariant, methodLabel } from '../unified';
   import type { Platform } from '../types';
   import Cover from '../components/Cover.svelte';
   import GhostCover from '../components/GhostCover.svelte';
@@ -20,16 +20,16 @@
   // Search, filters, sort and scroll position survive opening a game and coming back.
   // svelte-ignore state_referenced_locally
   const view = libraryView(collection ?? 'all');
-  const regions = $derived([...new Set(app.games.flatMap((g) => regionValues(g.region)))].sort());
-  const languages = $derived([...new Set(app.games.flatMap((g) => g.languages ?? []))].sort());
-  const revisions = $derived([...new Set(app.games.flatMap(versions))].sort());
-  const playerModes = $derived((['single', 'multi', 'coop'] as const).filter((mode) => app.games.some((g) => {
+  const inScope = $derived(app.games.filter((g) => (!collection || g.platform === collection) && (view.discovery ? g.source === 'catalogue' : g.source !== 'catalogue')));
+  const regions = $derived([...new Set(inScope.flatMap((g) => regionValues(g.region)))].sort());
+  const languages = $derived([...new Set(inScope.flatMap((g) => g.languages ?? []))].sort());
+  const revisions = $derived([...new Set(inScope.flatMap(versions))].sort());
+  const playerModes = $derived((['single', 'multi', 'coop'] as const).filter((mode) => inScope.some((g) => {
     const n = g.players ?? g.metadata?.players;
     if (n === undefined || n === null) return false;
     return mode === 'single' ? n <= 1 : n >= 2;
   })));
-  const inScope = $derived(app.games.filter((g) => !collection || g.platform === collection));
-  const counts = $derived.by(() => { const m = new Map<Platform, number>(); for (const g of inScope) m.set(g.platform, (m.get(g.platform) ?? 0) + 1); return m; });
+  const counts = $derived.by(() => { const m = new Map<Platform, number>(); const ids = new Map<Platform, Set<string>>(); for (const g of inScope) { const set = ids.get(g.platform) ?? new Set<string>(); set.add(canonicalId(g)); ids.set(g.platform, set); } for (const [platform, set] of ids) m.set(platform, set.size); return m; });
   // Biggest first, "Other" (store games, unrecognised files) last: it is the catch-all, not a platform.
   const platforms = $derived([...counts.keys()].sort((a, b) => (a === 'unknown' ? 1 : b === 'unknown' ? -1 : (counts.get(b) ?? 0) - (counts.get(a) ?? 0) || platformLabel[a].localeCompare(platformLabel[b]))));
   const chipLabel = (p: Platform) => (p === 'unknown' ? 'Other' : platformLabel[p]);
@@ -44,12 +44,12 @@
   let search: HTMLInputElement;
   let addMenu: HTMLDetailsElement;
 
-  const allSources = $derived([...new Set(app.games.map((g) => g.source))]);
+  const allSources = $derived([...new Set(inScope.map((g) => g.source))]);
   const noFilesCount = $derived(inScope.filter((g) => g.wanted || g.mediaMissing).length);
   const secondaryActive = $derived([view.sourceFilter, view.region, view.language, view.revision, view.playerMode].filter(Boolean).length);
 
   const shown = $derived.by(() => {
-    let list = app.games.filter(
+    let list = inScope.filter(
       (g) =>
         (!collection || g.platform === collection) &&
         matchesVariant(g, view.platform, '') &&
@@ -92,12 +92,13 @@
 
   // A changed search or filter starts again at the top; a restored one must not.
   $effect(() => {
-    const signature = JSON.stringify([view.query, view.platform, view.sourceFilter, view.region, view.language, view.revision, view.playerMode, view.installedOnly, view.noFiles, view.favOnly, view.sort, collection]);
+    const signature = JSON.stringify([view.discovery, view.query, view.platform, view.sourceFilter, view.region, view.language, view.revision, view.playerMode, view.installedOnly, view.noFiles, view.favOnly, view.sort, collection]);
     untrack(() => { if (view.signature !== signature) { view.signature = signature; view.visibleCount = PAGE; } });
   });
   const grouped = $derived(groupGames(shown, app.variantPreferences));
 
   const filtering = $derived(!!view.query || !!view.platform || !!view.sourceFilter || !!view.region || !!view.language || !!view.revision || !!view.playerMode || view.installedOnly || view.noFiles || view.favOnly);
+  function changeScope(discovery: boolean) { clearFilters(); view.discovery = discovery; }
   function clearFilters() { Object.assign(view, { query: '', platform: '', sourceFilter: '', region: '', language: '', revision: '', playerMode: '', installedOnly: false, noFiles: false, favOnly: false }); }
   const dur = $derived(app.motionReduced || app.visualEffects === 'balanced' ? 0 : 260);
 
@@ -149,10 +150,10 @@
 
 <div class="library">
   <header class="library-heading">
-    <div><span class="eyebrow">Your collection</span><h1>{collection === 'ps2' ? 'PlayStation 2' : 'Library'}</h1><p>Choose a game, then choose how you play.</p></div>
+    <div><span class="eyebrow">{view.discovery ? 'Catalogue discovery' : 'Your collection'}</span><h1>{collection === 'ps2' ? 'PlayStation 2' : 'Library'}</h1><p>{view.discovery ? 'Imported reference entries. Ownership and local files are not implied.' : 'Your games and saved play options, together.'}</p></div>
     <div class="heading-actions">
       <button class="btn glass small" data-nav onclick={() => app.go('tools')}><Icon name="controller" size={16} /> Tools & launchers</button>
-      <details class="add-menu" bind:this={addMenu}>
+      <details class="add-menu" bind:this={addMenu} bind:open={view.addMenuOpen}>
         <summary class="btn primary small" data-nav><Icon name="plus" size={16} /> Add games</summary>
         <div class="add-list glass-panel" role="menu" aria-label="Add a folder of games">
           <span class="add-hint">Pick the system, then the folder that holds its games.</span>
@@ -164,10 +165,14 @@
       </details>
     </div>
   </header>
+  <div class="scope" data-nav-row aria-label="Library scope">
+    <button class="chip" class:on={!view.discovery} data-nav aria-pressed={!view.discovery} onclick={() => changeScope(false)}>Your library</button>
+    <button class="chip" class:on={view.discovery} data-nav aria-pressed={view.discovery} onclick={() => changeScope(true)}>Catalogue discovery</button>
+  </div>
   {#if adding}
     <form class="add-game glass-panel" onsubmit={(e) => { e.preventDefault(); void saveGame(); }}>
       <strong>Add a game without files</strong>
-      <p>It appears in your library with Play disabled. Its cover and details are looked up by name, and the files attach by themselves when you scan or import a matching game.</p>
+      <p>It appears in your library with an Add game files action. Its cover and details are looked up by name, and the files attach by themselves when you scan or import a matching game.</p>
       <div class="add-fields">
         <label>Title<input data-nav bind:value={draft.title} placeholder="e.g. Super Metroid" maxlength="200" required /></label>
         <label>System<select class="ui-select" data-nav bind:value={draft.system}>{#each systemOptions as o (o.id)}<option value={o.id}>{o.label}</option>{/each}</select></label>
@@ -177,13 +182,13 @@
     </form>
   {/if}
   <div class="categories" data-nav-row aria-label="Game platforms">
-    <button class="chip" class:on={!view.platform} data-nav aria-pressed={!view.platform} onclick={() => view.platform = ''}>All platforms <span>{inScope.length}</span></button>
+    <button class="chip" class:on={!view.platform} data-nav aria-pressed={!view.platform} onclick={() => view.platform = ''}>All platforms <span>{groupGames(inScope).length}</span></button>
     {#each platforms as p}<button class="chip" class:on={view.platform === p} data-nav aria-pressed={view.platform === p} onclick={() => view.platform = p}>{#if hasMark(p)}<Mark id={p} size={16} />{/if}<b>{chipLabel(p)}</b> <span>{counts.get(p)}</span></button>{/each}
   </div>
   <div class="bar glass-panel">
     <label class="search">
       <Icon name="search" size={18} />
-      <input bind:this={search} bind:value={view.query} onkeydown={onSearchKey} data-nav placeholder="Search {collection === 'ps2' ? 'PS2' : app.games.length} games…" spellcheck="false" />
+      <input bind:this={search} bind:value={view.query} onkeydown={onSearchKey} data-nav aria-label="Search games" placeholder={view.discovery ? 'Search catalogue…' : 'Search your library…'} spellcheck="false" />
       {#if view.query}<button class="clear" onclick={() => (view.query = '')} aria-label="Clear search"><Icon name="x" size={16} /></button>{/if}
     </label>
     <div class="chips" data-nav-row>
@@ -217,7 +222,7 @@
 
   <div class="results"><p class="count" aria-live="polite">{grouped.length} {grouped.length === 1 ? 'game' : 'games'}{shown.length !== grouped.length ? ` · ${shown.length} play options` : ''}</p>{#if filtering}<button class="reset" data-nav onclick={clearFilters}>Clear filters</button>{/if}</div>
 
-  {#if !shown.length && (app.libraryStatus === 'loading' || app.libraryStatus === 'failed' || view.query || app.games.length)}
+  {#if !shown.length && (app.libraryStatus === 'loading' || app.libraryStatus === 'failed' || view.query || inScope.length)}
     <div class="empty-banner">
       {#if app.libraryStatus === 'loading'}
         <p>Loading library…</p>
@@ -227,11 +232,11 @@
         <p>{view.query ? `No games match “${view.query}” and these filters.` : 'No games match these filters.'}</p><button class="btn glass small" data-nav onclick={clearFilters}>Clear filters</button>
       {/if}
     </div>
-  {:else if !shown.length && !view.query && app.games.length === 0}
+  {:else if !shown.length && !view.query && inScope.length === 0}
     <div class="empty-banner actions">
-      <p>No games yet. Add a folder of games, or connect a launcher in Tools.</p>
-      {#each addTargets as t (t.id)}<button class="btn {t.id === 'ps2' ? 'primary' : 'glass'}" data-nav onclick={() => app.addSystemFolder(t.id)}>{t.label}</button>{/each}
-      <InstallMenu />
+      <p>{view.discovery ? 'No catalogue entries imported yet. Import a saved catalogue below.' : 'Add a folder of game files to build your library. Supported emulators can be installed in Tools.'}</p>
+      {#if !view.discovery}{#each addTargets as t (t.id)}<button class="btn {t.id === 'ps2' ? 'primary' : 'glass'}" data-nav onclick={() => app.addSystemFolder(t.id)}>{t.label}</button>{/each}
+      <InstallMenu />{/if}
       {#if app.lastScan?.skipped_unsupported}
         <p>Skipped {app.lastScan.skipped_unsupported} companion or unsupported files. PS1 accepts ISO, CHD and CUE sets; PS2 accepts ISO.</p>
       {/if}
@@ -252,9 +257,9 @@
         {#if group.entries.length > 1}<span class="variants">{group.entries.length} play options</span>{/if}
       </div>
     {:else}
-      {#if !view.query && app.games.length === 0 && app.libraryStatus !== 'loading' && app.libraryStatus !== 'failed'}
+      {#if !view.query && inScope.length === 0 && !view.discovery && app.libraryStatus !== 'loading' && app.libraryStatus !== 'failed'}
         {#each Array(12) as _, i (i)}
-          <GhostCover onclick={() => app.addPs2Folder()} />
+          <GhostCover onclick={() => app.addGames()} />
         {/each}
       {/if}
     {/each}
@@ -262,10 +267,11 @@
   {#if grouped.length > view.visibleCount}
     {#key view.visibleCount}<div class="load-more" use:nearEnd><button class="btn glass" data-nav onclick={() => (view.visibleCount += PAGE)}>Show more · {view.visibleCount} of {grouped.length}</button></div>{/key}
   {/if}
-  <CatalogueImport />
+  {#if view.discovery}<CatalogueImport />{/if}
 </div>
 
 <style>
+  .scope { display:flex; gap:8px; margin-bottom:20px; }
   .categories { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px; }
   .categories .chip { display:inline-flex; align-items:center; gap:6px; }
   .categories b { font-weight:inherit; }

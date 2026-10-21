@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { modal } from '../modal';
   import { onMount, tick } from 'svelte';
   import { app } from '../state.svelte';
   import type { BiosFile, EmulatorInfo, LauncherConfig, LauncherInfo, Runner } from '../api/contracts';
@@ -29,6 +30,9 @@
 
   let query = $state('');
   let onlyReady = $state(false);
+  let attentionOnly = $state(false);
+  let kind = $state('');
+  let compact = $state(false);
   let platform = $state('');
   let sourceDialog = $state<'purple' | 'lutris' | null>(null);
   let draft = $state<LauncherConfig | null>(null);
@@ -91,7 +95,7 @@
   };
   const items = $derived(
     all
-      .filter((i) => matchesText(i) && (!onlyReady || i.ready) && (!platform || i.platforms.includes(platform)))
+      .filter((i) => matchesText(i) && (!onlyReady || i.ready) && (!platform || i.platforms.includes(platform)) && (!kind || i.t === kind || (kind === 'bios' && i.t === 'bios-empty')) && (!attentionOnly || !i.ready || (i.t === 'emulator' && (i.e.status === 'update' || i.e.firmware?.some((f) => f.required && !f.present)))))
       .sort((a, b) => Number(b.ready) - Number(a.ready) || a.name.localeCompare(b.name)),
   );
   const platforms = $derived(
@@ -137,18 +141,18 @@
   }
 </script>
 
-<div class="tools">
+<div class="tools" class:compact>
   <header class="tool-hero">
-    <div class="hero-copy"><h1>Tools</h1><p>Emulators, launchers, BIOS firmware, and connected libraries — one list, filtered by platform. {ready} ready.</p></div>
+    <div class="hero-copy"><h1>Tools</h1><p>Manage the software and firmware your games need. {ready} available tools and resources.</p></div>
     <InstallMenu />
     {#if app.neededEmulators.length}
       <button class="btn glass" data-nav onclick={() => app.installNeededEmulators()} title={app.neededEmulators.map((e) => e.name).join(', ')}><Icon name="download" /> Install what my library needs ({app.neededEmulators.length})</button>
     {/if}
-    <button class="btn primary" data-nav onclick={() => edit()}><Icon name="plus" /> Add launcher</button>
+    <button class="btn glass" data-nav onclick={() => edit()}><Icon name="plus" /> Add custom launcher</button>
   </header>
 
   {#if draft}
-    <div class="modal-wrap" role="dialog" aria-modal="true" aria-label="Launcher configuration" tabindex="-1" onkeydown={(e) => { if (e.key === "Escape" && !saving) draft = null; }} onclick={(e) => { if (e.target === e.currentTarget && !saving) draft = null; }}>
+    <div class="modal-wrap" use:modal={() => { if (!saving) draft = null; }} role="dialog" aria-modal="true" aria-label="Launcher configuration" tabindex="-1" onkeydown={(e) => { if (e.key === "Escape" && !saving) draft = null; }} onclick={(e) => { if (e.target === e.currentTarget && !saving) draft = null; }}>
     <form class="editor glass-panel" onsubmit={submit} aria-label="Launcher configuration" aria-busy={saving}>
       <div class="section-heading"><div><span class="eyebrow">Configuration</span><h2>{app.launchers.some((l) => l.id === draft?.id) ? 'Edit launcher' : 'Add a launcher'}</h2></div><button class="btn glass small" type="button" data-nav disabled={saving} onclick={() => { draft = null; }} aria-label="Close launcher editor"><Icon name="x" /></button></div>
       <p>Open an existing application, AppImage, or native game. Saving does not start it.</p>
@@ -171,7 +175,10 @@
 
   <div class="toolbar glass-panel">
     <label class="search"><Icon name="search" size={18} /><input bind:value={query} data-nav aria-label="Search tools" placeholder="Search emulators, launchers, BIOS…" /></label>
-    <button class="chip" class:on={onlyReady} data-nav aria-pressed={onlyReady} onclick={() => (onlyReady = !onlyReady)}>Ready only</button>
+    <button class="chip" class:on={onlyReady} data-nav aria-pressed={onlyReady} onclick={() => (onlyReady = !onlyReady)}>Available only</button>
+    <button class="chip" class:on={attentionOnly} data-nav aria-pressed={attentionOnly} onclick={() => (attentionOnly = !attentionOnly)}>Needs attention</button>
+    <select class="ui-select" data-nav aria-label="Tool type" bind:value={kind}><option value="">All types</option><option value="emulator">Emulators</option><option value="launcher">Launchers</option><option value="source">Library connections</option><option value="bios">Firmware</option><option value="runner">External emulators</option></select>
+    <button class="chip" data-nav aria-pressed={compact} onclick={() => (compact = !compact)}>Compact view</button>
     <button class="btn glass small" data-nav disabled={app.biosBusy} onclick={() => app.importBios()}><Icon name="folder" size={16} />{app.biosBusy ? 'Importing…' : 'Import BIOS'}</button>
     <button class="btn glass small" data-nav disabled={app.launchersLoading} onclick={() => { void app.loadLaunchers(); void app.loadEmulators(); void app.loadBios(); }}><Icon name="refresh" size={16} /> Refresh</button>
   </div>
@@ -187,8 +194,8 @@
         {@const e = item.e}
         {@const busy = app.emulatorBusy[e.id]}
         <ToolCard seed={`emulator:${e.id}`} kind="Emulator" title={e.name} subtitle={e.systems.map(labelOf).join(' · ')}
-          detail={`${e.integrated ? 'Launches your library games' : 'Opens on its own for now'}${e.installed_version ? ` · ${e.installed_version.length > 18 ? `${e.installed_version.slice(0, 14)}…` : e.installed_version}` : ''}`}
-          badge={{ text: e.status === 'not_installed' ? 'Not installed' : e.status === 'update' ? 'Update available' : 'Ready', tone: e.status === 'ready' ? 'ok' : e.status === 'update' ? 'warn' : '' }}
+          detail={e.firmware?.some((f) => f.required && !f.present) ? 'Required firmware is missing' : e.integrated ? 'Supports library launch · game setup may be required' : 'Opens separately · library launch not supported'}
+          badge={{ text: e.status === 'not_installed' ? 'Not installed' : e.status === 'update' ? 'Update available' : 'Installed', tone: e.status === 'ready' ? 'ok' : e.status === 'update' ? 'warn' : '' }}
           icon={coverSrc(e.icon)} ready={item.ready} {busy} onopen={() => (app.emulatorDialogId = e.id)}>
           {#snippet actions()}
             {#if e.status === 'not_installed'}
@@ -214,7 +221,7 @@
         {@const l = item.l}
         {@const mark = launcherBrandIcon(l)}
         <ToolCard seed={`launcher:${l.id}`} kind="Launcher" title={l.name} subtitle={l.status} mono={l.executable} detail={l.args.length ? `${l.args.length} argument${l.args.length === 1 ? '' : 's'} configured` : ''}
-          badge={{ text: l.available ? 'Ready' : 'Needs setup', tone: l.available ? 'ok' : '' }} icon={mark?.src} iconTone={mark?.tone ?? 'color'} glyph="monitor" ready={l.available}>
+          badge={{ text: l.available ? 'Available' : 'Needs setup', tone: l.available ? 'ok' : '' }} icon={mark?.src} iconTone={mark?.tone ?? 'color'} glyph="monitor" ready={l.available}>
           {#snippet actions()}
             <button class="btn primary small" data-nav disabled={!l.available || app.openingLaunchers.includes(l.id)} onclick={() => app.openLauncher(l.id)}><Icon name="play" size={15} />{app.openingLaunchers.includes(l.id) ? 'Opening…' : 'Open'}</button>
             <button class="btn glass small" data-nav onclick={() => edit(l)}>Configure</button>
@@ -229,12 +236,13 @@
           kind="BIOS"
           title={item.name}
           subtitle={regions.join(' · ')}
-          detail={item.files.map((f) => `${f.region}: ${f.file}`).join(' · ')}
+          detail={`${item.files.length} firmware files · ${regions.length} regions`}
           glyph="folder"
           badge={{ text: `${item.files.length} file${item.files.length === 1 ? '' : 's'}`, tone: 'ok' }}
           ready={true}
         >
           {#snippet actions()}
+            <details class="firmware-files"><summary data-nav>View firmware files</summary><ul>{#each item.files as file}<li>{file.region} · {file.file}</li>{/each}</ul></details>
             <button class="btn glass small" data-nav disabled={app.biosBusy} onclick={() => app.importBios()}><Icon name="folder" size={15} />Import more</button>
             <button
               class="text-button"
@@ -266,7 +274,7 @@
         {@const purple = item.src === 'purple'}
         {@const mark = sourceBrandIcon(item.src)}
         <ToolCard seed={`source:${item.src}`} kind="Source" title={item.name}
-          subtitle={purple ? 'Managed Windows launcher' : 'Existing installations and synced store libraries'}
+          subtitle={purple ? 'Managed Windows launcher' : 'Optional legacy integration'}
           detail={purple ? 'Sets up the compatibility runtime and a separate Purple install.' : 'Discovered automatically; your Lutris settings are kept.'}
           badge={{ text: purple ? 'Windows' : lutrisOn ? 'Connected' : 'Not connected', tone: !purple && lutrisOn ? 'ok' : '' }}
           icon={mark.src} iconTone={mark.tone} ready={item.ready || purple}>
@@ -283,7 +291,7 @@
   <EmulatorDialog />
 
   {#if sourceDialog}
-    <div class="modal-wrap" role="dialog" aria-modal="true" aria-label="Source setup" tabindex="-1" onkeydown={(e) => { if (e.key === 'Escape') sourceDialog = null; }} onclick={(e) => { if (e.target === e.currentTarget) sourceDialog = null; }}>
+    <div class="modal-wrap" use:modal={() => (sourceDialog = null)} role="dialog" aria-modal="true" aria-label="Source setup" tabindex="-1" onkeydown={(e) => { if (e.key === 'Escape') sourceDialog = null; }} onclick={(e) => { if (e.target === e.currentTarget) sourceDialog = null; }}>
       <div class="editor source-dialog">
         <button class="btn glass small close" data-nav onclick={() => (sourceDialog = null)} aria-label="Close"><Icon name="x" /></button>
         {#if sourceDialog === 'purple'}<PurpleLauncher />{:else}<LutrisSource />{/if}
@@ -293,6 +301,12 @@
 </div>
 
 <style>
+  .firmware-files { width:100%; font-size:13px; color:var(--text-soft); }
+  .firmware-files summary { cursor:pointer; padding:8px 0; }
+  .firmware-files ul { padding-left:18px; overflow-wrap:anywhere; }
+  .compact .tool-grid { grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr)); }
+  .compact :global(.tile) { height:80px; }
+  .compact :global(.pic) { width:48px; height:48px; }
   .tools { padding:32px var(--gutter) 64px; display:grid; gap:30px; max-width:1600px; margin:auto; }
   .tool-hero { display:flex; flex-wrap:wrap; align-items:center; gap:22px; }
   .hero-copy { flex:1; min-width:240px; } h1 { margin:5px 0 8px; font-size:clamp(28px, 3vw, 40px); letter-spacing:-1px; } h2 { margin:0; font-size:21px; letter-spacing:-.4px; } h3 { margin:0 0 8px; font-size:17px; }
@@ -300,7 +314,7 @@
   .filters { display:flex; flex-wrap:wrap; gap:8px; margin-top:-14px; } .filters .chip span { opacity:.6; margin-left:4px; } .source-dialog { position:relative; } .source-dialog .close { position:absolute; top:14px; right:14px; z-index:1; }
   .toolbar { display:flex; flex-wrap:wrap; gap:12px; padding:12px; border-radius:16px; align-items:center; } .search { display:flex; align-items:center; gap:10px; flex:1; min-width:220px; color:var(--text-dim); padding:0 8px; } .search input { background:transparent; border:0; padding:10px 0; }
   input { min-width:0; width:100%; border:1px solid var(--line); background:var(--field); color:var(--text); border-radius:10px; padding:12px; font:inherit; box-sizing:border-box; } input:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-  .section-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px; } .tool-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(275px,1fr)); gap:16px; }
+  .section-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px; } .tool-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,275px),1fr)); gap:16px; }
   
   
   .pin, .text-button { border:0; background:none; color:var(--text-dim); padding:8px; cursor:pointer; } .pin.pinned { color:var(--warn); } .text-button { font:inherit; font-size:12px; }

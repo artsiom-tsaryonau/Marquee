@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { modal } from '../modal';
   import { fade, fly } from 'svelte/transition';
   import { app } from '../state.svelte';
   import { artFromSeed } from '../art';
@@ -111,8 +112,8 @@
 {#if emulator}
   {@const e = emulator}
   {@const icon = coverSrc(e.icon)}
-  <div class="scrim" transition:fade={{ duration: dur }} onclick={() => (app.emulatorDialogId = null)} role="presentation"></div>
-  <div class="dialog glass-panel" role="dialog" aria-modal="true" aria-labelledby="emu-title" transition:fly={{ y: 24, duration: dur }}>
+  <div data-modal-dismiss class="scrim" transition:fade={{ duration: dur }} onclick={() => (app.emulatorDialogId = null)} role="presentation"></div>
+  <div class="dialog glass-panel" use:modal={() => (app.emulatorDialogId = null)} role="dialog" aria-modal="true" aria-labelledby="emu-title" transition:fly={{ y: 24, duration: dur }}>
     <div class="banner">
       <Artwork art={artFromSeed(`emulator:${e.id}`)} />
       <div class="shade"></div>
@@ -129,9 +130,9 @@
 
       <div class="status">
         <span class="badge" class:ok={e.status === 'ready'} class:warn={e.status === 'update'}>
-          {e.status === 'not_installed' ? 'Not installed' : e.status === 'update' ? 'Update available' : 'Ready'}
+          {e.status === 'not_installed' ? 'Not installed' : e.status === 'update' ? 'Update available' : 'Installed'}
         </span>
-        {#if e.installed_version}<span class="ver">Version {e.installed_version.length > 24 ? `${e.installed_version.slice(0, 20)}…` : e.installed_version}</span>{/if}
+        {#if e.installed_version}<span class="ver">Version {e.installed_version}</span>{/if}
         {#if busy}<span class="busy" role="status">{busy}</span>{/if}
         <span class="spacer"></span>
         {#if e.status === 'not_installed'}

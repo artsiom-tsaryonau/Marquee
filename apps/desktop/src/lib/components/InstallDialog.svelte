@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { modal } from '../modal';
   import { fade, fly } from 'svelte/transition';
   import { app } from '../state.svelte';
   import { installable } from '../install';
@@ -15,9 +16,9 @@
 </script>
 
 {#if tool}
-  <div class="scrim" transition:fade={{ duration: dur }} onclick={() => app.closeInstall()} role="presentation"></div>
+  <div data-modal-dismiss class="scrim" transition:fade={{ duration: dur }} onclick={() => app.closeInstall()} role="presentation"></div>
   <div
-    class="dialog glass-panel"
+    class="dialog glass-panel" use:modal={() => app.closeInstall()}
     role="dialog"
     aria-modal="true"
     aria-labelledby="install-title"
@@ -26,7 +27,7 @@
     <header>
       <div>
         <h2 id="install-title">Install {tool.title}</h2>
-        <p>{tool.subtitle}. Marquee will not download BIOS files or commercial games. Click an option to run it.</p>
+        <p>{tool.subtitle}. This installs the emulator. Game files and any required firmware are set up separately.</p>
       </div>
       <button class="close" data-nav onclick={() => app.closeInstall()} aria-label="Close"><Icon name="x" /></button>
     </header>

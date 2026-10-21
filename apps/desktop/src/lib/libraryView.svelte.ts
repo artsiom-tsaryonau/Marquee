@@ -11,6 +11,8 @@ export type SortKey = 'title' | 'recent' | 'playtime' | 'added' | 'critic' | 'sh
  */
 export interface LibraryView {
   query: string;
+  discovery: boolean;
+  addMenuOpen: boolean;
   platform: Platform | '';
   sourceFilter: Source | '';
   region: string;
@@ -33,7 +35,7 @@ const views = new Map<string, LibraryView>();
 
 function fresh(): LibraryView {
   const view = $state<LibraryView>({
-    query: '', platform: '', sourceFilter: '', region: '', language: '', revision: '', playerMode: '',
+    query: '', discovery: false, addMenuOpen: false, platform: '', sourceFilter: '', region: '', language: '', revision: '', playerMode: '',
     installedOnly: false, noFiles: false, favOnly: false, sort: 'title', filtersOpen: false,
     visibleCount: PAGE, scrollY: 0, signature: '',
   });

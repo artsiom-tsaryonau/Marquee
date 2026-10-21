@@ -17,6 +17,8 @@ cross-provider IDs, artwork edition associations, general field provenance and
 user override editing/precedence remain open. Name-based enrichment must not
 be represented as a verified release mapping or merge installations.
 
+The [UI/UX implementation pass](UI_UX.md) adds explicit availability, personal versus catalogue scopes, calmer title/artwork presentation, Settings categories and dialog focus handling. Rendered layout and native controller acceptance remain open.
+
 ## Metadata and artwork candidates
 
 | Area | Planned approach |

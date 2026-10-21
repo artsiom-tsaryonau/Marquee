@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { gameStatus } from '../presentation';
   import type { GameEntry } from '../types';
   import { platformLabel, sourceLabel } from '../labels';
   import { cleanTitle, hours, titleRegion } from '../format';
@@ -14,27 +15,7 @@
     showTitle = false,
   }: { game: GameEntry; shape?: 'cover' | 'wide'; showTitle?: boolean } = $props();
 
-  const status = $derived(
-    game.portStatus === 'update'
-      ? { label: 'Update', tone: 'warn' }
-      : game.source === 'port'
-        ? { label: game.installed ? 'Native port' : 'Not installed', tone: game.installed ? 'ok' : 'dim' }
-        : game.source === 'catalogue'
-          ? { label: 'Not in library', tone: 'dim' }
-          : game.wanted
-          ? { label: game.wanted === 'wishlist' ? 'Wishlist' : 'No files', tone: 'note' }
-          : game.rootOffline
-          ? { label: 'Drive offline', tone: 'dim' }
-          : game.mediaMissing
-            ? { label: 'Missing', tone: 'warn' }
-            : game.setupState === 'runner_missing'
-              ? { label: game.platform === 'ps1' ? 'Needs DuckStation' : 'Needs PCSX2', tone: 'warn' }
-              : game.setupState === 'missing'
-                ? { label: 'Needs BIOS', tone: 'warn' }
-                : !game.installed
-                  ? { label: 'Not installed', tone: 'dim' }
-                  : null,
-  );
+  const status = $derived(gameStatus(game));
 </script>
 
 <div class="wrap {shape}">
@@ -42,12 +23,11 @@
     class="card"
     data-nav
     style="--accent-h:{game.art.hue2}"
-    onfocus={() => app.preview(game.id)}
-    onpointerenter={() => app.preview(game.id)}
+    onfocus={() => { if (app.mode === 'big') app.preview(game.id); }}
     onclick={() => app.open(game)}
-    aria-label={game.title}
+    aria-label={`${cleanTitle(game.title)}${status ? ` · ${status.label}` : ''}`}
   >
-    <div class="art">
+    <div class="art" class:generated={!game.coverUrl}>
       {#if game.coverUrl}
         <img class="cover-img" src={game.coverUrl} alt="" loading="lazy" decoding="async" />
       {:else}
@@ -63,9 +43,7 @@
     {/if}
     <span class="source" title={sourceLabel[game.source]}>{#if hasMark(game.source)}<Mark id={game.source} size={14} /><span class="sr">{sourceLabel[game.source]}</span>{:else}{sourceLabel[game.source]}{/if}</span>
     {#if game.favorite}<span class="fav"><Icon name="star" size={14} filled /></span>{/if}
-    {#if status?.tone === 'dim'}
-      <span class="status dim icon" title="Not installed"><Icon name="download" size={13} /></span>
-    {:else if status}
+    {#if status}
       <span class="status {status.tone}">{status.label}</span>
     {/if}
   </button>
@@ -126,11 +104,13 @@
     inset: 0;
     background: linear-gradient(180deg, transparent 45%, rgb(0 0 0 / 0.65));
   }
+  .art.generated { filter:saturate(.5) brightness(.8); }
+  .wide .cover-img { object-fit:contain; }
   .logo {
     position: absolute;
     left: 12px;
     right: 12px;
-    bottom: 12px;
+    bottom: 42px;
     text-align: left;
   }
   .source,
@@ -153,7 +133,13 @@
     border: 1px solid rgb(255 255 255 / 0.18);
   }
   .status {
-    right: 10px;
+    right: 8px;
+    top: auto;
+    bottom: 8px;
+    max-width: calc(100% - 16px);
+    font-size: 10px;
+    text-transform: none;
+    letter-spacing: 0;
   }
   .status.ok {
     background: rgb(52 211 153 / 0.85);
@@ -178,7 +164,8 @@
   .fav {
     position: absolute;
     right: 10px;
-    bottom: 10px;
+    bottom: auto;
+    top: 10px;
     color: #fde68a;
   }
   :global(:root[data-effects='full']) .fav { filter: drop-shadow(0 0 6px rgb(253 230 138 / 0.8)); }
@@ -203,7 +190,7 @@
     position: absolute;
     left: 12px;
     right: 12px;
-    bottom: 12px;
+    bottom: 42px;
     font-size: 11px;
     font-weight: 700;
     letter-spacing: 0.08em;
