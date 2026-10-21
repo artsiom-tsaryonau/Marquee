@@ -182,7 +182,7 @@ pub fn launch_argv(runner: &Runner, img: &Path, extra: &[String]) -> Result<Vec<
     Ok(argv)
 }
 
-fn emulator_for_runner(runner_id: &str) -> Option<crate::emulators::EmulatorDef> {
+pub(crate) fn emulator_for_runner(runner_id: &str) -> Option<crate::emulators::EmulatorDef> {
     crate::emulators::catalogue()
         .ok()?
         .into_iter()

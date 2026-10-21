@@ -35,6 +35,62 @@ const CATALOGUE: &[&str] = &[
     include_str!("../../../catalog/emulators/rmg.json"),
 ];
 
+/// A file Marquee writes into an emulator's config folder before it starts, only
+/// when it is missing, so the emulator skips its first-run wizard.
+#[derive(Debug, Clone, Deserialize)]
+pub struct SeedFile {
+    /// Relative to the emulator's `XDG_CONFIG_HOME`.
+    pub path: String,
+    pub contents: String,
+}
+
+/// Write the entry's seed files under `home` unless they already exist.
+pub fn seed_config(def: &EmulatorDef, home: &Path) {
+    for seed in &def.seed {
+        let rel = Path::new(&seed.path);
+        let safe = rel
+            .components()
+            .all(|c| matches!(c, std::path::Component::Normal(_)));
+        if !safe {
+            continue;
+        }
+        let target = home.join(rel);
+        if target.exists() {
+            continue;
+        }
+        if let Some(parent) = target.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let _ = fs::write(&target, &seed.contents);
+    }
+}
+
+fn hex_sha256(bytes: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    Sha256::digest(bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+/// An icon fetched at install time for emulators that ship no image file.
+fn fetch_icon(paths: &Paths, def: &EmulatorDef) {
+    let Some(icon) = &def.icon_download else {
+        return;
+    };
+    let dir = paths.cache_dir.join("art");
+    let target = dir.join(format!("emulator-{}.png", def.id));
+    if target.is_file() {
+        return;
+    }
+    let Ok(bytes) = http::get_bytes(&icon.url) else {
+        return;
+    };
+    if hex_sha256(&bytes) == icon.sha256.to_ascii_lowercase() && fs::create_dir_all(&dir).is_ok() {
+        let _ = fs::write(&target, bytes);
+    }
+}
+
 /// A firmware or BIOS file an emulator reads, from the emulator's own source.
 #[derive(Debug, Clone, Deserialize)]
 pub struct FirmwareDef {
@@ -66,6 +122,12 @@ pub struct FirmwareStatus {
     pub present: bool,
     pub path: Option<String>,
     pub note: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct IconDownload {
+    pub url: String,
+    pub sha256: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -118,6 +180,12 @@ pub struct EmulatorDef {
     /// Extra `NAME=value` environment for every start (for example a locale).
     #[serde(default)]
     pub env: Vec<String>,
+    /// Config files written before launch when missing (skips first-run wizards).
+    #[serde(default)]
+    pub seed: Vec<SeedFile>,
+    /// Icon to fetch at install time when the download holds no image.
+    #[serde(default)]
+    pub icon_download: Option<IconDownload>,
     /// Firmware or BIOS files this emulator reads, checked and filled from the inbox.
     #[serde(default)]
     pub firmware: Vec<FirmwareDef>,
@@ -586,6 +654,7 @@ pub fn install(paths: &Paths, def: &EmulatorDef, sink: &Arc<dyn EventSink>) -> R
         let _ = fs::remove_dir_all(&old);
     }
     fs::create_dir_all(config_home(paths, &def.id))?;
+    fetch_icon(paths, def);
     Ok(Installed {
         version: release.version,
         bin: def.binary.clone(),
@@ -869,6 +938,27 @@ mod tests {
                 .count(),
             3
         );
+    }
+
+    #[test]
+    fn seed_files_are_written_once_and_cannot_escape_the_config_folder() {
+        let t = tempfile::tempdir().unwrap();
+        let home = t.path().join("cfg");
+        let mut def = find("mesen").unwrap();
+        seed_config(&def, &home);
+        let file = home.join("Mesen2/settings.json");
+        assert!(fs::read_to_string(&file)
+            .unwrap()
+            .contains("\"ConfigUpgrade\":1"));
+        fs::write(&file, "mine").unwrap();
+        seed_config(&def, &home);
+        assert_eq!(fs::read_to_string(&file).unwrap(), "mine");
+        def.seed = vec![SeedFile {
+            path: "../escape.json".into(),
+            contents: "x".into(),
+        }];
+        seed_config(&def, &home);
+        assert!(!t.path().join("escape.json").exists());
     }
 
     #[test]

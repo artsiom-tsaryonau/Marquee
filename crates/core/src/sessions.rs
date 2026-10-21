@@ -142,6 +142,17 @@ pub fn launch(
                 let _ = crate::bios::seed_duckstation(Path::new(home));
             }
         }
+        // Generic catalogue emulators: write the entry's seed files (first-run
+        // wizard suppression) into the config folder the command points at.
+        if runner.kind == RunnerKind::Emulator && runner.source == "marquee" {
+            let home = runner
+                .command
+                .iter()
+                .find_map(|a| a.strip_prefix("XDG_CONFIG_HOME="));
+            if let (Some(home), Some(def)) = (home, runners::emulator_for_runner(&runner.id)) {
+                crate::emulators::seed_config(&def, Path::new(home));
+            }
+        }
         (session, argv, runner.kind, isolate)
     };
 
