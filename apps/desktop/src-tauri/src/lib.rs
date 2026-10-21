@@ -44,20 +44,28 @@ pub fn run() {
             let allow_fake = std::env::var_os("MARQUEE_ALLOW_FAKE").is_some();
             let core = Arc::new(Core::open(data_dir, allow_fake).map_err(Box::new)?);
 
-            // Browser access to this same library; the app still works if it cannot bind.
+            // The desktop app is standalone by default. Set MARQUEE_WEB=1 (or MARQUEE_PORT)
+            // to also serve this same library to a browser; `marquee serve` runs the web
+            // UI without the app.
             let port = std::env::var("MARQUEE_PORT")
                 .ok()
                 .and_then(|p| p.parse().ok());
-            let web_url = match server::start(
-                Arc::clone(&core),
-                Some(web_assets(app.handle().clone())),
-                port,
-            ) {
-                Ok(handle) => Some(handle.url()),
-                Err(err) => {
-                    eprintln!("web access disabled: {err}");
-                    None
+            let web_wanted = port.is_some()
+                || std::env::var("MARQUEE_WEB").is_ok_and(|v| !matches!(v.as_str(), "" | "0"));
+            let web_url = if web_wanted {
+                match server::start(
+                    Arc::clone(&core),
+                    Some(web_assets(app.handle().clone())),
+                    port,
+                ) {
+                    Ok(handle) => Some(handle.url()),
+                    Err(err) => {
+                        eprintln!("web access disabled: {err}");
+                        None
+                    }
                 }
+            } else {
+                None
             };
 
             // Forward core events (from this window or from a browser tab) to the window.
