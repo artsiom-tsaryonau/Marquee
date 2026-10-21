@@ -45,7 +45,7 @@ pub fn run() {
             let core = Arc::new(Core::open(data_dir, allow_fake).map_err(Box::new)?);
 
             // The desktop app is standalone by default. Set MARQUEE_WEB=1 (or MARQUEE_PORT)
-            // to also serve this same library to a browser; `marquee serve` runs the web
+            // to also serve this same library to a browser; `marquee run web` runs the web
             // UI without the app.
             let port = std::env::var("MARQUEE_PORT")
                 .ok()

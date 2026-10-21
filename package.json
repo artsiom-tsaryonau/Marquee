@@ -4,7 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "run:desktop": "scripts/run.sh desktop",
+    "run:web": "scripts/run.sh web",
+    "run:dev": "scripts/run.sh dev",
+    "run:both": "scripts/run.sh both"
   },
   "keywords": [],
   "author": "",

@@ -79,7 +79,7 @@ Those import with `serial: null` and `region: null`, keep procedural art, and ar
 ```bash
 cd apps/desktop
 pnpm install
-pnpm tauri dev        # or ./scripts/tauri-dev.sh on NVIDIA Wayland
+pnpm tauri dev        # or ./scripts/run.sh desktop on NVIDIA Wayland
 
 # CLI, isolated data dir
 cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev library add-root --system ps1 ~/ROMs/ps1

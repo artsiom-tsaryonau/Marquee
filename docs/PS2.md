@@ -22,14 +22,14 @@ Marquee does not download BIOS files or commercial games.
 | --- | --- |
 | Browser demo (`pnpm dev`) | **Works.** Sample games, simulated launch, fictional playtime. Home/Library/Ports/Downloads/Settings chrome. `?empty=1` shows the empty desktop look without sample titles. |
 | CLI (`marquee`) | **Works** without GTK. Same core as desktop. Use `--data-dir` for isolation. |
-| Desktop (`./scripts/tauri-dev.sh` / `pnpm tauri dev`) | **Window opens** with the same chrome as the frontend (hero, cover rows, nav). Empty library uses procedural art and ghost shelves — never sample games. NVIDIA Wayland needs `WEBKIT_DISABLE_DMABUF_RENDERER=1`. Native folder-picker / Play clicks are **not live-tested**. |
+| Desktop (`./scripts/run.sh desktop` / `pnpm tauri dev`) | **Window opens** with the same chrome as the frontend (hero, cover rows, nav). Empty library uses procedural art and ghost shelves — never sample games. NVIDIA Wayland needs `WEBKIT_DISABLE_DMABUF_RENDERER=1`. Native folder-picker / Play clicks are **not live-tested**. |
 | Persistent library | SQLite schema **v4** after the shared PS1 root-system work (artwork v2, session recovery v3) at `$XDG_DATA_HOME/marquee/library.db` (or `--data-dir` / `MARQUEE_DATA_DIR`). `artwork` table + migrate v1→2. Newer `user_version` is rejected. |
 | In-app PCSX2 install | **Built.** Recommended path unpacks the official AppImage into `$XDG_DATA_HOME/marquee/runners/pcsx2/current` (no wizard, no Flatpak). Host Flatpak is optional and does not skip unpack. Tests isolate host PCSX2 (`Core::open_isolated`). |
 | Serial covers | **Built.** xlenore/ps2-covers JPEG cache, `convertFileSrc` + asset protocol. ScreenScraper/SteamGridDB still [follow-up](PS2_METADATA_FOLLOWUP.md). |
 | Real PCSX2 Play → quit → duration | **Pending.** Fake runner `/bin/sleep` records duration in tests. That is not the gate. |
 | Controller in Tauri WebView | **Pending.** Browser Gamepad API + focus engine exist; `gilrs` not added. Browser gamepad is not evidence. |
 
-`origin/main` as of this sweep: `e902f4e` (WebKit/DBus Fedora script). ISO library + Tauri shell: `1b20257`. **Unpack install, covers, icons, schema v2, isolated tests, desktop look, `tauri-dev.sh`, `check.sh` compile-fail, and the 2026-10-20 roadmap/catalogue sweep are in the working tree, not pushed.** Commit when you say so.
+`origin/main` as of this sweep: `e902f4e` (WebKit/DBus Fedora script). ISO library + Tauri shell: `1b20257`. **Unpack install, covers, icons, schema v2, isolated tests, desktop look, `run.sh`, `check.sh` compile-fail, and the 2026-10-20 roadmap/catalogue sweep are in the working tree, not pushed.** Commit when you say so.
 
 ### In scope for this slice
 
@@ -55,7 +55,7 @@ cd apps/desktop
 pnpm install
 pnpm dev              # browser demo, sample data · http://localhost:1420
 pnpm tauri dev        # real library (empty until you add a folder)
-./scripts/tauri-dev.sh  # same, plus NVIDIA Wayland DMA-BUF workaround
+./scripts/run.sh desktop  # same, plus NVIDIA Wayland DMA-BUF workaround
 ```
 
 Desktop starts empty and never falls back to sample games. Nav is Home / Library / Ports / Downloads / Settings (same as the demo). Ports and Downloads on desktop are empty chrome — they do not install ports. Settings → PlayStation 2 → Choose folder, then Play. “Return to Marquee” hides the overlay; it does not quit PCSX2.
@@ -144,7 +144,7 @@ PS2 vertical slice implemented before the direct-store milestones. Metadata matc
 - Schema v2 `artwork` table; reject a newer `user_version`; abandon stale `running` sessions on open (no playtime).
 - Tests isolate host PCSX2 (`open_isolated` / `discover_host: false`).
 - Window icon (`scripts/make-icon.py` + `pnpm tauri icon`).
-- `scripts/tauri-dev.sh` sets `WEBKIT_DISABLE_DMABUF_RENDERER=1`.
+- `scripts/run.sh desktop` sets `WEBKIT_DISABLE_DMABUF_RENDERER=1`.
 - `scripts/check.sh`: missing WebKit still prints `BLOCKED` and continues; a failed `cargo check -p marquee-desktop` **exits 1**.
 - Desktop UI matches the frontend chrome: same nav, ken-burns hero, cover rows; empty state uses procedural art + ghost shelves.
 
@@ -180,7 +180,7 @@ Isolated data directories only. No commercial ISOs or BIOS in the repo.
 | Host | Fedora Linux, Wayland (NVIDIA: DMA-BUF workaround required) |
 | Primary PCSX2 variant | **Pending live Play.** Flatpak id `net.pcsx2.PCSX2` may exist on the host; tests must not launch it. |
 | Desktop compile | **Pass** (`cargo check -p marquee-desktop`) |
-| Window | **Opens** via `./scripts/tauri-dev.sh`. Plain Wayland without the env dies with Gdk protocol error 71 on this NVIDIA host. |
+| Window | **Opens** via `./scripts/run.sh desktop`. Plain Wayland without the env dies with Gdk protocol error 71 on this NVIDIA host. |
 | Empty UI chrome | **Pass** in the browser (`?splash=0&empty=1`): hero, ghost rows, Library grid, Ports empty banner. Native WebView of the same shell: process up; not re-screenshoted after the look change. |
 
 `scripts/check.sh`: fmt; clippy/tests for core+CLI (excludes `marquee-desktop` from clippy/test); `cargo check -p marquee-desktop` prints `BLOCKED` if native deps are missing, **exits 1** if they are present and compile fails; then `pnpm check` / `pnpm test` / `pnpm build`.
@@ -220,7 +220,7 @@ Fake-runner tests do **not** close the real-emulator gate.
 
 **PS2 acceptance remains open.** Preserve this gate and the existing implementation while proceeding with the owner-authorized direct-store order: Steam, then Epic/Legendary with managed compatibility, then GOG/gogdl. Lutris is not required. [ROADMAP.md](ROADMAP.md) owns cross-project priority; this slice does not gate all other work.
 
-1. Restart the desktop window (`./scripts/tauri-dev.sh` on this NVIDIA Wayland host) so the look, install, covers, and session reclaim are in the binary.
+1. Restart the desktop window (`./scripts/run.sh desktop` on this NVIDIA Wayland host) so the look, install, covers, and session reclaim are in the binary.
 2. **Add a PS2 `.iso` folder** (native picker). Confirm no sample games, skipped-format summary if needed, covers after import.
 3. If PCSX2 is missing, **Install → Recommended** (unpack into Marquee). Open setup; add your own BIOS. Host Flatpak does not skip this.
 4. **Play → quit emulator → duration once → selection restored.** Relaunch without stale busy. This is the release gate.
@@ -263,7 +263,7 @@ After import, Marquee fetches 2D covers from [xlenore/ps2-covers](https://github
 | Tauri bridge | `apps/desktop/src-tauri/src/commands.rs` (`core_call`, `web_url`), `lib.rs` (starts the server, forwards events) |
 | Event stream | `crates/core/src/hub.rs` |
 | API keys (registry, precedence, masking) | `crates/core/src/keys.rs`; Settings → API keys in `Settings.svelte` |
-| Local web server (token, loopback) | `crates/core/src/server.rs`, `marquee serve` |
+| Local web server (token, loopback) | `crates/core/src/server.rs`, `marquee run web` |
 | Native ports | `crates/core/src/ports.rs`, `catalog/ports/*.json`, `apps/desktop/src/lib/screens/Ports.svelte` |
 | Native vs browser vs demo | `apps/desktop/src/lib/api/` (`desktop.ts`, `http.ts`, `demo.ts`, shared `core.ts`) |
 | Play / empty library | `apps/desktop/src/lib/state.svelte.ts` |
@@ -271,4 +271,4 @@ After import, Marquee fetches 2D covers from [xlenore/ps2-covers](https://github
 | Empty shelves | `apps/desktop/src/lib/components/GhostCover.svelte` |
 | Nav | `apps/desktop/src/App.svelte` (Home / Library / Ports / Downloads / Settings; `ps2` route still works) |
 | Registry | `catalog/systems/ps2.json` |
-| NVIDIA Wayland | `scripts/tauri-dev.sh` |
+| NVIDIA Wayland | `scripts/run.sh desktop` |

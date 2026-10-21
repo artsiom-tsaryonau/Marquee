@@ -24,7 +24,7 @@ pnpm install
 pnpm dev              # browser demo with sample data · http://localhost:1420
 pnpm tauri dev        # real library; existing legacy sources may also appear
 # NVIDIA + Wayland:
-./scripts/tauri-dev.sh
+./scripts/run.sh desktop      # or: web | dev | both  (also pnpm run:desktop …)
 ```
 
 CLI (same core; use `--data-dir` for an isolated database):
@@ -38,7 +38,7 @@ cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev artwork refresh
 cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev ports install zelda64recomp   # also: ports list | check | launch
 ```
 
-**One app, two surfaces, run separately.** The desktop app is standalone and opens no port by default. Set `MARQUEE_WEB=1` (or `MARQUEE_PORT=<port>`) and it also serves the same UI and library on `127.0.0.1` (default port 47820). For the web alone, run `marquee serve` with no window. Settings → Web access copies an address ending in `#token=…`; open it in a browser on the same computer and you get the identical UI with the same games, covers, ports and launches, and both surfaces see each other's changes live. Headless: `marquee serve` (after `pnpm build`). While developing, `pnpm dev` proxies `/api` to a running Marquee, so a browser at `http://localhost:1420/#token=…` shows real data with hot reload. The server is loopback-only, needs the token for every API and cover request, and rejects foreign `Host` headers. The token lives in `<data dir>/server.token` (mode 600).
+**One app, two surfaces, run separately.** The desktop app is standalone and opens no port by default. Set `MARQUEE_WEB=1` (or `MARQUEE_PORT=<port>`) and it also serves the same UI and library on `127.0.0.1` (default port 47820). For the web alone, run `scripts/run.sh web` (`marquee run web`) with no window. Settings → Web access copies an address ending in `#token=…`; open it in a browser on the same computer and you get the identical UI with the same games, covers, ports and launches, and both surfaces see each other's changes live. Headless: `marquee run web` (after `pnpm build`). While developing, `scripts/run.sh dev` starts the server and Vite together; Vite proxies `/api` to a running Marquee, so a browser at `http://localhost:1420/#token=…` shows real data with hot reload. The server is loopback-only, needs the token for every API and cover request, and rejects foreign `Host` headers. The token lives in `<data dir>/server.token` (mode 600).
 
 **Demo (`pnpm dev`, no token, or `?demo=1`)** still uses invented titles and simulated playtime. Controller input in the browser is not evidence for the Tauri window.
 
@@ -55,7 +55,7 @@ apps/desktop/   Svelte 5 + TypeScript + Vite UI and Tauri 2 shell
 crates/core/    library DB, ISO scan, PCSX2 unpack/argv, serial covers, sessions, ports, command layer (`api`), event hub, local web server
 crates/cli/     `marquee` diagnostics over the same core
 catalog/        PS2/PS1 system descriptors, ports/ (one JSON per port)
-scripts/        fedora-deps.sh, bootstrap.sh, check.sh, make-icon.py, tauri-dev.sh
+scripts/        fedora-deps.sh, bootstrap.sh, check.sh, make-icon.py, run.sh
 docs/           ROADMAP.md, STORE_INTEGRATION.md, PS2.md, PS1.md, UNIFIED_LIBRARY.md, and supporting notes
 ```
 

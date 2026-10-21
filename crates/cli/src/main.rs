@@ -49,15 +49,22 @@ enum Command {
     Launch {
         edition_id: String,
     },
-    /// Serve the UI and API on 127.0.0.1 so a browser shows this same library
-    Serve {
+    /// Run Marquee: `run web` serves the UI and API on 127.0.0.1 without a window
+    #[command(subcommand)]
+    Run(RunCmd),
+    Health,
+}
+
+#[derive(Subcommand)]
+enum RunCmd {
+    /// Serve the UI and API for a browser (the desktop app is `scripts/run.sh desktop`)
+    Web {
         #[arg(long)]
         port: Option<u16>,
         /// Built UI directory
         #[arg(long, default_value = "apps/desktop/dist")]
         web_dir: PathBuf,
     },
-    Health,
 }
 
 #[derive(Subcommand)]
@@ -289,7 +296,7 @@ fn run() -> marquee_core::error::Result<()> {
             let report = core.refresh_artwork(edition.as_deref(), None)?;
             println!("{}", serde_json::to_string_pretty(&report)?);
         }
-        Command::Serve { port, web_dir } => {
+        Command::Run(RunCmd::Web { port, web_dir }) => {
             let assets = marquee_core::server::dir_assets(web_dir);
             let handle = marquee_core::server::start(Arc::clone(&core), Some(assets), port)?;
             println!("Marquee web UI: {}", handle.url());

@@ -5,7 +5,7 @@ const TOKEN_KEY = 'marquee.token';
 
 /**
  * The browser surface of a running Marquee. Open the address the desktop app (or
- * `marquee serve`) prints once: it ends in `#token=…`. The token is kept for next
+ * `marquee run web`) prints once: it ends in `#token=…`. The token is kept for next
  * time and removed from the address bar.
  */
 export function webToken(): string | null {
@@ -43,7 +43,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   } catch {
     throw {
       code: 'UNREACHABLE',
-      message: 'Marquee is not running. Start the desktop app (or `marquee serve`), or add ?demo=1 for the demo.',
+      message: 'Marquee is not running. Start the desktop app (or `marquee run web`), or add ?demo=1 for the demo.',
     } satisfies AppError;
   }
   const body = (await res.json().catch(() => null)) as unknown;
