@@ -12,6 +12,6 @@
   ],
   "binary": "AppRun",
   "config_subdir": "flycast",
-  "requirement": "Needs your own Dreamcast BIOS (dc_boot.bin, dc_flash.bin) in its data folder",
+  "requirement": "Dreamcast BIOS (dc_boot.bin, dc_flash.bin) — automated setup planned; manual copy fallback",
   "packages": []
 }

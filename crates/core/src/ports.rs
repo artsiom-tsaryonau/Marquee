@@ -3,7 +3,7 @@
 //! Each port is one JSON file in `catalog/ports/`. Install downloads the latest
 //! GitHub release asset (no key needed), stages and validates it before replacing
 //! the installation, preserves user files, and records the release tag.
-//! Marquee never downloads game data.
+//! Port engine binaries only; retail game data is acquired via planned setup jobs (manual folder today).
 
 use crate::error::{AppError, Result};
 use crate::http;

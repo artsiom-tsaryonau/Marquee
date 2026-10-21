@@ -8,5 +8,5 @@
   "asset_suffix": "-linux-x64.tar.gz",
   "asset_excludes": [],
   "binary": "fallout2-ce",
-  "requirement": "Needs master.dat, critter.dat and the patch/data folders from your own GOG or Steam install in the port folder (Open folder)"
+  "requirement": "GOG/Steam install detection should copy data files; Open folder fallback"
 }

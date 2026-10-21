@@ -18,3 +18,8 @@ roms/
 *.rom
 *.7z
 bios/
+
+# samples and generated catalog dumps
+sample/
+data/
+scripts/vimm/

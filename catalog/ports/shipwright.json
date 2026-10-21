@@ -8,5 +8,5 @@
   "asset_suffix": ".appimage",
   "asset_excludes": ["mac", "win"],
   "binary": null,
-  "requirement": "Asks for your own Ocarina of Time ROM on first launch"
+  "requirement": "Ocarina of Time ROM — setup job or first-launch picker (automation target)"
 }

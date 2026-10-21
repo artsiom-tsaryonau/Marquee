@@ -8,5 +8,5 @@
   "asset_suffix": "_linux.zip",
   "asset_excludes": [],
   "binary": "sm64coopdx",
-  "requirement": "Needs your own baserom.us.z64 in the port folder (Open folder)"
+  "requirement": "baserom.us.z64 — detection/setup job planned; Open folder fallback"
 }

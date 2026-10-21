@@ -3,7 +3,10 @@
   import { app } from '../state.svelte';
   import { asError } from '../api/core';
   import type { PurpleStatus } from '../api/contracts';
+  import { brandIcon } from '../brandIcons';
   import Icon from './Icon.svelte';
+
+  const purpleMark = brandIcon('purple');
   import { pollWhileActive } from '../activity';
 
   let status = $state<PurpleStatus | null>(null);
@@ -39,7 +42,7 @@
 </script>
 
 <section class="purple glass-panel" aria-labelledby="purple-title" aria-busy={!!status?.busy}>
-  <div class="heading"><span class="mark"><Icon name="monitor" size={28} /></span><div><span class="eyebrow">Managed Windows launcher</span><h2 id="purple-title">Purple for Aion 2</h2></div><span class="badge">{status?.busy ? 'Setting up' : status?.running ? 'Purple open' : status?.ready ? 'Launcher installed' : 'Setup available'}</span></div>
+  <div class="heading"><span class="mark"><img src={purpleMark.src} width="36" height="36" alt="" /></span><div><span class="eyebrow">Managed Windows launcher</span><h2 id="purple-title">Purple for Aion 2</h2></div><span class="badge">{status?.busy ? 'Setting up' : status?.running ? 'Purple open' : status?.ready ? 'Launcher installed' : 'Setup available'}</span></div>
   <p>Marquee prepares the compatibility runtime and a separate Purple installation for you. Sign in and select Aion 2 in Purple’s Store.</p>
   <p class="compatibility">Aion 2 on Linux is unverified. NCSOFT lists Windows as its supported PC platform; installing Purple does not establish game compatibility.</p>
   {#if status?.busy || status?.error}<p class="progress" role="status" aria-live="polite">{status.message}</p>{/if}
@@ -67,7 +70,7 @@
 
 <style>
   .purple { padding:26px; border-radius:20px; background:radial-gradient(ellipse at 0 0,rgb(139 92 246 / .13),transparent 75%),var(--surface); }
-  .heading { display:flex; align-items:center; gap:16px; flex-wrap:wrap; } .heading>div { flex:1; } .mark { width:54px; height:54px; display:grid; place-items:center; border-radius:15px; color:var(--accent); background:rgb(139 92 246 / .12); }
+  .heading { display:flex; align-items:center; gap:16px; flex-wrap:wrap; } .heading>div { flex:1; } .mark { width:54px; height:54px; display:grid; place-items:center; border-radius:15px; color:var(--accent); background:rgb(139 92 246 / .12); } .mark img { width:36px; height:36px; object-fit:contain; }
   h2 { margin:4px 0; font-size:23px; } p { margin:16px 0 0; line-height:1.65; color:var(--text-soft); font-size:14px; } .badge { padding:6px 10px; border-radius:8px; background:var(--field); color:var(--text-dim); font-size:12px; }
   .compatibility { color:var(--text-dim); font-size:13px; } .actions { margin-top:20px; display:flex; gap:10px; flex-wrap:wrap; } .actions a { text-decoration:none; } .progress { color:var(--accent); } .error { color:var(--bad); } .details { border-top:1px solid var(--line); margin-top:20px; } dl { display:grid; gap:8px; margin:18px 0 0; font-size:12px; } dt { color:var(--text-dim); } dd { margin:0 0 8px; overflow-wrap:anywhere; font-family:ui-monospace,monospace; }
 </style>

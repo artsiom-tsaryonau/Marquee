@@ -3,6 +3,7 @@
   import { app } from '../state.svelte';
   import type { EmulatorInfo, LauncherConfig, LauncherInfo, Runner } from '../api/contracts';
   import { launcherDraft, launcherMatches, launcherTemplates } from '../launchers';
+  import { launcherBrandIcon, sourceBrandIcon } from '../brandIcons';
   import { coverSrc } from '../api/map';
   import { platformLabel, systemLabel } from '../labels';
   import BiosPanel from '../components/BiosPanel.svelte';
@@ -159,8 +160,9 @@
         </ToolCard>
       {:else if item.t === 'launcher'}
         {@const l = item.l}
+        {@const mark = launcherBrandIcon(l)}
         <ToolCard seed={`launcher:${l.id}`} kind="Launcher" title={l.name} subtitle={l.status} mono={l.executable} detail={l.args.length ? `${l.args.length} argument${l.args.length === 1 ? '' : 's'} configured` : ''}
-          badge={{ text: l.available ? 'Ready' : 'Needs setup', tone: l.available ? 'ok' : '' }} glyph="monitor" ready={l.available}>
+          badge={{ text: l.available ? 'Ready' : 'Needs setup', tone: l.available ? 'ok' : '' }} icon={mark?.src} iconTone={mark?.tone ?? 'color'} glyph="monitor" ready={l.available}>
           {#snippet actions()}
             <button class="btn primary small" data-nav disabled={!l.available || app.openingLaunchers.includes(l.id)} onclick={() => app.openLauncher(l.id)}><Icon name="play" size={15} />{app.openingLaunchers.includes(l.id) ? 'Opening…' : 'Open'}</button>
             <button class="btn glass small" data-nav onclick={() => edit(l)}>Configure</button>
@@ -170,10 +172,12 @@
         </ToolCard>
       {:else}
         {@const purple = item.src === 'purple'}
+        {@const mark = sourceBrandIcon(item.src)}
         <ToolCard seed={`source:${item.src}`} kind="Source" title={item.name}
           subtitle={purple ? 'Managed Windows launcher' : 'Existing installations and synced store libraries'}
           detail={purple ? 'Sets up the compatibility runtime and a separate Purple install.' : 'Discovered automatically; your Lutris settings are kept.'}
-          badge={{ text: purple ? 'Windows' : lutrisOn ? 'Connected' : 'Not connected', tone: !purple && lutrisOn ? 'ok' : '' }} glyph={purple ? 'monitor' : 'grid'} ready={item.ready || purple}>
+          badge={{ text: purple ? 'Windows' : lutrisOn ? 'Connected' : 'Not connected', tone: !purple && lutrisOn ? 'ok' : '' }}
+          icon={mark.src} iconTone={mark.tone} ready={item.ready || purple}>
           {#snippet actions()}
             <button class="btn glass small" data-nav onclick={() => (sourceDialog = item.src)}>{purple ? 'Set up / open' : 'Configure'}</button>
           {/snippet}

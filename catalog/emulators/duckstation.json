@@ -11,7 +11,7 @@
   "config_subdir": "duckstation",
   "bios_subdir": "duckstation/bios",
   "bios_system": "ps1",
-  "requirement": "Needs your own PS1 BIOS (Marquee can import a folder of them)",
+  "requirement": "PS1 BIOS required — acquisition jobs planned; import folder fallback in Tools",
   "packages": [
     {
       "manager": "flatpak",

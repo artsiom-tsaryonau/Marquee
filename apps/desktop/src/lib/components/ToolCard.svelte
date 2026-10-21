@@ -13,6 +13,7 @@
     mono = '',
     badge,
     icon = undefined,
+    iconTone = 'color',
     glyph = 'controller',
     ready = true,
     busy = '',
@@ -27,6 +28,8 @@
     mono?: string;
     badge: { text: string; tone?: 'ok' | 'warn' | '' };
     icon?: string | undefined;
+    /** `light` inverts dark silhouettes (Steam, store wordmarks) on dark card art. */
+    iconTone?: 'color' | 'light';
     glyph?: IconName;
     ready?: boolean;
     busy?: string;
@@ -40,7 +43,7 @@
     <button class="tile" data-nav onclick={onopen} aria-label={`${title}: details`}>
     <Artwork art={artFromSeed(seed)} />
     <span class="shade"></span>
-    {#if icon}<img class="pic" src={icon} alt="" loading="lazy" />{:else}<span class="pic fallback"><Icon name={glyph} size={30} /></span>{/if}
+    {#if icon}<img class="pic" class:light={iconTone === 'light'} src={icon} alt="" loading="lazy" />{:else}<span class="pic fallback"><Icon name={glyph} size={30} /></span>{/if}
     <span class="kind">{kind}</span>
     <span class="badge" class:ok={badge.tone === 'ok'} class:warn={badge.tone === 'warn'}>{badge.text}</span>
     </button>
@@ -48,7 +51,7 @@
     <div class="tile">
     <Artwork art={artFromSeed(seed)} />
     <span class="shade"></span>
-    {#if icon}<img class="pic" src={icon} alt="" loading="lazy" />{:else}<span class="pic fallback"><Icon name={glyph} size={30} /></span>{/if}
+    {#if icon}<img class="pic" class:light={iconTone === 'light'} src={icon} alt="" loading="lazy" />{:else}<span class="pic fallback"><Icon name={glyph} size={30} /></span>{/if}
     <span class="kind">{kind}</span>
     <span class="badge" class:ok={badge.tone === 'ok'} class:warn={badge.tone === 'warn'}>{badge.text}</span>
     </div>
@@ -73,6 +76,8 @@
   .shade { position: absolute; inset: 0; background: linear-gradient(to top, rgb(8 8 14 / .7), transparent 65%); }
   .pic { position: absolute; left: 50%; top: 50%; width: 72px; height: 72px; transform: translate(-50%, -52%); object-fit: contain; transition: transform .25s; }
   :global(:root[data-effects='full']) .pic { filter: drop-shadow(0 8px 16px rgb(0 0 0 / .5)); }
+  .pic.light { filter: brightness(0) invert(1) drop-shadow(0 6px 14px rgb(0 0 0 / .45)); }
+  :global(:root[data-effects='full']) .pic.light { filter: brightness(0) invert(1) drop-shadow(0 8px 16px rgb(0 0 0 / .5)); }
   button.tile:hover .pic { transform: translate(-50%, -52%) scale(1.08); }
   .pic.fallback { display: grid; place-items: center; border-radius: 20px; background: rgb(0 0 0 / .3); color: #fff; }
   .kind, .badge { position: absolute; bottom: 10px; padding: 4px 8px; border-radius: 6px; font-size: 11px; color: var(--text-soft); background: rgb(0 0 0 / .45); backdrop-filter: var(--overlay-filter); }

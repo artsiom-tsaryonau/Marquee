@@ -62,7 +62,7 @@
     <div class="feature-text">
       <span class="eyebrow">Native ports</span>
       <Logo game={{ title: 'Ports', art: portsAtmosphere }} size="lg" />
-      <p>No ports could be loaded. PS2 games stay in Library. You supply your own files.</p>
+      <p>No ports could be loaded. PS2 games stay in Library. Engines install from GitHub; game data should be filled by setup jobs (Open folder is the fallback).</p>
       <button class="btn primary" data-nav onclick={() => app.go('library')}>
         <Icon name="grid" /> Open library
       </button>
@@ -101,7 +101,7 @@
       </article>
     {/each}
   </div>
-  <p class="note">The catalogue links only to official port releases on GitHub. You supply your own game files; updates keep them.</p>
+  <p class="note">Marquee installs port engines from GitHub. Retail data should come from automated setup (store detection, extractors); use Open folder when a port still needs files manually.</p>
 </div>
 
 <style>

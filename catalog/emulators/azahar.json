@@ -9,6 +9,6 @@
   "asset_excludes": [],
   "binary": "AppRun",
   "config_subdir": "azahar",
-  "requirement": "Bring your own decrypted 3DS game files",
+  "requirement": "Decrypted 3DS titles — library jobs planned; manual import fallback",
   "packages": []
 }

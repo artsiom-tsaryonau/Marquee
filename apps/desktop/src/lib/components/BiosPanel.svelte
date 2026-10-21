@@ -26,9 +26,9 @@
   <div class="heading">
     <div>
       <h2 id="bios-title">BIOS files</h2>
-      <p>You supply these; Marquee never downloads them. It reads the region from each file and keeps them in its own folder.</p>
+      <p>Firmware should be fetched automatically when a source is configured. Until then, import a folder — Marquee detects regions and stores copies locally.</p>
     </div>
-    <button class="btn primary small" data-nav disabled={app.biosBusy} onclick={() => app.importBios()}><Icon name="folder" size={15} />{app.biosBusy ? 'Working…' : 'Import a folder…'}</button>
+    <button class="btn primary small" data-nav disabled={app.biosBusy} onclick={() => app.importBios()}><Icon name="folder" size={15} />{app.biosBusy ? 'Working…' : 'Import folder (fallback)…'}</button>
   </div>
   {#if systems.length}
     <div class="grid">
@@ -55,7 +55,7 @@
     <div class="empty glass-panel">
       <Icon name="folder" size={28} />
       <h3>No BIOS files yet</h3>
-      <p>Import a folder or archive you extracted from your own console dumps. Marquee copies only the files it recognises and ignores the rest.</p>
+      <p>Fallback: pick a folder or archive. Marquee copies only recognised firmware files and ignores the rest.</p>
     </div>
   {:else}
     <p class="detail">No BIOS files for this platform.</p>

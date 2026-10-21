@@ -12,6 +12,6 @@
   ],
   "binary": "AppRun",
   "config_subdir": "xemu",
-  "requirement": "Needs your own Xbox BIOS, MCPX boot ROM and hard-disk image",
+  "requirement": "Xbox BIOS, MCPX ROM and HDD image — setup jobs planned; manual import fallback",
   "packages": []
 }

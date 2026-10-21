@@ -23,6 +23,7 @@ The 2026-10-21 direct-store decision supersedes earlier numbered phases, “Lutr
 | [Managed emulators and BIOS](EMULATORS.md) | Seven managed emulator launchers and Tools UI, BIOS management, game-only window research, and the mGBA source-build pilot |
 | [Purple for Aion 2](PURPLE.md) | Managed setup/open recipe, runtime pins, retry/cancellation, and the unverified live game gate |
 | [Tools, launchers and legacy Lutris bridge](LAUNCHERS.md) | Generic shortcuts and advanced configuration; the deprioritized Lutris cache bridge (automatic discovery stays until made opt-in) |
+| [Launcher branding](LAUNCHER_BRANDING.md) | Official marks, Simple Icons slugs, and UI wiring notes for Steam/Epic/GOG/Lutris/Heroic/Purple/runtimes |
 | [Desktop rendering](DESKTOP_RENDERING.md) | Production launch, renderer modes, Balanced/Full effects, and remaining acceptance |
 | [Enrichment, UI and PS2 metadata](ENRICHMENT.md) | Optional metadata/artwork providers and the ScreenScraper/SteamGridDB follow-up |
 | [Catalogue metadata](CATALOGUE_METADATA.md) | Saved-page import, regional revisions/languages, source artwork and ratings, explicit installation links and raw-ISO SHA-1 matching; schema v5 |

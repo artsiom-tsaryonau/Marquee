@@ -8,5 +8,5 @@
   "asset_suffix": "x86_64.appimage",
   "asset_excludes": ["zsync", "mac", "windows"],
   "binary": null,
-  "requirement": "Needs a Doom WAD: your own, or the free Freedoom"
+  "requirement": "Doom WAD or Freedoom — setup job should offer both; manual pick fallback"
 }

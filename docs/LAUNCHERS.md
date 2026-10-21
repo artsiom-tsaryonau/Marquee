@@ -2,7 +2,7 @@
 
 Current shortcut features were implemented 2026-10-20. Direction updated 2026-10-21: [direct store integration](STORE_INTEGRATION.md) is the main workflow; Lutris/Heroic shortcuts are optional legacy tools. Opening their windows is not store-account integration.
 
-The target normal flow detects and manages Steam/Legendary/gogdl/umu/Proton dependencies from Marquee. Users should not need this executable/argument editor to connect stores or play a supported game. The editor remains an advanced escape hatch. Open **Tools** from the sidebar or Library header.
+The target normal flow detects and manages Steam/Legendary/gogdl/umu/Proton dependencies from Marquee. Users should not need this executable/argument editor to connect stores or play a supported game. The editor remains an advanced escape hatch. Open **Tools** from the sidebar or Library header. Recognisable store/launcher marks are catalogued in [launcher branding](LAUNCHER_BRANDING.md).
 
 ## What works
 
