@@ -1,38 +1,66 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
   import { app } from '../state.svelte';
-  import type { LauncherConfig, LauncherInfo } from '../api/contracts';
+  import type { EmulatorInfo, LauncherConfig, LauncherInfo, Runner } from '../api/contracts';
+  import type { PortEntry } from '../types';
   import { launcherDraft, launcherMatches, launcherTemplates } from '../launchers';
+  import { coverSrc } from '../api/map';
+  import { platformLabel, systemLabel } from '../labels';
+  import BiosPanel from '../components/BiosPanel.svelte';
+  import EmulatorDialog from '../components/EmulatorDialog.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
   import LutrisSource from '../components/LutrisSource.svelte';
   import PurpleLauncher from '../components/PurpleLauncher.svelte';
-  import EmulatorsPanel from '../components/EmulatorsPanel.svelte';
-  import { systemLabel } from '../labels';
+  import ToolCard from '../components/ToolCard.svelte';
   import Icon from '../components/Icon.svelte';
 
-  type Kind = 'all' | 'emulators' | 'launchers' | 'ports' | 'sources' | 'bios';
-  const kinds: { id: Kind; label: string }[] = [
-    { id: 'all', label: 'Everything' }, { id: 'emulators', label: 'Emulators' }, { id: 'launchers', label: 'Launchers' },
-    { id: 'ports', label: 'Native ports' }, { id: 'sources', label: 'Sources' }, { id: 'bios', label: 'BIOS' },
-  ];
-  let kind = $state<Kind>('all');
-  let platform = $state('');
-  let sourceDialog = $state<'purple' | 'lutris' | null>(null);
-  // Platform narrows the platform-specific kinds; launchers, ports and sources have no platform.
-  const platforms = $derived([...new Set(app.emulators.flatMap((e) => e.systems))].sort((a, b) => systemLabel(a).localeCompare(systemLabel(b))));
-  const show = (k: Exclude<Kind, 'all'>) => (kind === 'all' || kind === k) && (!platform || k === 'emulators' || k === 'bios');
-  const runnerSystem = (r: { kind: string }) => (r.kind === 'duckstation' ? 'ps1' : 'ps2');
+  // Everything that opens, runs or hosts games is one kind of thing here; what separates
+  // them is the platform they serve, exactly like the Library.
+  type Item =
+    | { t: 'emulator'; key: string; name: string; platforms: string[]; ready: boolean; e: EmulatorInfo }
+    | { t: 'runner'; key: string; name: string; platforms: string[]; ready: boolean; r: Runner }
+    | { t: 'launcher'; key: string; name: string; platforms: string[]; ready: boolean; l: LauncherInfo }
+    | { t: 'port'; key: string; name: string; platforms: string[]; ready: boolean; p: PortEntry }
+    | { t: 'source'; key: string; name: string; platforms: string[]; ready: boolean; src: 'purple' | 'lutris' };
+
+  const norm = (id: string) => (id.startsWith('pc-') ? 'pc' : id);
+  const labelOf = (id: string) => (id === 'pc' ? 'PC' : ((platformLabel as Record<string, string>)[id] ?? systemLabel(id)));
+  const runnerSystem = (r: Runner) => (r.kind === 'duckstation' ? 'ps1' : 'ps2');
+
   let query = $state('');
   let onlyReady = $state(false);
+  let platform = $state('');
+  let sourceDialog = $state<'purple' | 'lutris' | null>(null);
   let draft = $state<LauncherConfig | null>(null);
   let error = $state<string | null>(null);
   let saving = $state(false);
   let nameInput = $state<HTMLInputElement>();
-  const shown = $derived(app.launchers.filter((l) => launcherMatches(l, query, onlyReady)));
-  const ports = $derived(app.ports.filter((p) => (!onlyReady || p.status === 'ready' || p.status === 'update') && `${p.name} ${p.game}`.toLowerCase().includes(query.toLowerCase())));
-  const runners = $derived(app.runners.filter((r) => r.source !== 'marquee' && (!platform || runnerSystem(r) === platform) && (!onlyReady || r.available) && r.display_name.toLowerCase().includes(query.toLowerCase())));
-  const ready = $derived(app.launchers.filter((l) => l.available).length);
-  onMount(() => { void app.loadLaunchers(); });
+
+  const lutrisOn = $derived(!!app.lutrisSource?.config.enabled);
+  const all = $derived.by<Item[]>(() => [
+    ...app.emulators.map((e): Item => ({ t: 'emulator', key: `emu:${e.id}`, name: e.name, platforms: e.systems, ready: e.status !== 'not_installed', e })),
+    ...app.runners.filter((r) => r.source !== 'marquee').map((r): Item => ({ t: 'runner', key: `run:${r.id}`, name: r.display_name, platforms: [runnerSystem(r)], ready: r.available, r })),
+    ...app.launchers.map((l): Item => ({ t: 'launcher', key: `app:${l.id}`, name: l.name, platforms: ['pc'], ready: l.available, l })),
+    ...app.ports.map((p): Item => ({ t: 'port', key: `port:${p.id}`, name: p.name, platforms: [norm(p.platform)], ready: p.status === 'ready' || p.status === 'update', p })),
+    { t: 'source', key: 'src:purple', name: 'Purple for Aion 2', platforms: ['pc'], ready: false, src: 'purple' },
+    { t: 'source', key: 'src:lutris', name: 'Lutris library', platforms: ['pc'], ready: lutrisOn, src: 'lutris' },
+  ]);
+  const matchesText = (i: Item) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return true;
+    const extra = i.t === 'port' ? i.p.game : i.t === 'launcher' ? i.l.executable : '';
+    return `${i.name} ${extra} ${i.platforms.map(labelOf).join(' ')}`.toLowerCase().includes(q);
+  };
+  const items = $derived(
+    all
+      .filter((i) => matchesText(i) && (!onlyReady || i.ready) && (!platform || i.platforms.includes(platform)))
+      .sort((a, b) => Number(b.ready) - Number(a.ready) || a.name.localeCompare(b.name)),
+  );
+  const platforms = $derived(
+    [...new Set(all.flatMap((i) => i.platforms))].sort((a, b) => labelOf(a).localeCompare(labelOf(b))),
+  );
+  const ready = $derived(all.filter((i) => i.ready).length);
+  onMount(() => { void app.loadLaunchers(); void app.loadEmulators(); });
   $effect(() => {
     if (!draft && !sourceDialog) return;
     app.closeLauncherEditor = () => { if (sourceDialog) sourceDialog = null; else if (!saving) draft = null; };
@@ -64,7 +92,8 @@
 
 <div class="tools">
   <header class="tool-hero">
-    <div class="hero-copy"><h1>Tools</h1><p>Emulators, launchers, native ports and connected libraries in one place. {ready} launcher{ready === 1 ? '' : 's'} ready · {app.emulators.filter((e) => e.status !== 'not_installed').length} emulator{app.emulators.filter((e) => e.status !== 'not_installed').length === 1 ? '' : 's'} installed · {app.ports.filter((p) => p.status !== 'not-installed').length} native port{app.ports.filter((p) => p.status !== 'not-installed').length === 1 ? '' : 's'}.</p></div>
+    <div class="hero-copy"><h1>Tools</h1><p>Emulators, launchers, native ports and connected libraries, by the platform they run. {ready} ready.</p></div>
+    <InstallMenu />
     <button class="btn primary" data-nav onclick={() => edit()}><Icon name="plus" /> Add launcher</button>
   </header>
 
@@ -91,60 +120,84 @@
   {/if}
 
   <div class="toolbar glass-panel">
-    <label class="search"><Icon name="search" size={18} /><input bind:value={query} data-nav aria-label="Search tools" placeholder="Search your tools…" /></label>
+    <label class="search"><Icon name="search" size={18} /><input bind:value={query} data-nav aria-label="Search tools" placeholder="Search emulators, launchers, ports…" /></label>
     <button class="chip" class:on={onlyReady} data-nav aria-pressed={onlyReady} onclick={() => (onlyReady = !onlyReady)}>Ready only</button>
-    <button class="btn glass small" data-nav disabled={app.launchersLoading} onclick={() => app.loadLaunchers()}><Icon name="refresh" size={16} /> Refresh</button>
+    <button class="btn glass small" data-nav disabled={app.launchersLoading} onclick={() => { void app.loadLaunchers(); void app.loadEmulators(); }}><Icon name="refresh" size={16} /> Refresh</button>
   </div>
-  <div class="filters" data-nav-row aria-label="Kind of tool">
-    {#each kinds as k}<button class="chip" class:on={kind === k.id} data-nav aria-pressed={kind === k.id} onclick={() => (kind = k.id)}>{k.label}</button>{/each}
+  <div class="filters" data-nav-row aria-label="Platforms">
+    <button class="chip" class:on={!platform} data-nav aria-pressed={!platform} onclick={() => (platform = '')}>All platforms <span>{all.length}</span></button>
+    {#each platforms as p}<button class="chip" class:on={platform === p} data-nav aria-pressed={platform === p} onclick={() => (platform = p)}>{labelOf(p)} <span>{all.filter((i) => i.platforms.includes(p)).length}</span></button>{/each}
   </div>
-  {#if platforms.length}
-    <div class="filters" data-nav-row aria-label="Supported platforms">
-      <button class="chip" class:on={!platform} data-nav aria-pressed={!platform} onclick={() => (platform = '')}>All platforms</button>
-      {#each platforms as p}<button class="chip" class:on={platform === p} data-nav aria-pressed={platform === p} onclick={() => (platform = p)}>{systemLabel(p)}</button>{/each}
-    </div>
-  {/if}
 
-  {#if show('launchers')}
-    <section aria-labelledby="launchers-title"><div class="section-heading"><div><h2 id="launchers-title">Your launchers</h2><p>Open apps here. Their game libraries remain separate until an import adapter is connected.</p></div><span class="pill">{shown.length}</span></div>
-      {#if app.launcherError}<div class="empty glass-panel" role="alert"><p>{app.launcherError}</p><button class="btn glass" data-nav onclick={() => app.loadLaunchers()}>Try again</button></div>{/if}
-      <div class="tool-grid">
-        {#each shown as launcher (launcher.id)}
-          <article class="tool-card glass-panel" class:ready={launcher.available}>
-            <div class="card-heading"><span class="app-mark"><Icon name="monitor" size={24} /></span><div><h3>{launcher.name}</h3><span class="badge" class:available={launcher.available}>{launcher.available ? 'Ready' : app.demo ? 'Demo' : 'Needs setup'}</span></div><button class="pin" class:pinned={launcher.pinned} data-nav aria-label={`${launcher.pinned ? 'Unpin' : 'Pin'} ${launcher.name}`} aria-pressed={launcher.pinned} onclick={() => pin(launcher)}><Icon name="star" size={18} filled={launcher.pinned} /></button></div>
-            <p class="status">{launcher.status}</p><p class="command" title={launcher.executable}>{launcher.executable}</p>
-            {#if launcher.args.length}<span class="detail">{launcher.args.length} argument{launcher.args.length === 1 ? '' : 's'} configured</span>{/if}
-            <div class="card-actions"><button class="btn primary small" data-nav disabled={!launcher.available || app.openingLaunchers.includes(launcher.id)} onclick={() => app.openLauncher(launcher.id)}><Icon name="play" size={15} />{app.openingLaunchers.includes(launcher.id) ? 'Opening…' : 'Open'}</button><button class="btn glass small" data-nav onclick={() => edit(launcher)}>Configure</button>{#if launcher.configured}<button class="text-button" data-nav onclick={() => app.removeLauncher(launcher.id)}>{launcher.id.startsWith('detected.') ? 'Reset' : 'Remove'}</button>{/if}</div>
-          </article>
-        {:else}
-          <div class="empty glass-panel"><Icon name="monitor" size={28} /><h3>{app.launchersLoading ? 'Finding your launchers…' : 'No matching launchers'}</h3><p>Add an application or change the filters to see more.</p><button class="btn glass" data-nav onclick={() => edit()}>Add launcher</button></div>
-        {/each}
-      </div>
-    </section>
-  {/if}
-  {#if show('emulators')}
-    <EmulatorsPanel {query} {onlyReady} {platform} show="emulators" />
-    {#if runners.length || (!platform && !query && !onlyReady)}
-    <section aria-labelledby="emulators-title"><div class="section-heading"><div><h2 id="emulators-title">Other emulators on this computer</h2><p>PCSX2 and anything already installed. Defaults are saved per system.</p></div><InstallMenu /></div>
-      <div class="tool-grid">{#each runners as runner}<article class="tool-card glass-panel"><div class="card-heading"><span class="app-mark"><Icon name="controller" size={24} /></span><div><h3>{runner.display_name}</h3><span class="badge" class:available={runner.available}>{app.runnerFor(runner.kind === 'duckstation' ? 'ps1' : 'ps2')?.id === runner.id ? 'Default' : runner.available ? 'Detected' : 'Unavailable'}</span></div></div><p class="status">{runner.bios_state.replaceAll('_', ' ')}</p><p class="command">{runner.command.join(' ')}</p><div class="card-actions"><button class="btn primary small" data-nav disabled={!runner.available || app.runnerFor(runner.kind === 'duckstation' ? 'ps1' : 'ps2')?.id === runner.id} onclick={() => app.chooseRunner(runner.id)}>Use as default</button><button class="btn glass small" data-nav disabled={!runner.available} onclick={() => app.openSetup(runner.id)}>Setup</button></div></article>{:else}<div class="empty glass-panel"><Icon name="controller" size={28} /><h3>{query || onlyReady ? 'No matching runners' : 'Set up an emulator'}</h3><p>Install DuckStation for PS1 or PCSX2 for PS2, then open its setup and add a disc folder in Settings.</p><button class="btn glass" data-nav onclick={() => app.go('settings')}>Open settings</button></div>{/each}</div>
-    </section>
-    {/if}
-  {/if}
-  {#if show('bios')}<EmulatorsPanel {platform} show="bios" />{/if}
-  {#if show('ports')}
-    <section aria-labelledby="ports-title"><div class="section-heading"><div><h2 id="ports-title">Native ports</h2><p>Modern runtimes for your classic games.</p></div><button class="btn glass small" data-nav onclick={() => app.go('ports')}>Browse ports</button></div>
-      <div class="tool-grid">{#each ports as port}<article class="tool-card glass-panel"><div class="card-heading"><span class="app-mark"><Icon name="puzzle" size={24} /></span><div><h3>{port.name}</h3><span class="badge" class:available={port.status === 'ready'}>{port.status.replaceAll('-', ' ')}</span></div></div><p class="status">{port.game}</p><p class="detail">{port.requirement}</p><div class="card-actions"><button class="btn glass small" data-nav onclick={() => app.go('ports')}>Manage</button>{#if !app.demo && port.status !== 'not-installed'}<button class="btn glass small" data-nav onclick={() => app.openPortFolder(port)}>Folder</button>{/if}</div></article>{:else}<div class="empty glass-panel"><p>No native ports match these filters.</p></div>{/each}</div>
-      {#if !query && !onlyReady}<div class="opengoal glass-panel"><img src="/reference/jak/opengoal-logo.png" alt="" /><div><h3>Already have OpenGOAL?</h3><p>Add its installed launcher as an app shortcut. Managed game extraction remains separate.</p></div><button class="btn glass small" data-nav onclick={async () => { await edit(); if (draft) { draft.name = 'OpenGOAL'; } }}>Configure OpenGOAL</button></div>{/if}
-    </section>
-  {/if}
-  {#if show('sources')}
-    <section aria-labelledby="sources-title"><div class="section-heading"><div><h2 id="sources-title">Connected sources</h2><p>Libraries and Windows launchers Marquee can set up or discover for you.</p></div></div>
-      <div class="tool-grid">
-        <article class="tool-card glass-panel"><div class="card-heading"><span class="app-mark"><Icon name="monitor" size={24} /></span><div><h3>Purple for Aion 2</h3><span class="badge">Managed Windows launcher</span></div></div><p class="status">Sets up the compatibility runtime and a separate Purple install.</p><div class="card-actions"><button class="btn primary small" data-nav onclick={() => (sourceDialog = 'purple')}>Set up / open</button></div></article>
-        <article class="tool-card glass-panel"><div class="card-heading"><span class="app-mark"><Icon name="grid" size={24} /></span><div><h3>Lutris library</h3><span class="badge" class:available={app.lutrisSource?.config.enabled}>{app.lutrisSource?.config.enabled ? 'Connected' : 'Not connected'}</span></div></div><p class="status">Discovers existing installations and synced store libraries.</p><div class="card-actions"><button class="btn glass small" data-nav onclick={() => (sourceDialog = 'lutris')}>Configure</button></div></article>
-      </div>
-    </section>
-  {/if}
+  {#if app.launcherError}<div class="empty glass-panel" role="alert"><p>{app.launcherError}</p><button class="btn glass" data-nav onclick={() => app.loadLaunchers()}>Try again</button></div>{/if}
+  <div class="tool-grid">
+    {#each items as item (item.key)}
+      {#if item.t === 'emulator'}
+        {@const e = item.e}
+        {@const busy = app.emulatorBusy[e.id]}
+        <ToolCard seed={`emulator:${e.id}`} kind="Emulator" title={e.name} subtitle={e.systems.map(labelOf).join(' · ')}
+          detail={`${e.integrated ? 'Launches your library games' : 'Opens on its own for now'}${e.installed_version ? ` · ${e.installed_version.length > 18 ? `${e.installed_version.slice(0, 14)}…` : e.installed_version}` : ''}`}
+          badge={{ text: e.status === 'not_installed' ? 'Not installed' : e.status === 'update' ? 'Update available' : 'Ready', tone: e.status === 'ready' ? 'ok' : e.status === 'update' ? 'warn' : '' }}
+          icon={coverSrc(e.icon)} ready={item.ready} {busy} onopen={() => (app.emulatorDialogId = e.id)}>
+          {#snippet actions()}
+            {#if e.status === 'not_installed'}
+              <button class="btn primary small" data-nav disabled={!!busy} onclick={() => app.installEmulator(e)}><Icon name="download" size={15} />{busy ? 'Installing…' : 'Install'}</button>
+            {:else if e.status === 'update'}
+              <button class="btn primary small" data-nav disabled={!!busy} onclick={() => app.installEmulator(e)}>Update</button>
+            {:else}
+              <button class="btn primary small" data-nav disabled={!!busy} onclick={() => app.openEmulator(e)}><Icon name="play" size={15} />Open</button>
+            {/if}
+            <button class="btn glass small" data-nav onclick={() => (app.emulatorDialogId = e.id)}><Icon name="settings" size={15} />Configure</button>
+          {/snippet}
+        </ToolCard>
+      {:else if item.t === 'runner'}
+        {@const r = item.r}
+        {@const isDefault = app.runnerFor(runnerSystem(r))?.id === r.id}
+        <ToolCard seed={`runner:${r.id}`} kind="Emulator" title={r.display_name} subtitle={labelOf(runnerSystem(r))} detail={r.bios_state.replaceAll('_', ' ')} mono={r.command.join(' ')}
+          badge={{ text: isDefault ? 'Default' : r.available ? 'Detected' : 'Unavailable', tone: r.available ? 'ok' : '' }} ready={r.available}>
+          {#snippet actions()}
+            <button class="btn primary small" data-nav disabled={!r.available || isDefault} onclick={() => app.chooseRunner(r.id)}>Use as default</button>
+            <button class="btn glass small" data-nav disabled={!r.available} onclick={() => app.openSetup(r.id)}>Setup</button>
+          {/snippet}
+        </ToolCard>
+      {:else if item.t === 'launcher'}
+        {@const l = item.l}
+        <ToolCard seed={`launcher:${l.id}`} kind="Launcher" title={l.name} subtitle={l.status} mono={l.executable} detail={l.args.length ? `${l.args.length} argument${l.args.length === 1 ? '' : 's'} configured` : ''}
+          badge={{ text: l.available ? 'Ready' : app.demo ? 'Demo' : 'Needs setup', tone: l.available ? 'ok' : '' }} glyph="monitor" ready={l.available}>
+          {#snippet actions()}
+            <button class="btn primary small" data-nav disabled={!l.available || app.openingLaunchers.includes(l.id)} onclick={() => app.openLauncher(l.id)}><Icon name="play" size={15} />{app.openingLaunchers.includes(l.id) ? 'Opening…' : 'Open'}</button>
+            <button class="btn glass small" data-nav onclick={() => edit(l)}>Configure</button>
+            {#if l.configured}<button class="text-button" data-nav onclick={() => app.removeLauncher(l.id)}>{l.id.startsWith('detected.') ? 'Reset' : 'Remove'}</button>{/if}
+            <button class="pin" class:pinned={l.pinned} data-nav aria-label={`${l.pinned ? 'Unpin' : 'Pin'} ${l.name}`} aria-pressed={l.pinned} onclick={() => pin(l)}><Icon name="star" size={18} filled={l.pinned} /></button>
+          {/snippet}
+        </ToolCard>
+      {:else if item.t === 'port'}
+        {@const p = item.p}
+        <ToolCard seed={`port:${p.id}`} kind="Native port" title={p.name} subtitle={p.game} detail={p.requirement}
+          badge={{ text: p.status.replaceAll('-', ' '), tone: p.status === 'ready' ? 'ok' : p.status === 'update' ? 'warn' : '' }} glyph="puzzle" ready={item.ready || p.status !== 'not-installed'}>
+          {#snippet actions()}
+            <button class="btn glass small" data-nav onclick={() => app.go('ports')}>Manage</button>
+            {#if !app.demo && p.status !== 'not-installed'}<button class="btn glass small" data-nav onclick={() => app.openPortFolder(p)}>Folder</button>{/if}
+          {/snippet}
+        </ToolCard>
+      {:else}
+        {@const purple = item.src === 'purple'}
+        <ToolCard seed={`source:${item.src}`} kind="Source" title={item.name}
+          subtitle={purple ? 'Managed Windows launcher' : 'Existing installations and synced store libraries'}
+          detail={purple ? 'Sets up the compatibility runtime and a separate Purple install.' : 'Discovered automatically; your Lutris settings are kept.'}
+          badge={{ text: purple ? 'Windows' : lutrisOn ? 'Connected' : 'Not connected', tone: !purple && lutrisOn ? 'ok' : '' }} glyph={purple ? 'monitor' : 'grid'} ready={item.ready || purple}>
+          {#snippet actions()}
+            <button class="btn glass small" data-nav onclick={() => (sourceDialog = item.src)}>{purple ? 'Set up / open' : 'Configure'}</button>
+          {/snippet}
+        </ToolCard>
+      {/if}
+    {:else}
+      <div class="empty glass-panel"><Icon name="controller" size={28} /><h3>{app.launchersLoading ? 'Finding your tools…' : 'Nothing matches'}</h3><p>Change the platform or search, or add a launcher.</p><button class="btn glass" data-nav onclick={() => edit()}>Add launcher</button></div>
+    {/each}
+  </div>
+
+  <BiosPanel {platform} />
+  <EmulatorDialog />
 
   {#if sourceDialog}
     <div class="modal-wrap" role="dialog" aria-modal="true" aria-label="Source setup" tabindex="-1" onkeydown={(e) => { if (e.key === 'Escape') sourceDialog = null; }} onclick={(e) => { if (e.target === e.currentTarget) sourceDialog = null; }}>
@@ -161,16 +214,16 @@
   .tool-hero { display:flex; flex-wrap:wrap; align-items:center; gap:22px; }
   .hero-copy { flex:1; min-width:240px; } h1 { margin:5px 0 8px; font-size:clamp(28px, 3vw, 40px); letter-spacing:-1px; } h2 { margin:0; font-size:21px; letter-spacing:-.4px; } h3 { margin:0 0 8px; font-size:17px; }
   p { color:var(--text-soft); margin:5px 0; line-height:1.6; }
-  .filters { display:flex; flex-wrap:wrap; gap:8px; margin-top:-14px; } .source-dialog { position:relative; } .source-dialog .close { position:absolute; top:14px; right:14px; z-index:1; }
+  .filters { display:flex; flex-wrap:wrap; gap:8px; margin-top:-14px; } .filters .chip span { opacity:.6; margin-left:4px; } .source-dialog { position:relative; } .source-dialog .close { position:absolute; top:14px; right:14px; z-index:1; }
   .toolbar { display:flex; flex-wrap:wrap; gap:12px; padding:12px; border-radius:16px; align-items:center; } .search { display:flex; align-items:center; gap:10px; flex:1; min-width:220px; color:var(--text-dim); padding:0 8px; } .search input { background:transparent; border:0; padding:10px 0; }
   input { min-width:0; width:100%; border:1px solid var(--line); background:var(--field); color:var(--text); border-radius:10px; padding:12px; font:inherit; box-sizing:border-box; } input:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
-  .section-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px; } .section-heading p { font-size:13px; } .tool-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(275px,1fr)); gap:16px; }
-  .tool-card { padding:22px; border-radius:18px; display:flex; flex-direction:column; min-width:0; transition:border-color .2s; } .tool-card:hover { border-color:rgb(139 92 246 / .45); } .card-heading { display:flex; gap:14px; align-items:center; margin-bottom:16px; } .card-heading > div { flex:1; min-width:0; } .app-mark { display:grid; place-items:center; width:48px; height:48px; flex-shrink:0; border-radius:14px; background:var(--field); color:var(--text-soft); }
-  .badge { display:inline-block; padding:4px 8px; border-radius:6px; font-size:11px; color:var(--text-dim); background:var(--field); } .badge.available { color:var(--ok); background:rgb(52 211 153 / .08); } .status { font-size:13px; } .command { font:12px ui-monospace,monospace; color:var(--text-dim); overflow-wrap:anywhere; margin:10px 0 16px; } .detail { font-size:12px; color:var(--text-dim); }
-  .card-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:auto; padding-top:18px; } .pin, .text-button { border:0; background:none; color:var(--text-dim); padding:8px; cursor:pointer; } .pin.pinned { color:var(--warn); } .text-button { font:inherit; font-size:12px; }
+  .section-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px; } .tool-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(275px,1fr)); gap:16px; }
+  
+  
+  .pin, .text-button { border:0; background:none; color:var(--text-dim); padding:8px; cursor:pointer; } .pin.pinned { color:var(--warn); } .text-button { font:inherit; font-size:12px; }
   .empty { grid-column:1/-1; text-align:center; padding:36px; border-radius:18px; color:var(--text-dim); display:grid; gap:12px; justify-items:center; } .empty h3, .empty p { margin:0; }
-  .modal-wrap { position:fixed; inset:0; z-index:40; display:grid; place-items:start center; overflow:auto; padding:6vh 24px; background:rgb(0 0 0 / .6); backdrop-filter:blur(6px); } .modal-wrap .editor { width:min(820px,100%); } .editor { border-radius:20px; padding:26px; display:grid; gap:18px; } .editor .section-heading { margin:0; } .fields { display:grid; grid-template-columns:1fr 1fr; gap:18px; } .fields label { display:grid; gap:9px; font-size:13px; } .fields .wide { grid-column:1/-1; } .path-field { display:flex; gap:8px; } .path-field input { flex:1; } .optional { color:var(--text-dim); font-weight:normal; font-size:12px; } .templates { display:flex; align-items:center; flex-wrap:wrap; gap:8px; font-size:12px; color:var(--text-dim); }
+  .modal-wrap { position:fixed; inset:0; z-index:40; display:grid; place-items:start center; overflow:auto; padding:6vh 24px; background:rgb(0 0 0 / .6); backdrop-filter:var(--overlay-filter); } .modal-wrap .editor { width:min(820px,100%); } .editor { border-radius:20px; padding:26px; display:grid; gap:18px; } .editor .section-heading { margin:0; } .fields { display:grid; grid-template-columns:1fr 1fr; gap:18px; } .fields label { display:grid; gap:9px; font-size:13px; } .fields .wide { grid-column:1/-1; } .path-field { display:flex; gap:8px; } .path-field input { flex:1; } .optional { color:var(--text-dim); font-weight:normal; font-size:12px; } .templates { display:flex; align-items:center; flex-wrap:wrap; gap:8px; font-size:12px; color:var(--text-dim); }
   fieldset { border:1px solid var(--line); padding:16px; border-radius:12px; display:grid; gap:10px; } legend { padding:0 8px; font-size:13px; } .argument { display:flex; gap:8px; } .pin-choice { display:flex; gap:10px; align-items:center; font-size:13px; } input[type=checkbox] { width:18px; height:18px; accent-color:var(--accent); }
-  footer { display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding-top:16px; border-top:1px solid var(--line); } footer span { flex:1; min-width:220px; font-size:12px; color:var(--text-dim); line-height:1.6; } .error { color:var(--bad); } .opengoal { display:flex; gap:20px; align-items:center; padding:22px; border-radius:18px; margin-top:18px; } .opengoal img { width:48px; height:48px; object-fit:contain; } .opengoal div { flex:1; } .opengoal p { font-size:13px; }
-  @media(max-width:800px) { .tools { padding:22px var(--gutter); } .opengoal { flex-wrap:wrap; } .fields { grid-template-columns:1fr; } }
+  footer { display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding-top:16px; border-top:1px solid var(--line); } footer span { flex:1; min-width:220px; font-size:12px; color:var(--text-dim); line-height:1.6; } .error { color:var(--bad); } 
+  @media(max-width:800px) { .tools { padding:22px var(--gutter); } .fields { grid-template-columns:1fr; } }
 </style>
