@@ -10,7 +10,7 @@ One console-style launcher for Fedora/Linux for your Steam, Epic, GOG, emulated,
 
 **Tools additions:** managed emulator installation/opening/update/removal for DuckStation, PPSSPP, RPCS3, Flycast, Azahar, Cemu and xemu; BIOS import/list/removal for PS1/PS2. DuckStation connects to PS1 library launch; the other six currently open independently. PCSX2 uses its existing dedicated installer. Catalogue availability does not establish tested game compatibility. See [emulator management](docs/EMULATORS.md) and the [PS1/PS2 correction pass](docs/PS1_PS2_CORRECTIONS_2026-10-21.md).
 
-Documentation navigation: [docs index](docs/README.md). Broader platform/port ideas remain in the [expansion catalogue](docs/EXPANSION_CATALOGUE.md); [Jak/OpenGOAL and edition/run choices](docs/UNIFIED_LIBRARY.md) remain a separate track. Metadata matching and [ScreenScraper/SteamGridDB](docs/PS2_METADATA_FOLLOWUP.md) must never gate Play. Original ROM/BIOS/firmware/port extraction assets remain user-supplied; authenticated downloads of owned store games are in scope.
+Documentation navigation: [docs index](docs/README.md). Broader platform/port ideas remain in the [expansion catalogue](docs/EXPANSION_CATALOGUE.md); [Jak/OpenGOAL and edition/run choices](docs/UNIFIED_LIBRARY.md) remain a separate track. Metadata matching and [ScreenScraper/SteamGridDB](docs/PS2_METADATA_FOLLOWUP.md) must never gate Play. Original ROM/BIOS/firmware/port extraction assets can be extracted from any place or locations; authenticated downloads of owned store games are in scope.
 
 ## Run
 
