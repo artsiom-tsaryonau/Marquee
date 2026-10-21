@@ -595,6 +595,16 @@ class AppState {
     }
   }
 
+  /** Emulators the library folders need that are not installed yet (link downloads only). */
+  get neededEmulators(): EmulatorInfo[] {
+    const systems = new Set(this.roots.map((r) => r.system));
+    return this.emulators.filter((e) => e.integrated && !e.source_build && e.status === 'not_installed' && e.systems.some((s) => systems.has(s)));
+  }
+
+  async installNeededEmulators() {
+    for (const emulator of this.neededEmulators) await this.installEmulator(emulator);
+  }
+
   async installEmulator(emulator: EmulatorInfo) {
     if (emulator.source_build) { await this.buildEmulator(emulator); return; }
     await this.emulatorAction(emulator.id, `Installing ${emulator.name}…`, async () => {

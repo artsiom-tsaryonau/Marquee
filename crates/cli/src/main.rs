@@ -99,6 +99,8 @@ enum EmulatorsCmd {
     Check,
     /// Install or update an emulator inside Marquee's own folder
     Install { id: String },
+    /// Install every emulator your library folders need and that is not installed yet
+    InstallNeeded,
     /// Build a reviewed pinned recipe with rootless Podman; wait and report logs
     Build { id: String },
     /// Last source-build status (including interrupted builds)
@@ -339,6 +341,24 @@ fn run() -> marquee_core::error::Result<()> {
                         _ => {}
                     }));
                     core.install_emulator(&id, sink)?
+                }
+                EmulatorsCmd::InstallNeeded => {
+                    let sink = Arc::new(FnSink(|event: CoreEvent| match event {
+                        CoreEvent::ToolInstallProgress { message, .. } => println!("{message}"),
+                        CoreEvent::ToolInstallFailed { message, .. } => eprintln!("{message}"),
+                        _ => {}
+                    }));
+                    let done = core.install_needed(sink)?;
+                    println!(
+                        "{}",
+                        if done.is_empty() {
+                            "nothing to install: every emulator your library needs is already there"
+                                .to_string()
+                        } else {
+                            format!("installed: {}", done.join(", "))
+                        }
+                    );
+                    return Ok(());
                 }
                 EmulatorsCmd::Open { id } => {
                     core.open_emulator(&id)?;

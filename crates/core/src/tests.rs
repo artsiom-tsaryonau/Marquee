@@ -1028,3 +1028,17 @@ fn prune_removes_only_unplayed_entries_whose_files_are_gone() {
     );
     assert!(!titles.contains(&"Gone".to_string()));
 }
+
+#[test]
+fn needed_emulators_follow_the_library_folders_and_skip_what_is_installed() {
+    let dir = tempfile::tempdir().unwrap();
+    let roms = dir.path().join("nes");
+    std::fs::create_dir_all(&roms).unwrap();
+    let core = Core::open_isolated(Some(dir.path().join("data")), false).unwrap();
+    assert!(
+        core.needed_emulators().unwrap().is_empty(),
+        "no folders, nothing needed"
+    );
+    core.add_root("nes", roms, None).unwrap();
+    assert_eq!(core.needed_emulators().unwrap(), ["mesen"]);
+}

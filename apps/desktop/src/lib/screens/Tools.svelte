@@ -92,6 +92,9 @@
   <header class="tool-hero">
     <div class="hero-copy"><h1>Tools</h1><p>Emulators, launchers and connected libraries, by the platform they run. {ready} ready.</p></div>
     <InstallMenu />
+    {#if app.neededEmulators.length}
+      <button class="btn glass" data-nav onclick={() => app.installNeededEmulators()} title={app.neededEmulators.map((e) => e.name).join(', ')}><Icon name="download" /> Install what my library needs ({app.neededEmulators.length})</button>
+    {/if}
     <button class="btn primary" data-nav onclick={() => edit()}><Icon name="plus" /> Add launcher</button>
   </header>
 

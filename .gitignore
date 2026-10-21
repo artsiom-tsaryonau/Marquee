@@ -23,3 +23,20 @@ bios/
 sample/
 data/
 scripts/vimm/
+
+# Emulators are downloaded by Marquee into its own data folder, never committed.
+# catalog/emulators/*.json (the download recipes) stay tracked.
+runners/
+bios-inbox/
+firmware/
+*.AppImage
+*.tar.gz
+*.tgz
+*.[pP][uU][pP]
+*.qcow2
+*.nvmem
+# Saves, states and memory cards an emulator writes
+*.sav
+*.srm
+*.state
+*.mcd

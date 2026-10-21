@@ -728,6 +728,41 @@ impl Core {
     }
 
     /// Remove an emulator's program. `purge_data` also deletes its settings, saves and BIOS.
+    /// Emulators the library needs but Marquee has not installed: those that run
+    /// a system with a library folder, are integrated, and download from a link
+    /// (source builds are never started automatically).
+    pub fn needed_emulators(&self) -> Result<Vec<String>> {
+        let systems: std::collections::HashSet<String> = self
+            .snapshot()?
+            .roots
+            .into_iter()
+            .map(|r| r.system)
+            .collect();
+        Ok(self
+            .list_emulators()?
+            .into_iter()
+            .filter(|e| {
+                e.integrated
+                    && !e.source_build
+                    && e.status == "not_installed"
+                    && e.systems.iter().any(|s| systems.contains(s))
+            })
+            .map(|e| e.id)
+            .collect())
+    }
+
+    /// Install every needed emulator, one after another; returns the ids installed.
+    /// A failure stops the run and names the emulator.
+    pub fn install_needed(&self, sink: Arc<dyn EventSink>) -> Result<Vec<String>> {
+        let mut done = Vec::new();
+        for id in self.needed_emulators()? {
+            self.install_emulator(&id, Arc::clone(&sink))
+                .map_err(|e| AppError::new(e.code.as_str(), format!("{id}: {}", e.message)))?;
+            done.push(id);
+        }
+        Ok(done)
+    }
+
     pub fn uninstall_emulator(
         &self,
         id: &str,

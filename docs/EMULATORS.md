@@ -101,6 +101,16 @@ Verified on this host (2026-10-21): all three installed through `marquee emulato
 
 Not covered yet, and why: **Sega Genesis/Mega Drive** and **Neo Geo Pocket** have no emulator with a checksummed Linux download that Marquee can fetch (ares publishes no Linux build; mGBA publishes no checksums). They need a source-build recipe or a different emulator. **mGBA** is not used for Game Boy because Mesen covers it. The UI maps these systems to platforms and launches them; "Add folder" buttons for them are not built yet (use `marquee library add-root --system <id> <folder>`).
 
+## Installing what you need
+
+Nothing about an emulator is committed except its small recipe in `catalog/emulators/<id>.json`. Programs, settings, saves and BIOS live in Marquee's data folder, and `.gitignore` covers anything an install or run could leave in the repo. Three ways to get them, all verified downloads into that folder:
+
+- **UI:** Tools has an "Install what my library needs (N)" button (shown only when something is missing; the tooltip lists which), and each emulator card has its own install.
+- **CLI:** `marquee emulators install-needed` installs every integrated emulator that covers a system you have a library folder for and skips source builds; `marquee emulators install <id>` does one.
+- **Script:** `scripts/install-emulators.sh` runs the same thing (or the ids you give it) from a clone. Safe to re-run.
+
+Checked: in a clean data folder, with only the NES and Dreamcast folders registered, `install-needed` installed Flycast and Mesen, and a second run did nothing.
+
 ## Keyboard controls
 
 A game is only playable if the emulator has input bindings, and a seeded config can skip the step where an emulator writes its defaults. Found 2026-10-21: the PCSX2 file Marquee seeded had no `[Pad1]` section, so no key reached PS2 games. Marquee now adds PCSX2's own default keyboard layout for controller 1 (the one its auto-mapper writes: arrows for the D-pad, I/J/K/L for the face buttons, Q/E and 1-4 for the shoulders and sticks' buttons, W/A/S/D for the left stick, T/F/G/H for the right, Backspace for Select, Return for Start) only when `[Pad1]` is missing, so a layout you change is kept. Checked on this host: the section was written, PCSX2 launched and stayed running, and the bindings were still in the file after it exited; the keys themselves were not pressed. Status of the others: DuckStation and Mesen write complete keyboard defaults themselves (checked in their files); Flycast has a built-in keyboard map and its seeded file only holds window settings (not tested with keys); **RMG (N64) has no input profile in its config and is probably affected too**: its input plugin reads per-controller profile sections with SDL scancodes, which Marquee does not write yet.
