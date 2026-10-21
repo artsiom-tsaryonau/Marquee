@@ -48,7 +48,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
   const body = (await res.json().catch(() => null)) as unknown;
   if (!res.ok) {
-    if (res.status === 401) forgetWebToken();
+    if (res.status === 401) {
+      forgetWebToken();
+      throw {
+        code: 'UNAUTHORIZED',
+        message: 'Open the full address Marquee printed in its terminal, the one ending in #token=…',
+      } satisfies AppError;
+    }
     throw asError(body ?? { code: 'NETWORK', message: `HTTP ${res.status}` });
   }
   return body as T;

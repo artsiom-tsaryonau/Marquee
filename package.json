@@ -6,6 +6,7 @@
     "run:desktop": "scripts/run.sh desktop",
     "run:web": "scripts/run.sh web",
     "run:dev": "scripts/run.sh dev",
-    "run:both": "scripts/run.sh both"
+    "run:both": "scripts/run.sh both",
+    "run:tauri": "scripts/run.sh tauri"
   }
 }

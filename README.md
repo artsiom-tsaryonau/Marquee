@@ -19,7 +19,7 @@ Needs Node 22+, pnpm (`corepack enable pnpm`), and Rust for the desktop/CLI. On 
 ```bash
 ./scripts/setup.sh                # Fedora devel packages, then checks rustc / node / pnpm
 (cd apps/desktop && pnpm install)
-./scripts/run.sh desktop          # or: web | dev | both  (also pnpm run:desktop …)
+./scripts/run.sh desktop          # or: web | dev | both | tauri  (also pnpm run:desktop …)
 (cd apps/desktop && pnpm dev)     # browser demo with sample data · http://localhost:1420
 ```
 
