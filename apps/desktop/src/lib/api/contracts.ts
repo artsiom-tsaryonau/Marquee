@@ -105,6 +105,37 @@ export interface Settings {
   selected_runner_id: string | null;
   selected_runner_ids?: Record<string, string>;
   display_mode?: 'window' | 'fullscreen';
+  torrents?: TorrentSettings;
+}
+
+/** Optional device-to-device library transfer. Off by default. */
+export interface TorrentSettings {
+  enabled: boolean;
+  /** Let other devices download from this one. */
+  seeding: boolean;
+  /** KiB/s, 0 = unlimited. */
+  upload_kbps: number;
+  download_kbps: number;
+}
+
+export interface TransferItem {
+  info_hash: string;
+  name: string;
+  kind: 'share' | 'get';
+  edition_id: string | null;
+  state: 'preparing' | 'checking' | 'downloading' | 'sharing' | 'paused' | 'error' | 'starting';
+  downloaded: number;
+  total: number;
+  uploaded: number;
+  /** Paste this on another device to get the game from this one. */
+  link: string | null;
+  error: string | null;
+}
+
+export interface TransferStatus {
+  enabled: boolean;
+  seeding: boolean;
+  items: TransferItem[];
 }
 
 export interface LibrarySnapshot {
@@ -252,6 +283,11 @@ export interface LibraryApi {
   listRunners(): Promise<Runner[]>;
   selectRunner(id: string): Promise<void>;
   setDisplayMode(mode: 'window' | 'fullscreen'): Promise<void>;
+  setTorrentSettings(settings: TorrentSettings): Promise<void>;
+  transferStatus(): Promise<TransferStatus>;
+  transferShare(editionId: string): Promise<void>;
+  transferGet(link: string): Promise<void>;
+  transferStop(infoHash: string): Promise<void>;
   launch(editionId: string): Promise<Session>;
   setFavourite(editionId: string, favorite: boolean): Promise<void>;
   setDisplayTitle(editionId: string, title: string): Promise<void>;

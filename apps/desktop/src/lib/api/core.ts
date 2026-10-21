@@ -1,5 +1,6 @@
 import type {
   AppError,
+  TransferStatus,
   BiosFile,
   BiosImport,
   EmulatorInfo,
@@ -51,6 +52,11 @@ export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'su
     listRunners: () => call<Runner[]>('list_runners'),
     selectRunner: (runnerId) => call<void>('select_runner', { runner_id: runnerId }),
     setDisplayMode: (mode) => call<void>('set_display_mode', { mode }),
+    setTorrentSettings: (settings) => call<void>('set_torrent_settings', { settings }),
+    transferStatus: () => call<TransferStatus>('transfer_status'),
+    transferShare: (editionId) => call<void>('transfer_share', { edition_id: editionId }),
+    transferGet: (link) => call<void>('transfer_get', { link }),
+    transferStop: (infoHash) => call<void>('transfer_stop', { info_hash: infoHash }),
     launch: (editionId) => call<Session>('launch_game', { edition_id: editionId }),
     setFavourite: (editionId, favorite) => call<void>('set_favourite', { edition_id: editionId, favorite }),
     setDisplayTitle: (editionId, title) => call<void>('set_display_title', { edition_id: editionId, title }),

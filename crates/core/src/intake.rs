@@ -338,7 +338,7 @@ fn possible_duplicates(dir: &Path, wanted: &[(Entry, PathBuf)]) -> Vec<String> {
 impl Core {
     /// Folder for a system's library files, creating and registering one when
     /// no root exists yet. Returns the path and whether the system is known.
-    fn intake_root(&self, system: &str) -> Result<PathBuf> {
+    pub(crate) fn intake_root(&self, system: &str) -> Result<PathBuf> {
         let snap = self.snapshot()?;
         if let Some(root) = snap
             .roots

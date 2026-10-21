@@ -26,6 +26,7 @@ pub mod server;
 pub mod sessions;
 pub mod source_builds;
 
+pub mod transfer;
 use crate::db::Db;
 use crate::error::{AppError, Result};
 use crate::instance::InstanceLock;
@@ -49,6 +50,7 @@ pub struct Core {
     pub purple: Arc<purple::Manager>,
     pub source_builds: source_builds::Manager,
 }
+    pub(crate) transfers: transfer::Transfers,
 
 impl Core {
     pub fn open(data_dir: Option<PathBuf>, allow_fake: bool) -> Result<Self> {
@@ -69,6 +71,7 @@ impl Core {
         let core = Self {
             source_builds: source_builds::Manager::default(),
             purple: Arc::new(purple::Manager::new(&paths)),
+            transfers: transfer::Transfers::new(&paths.data_dir),
             paths,
             db: Arc::new(Mutex::new(db)),
             _lock: Arc::new(lock),
@@ -85,6 +88,9 @@ impl Core {
         )?;
         core.refresh_runners()?;
         Ok(core)
+        if let Ok(t) = core.torrent_settings() {
+            core.transfers.autostart(&t);
+        }
     }
 
     fn with_db<T>(&self, f: impl FnOnce(&Db) -> Result<T>) -> Result<T> {
@@ -271,7 +277,9 @@ impl Core {
         self.set_setting("torrent.enabled", if t.enabled { "1" } else { "0" })?;
         self.set_setting("torrent.seeding", if t.seeding { "1" } else { "0" })?;
         self.set_setting("torrent.upload_kbps", &t.upload_kbps.to_string())?;
-        self.set_setting("torrent.download_kbps", &t.download_kbps.to_string())
+        self.set_setting("torrent.download_kbps", &t.download_kbps.to_string())?;
+        self.transfers.reset(t);
+        Ok(())
     }
 
         let Some(runner) = runners.iter().find(|r| r.id == runner_id && r.available) else {

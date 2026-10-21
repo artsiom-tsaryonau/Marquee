@@ -1,11 +1,14 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { transferLine } from '../format';
   import { app } from '../state.svelte';
   import type { KeyInfo } from '../api/contracts';
   import Icon from '../components/Icon.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
 
   let drafts = $state<Record<string, string>>({});
+  let link = $state('');
+  $effect(() => { if (app.torrentsOn) return app.watchTransfers(); });
   onMount(() => void app.loadKeys());
 
   const sourceLabel = (k: KeyInfo) =>
@@ -97,6 +100,63 @@
         <option value="fullscreen">Fullscreen</option>
       </select>
     </div>
+  </section>
+
+  <section class="glass-panel">
+    <h2>Share games between your devices</h2>
+    <div class="item">
+      <div>
+        <strong>Let my own devices send games to each other</strong>
+        <span>Off by default. Works between Marquee installs you control; nothing is published, and there is no public search or tracker. Keep the other device on your home network or a private VPN.</span>
+      </div>
+      <label class="pin-choice"><input type="checkbox" data-nav checked={app.torrentSettings.enabled} onchange={(e) => app.setTorrents({ enabled: e.currentTarget.checked })} /> {app.torrentSettings.enabled ? 'On' : 'Off'}</label>
+    </div>
+    {#if app.torrentSettings.enabled}
+      <div class="item">
+        <div>
+          <strong>Allow other devices to download from this one</strong>
+          <span>Turn off to only receive. Shared games stay in place; nothing is copied or moved.</span>
+        </div>
+        <label class="pin-choice"><input type="checkbox" data-nav checked={app.torrentSettings.seeding} onchange={(e) => app.setTorrents({ seeding: e.currentTarget.checked })} /> {app.torrentSettings.seeding ? 'Allowed' : 'Receive only'}</label>
+      </div>
+      <div class="item">
+        <div>
+          <strong>Upload speed limit</strong>
+          <span>Applies to everything this device shares.</span>
+        </div>
+        <select data-nav aria-label="Upload speed limit" value={String(app.torrentSettings.upload_kbps)} onchange={(e) => app.setTorrents({ upload_kbps: Number(e.currentTarget.value) })}>
+          <option value="0">No limit</option>
+          <option value="1024">1 MB/s</option>
+          <option value="5120">5 MB/s</option>
+          <option value="20480">20 MB/s</option>
+        </select>
+      </div>
+      <div class="item">
+        <div>
+          <strong>Get a game from another device</strong>
+          <span>On that device open the game and press Share, then Copy link. Paste it here.</span>
+        </div>
+        <form class="row-actions" onsubmit={(e) => { e.preventDefault(); if (link.trim()) { void app.getFromLink(link); link = ''; } }}>
+          <input data-nav type="text" placeholder="magnet:?xt=…" aria-label="Game link" bind:value={link} />
+          <button class="btn glass small" data-nav type="submit" disabled={!link.trim()}>Get</button>
+        </form>
+      </div>
+      {#each app.transfers?.items ?? [] as t (t.info_hash || t.name)}
+        <div class="item">
+          <div>
+            <strong>{t.name}</strong>
+            <span>{t.kind === 'get' ? 'Received' : 'Shared'} · {transferLine(t)}</span>
+            {#if t.state === 'downloading' && t.total}<progress max={t.total} value={t.downloaded} aria-label="Download progress"></progress>{/if}
+          </div>
+          <div class="row-actions">
+            {#if t.link}<button class="btn glass small" data-nav onclick={() => app.copyTransferLink(t)}>Copy link</button>{/if}
+            {#if t.info_hash}<button class="btn glass small" data-nav onclick={() => app.stopTransfer(t)}>Stop</button>{/if}
+          </div>
+        </div>
+      {:else}
+        <div class="item"><div><span>Nothing shared or received yet.</span></div></div>
+      {/each}
+    {/if}
   </section>
 
   {#if app.webUrl}

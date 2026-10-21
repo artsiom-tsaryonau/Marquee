@@ -9,9 +9,19 @@ An optional way to move your own game library between your own devices, using an
 | `marquee-torrent` crate: create `.torrent`, seed, download, progress, limits | Done. Integration test moves a 12 MiB file between two engines on loopback, byte-identical. |
 | Setting `torrents` (`enabled`, `seeding`, `upload_kbps`, `download_kbps`) and the `get_torrent_settings` / `set_torrent_settings` API calls | Done. Default is disabled. |
 | CLI `marquee torrent ...` | Done and checked end to end between two separate data directories (a 40 MB file, identical on arrival). |
-| Settings UI, Tools/Downloads panel, "send to device" actions | Not started. |
+| UI: **Share** / **Copy link** / **Stop sharing** on a game page, and Settings → *Share games between your devices* (switch, receive-only, upload limit, paste a link to get a game, list of transfers with state) | Done. Checked in a browser against a real backend; not yet clicked in the native window. |
+| Backend `transfer_status`, `transfer_share`, `transfer_get`, `transfer_stop` (desktop and web share one API) | Done. A test shares a game on one core and fetches it on another. |
 | Tested across real machines, with 20–50 GB images, restart/resume, NAT | Not tested. |
 | Automatic discovery of your other devices | Not started; today you give the seeder's address. |
+
+## Using it
+
+1. On both devices: **Settings → Share games between your devices → On.**
+2. On the device that has the game: open the game, press **Share**. Large images are checked first ("Preparing to share"); then it says "Sharing with your other devices" and **Copy link** appears.
+3. On the other device: paste the link into **Get a game from another device** and press **Get**. It lands in that device's library folder for the same system and appears after a rescan.
+4. **Stop sharing** only stops serving; your game files are never deleted or moved.
+
+The link carries the sharing device's address (`x.pe`) and the system (`x.mq`, so the game lands in the right folder). The address is the device's LAN IP and port 51413 (or another free port); set `MARQUEE_TORRENT_HOST` to advertise a different one, such as a Tailscale address. Shares and fetches are remembered and resume when Marquee starts with the setting on. A game stored in its own folder (for example `.cue` plus `.bin`) is shared as that folder.
 
 ## Privacy defaults
 
@@ -48,8 +58,8 @@ marquee torrent get "Game (USA).iso.torrent" --into roms/ps2 --peer 192.168.1.20
 
 ## Next
 
-1. Settings and Tools UI (enable, seeding, limits, per-game "make available" and "get").
-2. A background service in the desktop app that seeds torrents you have marked, with persistence and resume.
+1. Show share state on library cards, and a choice of advertised address in Settings instead of an environment variable.
+2. Start seeding at login without opening the window (today it runs while Marquee is open); restart-time re-checking of very large images is not optimised.
 3. Peer discovery between your devices (saved addresses first, then mDNS on the LAN).
 4. Private-flag torrents and an allow-list of peer addresses.
 5. Pairing with remote play (Apollo/Moonlight): "play here after download" versus "play remotely". Apollo's app-registration API is unchecked.

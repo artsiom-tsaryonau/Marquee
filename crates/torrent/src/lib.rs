@@ -255,6 +255,11 @@ impl Engine {
             .block_on(self.session.delete(id.into(), delete_files))
     }
 
+    /// Ask every task to stop. The engine can then be dropped on any thread.
+    pub fn cancel(&self) {
+        self.session.cancellation_token().cancel();
+    }
+
     pub fn shutdown(self) {
         self.session.cancellation_token().cancel();
         self.rt.shutdown_timeout(Duration::from_secs(3));

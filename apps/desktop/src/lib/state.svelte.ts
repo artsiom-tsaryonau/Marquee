@@ -1,6 +1,6 @@
 import { createApi, type LibraryApi } from './api';
 import { gamesFromSnapshot, pickRunner } from './api/map';
-import type { BiosFile, CoreEvent, EmulatorInfo, KeyInfo, LauncherConfig, LauncherInfo, LutrisConfig, LutrisSnapshot, LibraryRoot, LibrarySnapshot, PortInfo, Runner, ScanReport, Session } from './api/contracts';
+import type { BiosFile, CoreEvent, TorrentSettings, TransferItem, TransferStatus, EmulatorInfo, KeyInfo, LauncherConfig, LauncherInfo, LutrisConfig, LutrisSnapshot, LibraryRoot, LibrarySnapshot, PortInfo, Runner, ScanReport, Session } from './api/contracts';
 import { nativePortGame, canonicalId } from './unified';
 import { lutrisToGame } from './lutris';
 import { artFromSeed } from './art';
@@ -393,6 +393,84 @@ class AppState {
 
   async setDisplayMode(mode: 'window' | 'fullscreen') {
     try {
+  // ---- Share games with your own other devices (optional, off by default) ----
+  transfers = $state<TransferStatus | null>(null);
+  private transferWatchers = 0;
+  private transferTimer: ReturnType<typeof setInterval> | undefined;
+
+  get torrentsOn() { return !!this.runnerSettings.torrents?.enabled; }
+  get torrentSettings(): TorrentSettings {
+    return { enabled: false, seeding: true, upload_kbps: 0, download_kbps: 0, ...this.runnerSettings.torrents };
+  }
+  transferFor(editionId: string): TransferItem | undefined {
+    return this.transfers?.items.find((i) => i.edition_id === editionId);
+  }
+
+  async refreshTransfers() {
+    if (!this.torrentsOn) { this.transfers = null; return; }
+    try { this.transfers = await this.api.transferStatus(); } catch { /* keep the last list */ }
+  }
+
+  /** Poll while a screen that shows transfers is open. Returns the cleanup. */
+  watchTransfers() {
+    this.transferWatchers++;
+    void this.refreshTransfers();
+    this.transferTimer ??= setInterval(() => void this.refreshTransfers(), 3000);
+    return () => {
+      this.transferWatchers = Math.max(0, this.transferWatchers - 1);
+      if (this.transferWatchers === 0 && this.transferTimer) { clearInterval(this.transferTimer); this.transferTimer = undefined; }
+    };
+  }
+
+  async setTorrents(patch: Partial<TorrentSettings>) {
+    try {
+      await this.api.setTorrentSettings({ ...this.torrentSettings, ...patch });
+      this.applySnapshot(await this.api.snapshot());
+      await this.refreshTransfers();
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? 'Could not change sharing settings');
+    }
+  }
+
+  async shareGame(game: GameEntry) {
+    try {
+      await this.api.transferShare(game.id);
+      await this.refreshTransfers();
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? 'Could not share this game');
+    }
+  }
+
+  async getFromLink(link: string) {
+    try {
+      await this.api.transferGet(link.trim());
+      this.notify('Fetching from your other device. Progress is under Settings → Share games.');
+      await this.refreshTransfers();
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? 'Could not fetch that game');
+    }
+  }
+
+  async stopTransfer(item: TransferItem) {
+    try {
+      await this.api.transferStop(item.info_hash);
+      await this.refreshTransfers();
+      this.notify('Stopped. Your game files were not touched.');
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? 'Could not stop');
+    }
+  }
+
+  async copyTransferLink(item: TransferItem) {
+    if (!item.link) return;
+    try {
+      await navigator.clipboard.writeText(item.link);
+      this.notify('Link copied. Paste it into Marquee on your other device.');
+    } catch {
+      this.notify(item.link);
+    }
+  }
+
       await this.api.setDisplayMode(mode);
       this.applySnapshot(await this.api.snapshot());
     } catch (err) {

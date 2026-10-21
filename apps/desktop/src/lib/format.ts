@@ -56,3 +56,25 @@ export function fuzzy(query: string, text: string) {
   }
   return score - t.length * 0.01;
 }
+
+export function bytes(n: number) {
+  if (n < 1024) return `${n} B`;
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let v = n / 1024;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+  return `${v < 10 ? v.toFixed(1) : Math.round(v)} ${units[i]}`;
+}
+
+/** One plain line about a transfer, e.g. "Sharing with your other devices · 2.1 GB uploaded". */
+export function transferLine(t: { state: string; kind: string; downloaded: number; total: number; uploaded: number; error: string | null }) {
+  switch (t.state) {
+    case 'preparing': return 'Preparing to share. Large games take a while to check.';
+    case 'starting': return 'Starting…';
+    case 'checking': return 'Checking files…';
+    case 'downloading': return `Downloading · ${bytes(t.downloaded)} of ${bytes(t.total)}${t.total ? ` (${Math.floor((t.downloaded / t.total) * 100)}%)` : ''}`;
+    case 'paused': return 'Paused';
+    case 'error': return t.error ?? 'Something went wrong';
+    default: return t.kind === 'get' ? `Done · sharing it onward · ${bytes(t.uploaded)} uploaded` : `Sharing with your other devices · ${bytes(t.uploaded)} uploaded`;
+  }
+}

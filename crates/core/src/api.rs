@@ -4,6 +4,7 @@
 use crate::catalog;
 use crate::error::{AppError, Result};
 use crate::sessions::EventSink;
+use crate::transfer;
 use crate::Core;
 use serde::Serialize;
 use serde_json::Value;
@@ -84,6 +85,10 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
             let delete = args.get("delete_source").and_then(|v| v.as_bool()).unwrap_or(false);
             out(core.intake_archive(&path, delete)?)
         }
+        "transfer_status" => out(transfer::status(core)?),
+        "transfer_share" => out(transfer::share(core, &text(&args, "edition_id")?)?),
+        "transfer_get" => out(transfer::get(core, &text(&args, "link")?)?),
+        "transfer_stop" => out(transfer::stop(core, &text(&args, "info_hash")?)?),
         "get_torrent_settings" => out(core.torrent_settings()?),
         "set_torrent_settings" => {
             let t = serde_json::from_value(args.get("settings").cloned().unwrap_or_default())?;

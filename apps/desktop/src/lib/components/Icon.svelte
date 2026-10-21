@@ -26,6 +26,7 @@
     x: 'M6 6l12 12M18 6 6 18',
     sparkle: 'M12 3c.6 4.6 2.4 6.4 7 7-4.6.6-6.4 2.4-7 7-.6-4.6-2.4-6.4-7-7 4.6-.6 6.4-2.4 7-7z',
     chevron: 'M6 9l6 6 6-6',
+    share: 'M12 15V4m0 0L8 8m4-4 4 4M5 13v6h14v-6',
   } as const;
   export type IconName = keyof typeof paths;
 </script>

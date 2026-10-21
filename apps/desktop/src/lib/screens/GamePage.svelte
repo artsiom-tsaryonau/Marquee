@@ -3,7 +3,7 @@
   import { app } from '../state.svelte';
   import { platformLabel, sourceLabel } from '../labels';
   import { canonicalId, editionKey, editionLabel, launchMethod, methodLabel } from '../unified';
-  import { ago, hours } from '../format';
+  import { ago, hours, transferLine } from '../format';
   import Artwork from '../components/Artwork.svelte';
   import Logo from '../components/Logo.svelte';
   import Icon from '../components/Icon.svelte';
@@ -21,6 +21,8 @@
   const dur = $derived(app.motionReduced ? 0 : 360);
   const offline = $derived(!!g && g.source === 'rom' && g.platform !== 'unknown');
   const emulator = $derived(g?.runnerName?.replace(' (Marquee)', '') ?? (g?.platform === 'ps1' ? 'DuckStation' : g?.platform === 'ps2' ? 'PCSX2' : 'its emulator'));
+  const share = $derived(g && offline ? app.transferFor(g.id) : undefined);
+  $effect(() => { if (app.torrentsOn) return app.watchTransfers(); });
   let editing = $state(false);
   let titleDraft = $state('');
 
@@ -122,12 +124,21 @@
       </button>
       {#if offline}
         <button class="btn glass" data-nav onclick={() => { titleDraft = g.title; editing = true; }}><Icon name="image" /> Rename</button>
+        {#if app.torrentsOn && app.torrentSettings.seeding}
+          {#if !share}
+            <button class="btn glass" data-nav onclick={() => app.shareGame(g)}><Icon name="share" /> Share</button>
+          {:else}
+            {#if share.link}<button class="btn glass" data-nav onclick={() => app.copyTransferLink(share)}><Icon name="share" /> Copy link</button>{/if}
+            {#if share.info_hash}<button class="btn glass" data-nav onclick={() => app.stopTransfer(share)}><Icon name="x" /> Stop sharing</button>{/if}
+          {/if}
+        {/if}
       {:else if g.lutris}
         <button class="btn glass" data-nav onclick={() => app.go('tools')}><Icon name="settings" /> Lutris connection</button>
       {:else if port}
         <button class="btn glass" data-nav onclick={() => app.openPortFolder(port)}><Icon name="folder" /> Folder</button>
       {/if}
     </div>
+    {#if offline && share}<p class="tagline" role="status">{transferLine(share)}</p>{/if}
     {#if offline && (g.mediaIssue || g.setupState === 'runner_missing')}<p class="tagline" role="status">{g.mediaIssue || `${emulator} is not installed or available for this platform. Open Tools to set it up.`}</p>{/if}
   </div>
 
