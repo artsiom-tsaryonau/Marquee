@@ -9,6 +9,7 @@
   import Icon from '../components/Icon.svelte';
   import Row from '../components/Row.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
+  import CatalogueDetails from '../components/CatalogueDetails.svelte';
 
   const g = $derived(app.current ?? app.hero);
   const variants = $derived(g ? app.games.filter((x) => canonicalId(x) === canonicalId(g)) : []);
@@ -32,6 +33,7 @@
           lutris: 'Lutris · umu-launcher + GE-Proton',
           port: 'Native port binary',
           rom: offline ? (g.runnerName ?? emulator) : 'Emulator',
+          catalogue: 'Catalogue only · no local installation',
         }[g.source]
       : '',
   );
@@ -92,7 +94,9 @@
       </div>
     {/if}
     <div class="actions">
-      {#if offline && g.setupState === 'runner_missing'}
+      {#if g.source === 'catalogue' && g.metadata}
+        <button class="btn primary big" data-nav onclick={() => g.metadata && app.openCataloguePage(g.metadata.id)}>Open source page in browser</button>
+      {:else if offline && g.setupState === 'runner_missing'}
         {#if g.platform === 'ps2'}<InstallMenu tone="primary" size="big" />
         {:else}<button class="btn primary big" data-nav onclick={() => app.go('tools')}><Icon name="settings" /> Set up DuckStation</button>{/if}
       {:else}
@@ -116,7 +120,7 @@
       {#if g.portStatus === 'update'}
         <button class="btn glass" data-nav onclick={() => port && app.installPort(port)}><Icon name="refresh" /> Update</button>
       {/if}
-      <button class="btn glass icon" data-nav aria-label="Favourite" disabled={g.source === 'port' || !!g.lutris} onclick={() => app.toggleFavorite(g)}>
+      <button class="btn glass icon" data-nav aria-label="Favourite" disabled={g.source === 'port' || g.source === 'catalogue' || !!g.lutris} onclick={() => app.toggleFavorite(g)}>
         <Icon name="star" filled={g.favorite} />
       </button>
       {#if offline}
@@ -132,6 +136,7 @@
 
   <div class="body">
     <div class="main">
+      <CatalogueDetails game={g} />
       {#if g.screenshots?.length}
       <h3>Screenshots · OpenGOAL</h3>
       <div class="shots" data-nav-row>
@@ -157,11 +162,15 @@
         <dt>Source</dt>
         <dd><span class="pill">{sourceLabel[g.source]}</span></dd>
         <dt>Platform</dt>
-        <dd>{platformLabel[g.platform]}</dd>
+        <dd>{platformLabel[g.platform]}{g.platform === 'unknown' && g.metadata ? ` · ${g.metadata.system}` : ''}</dd>
+        {#if g.region}<dt>Region</dt><dd>{g.region}</dd>{/if}
+        {#if g.languages?.length}<dt>Languages</dt><dd>{g.languages.join(', ')}</dd>{/if}
+        {#if g.revision}<dt>ROM revision</dt><dd>{g.revision}</dd>{/if}
+        {#if g.players}<dt>Players</dt><dd>{g.players}</dd>{/if}
         <dt>Launches with</dt>
         <dd>{launchVia}</dd>
         <dt>Playtime</dt>
-        <dd>{port ? 'Tracking not available yet' : g.playtimeMin ? hours(g.playtimeMin) : 'Not played yet'}</dd>
+        <dd>{g.source === 'catalogue' ? 'No local installation' : port ? 'Tracking not available yet' : g.playtimeMin ? hours(g.playtimeMin) : 'Not played yet'}</dd>
         <dt>Last played</dt>
         <dd>{g.lastPlayed ? ago(g.lastPlayed) : '—'}</dd>
         {#if g.lutris}<dt>Library provider</dt><dd>Lutris · {g.installed ? 'configured installation' : 'cached store listing'}</dd>{/if}
@@ -172,7 +181,7 @@
           <dd>{g.serial}{g.region ? ` · ${g.region}` : ''}</dd>
         {/if}
         {#if g.setupState}
-          <dt>PCSX2</dt>
+          <dt>{emulator}</dt>
           <dd>{g.setupState.replace('_', ' ')}</dd>
         {/if}
         {#if g.steam && !offline}
@@ -203,6 +212,7 @@
   .shot img { width:100%; height:100%; object-fit:cover; }
   .page {
     position: relative;
+    isolation: isolate;
     padding-bottom: 40px;
   }
   .banner {

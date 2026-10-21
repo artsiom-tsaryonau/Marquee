@@ -244,6 +244,7 @@ fn title_from_filename(path: &Path) -> String {
 
 pub fn snapshot(db: &Db) -> Result<LibrarySnapshot> {
     Ok(LibrarySnapshot {
+        catalogue: crate::metadata::snapshot(db)?,
         roots: snapshot_roots(db)?,
         editions: snapshot_editions(db)?,
         media: snapshot_media(db)?,

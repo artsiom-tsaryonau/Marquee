@@ -7,6 +7,7 @@ export const sourceLabel: Record<Source, string> = {
   lutris: 'Lutris',
   port: 'Port',
   rom: 'Emulated',
+  catalogue: 'Catalogue',
 };
 
 export const platformLabel: Record<Platform, string> = {
@@ -20,6 +21,13 @@ export const platformLabel: Record<Platform, string> = {
   ps1: 'PlayStation',
   ps2: 'PlayStation 2',
   gba: 'Game Boy Advance',
+  genesis: 'Genesis / Mega Drive',
+  atari2600: 'Atari 2600', atari5200: 'Atari 5200', sms: 'Master System', atari7800: 'Atari 7800',
+  tg16: 'TurboGrafx-16', tgcd: 'TurboGrafx-CD', cdi: 'CD-i', segacd: 'Sega CD', jaguar: 'Jaguar',
+  '32x': 'Sega 32X', saturn: 'Saturn', jaguarcd: 'Jaguar CD', dreamcast: 'Dreamcast', xbox: 'Xbox',
+  xbox360: 'Xbox 360', 'xbox360-digital': 'Xbox 360 Digital', ps3: 'PlayStation 3', wii: 'Wii', wiiware: 'WiiWare',
+  wiiu: 'Wii U', gb: 'Game Boy', lynx: 'Lynx', gamegear: 'Game Gear', virtualboy: 'Virtual Boy', gbc: 'Game Boy Color',
+  ds: 'Nintendo DS', psp: 'PSP', '3ds': 'Nintendo 3DS',
 };
 
 /** Emulator catalogue system ids, as people say them. */

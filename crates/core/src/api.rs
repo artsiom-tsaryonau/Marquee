@@ -30,6 +30,22 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
     match cmd {
         "health" => out(core.health()?),
         "library_snapshot" => out(core.snapshot()?),
+        "import_catalogue" => {
+            let data = serde_json::from_value(args.get("snapshot").cloned().unwrap_or(Value::Null))
+                .map_err(|e| {
+                    AppError::new("BAD_REQUEST", format!("Invalid catalogue snapshot: {e}"))
+                })?;
+            out(core.import_catalogue(data)?)
+        }
+        "link_catalogue" => out(core.link_catalogue(
+            &text(&args, "edition_id")?,
+            &text(&args, "record_id")?,
+            &text(&args, "media_id")?,
+        )?),
+        "unlink_catalogue" => out(core.unlink_catalogue(&text(&args, "edition_id")?)?),
+        "match_catalogue" => out(core.match_catalogue(&text(&args, "edition_id")?)?),
+        "clear_catalogue" => out(core.clear_catalogue()?),
+        "open_catalogue_page" => out(core.open_catalogue_page(&text(&args, "record_id")?)?),
         "add_library_root" => {
             let path = PathBuf::from(text(&args, "path")?);
             let system = maybe(&args, "system").unwrap_or_else(|| "ps2".into());

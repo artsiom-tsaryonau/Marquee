@@ -39,6 +39,12 @@ export function asError(err: unknown): AppError {
 /** The commands are identical on every surface; only the transport (`call`) differs. */
 export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable'> {
   return {
+    importCatalogue: (snapshot) => call('import_catalogue', { snapshot }),
+    linkCatalogue: (editionId, recordId, mediaId) => call('link_catalogue', { edition_id: editionId, record_id: recordId, media_id: mediaId }),
+    unlinkCatalogue: (editionId) => call('unlink_catalogue', { edition_id: editionId }),
+    matchCatalogue: (editionId) => call('match_catalogue', { edition_id: editionId }),
+    clearCatalogue: () => call('clear_catalogue'),
+    openCataloguePage: (recordId) => call('open_catalogue_page', { record_id: recordId }),
     snapshot: () => call<LibrarySnapshot>('library_snapshot'),
     addRoot: (path, system) => call<LibraryRoot>('add_library_root', { path, system }),
     scan: (rootId) => call<ScanReport>('scan_library_root', { root_id: rootId ?? null }),

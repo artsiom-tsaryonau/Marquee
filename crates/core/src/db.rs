@@ -145,6 +145,28 @@ impl Db {
                 COMMIT;",
             )?;
         }
+        let version: i64 = self
+            .conn
+            .query_row("PRAGMA user_version", [], |r| r.get(0))?;
+        if version == 4 {
+            self.conn.execute_batch(
+                "BEGIN IMMEDIATE;
+                CREATE TABLE catalogue_records (id TEXT PRIMARY KEY, payload TEXT NOT NULL);
+                CREATE TABLE catalogue_systems (id TEXT PRIMARY KEY, payload TEXT NOT NULL);
+                CREATE TABLE catalogue_links (
+                    edition_id TEXT PRIMARY KEY REFERENCES editions(id),
+                    record_id TEXT NOT NULL REFERENCES catalogue_records(id),
+                    media_id TEXT NOT NULL,
+                    local_media_id TEXT NOT NULL,
+                    size_bytes INTEGER NOT NULL,
+                    mtime INTEGER NOT NULL,
+                    method TEXT NOT NULL
+                    ,source_hash TEXT NOT NULL DEFAULT ''
+                );
+                PRAGMA user_version = 5;
+                COMMIT;",
+            )?;
+        }
         if version > SCHEMA_VERSION {
             return Err(crate::error::AppError::new(
                 "DB",

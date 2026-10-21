@@ -29,6 +29,46 @@ beforeEach(() => {
 after(() => mock.timers.reset());
 
 const { editionToGame, pickRunner, gamesFromSnapshot } = await import('../src/lib/api/map');
+const { metadataMatches, versions } = await import('../src/lib/metadata');
+function catalogueFixture() {
+  return { id:'vimm:123',game_id:'123',system:'ps2',title:'Source title',regions:'Europe | USA',languages:'en fr',version:'1.0',rating:'10',url:'https://vimm.net/vault/123',has_detail:true,
+    media:[{media_id:'456',filename:'game.iso',version:'1.0',regions:['Europe'],languages:['en','fr'],size:'1 MB',serial:'',crc32:'',md5:'',sha1:''}],
+    players:1,year:null,ratings:{graphics:10,sound:10,gameplay:10,overall:10},rating_votes:2,verified_at:'2026-10-18',
+    cover:{data_url:'data:image/png;base64,test',credit:'source',source_url:'https://github.com/libretro-thumbnails/'},exported_at:'export date',imported_at:'import date' };
+}
+test('catalogue discoveries cannot launch and have attributed metadata rather than invented critic scores', () => {
+  const snap=discSnapshot(); snap.catalogue={records:[catalogueFixture()],systems:[],links:[]};
+  const game=gamesFromSnapshot(snap).find(g=>g.source==='catalogue');
+  assert.equal(game.installed,false); assert.equal(game.setupState,undefined); assert.equal(game.ratings.critic,null);
+  assert.equal(game.metadata.rating_votes,2); assert.equal(game.players,1); assert.equal(game.year,0); assert.ok(game.coverUrl.startsWith('data:'));
+  const api=app.api; let launches=0;
+  try { app.api={...api,launch:()=>{launches++;}}; app.play(game); assert.equal(launches,0); assert.equal(app.launching,null); }
+  finally {app.api=api;}
+});
+test('metadata links enrich only the chosen installation and preserve identity, title, history and launch setup', () => {
+  const snap=discSnapshot(); snap.editions[1].playtime_seconds=120; snap.editions[1].favorite=true;
+  snap.catalogue={records:[catalogueFixture()],systems:[],links:[{edition_id:'e2',record_id:'vimm:123',media_id:'456',method:'manual',valid:true}]};
+  const games=gamesFromSnapshot(snap), local=games.find(g=>g.id==='e2');
+  assert.equal(local.title,'Vice City'); assert.equal(local.source,'rom'); assert.equal(local.playtimeMin,2); assert.equal(local.favorite,true);
+  assert.equal(local.runnerId,'pcsx2'); assert.equal(local.revision,'1.0'); assert.equal(local.region,'Europe');
+  assert.equal(games.find(g=>g.id==='e1').metadata,undefined);
+  snap.catalogue.links[0].valid=false;
+  assert.equal(gamesFromSnapshot(snap).find(g=>g.id==='e2').metadata,undefined);
+});
+test('region language revision and player filters match one concrete entry with unknowns excluded', () => {
+  const snap=discSnapshot(); snap.catalogue={records:[catalogueFixture()],systems:[],links:[]};
+  const game=gamesFromSnapshot(snap).find(g=>g.source==='catalogue');
+  assert.ok(metadataMatches(game,'Europe','fr','1.0','1'));
+  assert.equal(metadataMatches(game,'Japan','fr','1.0','1'),false);
+  assert.equal(metadataMatches(game,'Europe','de','1.0','1'),false);
+  assert.equal(metadataMatches(game,'Europe','fr','2.0','1'),false);
+  assert.equal(metadataMatches(game,'Europe','fr','1.0','2'),false);
+  assert.equal(metadataMatches(fixtureGame('unknown'),'Europe','','',''),false);
+  assert.deepEqual(versions(game),['1.0']);
+  game.metadata.media.push({media_id:'789',version:'2.0',regions:['USA'],languages:['en']});
+  assert.equal(metadataMatches(game,'Europe','fr','2.0','1'),false);
+  assert.ok(metadataMatches(game,'USA','en','2.0','1'));
+});
 function discSnapshot() {
   return { roots: [], media: [{ id: 'm1', path: '/roms/ps1/game.cue', available: true, skip_reason: null }, { id: 'm2', path: '/roms/ps2/game.iso', available: true, skip_reason: null }], sessions: [],
     editions: [{ id: 'e1', system: 'ps1', title: 'Metal Gear Solid', media_id: 'm1', missing: false, cover_path: null, playtime_seconds: 0 }, { id: 'e2', system: 'ps2', title: 'Vice City', media_id: 'm2', missing: false, cover_path: null, playtime_seconds: 0 }],

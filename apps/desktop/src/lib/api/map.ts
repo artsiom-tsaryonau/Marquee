@@ -1,5 +1,6 @@
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { enrichIdentity } from '../unified';
+import { projectCatalogue } from '../metadata';
 import { artFromSeed } from '../art';
 import type { GameEntry } from '../types';
 import type { Edition, LibraryRoot, LibrarySnapshot, Runner } from './contracts';
@@ -72,7 +73,7 @@ export function coverSrc(path: string | null): string | undefined {
 }
 
 export function gamesFromSnapshot(snap: LibrarySnapshot): GameEntry[] {
-  return snap.editions.map((edition) => enrichIdentity(editionToGame(edition, snap)));
+  return projectCatalogue(snap.editions.map((edition) => enrichIdentity(editionToGame(edition, snap))), snap);
 }
 
 export { pickRunner };

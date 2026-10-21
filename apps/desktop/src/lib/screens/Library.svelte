@@ -11,17 +11,27 @@
   import GhostCover from '../components/GhostCover.svelte';
   import Icon from '../components/Icon.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
+  import CatalogueImport from '../components/CatalogueImport.svelte';
+  import { metadataMatches, regionValues, versions, providerScore } from '../metadata';
 
   let { collection = null }: { collection?: 'ps2' | null } = $props();
   let visibleCount = $state(48);
   let query = $state('');
   let platform = $state<Platform | ''>('');
   let method = $state<LaunchMethod | ''>('');
+  let region = $state('');
+  let language = $state('');
+  let revision = $state('');
+  let players = $state('');
+  const regions = $derived([...new Set(app.games.flatMap((g) => regionValues(g.region)))].sort());
+  const languages = $derived([...new Set(app.games.flatMap((g) => g.languages ?? []))].sort());
+  const revisions = $derived([...new Set(app.games.flatMap(versions))].sort());
+  const playerCounts = $derived([...new Set(app.games.map((g) => g.players).filter((n) => n !== undefined))].sort((a,b) => a! - b!));
   const platforms = $derived([...new Set(app.games.filter((g) => !collection || g.platform === collection).map((g) => g.platform))].sort((a, b) => platformLabel[a].localeCompare(platformLabel[b])));
   let sources = $state<Set<Source>>(new Set());
   let installedOnly = $state(false);
   let favOnly = $state(false);
-  let sort = $state<'title' | 'recent' | 'playtime' | 'added' | 'critic' | 'short'>('title');
+  let sort = $state<'title' | 'recent' | 'playtime' | 'added' | 'critic' | 'short' | 'source'>('title');
   let search: HTMLInputElement;
 
   const allSources = $derived([...new Set(app.games.map((g) => g.source))]);
@@ -31,13 +41,14 @@
       (g) =>
         (!collection || g.platform === collection) &&
         matchesVariant(g, platform, method) &&
+        metadataMatches(g, region, language, revision, players) &&
         (!sources.size || sources.has(g.source)) &&
         (!installedOnly || g.installed) &&
         (!favOnly || g.favorite),
     );
     if (query.trim()) {
       return list
-        .map((g) => ({ g, s: Math.max(fuzzy(query, g.title), fuzzy(query, `${g.genre} ${g.editionLabel ?? ""} ${platformLabel[g.platform]} ${methodLabel[launchMethod(g)]}`) - 5) }))
+        .map((g) => ({ g, s: Math.max(fuzzy(query, g.title), fuzzy(query, `${g.genre} ${g.editionLabel ?? ""} ${platformLabel[g.platform]} ${methodLabel[launchMethod(g)]} ${g.region ?? ''} ${g.languages?.join(' ') ?? ''} ${versions(g).join(' ')} ${g.serial ?? ''}`) - 5) }))
         .filter((x) => x.s >= 0)
         .sort((a, b) => b.s - a.s)
         .map((x) => x.g);
@@ -49,6 +60,7 @@
       added: (a: typeof list[0], b: typeof list[0]) => b.addedAt.localeCompare(a.addedAt),
       critic: (a: typeof list[0], b: typeof list[0]) => (b.ratings.critic ?? -1) - (a.ratings.critic ?? -1),
       short: (a: typeof list[0], b: typeof list[0]) => (a.timeToBeat?.[0] ?? 999) - (b.timeToBeat?.[0] ?? 999),
+      source: (a: typeof list[0], b: typeof list[0]) => (providerScore(b.metadata) ?? -1) - (providerScore(a.metadata) ?? -1),
     }[sort];
     return [...list].sort(by);
   });
@@ -68,11 +80,11 @@
     }
   }
 
-  $effect(() => { JSON.stringify([query, platform, method, [...sources], installedOnly, favOnly, sort, collection]); visibleCount = 48; });
+  $effect(() => { JSON.stringify([query, platform, method, region, language, revision, players, [...sources], installedOnly, favOnly, sort, collection]); visibleCount = 48; });
   const grouped = $derived(groupGames(shown, app.variantPreferences));
 
-  const filtering = $derived(!!query || !!platform || !!method || sources.size > 0 || installedOnly || favOnly);
-  function clearFilters() { query = ''; platform = ''; method = ''; sources = new Set(); installedOnly = false; favOnly = false; }
+  const filtering = $derived(!!query || !!platform || !!method || !!region || !!language || !!revision || !!players || sources.size > 0 || installedOnly || favOnly);
+  function clearFilters() { query = ''; platform = ''; method = ''; region = ''; language = ''; revision = ''; players = ''; sources = new Set(); installedOnly = false; favOnly = false; }
   const dur = $derived(app.motionReduced || app.visualEffects === 'balanced' ? 0 : 260);
 </script>
 
@@ -84,6 +96,7 @@
     <button class="chip" class:on={!platform} data-nav aria-pressed={!platform} onclick={() => platform = ''}>All platforms</button>
     {#each platforms as p}<button class="chip" class:on={platform === p} data-nav aria-pressed={platform === p} title={platformLabel[p]} onclick={() => platform = p}>{#if hasMark(p)}<Mark id={p} size={18} /><span class="sr">{platformLabel[p]}</span>{:else}{platformLabel[p]}{/if} <span>{app.games.filter((g) => g.platform === p).length}</span></button>{/each}
   </div>
+  <CatalogueImport />
   <div class="bar glass-panel">
     <label class="search">
       <Icon name="search" size={18} />
@@ -113,7 +126,12 @@
       <option value="added">Recently added</option>
       <option value="critic">Critic score</option>
       <option value="short">Shortest to beat</option>
+      <option value="source">Source rating · Vimm</option>
     </select>
+    {#if regions.length}<select bind:value={region} data-nav aria-label="Region"><option value="">All regions</option>{#each regions as value}<option value={value}>{value}</option>{/each}</select>{/if}
+    {#if languages.length}<select bind:value={language} data-nav aria-label="Language"><option value="">All languages</option>{#each languages as value}<option value={value}>{value}</option>{/each}</select>{/if}
+    {#if revisions.length}<select bind:value={revision} data-nav aria-label="ROM revision"><option value="">All ROM revisions</option>{#each revisions as value}<option value={value}>{value}</option>{/each}</select>{/if}
+    {#if playerCounts.length}<select bind:value={players} data-nav aria-label="Player count"><option value="">Any player count</option>{#each playerCounts as value}<option value={String(value)}>{value} player{value === 1 ? '' : 's'}</option>{/each}</select>{/if}
   </div>
 
   <div class="results"><p class="count" aria-live="polite">{grouped.length} {grouped.length === 1 ? 'game' : 'games'}{shown.length !== grouped.length ? ` · ${shown.length} play options` : ''}</p>{#if filtering}<button class="reset" data-nav onclick={clearFilters}>Clear filters</button>{/if}</div>

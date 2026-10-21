@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-pub const SCHEMA_VERSION: i64 = 4;
+pub const SCHEMA_VERSION: i64 = 5;
 pub const SYSTEM_PS2: &str = "ps2";
 pub const SYSTEM_PS1: &str = "ps1";
 pub const KIND_PS2_ISO: &str = "ps2_iso";
@@ -261,6 +261,7 @@ pub struct Settings {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LibrarySnapshot {
+    pub catalogue: crate::metadata::CatalogueSnapshot,
     pub roots: Vec<LibraryRoot>,
     pub editions: Vec<Edition>,
     pub media: Vec<MediaFile>,

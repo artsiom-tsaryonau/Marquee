@@ -1,6 +1,6 @@
 // Mirrors the unified game entry in docs/ROADMAP.md (Architecture → Unified game entry).
 
-export type Source = 'steam' | 'gog' | 'epic' | 'lutris' | 'port' | 'rom';
+export type Source = 'steam' | 'gog' | 'epic' | 'lutris' | 'port' | 'rom' | 'catalogue';
 
 export type Platform =
   | 'unknown'
@@ -12,7 +12,11 @@ export type Platform =
   | 'gamecube'
   | 'ps1'
   | 'ps2'
-  | 'gba';
+  | 'gba'
+  | 'genesis' | 'atari2600' | 'atari5200' | 'sms' | 'atari7800' | 'tg16' | 'tgcd' | 'cdi'
+  | 'segacd' | 'jaguar' | '32x' | 'saturn' | 'jaguarcd' | 'dreamcast' | 'xbox' | 'xbox360'
+  | 'xbox360-digital' | 'ps3' | 'wii' | 'wiiware' | 'wiiu' | 'gb' | 'lynx' | 'gamegear'
+  | 'virtualboy' | 'gbc' | 'ds' | 'psp' | '3ds';
 
 export type Motif = 'sun' | 'rings' | 'peaks' | 'grid' | 'waves' | 'shards' | 'orbit' | 'monolith';
 
@@ -28,6 +32,12 @@ export interface Art {
 export type SetupState = 'runner_missing' | 'missing' | 'unverified' | 'launch_tested';
 
 export interface GameEntry {
+  metadata?: import('./api/contracts').CatalogueRecord;
+  metadataMediaId?: string;
+  metadataMatch?: string;
+  languages?: string[];
+  revision?: string;
+  players?: number;
   id: string;
   /** Explicit catalogue identity, independent of a concrete installation ID. */
   canonicalId?: string;

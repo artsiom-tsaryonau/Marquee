@@ -15,6 +15,7 @@ pub mod keys;
 pub mod launchers;
 pub mod library;
 pub mod lutris;
+pub mod metadata;
 pub mod model;
 pub mod paths;
 pub mod ports;

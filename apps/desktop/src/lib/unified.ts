@@ -1,11 +1,12 @@
 import type { GameEntry, Platform, PortEntry } from './types';
 import { artFromSeed } from './art';
 
-export type LaunchMethod = 'emulation' | 'native' | 'compatibility';
+export type LaunchMethod = 'emulation' | 'native' | 'compatibility' | 'reference';
 export const methodLabel: Record<LaunchMethod, string> = {
-  emulation: 'Emulation', native: 'Native port', compatibility: 'PC / compatibility',
+  emulation: 'Emulation', native: 'Native port', compatibility: 'PC / compatibility', reference: 'Catalogue only',
 };
 export function launchMethod(game: GameEntry): LaunchMethod {
+  if (game.source === 'catalogue') return 'reference';
   return game.launchMethod ?? (game.source === 'rom' ? 'emulation' : game.source === 'port' ? 'native' : 'compatibility');
 }
 export function canonicalId(game: GameEntry): string { return game.canonicalId ?? game.id; }

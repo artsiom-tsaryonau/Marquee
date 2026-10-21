@@ -97,7 +97,7 @@
   {#if showTitle}
     <div class="caption">
       <span class="t">{game.title}</span>
-      <span class="m">{game.playtimeMin ? `${Math.round(game.playtimeMin / 60)} h played` : game.genre}</span>
+      <span class="m">{game.playtimeMin ? `${Math.round(game.playtimeMin / 60)} h played` : [game.source === 'catalogue' ? 'Catalogue only' : game.genre, game.region, game.revision ? `rev ${game.revision}` : ''].filter(Boolean).join(' · ')}</span>
     </div>
   {/if}
 </div>

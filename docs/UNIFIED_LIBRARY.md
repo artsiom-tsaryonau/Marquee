@@ -60,6 +60,12 @@ No ISO, BIOS, extracted proprietary assets, or prepackaged game executable was d
 
 ## Shared identity work and later OpenGOAL track
 
+Saved-provider metadata now uses additive schema v5: see [Catalogue metadata](CATALOGUE_METADATA.md).
+Its explicit media links enrich installations without performing canonical-game
+merges or replacing the normalized model proposed below. Future migrations must
+use a version after v5. ROM revision selectors are separate from content editions
+and run methods.
+
 1. **Retain existing migration coverage, including v3 sessions and v4 PS1 roots.** Keep the correction regressions. Take an SQLite backup before testing any later migration against a real library. Do not reset dirty trees or replace the user's database with demo data.
 2. **Add an additive normalized library model at the next available schema version.** Create `games`, content `game_editions`, `installations`, `tools`, and installation-scoped `launch_profiles`. Maintain legacy edition IDs as installation IDs or keep an explicit stable ID mapping. Copy existing media, artwork references, favorites and history transactionally. Unknown identities initially get one canonical game each.
 3. **Preserve history correctly.** Existing sessions reference their concrete installation. Show aggregate game time by summing sessions, while keeping per-install time and filters. Do not merge save directories. Separate game-level favorites from optional installation preferences.

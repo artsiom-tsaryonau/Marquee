@@ -37,7 +37,7 @@ These are implemented capabilities; live acceptance gates are recorded separatel
 | Legacy Lutris bridge | Local read-only installed/cache projection and handoffs exist. Current code auto-discovers an existing database. Moving this behind an optional legacy integration is planned; documentation changes do not disable it |
 | Direct Steam/Epic/GOG | Not implemented as end-to-end native store integrations. Command shortcuts and Lutris cache entries do not count as direct integrations |
 | Compatibility automation | A narrow [Purple/Aion 2 recipe](PURPLE.md) now provides managed umu/GE-Proton prefix/dependency setup and launcher opening. Live Purple/Aion 2 compatibility is unverified. General runtime lifecycle and arbitrary Windows apps remain planned; other wizard recipes are demos |
-| Metadata and packaging | Serial covers exist; broader metadata, native gamepad integration, packaged updates, and release verification remain separate work |
+| Metadata and packaging | Serial covers and saved-catalogue metadata import exist: regions/languages/revisions, source artwork/ratings, explicit installation links and raw-ISO SHA-1 matching ([details](CATALOGUE_METADATA.md)). Live provider sync, native gamepad integration, packaged updates and release verification remain separate work |
 
 ## Completed increments — 2026-10-21
 
@@ -163,7 +163,7 @@ The [desktop performance correction pass](DESKTOP_RENDERING.md) adds Balanced vi
 
 The [live rendering correction](DESKTOP_RENDERING.md) now selects accelerated shared-memory transport on NVIDIA/Wayland instead of globally disabling compositing; direct GPU still reproduces Error 71 on the tested host. Production launch, explicit rendering fallbacks, startup-policy tests and a reproducible synthetic frame-interval comparison are implemented. The real optimized executable passed isolated startup with compositor/scrolling threads and GPU access. Real-collection frame-time, input-latency and game-return acceptance remain open.
 
-The normalized data model is shared infrastructure, implemented incrementally when S1 needs it rather than a separate store-blocking rewrite. Use the next available schema version; schema v4 is already allocated to PS1 root systems. Preserve legacy IDs through explicit mappings.
+The normalized data model is shared infrastructure, implemented incrementally when S1 needs it rather than a separate store-blocking rewrite. Use the next available schema version; v4 is allocated to PS1 root systems and v5 to additive catalogue metadata and explicit installation links. Preserve legacy IDs through explicit mappings.
 
 - Games → content editions → store products/entitlements → installations → launch profiles; project those into one canonical game page.
 - Keep provider/product IDs even when accounts disconnect or builds are unavailable. Define hide/remove/cache policies independently of uninstalling files.

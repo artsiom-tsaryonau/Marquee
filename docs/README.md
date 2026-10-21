@@ -25,8 +25,9 @@ The 2026-10-21 direct-store decision supersedes earlier numbered phases, “Lutr
 | [Tools, launchers and legacy Lutris bridge](LAUNCHERS.md) | Generic shortcuts and advanced configuration; the deprioritized Lutris cache bridge (automatic discovery stays until made opt-in) |
 | [Desktop rendering](DESKTOP_RENDERING.md) | Production launch, renderer modes, Balanced/Full effects, and remaining acceptance |
 | [Enrichment, UI and PS2 metadata](ENRICHMENT.md) | Optional metadata/artwork providers and the ScreenScraper/SteamGridDB follow-up |
+| [Catalogue metadata](CATALOGUE_METADATA.md) | Saved-page import, regional revisions/languages, source artwork and ratings, explicit installation links and raw-ISO SHA-1 matching; schema v5 |
 | [Correction history](CORRECTIONS.md) | Condensed 2026-10-20/21 corrections, PS1/PS2 audit outcomes and open gates |
 
-Implementation notes can contain dated snapshots. They do not reorder the current roadmap, make unverified live gates complete, or imply planned store/runtime features already exist. For migrations, inspect the actual schema and use the next available version; do not reuse v4 for the proposed unified backend.
+Implementation notes can contain dated snapshots. They do not reorder the current roadmap, make unverified live gates complete, or imply planned store/runtime features already exist. For migrations, inspect the actual schema and use the next available version; v4 and v5 are allocated and must not be reused for the proposed normalized unified backend.
 
 The direct-store documentation update itself changed no runtime behavior. The subsequent Purple integration adds an explicit, user-triggered setup recipe; it does not install anything at application startup or remove legacy integrations.

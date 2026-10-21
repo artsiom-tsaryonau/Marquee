@@ -107,6 +107,7 @@ export interface Settings {
 }
 
 export interface LibrarySnapshot {
+  catalogue?: CatalogueSnapshot;
   roots: LibraryRoot[];
   editions: Edition[];
   media: MediaFile[];
@@ -234,6 +235,12 @@ export interface EmulatorBuildStatus {
 export interface BiosImport { added: BiosFile[]; ignored: number }
 
 export interface LibraryApi {
+  importCatalogue(snapshot: unknown): Promise<CatalogueSnapshot>;
+  linkCatalogue(editionId: string, recordId: string, mediaId: string): Promise<void>;
+  unlinkCatalogue(editionId: string): Promise<void>;
+  matchCatalogue(editionId: string): Promise<CatalogueLink>;
+  clearCatalogue(): Promise<void>;
+  openCataloguePage(recordId: string): Promise<void>;
   /** `desktop` = native window, `web` = browser attached to a running Marquee. */
   kind: 'desktop' | 'web';
   snapshot(): Promise<LibrarySnapshot>;
@@ -291,4 +298,25 @@ export interface ArtworkReport {
   fetched: number;
   skipped: number;
   failed: number;
+}
+
+export interface CatalogueVariant {
+  regions?: string[]; languages?: string[]; verified_at?: string | null;
+  media_id: string; filename: string; version: string; size: string; serial: string;
+  crc32: string; md5: string; sha1: string;
+}
+export interface CatalogueRecord {
+  id: string; game_id: string; system: string; title: string; regions: string; languages: string;
+  version: string; rating: string; url: string; has_detail: boolean; media: CatalogueVariant[];
+  players: number | null; year: number | null;
+  ratings: { graphics: number | null; sound: number | null; gameplay: number | null; overall: number | null };
+  rating_votes: number | null; verified_at: string | null;
+  cover: { data_url: string; credit: string; source_url: string } | null;
+  exported_at: string; imported_at: string;
+}
+export interface CatalogueLink { edition_id: string; record_id: string; media_id: string; method: string; valid: boolean }
+export interface CatalogueSnapshot {
+  records: CatalogueRecord[];
+  systems: { slug: string; name: string; category: string; launch_year: string; url: string }[];
+  links: CatalogueLink[];
 }

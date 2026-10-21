@@ -25,6 +25,8 @@ struct Args {
 #[derive(Subcommand)]
 enum Command {
     #[command(subcommand)]
+    Catalogue(CatalogueCmd),
+    #[command(subcommand)]
     Library(LibraryCmd),
     Scan {
         #[arg(long)]
@@ -53,6 +55,26 @@ enum Command {
     #[command(subcommand)]
     Run(RunCmd),
     Health,
+}
+
+#[derive(Subcommand)]
+enum CatalogueCmd {
+    /// Import provider metadata exported from saved HTML (never installs games)
+    Import {
+        path: PathBuf,
+    },
+    List,
+    Match {
+        edition_id: String,
+    },
+    Link {
+        edition_id: String,
+        record_id: String,
+        media_id: String,
+    },
+    Unlink {
+        edition_id: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -167,6 +189,38 @@ fn run() -> marquee_core::error::Result<()> {
     let args = Args::parse();
     let core = Arc::new(Core::open(args.data_dir, args.allow_fake)?);
     match args.command {
+        Command::Catalogue(command) => match command {
+            CatalogueCmd::Import { path } => {
+                use std::io::Read;
+                let mut bytes = Vec::new();
+                std::fs::File::open(path)?
+                    .take(900_001)
+                    .read_to_end(&mut bytes)?;
+                if bytes.len() > 900_000 {
+                    return Err(AppError::new("METADATA", "Snapshot exceeds 900 KB"));
+                }
+                let result = core.import_catalogue(serde_json::from_slice(&bytes)?)?;
+                println!(
+                    "Imported {} catalogue records and {} source systems",
+                    result.records.len(),
+                    result.systems.len()
+                );
+            }
+            CatalogueCmd::List => println!(
+                "{}",
+                serde_json::to_string_pretty(&core.snapshot()?.catalogue)?
+            ),
+            CatalogueCmd::Match { edition_id } => println!(
+                "{}",
+                serde_json::to_string_pretty(&core.match_catalogue(&edition_id)?)?
+            ),
+            CatalogueCmd::Link {
+                edition_id,
+                record_id,
+                media_id,
+            } => core.link_catalogue(&edition_id, &record_id, &media_id)?,
+            CatalogueCmd::Unlink { edition_id } => core.unlink_catalogue(&edition_id)?,
+        },
         Command::Library(LibraryCmd::AddRoot { system, path }) => {
             // Validates against the shipped descriptors (ps2, ps1).
             let label = marquee_core::catalog::by_id(&system)?.display_name;

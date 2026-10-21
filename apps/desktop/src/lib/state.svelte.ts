@@ -29,6 +29,9 @@ function save(key: string, value: unknown) {
 }
 
 class AppState {
+  catalogue = $state<import('./api/contracts').CatalogueSnapshot>({ records: [], systems: [], links: [] });
+  catalogueBusy = $state(false);
+  catalogueError = $state<string | null>(null);
   route = $state<Route>('home');
   history: { route: Route; gameId: string | null; heroId: string | null }[] = [];
   gameId = $state<string | null>(null);
@@ -126,6 +129,7 @@ class AppState {
   }
 
   applySnapshot(snap: LibrarySnapshot) {
+    this.catalogue = snap.catalogue ?? { records: [], systems: [], links: [] };
     this.roots = snap.roots;
     this.runners = snap.runners;
     this.runnerSettings = snap.settings;
@@ -291,6 +295,7 @@ class AppState {
   }
 
   play(game: GameEntry) {
+    if (game.source === 'catalogue') { this.notify('Catalogue entry only. Open its source page or link an existing installation.'); return; }
     this.heroId = game.id;
     if (game.lutris) { void this.openLutrisGame(game); return; }
     if (game.source === 'port') {
@@ -324,7 +329,7 @@ class AppState {
   toggleFavorite(game: GameEntry) {
     const entry = this.games.find((x) => x.id === game.id);
     if (!entry) return;
-    if (entry.source === 'port' || entry.lutris) return;
+    if (entry.source === 'port' || entry.source === 'catalogue' || entry.lutris) return;
     entry.favorite = !entry.favorite;
     void this.api.setFavourite(entry.id, entry.favorite).catch((err) => {
       entry.favorite = !entry.favorite;
@@ -714,6 +719,33 @@ class AppState {
     } catch (err) {
       this.notify((err as { message?: string }).message ?? 'Could not open the folder');
     }
+  }
+
+  async catalogueAction(action: () => Promise<unknown>, message: string) {
+    if (this.catalogueBusy) return false;
+    this.catalogueBusy = true; this.catalogueError = null;
+    try {
+      await action();
+      this.applySnapshot(await this.api.snapshot());
+      this.notify(message);
+      return true;
+    } catch (err) {
+      this.catalogueError = (err as { message?: string }).message ?? 'Catalogue operation failed';
+      this.notify(this.catalogueError);
+      return false;
+    } finally { this.catalogueBusy = false; }
+  }
+
+  async importCatalogueFile(file: File) {
+    return this.catalogueAction(async () => {
+      if (file.size > 900_000) throw new Error('Snapshot exceeds 900 KB. Import a smaller catalogue batch.');
+      await this.api.importCatalogue(JSON.parse(await file.text()));
+    }, 'Catalogue metadata imported');
+  }
+
+  async openCataloguePage(recordId: string) {
+    try { await this.api.openCataloguePage(recordId); }
+    catch (err) { this.notify((err as { message?: string }).message ?? 'Could not open the browser'); }
   }
 
   notify(msg: string) {
