@@ -45,6 +45,9 @@
   });
   const empty = $derived(!g);
   const addFolder = () => app.addPs2Folder();
+  const playReady = $derived(
+    !!g && g.installed && !g.mediaMissing && g.setupState !== 'missing',
+  );
 </script>
 
 <div class="home">
@@ -98,14 +101,23 @@
           {#if g.setupState === 'runner_missing'}
             {#if g.platform === 'ps2'}<InstallMenu tone="primary" />{:else}<button class="btn primary" data-nav onclick={() => app.go('tools')}>Set up {g.platform === 'ps1' ? 'DuckStation' : g.platform === 'genesis' ? 'BlastEm' : g.platform === 'ds' ? 'melonDS' : g.platform === 'neogeo' ? 'FinalBurn Neo' : 'emulator'}</button>{/if}
           {:else}
-            <button class="btn primary" class:play={g.installed && !g.mediaMissing && g.setupState !== 'missing'} data-nav style="--accent-h:{g.art.hue2}" onclick={() => {
-              if (g.mediaMissing) app.open(g);
-              else if (g.setupState === 'missing') app.explainBios();
-              else if (g.installed) app.play(g);
-              else app.open(g);
-            }}>
-              <Icon name={g.installed ? 'play' : 'download'} size={24} />
-              {g.mediaMissing ? 'Check disc files' : g.setupState === 'missing' ? 'BIOS needed' : g.installed ? 'Play' : 'Details'}
+            <button
+              class="btn primary"
+              class:play={playReady}
+              data-nav
+              style="--accent-h:{g.art.hue2}"
+              aria-label={playReady ? 'Play' : undefined}
+              onclick={() => {
+                if (g.mediaMissing) app.open(g);
+                else if (g.setupState === 'missing') app.explainBios();
+                else if (g.installed) app.play(g);
+                else app.open(g);
+              }}
+            >
+              <Icon name={g.installed ? 'play' : 'download'} size={playReady ? 28 : 24} />
+              {#if !playReady}
+                {g.mediaMissing ? 'Check disc files' : g.setupState === 'missing' ? 'BIOS needed' : g.installed ? 'Play' : 'Details'}
+              {/if}
             </button>
           {/if}
           <button class="btn glass" data-nav onclick={() => app.open(g)}>Details</button>

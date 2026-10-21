@@ -231,11 +231,13 @@
     gap: 4px;
     z-index: 20;
     overflow: hidden;
-    transition: width 240ms var(--ease);
+    transition: width var(--side-close-duration) var(--ease);
   }
   .side:hover,
   .side:focus-within {
     width: 220px;
+    transition:
+      width var(--side-open-duration) var(--ease) var(--side-open-delay);
   }
   .brand {
     display: flex;
@@ -286,11 +288,12 @@
   .nav span,
   .word {
     opacity: 0;
-    transition: opacity 180ms;
+    transition: opacity 160ms var(--ease);
   }
   .side:hover :is(.nav span, .word),
   .side:focus-within :is(.nav span, .word) {
     opacity: 1;
+    transition: opacity 280ms var(--ease) var(--side-label-delay);
   }
   .nav:hover,
   .nav:focus-visible {
@@ -564,6 +567,20 @@
     }
   }
 
+  :global(:root[data-motion='reduce']) .side,
+  :global(:root[data-motion='reduce']) .side:hover,
+  :global(:root[data-motion='reduce']) .side:focus-within {
+    transition-duration: 0.001ms !important;
+    transition-delay: 0ms !important;
+  }
+  :global(:root[data-motion='reduce']) .nav span,
+  :global(:root[data-motion='reduce']) .word,
+  :global(:root[data-motion='reduce']) .side:hover :is(.nav span, .word),
+  :global(:root[data-motion='reduce']) .side:focus-within :is(.nav span, .word) {
+    transition-duration: 0.001ms !important;
+    transition-delay: 0ms !important;
+  }
+
   @media (max-width: 640px) {
     .side,
     .side:hover,
@@ -579,6 +596,7 @@
       padding: 6px;
       flex-direction: row;
       justify-content: space-around;
+      transition: none;
     }
     .side :is(.brand, .spacer, .add, .nav span) {
       display: none;

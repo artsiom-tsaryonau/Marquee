@@ -78,3 +78,25 @@ export function transferLine(t: { state: string; kind: string; downloaded: numbe
     default: return t.kind === 'get' ? `Done · sharing it onward · ${bytes(t.uploaded)} uploaded` : `Sharing with your other devices · ${bytes(t.uploaded)} uploaded`;
   }
 }
+
+/** No-Intro style tags that say where a ROM is from or which dump it is, not what the game is called. */
+const TAG = /^(usa|europe|japan|world|asia|australia|brazil|canada|china|france|germany|italy|korea|netherlands|russia|spain|sweden|taiwan|uk|pd|en|fr|de|es|it|ja|[a-z]{2}(,\s*[a-z]{2})+|[a-z]+(,\s*[a-z]+)+|v\d[\w.]*|rev [\w.]+)$/i;
+const REGION_TAG = /^(usa|europe|japan|world|asia|australia|brazil|canada|china|france|germany|italy|korea|netherlands|russia|spain|sweden|taiwan|uk|[a-z]+(,\s*[a-z]+)+)$/i;
+
+/** A readable name for a card: drops a leading catalogue number and `(USA)`, `(PD)`, `[C]`, `(v1.1)`-style tags. */
+export function cleanTitle(title: string): string {
+  const name = title
+    .replace(/^\d{1,5}\s+-\s+/, '')
+    .replace(/\s*\[[^\]]*\]/g, '')
+    .replace(/\s*\(\s*\)/g, '')
+    .replace(/\s*\(([^)]*)\)/g, (whole, inner: string) => (TAG.test(inner.trim()) ? '' : whole))
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  return name || title;
+}
+
+/** The region tag removed by `cleanTitle`, so the information is not lost. */
+export function titleRegion(title: string): string | undefined {
+  for (const m of title.matchAll(/\(([^)]*)\)/g)) if (REGION_TAG.test(m[1].trim())) return m[1].trim();
+  return undefined;
+}

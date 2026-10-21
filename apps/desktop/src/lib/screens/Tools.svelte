@@ -1,12 +1,11 @@
 <script lang="ts">
   import { onMount, tick } from 'svelte';
   import { app } from '../state.svelte';
-  import type { EmulatorInfo, LauncherConfig, LauncherInfo, Runner } from '../api/contracts';
+  import type { BiosFile, EmulatorInfo, LauncherConfig, LauncherInfo, Runner } from '../api/contracts';
   import { launcherDraft, launcherMatches, launcherTemplates } from '../launchers';
   import { launcherBrandIcon, sourceBrandIcon } from '../brandIcons';
   import { coverSrc } from '../api/map';
   import { platformLabel, systemLabel } from '../labels';
-  import BiosPanel from '../components/BiosPanel.svelte';
   import EmulatorDialog from '../components/EmulatorDialog.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
   import LutrisSource from '../components/LutrisSource.svelte';
@@ -21,7 +20,9 @@
     | { t: 'emulator'; key: string; name: string; platforms: string[]; ready: boolean; e: EmulatorInfo }
     | { t: 'runner'; key: string; name: string; platforms: string[]; ready: boolean; r: Runner }
     | { t: 'launcher'; key: string; name: string; platforms: string[]; ready: boolean; l: LauncherInfo }
-    | { t: 'source'; key: string; name: string; platforms: string[]; ready: boolean; src: 'purple' | 'lutris' };
+    | { t: 'source'; key: string; name: string; platforms: string[]; ready: boolean; src: 'purple' | 'lutris' }
+    | { t: 'bios'; key: string; name: string; platforms: string[]; ready: boolean; system: string; files: BiosFile[] }
+    | { t: 'bios-empty'; key: string; name: string; platforms: string[]; ready: boolean };
 
     const labelOf = (id: string) => (id === 'pc' ? 'PC' : ((platformLabel as Record<string, string>)[id] ?? systemLabel(id)));
   const runnerSystem = (r: Runner) => (r.kind === 'duckstation' ? 'ps1' : 'ps2');
@@ -34,20 +35,59 @@
   let error = $state<string | null>(null);
   let saving = $state(false);
   let nameInput = $state<HTMLInputElement>();
+  /** `bios:<system>` while an irreversible removal waits for a second click. */
+  let biosConfirm = $state<string | null>(null);
 
   const lutrisOn = $derived(!!app.lutrisSource?.config.enabled);
-  const all = $derived.by<Item[]>(() => [
-    ...app.emulators.map((e): Item => ({ t: 'emulator', key: `emu:${e.id}`, name: e.name, platforms: e.systems, ready: e.status !== 'not_installed', e })),
-    ...app.runners.filter((r) => r.source !== 'marquee').map((r): Item => ({ t: 'runner', key: `run:${r.id}`, name: r.display_name, platforms: [runnerSystem(r)], ready: r.available, r })),
-    ...app.launchers.map((l): Item => ({ t: 'launcher', key: `app:${l.id}`, name: l.name, platforms: ['pc'], ready: l.available, l })),
-    { t: 'source', key: 'src:purple', name: 'Purple for Aion 2', platforms: ['pc'], ready: false, src: 'purple' },
-    { t: 'source', key: 'src:lutris', name: 'Lutris library', platforms: ['pc'], ready: lutrisOn, src: 'lutris' },
-  ]);
+  const biosBySystem = $derived(
+    [...new Set(app.bios.map((b) => b.system))].map((system) => ({
+      system,
+      files: app.bios.filter((b) => b.system === system),
+    })),
+  );
+  const all = $derived.by<Item[]>(() => {
+    const biosItems: Item[] = biosBySystem.map(({ system, files }) => ({
+      t: 'bios',
+      key: `bios:${system}`,
+      name: `${systemLabel(system)} BIOS`,
+      platforms: [system],
+      ready: files.length > 0,
+      system,
+      files,
+    }));
+    if (!app.bios.length) {
+      biosItems.push({
+        t: 'bios-empty',
+        key: 'bios:empty',
+        name: 'BIOS firmware',
+        platforms: ['ps1', 'ps2'],
+        ready: false,
+      });
+    }
+    return [
+      ...app.emulators.map((e): Item => ({ t: 'emulator', key: `emu:${e.id}`, name: e.name, platforms: e.systems, ready: e.status !== 'not_installed', e })),
+      ...app.runners.filter((r) => r.source !== 'marquee').map((r): Item => ({ t: 'runner', key: `run:${r.id}`, name: r.display_name, platforms: [runnerSystem(r)], ready: r.available, r })),
+      ...app.launchers.map((l): Item => ({ t: 'launcher', key: `app:${l.id}`, name: l.name, platforms: ['pc'], ready: l.available, l })),
+      ...biosItems,
+      { t: 'source', key: 'src:purple', name: 'Purple for Aion 2', platforms: ['pc'], ready: false, src: 'purple' },
+      { t: 'source', key: 'src:lutris', name: 'Lutris library', platforms: ['pc'], ready: lutrisOn, src: 'lutris' },
+    ];
+  });
   const matchesText = (i: Item) => {
     const q = query.trim().toLowerCase();
     if (!q) return true;
-    const extra = i.t === 'launcher' ? i.l.executable : '';
-    return `${i.name} ${extra} ${i.platforms.map(labelOf).join(' ')}`.toLowerCase().includes(q);
+    if (i.t === 'launcher') {
+      return `${i.name} ${i.l.executable} ${i.platforms.map(labelOf).join(' ')}`.toLowerCase().includes(q);
+    }
+    if (i.t === 'bios') {
+      const files = i.files.map((f) => `${f.region} ${f.file} ${f.version}`).join(' ');
+      return `${i.name} ${systemLabel(i.system)} ${files} firmware`.toLowerCase().includes(q);
+    }
+    if (i.t === 'bios-empty') {
+      const hay = `${i.name} bios firmware import inbox folder ${i.platforms.map(labelOf).join(' ')}`.toLowerCase();
+      return hay.includes(q);
+    }
+    return `${i.name} ${i.platforms.map(labelOf).join(' ')}`.toLowerCase().includes(q);
   };
   const items = $derived(
     all
@@ -58,7 +98,16 @@
     [...new Set(all.flatMap((i) => i.platforms))].sort((a, b) => labelOf(a).localeCompare(labelOf(b))),
   );
   const ready = $derived(all.filter((i) => i.ready).length);
-  onMount(() => { void app.loadLaunchers(); void app.loadEmulators(); });
+  onMount(() => { void app.loadLaunchers(); void app.loadEmulators(); void app.loadBios(); });
+
+  async function dropBios(system: string) {
+    if (biosConfirm !== `bios:${system}`) {
+      biosConfirm = `bios:${system}`;
+      return;
+    }
+    biosConfirm = null;
+    await app.removeBios(system);
+  }
   $effect(() => {
     if (!draft && !sourceDialog) return;
     app.closeLauncherEditor = () => { if (sourceDialog) sourceDialog = null; else if (!saving) draft = null; };
@@ -90,7 +139,7 @@
 
 <div class="tools">
   <header class="tool-hero">
-    <div class="hero-copy"><h1>Tools</h1><p>Emulators, launchers and connected libraries, by the platform they run. {ready} ready.</p></div>
+    <div class="hero-copy"><h1>Tools</h1><p>Emulators, launchers, BIOS firmware, and connected libraries — one list, filtered by platform. {ready} ready.</p></div>
     <InstallMenu />
     {#if app.neededEmulators.length}
       <button class="btn glass" data-nav onclick={() => app.installNeededEmulators()} title={app.neededEmulators.map((e) => e.name).join(', ')}><Icon name="download" /> Install what my library needs ({app.neededEmulators.length})</button>
@@ -121,9 +170,10 @@
   {/if}
 
   <div class="toolbar glass-panel">
-    <label class="search"><Icon name="search" size={18} /><input bind:value={query} data-nav aria-label="Search tools" placeholder="Search emulators and launchers…" /></label>
+    <label class="search"><Icon name="search" size={18} /><input bind:value={query} data-nav aria-label="Search tools" placeholder="Search emulators, launchers, BIOS…" /></label>
     <button class="chip" class:on={onlyReady} data-nav aria-pressed={onlyReady} onclick={() => (onlyReady = !onlyReady)}>Ready only</button>
-    <button class="btn glass small" data-nav disabled={app.launchersLoading} onclick={() => { void app.loadLaunchers(); void app.loadEmulators(); }}><Icon name="refresh" size={16} /> Refresh</button>
+    <button class="btn glass small" data-nav disabled={app.biosBusy} onclick={() => app.importBios()}><Icon name="folder" size={16} />{app.biosBusy ? 'Importing…' : 'Import BIOS'}</button>
+    <button class="btn glass small" data-nav disabled={app.launchersLoading} onclick={() => { void app.loadLaunchers(); void app.loadEmulators(); void app.loadBios(); }}><Icon name="refresh" size={16} /> Refresh</button>
   </div>
   <div class="filters" data-nav-row aria-label="Platforms">
     <button class="chip" class:on={!platform} data-nav aria-pressed={!platform} onclick={() => (platform = '')}>All platforms <span>{all.length}</span></button>
@@ -172,6 +222,46 @@
             <button class="pin" class:pinned={l.pinned} data-nav aria-label={`${l.pinned ? 'Unpin' : 'Pin'} ${l.name}`} aria-pressed={l.pinned} onclick={() => pin(l)}><Icon name="star" size={18} filled={l.pinned} /></button>
           {/snippet}
         </ToolCard>
+      {:else if item.t === 'bios'}
+        {@const regions = [...new Set(item.files.map((f) => f.region))]}
+        <ToolCard
+          seed={`bios:${item.system}`}
+          kind="BIOS"
+          title={item.name}
+          subtitle={regions.join(' · ')}
+          detail={item.files.map((f) => `${f.region}: ${f.file}`).join(' · ')}
+          glyph="folder"
+          badge={{ text: `${item.files.length} file${item.files.length === 1 ? '' : 's'}`, tone: 'ok' }}
+          ready={true}
+        >
+          {#snippet actions()}
+            <button class="btn glass small" data-nav disabled={app.biosBusy} onclick={() => app.importBios()}><Icon name="folder" size={15} />Import more</button>
+            <button
+              class="text-button"
+              data-nav
+              disabled={app.biosBusy}
+              onclick={() => dropBios(item.system)}
+              onblur={() => (biosConfirm = null)}
+            >
+              {biosConfirm === `bios:${item.system}` ? 'Click again to delete these files' : `Remove ${item.system.toUpperCase()} BIOS…`}
+            </button>
+          {/snippet}
+        </ToolCard>
+      {:else if item.t === 'bios-empty'}
+        <ToolCard
+          seed="bios:empty"
+          kind="BIOS"
+          title={item.name}
+          subtitle="PS1 · PS2"
+          detail="Import a folder or archive. Marquee copies recognised firmware and ignores the rest."
+          glyph="folder"
+          badge={{ text: 'Not imported', tone: '' }}
+          ready={false}
+        >
+          {#snippet actions()}
+            <button class="btn primary small" data-nav disabled={app.biosBusy} onclick={() => app.importBios()}><Icon name="folder" size={15} />{app.biosBusy ? 'Working…' : 'Import folder'}</button>
+          {/snippet}
+        </ToolCard>
       {:else}
         {@const purple = item.src === 'purple'}
         {@const mark = sourceBrandIcon(item.src)}
@@ -186,11 +276,10 @@
         </ToolCard>
       {/if}
     {:else}
-      <div class="empty glass-panel"><Icon name="controller" size={28} /><h3>{app.launchersLoading ? 'Finding your tools…' : 'Nothing matches'}</h3><p>Change the platform or search, or add a launcher.</p><button class="btn glass" data-nav onclick={() => edit()}>Add launcher</button></div>
+      <div class="empty glass-panel"><Icon name="controller" size={28} /><h3>{app.launchersLoading ? 'Finding your tools…' : 'Nothing matches'}</h3><p>Change the platform or search, import BIOS, or add a launcher.</p><button class="btn glass" data-nav onclick={() => app.importBios()}>Import BIOS</button><button class="btn glass" data-nav onclick={() => edit()}>Add launcher</button></div>
     {/each}
   </div>
 
-  <BiosPanel {platform} />
   <EmulatorDialog />
 
   {#if sourceDialog}

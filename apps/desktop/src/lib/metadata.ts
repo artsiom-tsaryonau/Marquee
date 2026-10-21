@@ -14,8 +14,32 @@ export function providerScore(record?: CatalogueRecord): number | null {
 export function versions(game: GameEntry): string[] {
   return game.revision ? [game.revision] : [...new Set([...(game.metadata?.media.map((m) => m.version) ?? []), game.metadata?.version ?? ''].filter((s) => !!s && s !== '-'))];
 }
-export function metadataMatches(game: GameEntry, region: string, language: string, revision: string, players: string): boolean {
-  if (players && String(game.players ?? '') !== players) return false;
+export type PlayerMode = '' | 'single' | 'multi' | 'coop';
+
+export const playerModeLabel: Record<Exclude<PlayerMode, ''>, string> = {
+  single: 'Single player',
+  multi: 'Multiplayer',
+  coop: 'Co-op',
+};
+
+export function playerCount(game: GameEntry): number | undefined {
+  const n = game.players ?? game.metadata?.players;
+  return n === null || n === undefined ? undefined : n;
+}
+
+export function playerModeFor(game: GameEntry): 'single' | 'multi' | undefined {
+  const n = playerCount(game);
+  if (n === undefined) return undefined;
+  return n <= 1 ? 'single' : 'multi';
+}
+
+export function metadataMatches(game: GameEntry, region: string, language: string, revision: string, playerMode: PlayerMode): boolean {
+  if (playerMode) {
+    const mode = playerModeFor(game);
+    if (!mode) return false;
+    if (playerMode === 'single' && mode !== 'single') return false;
+    if ((playerMode === 'multi' || playerMode === 'coop') && mode !== 'multi') return false;
+  }
   if (game.source === 'catalogue' && game.metadata?.media.length) {
     return game.metadata.media.some((media) =>
       (!region || (media.regions?.length ? media.regions : regionValues(game.region)).includes(region))
@@ -23,7 +47,7 @@ export function metadataMatches(game: GameEntry, region: string, language: strin
       && (!revision || media.version === revision));
   }
   return (!region || regionValues(game.region).includes(region)) && (!language || !!game.languages?.includes(language))
-    && (!revision || versions(game).includes(revision)) && (!players || String(game.players ?? '') === players);
+    && (!revision || versions(game).includes(revision));
 }
 export function cataloguePlatform(system: string): Platform {
   if (system === 'pce') return 'tg16';

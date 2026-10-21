@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { GameEntry } from '../types';
-  import { sourceLabel } from '../labels';
+  import { platformLabel, sourceLabel } from '../labels';
+  import { cleanTitle, hours, titleRegion } from '../format';
   import { app } from '../state.svelte';
   import Artwork from './Artwork.svelte';
   import Logo from './Logo.svelte';
@@ -18,7 +19,9 @@
       ? { label: 'Update', tone: 'warn' }
       : game.source === 'port'
         ? { label: game.installed ? 'Native port' : 'Not installed', tone: game.installed ? 'ok' : 'dim' }
-        : game.rootOffline
+        : game.source === 'catalogue'
+          ? { label: 'Not in library', tone: 'dim' }
+          : game.rootOffline
           ? { label: 'Drive offline', tone: 'dim' }
           : game.mediaMissing
             ? { label: 'Missing', tone: 'warn' }
@@ -50,8 +53,11 @@
       {/if}
     </div>
     <div class="shade"></div>
-    {#if !game.coverUrl}
+    {#if !game.coverUrl && !showTitle}
       <div class="logo"><Logo {game} size={shape === 'wide' ? 'md' : 'sm'} /></div>
+    {:else if !game.coverUrl && game.platform !== 'unknown'}
+      <!-- The title is written under the card; repeating it on generated art is noise. -->
+      <span class="plat">{platformLabel[game.platform]}</span>
     {/if}
     <span class="source" title={sourceLabel[game.source]}>{#if hasMark(game.source)}<Mark id={game.source} size={14} /><span class="sr">{sourceLabel[game.source]}</span>{:else}{sourceLabel[game.source]}{/if}</span>
     {#if game.favorite}<span class="fav"><Icon name="star" size={14} filled /></span>{/if}
@@ -63,8 +69,8 @@
   </button>
   {#if showTitle}
     <div class="caption">
-      <span class="t">{game.title}</span>
-      <span class="m">{game.playtimeMin ? `${Math.round(game.playtimeMin / 60)} h played` : [game.source === 'catalogue' ? 'Catalogue only' : game.genre, game.region, game.revision ? `rev ${game.revision}` : ''].filter(Boolean).join(' · ')}</span>
+      <span class="t" title={game.title}>{cleanTitle(game.title)}</span>
+      <span class="m">{game.playtimeMin ? `${hours(game.playtimeMin)} played` : [game.source === 'catalogue' ? 'Catalogue only' : game.genre, game.region ?? titleRegion(game.title), game.revision ? `rev ${game.revision}` : ''].filter(Boolean).join(' · ')}</span>
     </div>
   {/if}
 </div>
@@ -179,9 +185,24 @@
   .caption .t {
     font-weight: 650;
     font-size: 14px;
-    white-space: nowrap;
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
+    overflow-wrap: anywhere;
+  }
+  .plat {
+    position: absolute;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgb(255 255 255 / 0.8);
   }
   .caption .m {
     color: var(--text-dim);

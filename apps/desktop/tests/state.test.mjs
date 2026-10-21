@@ -58,16 +58,16 @@ test('metadata links enrich only the chosen installation and preserve identity, 
 test('region language revision and player filters match one concrete entry with unknowns excluded', () => {
   const snap=discSnapshot(); snap.catalogue={records:[catalogueFixture()],systems:[],links:[]};
   const game=gamesFromSnapshot(snap).find(g=>g.source==='catalogue');
-  assert.ok(metadataMatches(game,'Europe','fr','1.0','1'));
-  assert.equal(metadataMatches(game,'Japan','fr','1.0','1'),false);
-  assert.equal(metadataMatches(game,'Europe','de','1.0','1'),false);
-  assert.equal(metadataMatches(game,'Europe','fr','2.0','1'),false);
-  assert.equal(metadataMatches(game,'Europe','fr','1.0','2'),false);
+  assert.ok(metadataMatches(game,'Europe','fr','1.0','single'));
+  assert.equal(metadataMatches(game,'Japan','fr','1.0','single'),false);
+  assert.equal(metadataMatches(game,'Europe','de','1.0','single'),false);
+  assert.equal(metadataMatches(game,'Europe','fr','2.0','single'),false);
+  assert.equal(metadataMatches(game,'Europe','fr','1.0','multi'),false);
   assert.equal(metadataMatches(fixtureGame('unknown'),'Europe','','',''),false);
   assert.deepEqual(versions(game),['1.0']);
   game.metadata.media.push({media_id:'789',version:'2.0',regions:['USA'],languages:['en']});
-  assert.equal(metadataMatches(game,'Europe','fr','2.0','1'),false);
-  assert.ok(metadataMatches(game,'USA','en','2.0','1'));
+  assert.equal(metadataMatches(game,'Europe','fr','2.0','single'),false);
+  assert.ok(metadataMatches(game,'USA','en','2.0','single'));
 });
 test('linked variants without locale evidence keep local identity instead of catalogue-wide labels', () => {
   const snap=discSnapshot(); snap.editions[1].region='USA';

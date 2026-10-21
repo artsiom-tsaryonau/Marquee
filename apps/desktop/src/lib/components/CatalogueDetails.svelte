@@ -3,6 +3,7 @@
   import type { GameEntry } from '../types';
   import { platformLabel } from '../labels';
   import { cataloguePlatform, providerScore } from '../metadata';
+  import Icon from './Icon.svelte';
   let { game }: { game: GameEntry } = $props();
   let selected = $state('');
   let installation = $state('');
@@ -18,7 +19,20 @@
   <section class="metadata glass-panel">
     <h3>Source metadata · Vimm’s Lair</h3>
     <p>Saved snapshot. Live availability unknown. {game.source !== 'catalogue' ? `Linked by ${game.metadataMatch === 'sha1' ? 'exact SHA-1' : 'manual confirmation'}.` : 'Catalogue entry only; no local installation is implied.'}</p>
-    {#if record.cover}<img class="source-cover" src={record.cover.data_url} alt="{record.title} box cover" loading="lazy" decoding="async" />{/if}
+    {#if record.cover}
+      <figure class="source-cover-wrap">
+        <img class="source-cover" src={record.cover.data_url} alt="{record.title} box cover" loading="lazy" decoding="async" />
+        <button
+          type="button"
+          class="cover-credit"
+          data-nav
+          title="{record.cover.credit} · {record.cover.source_url}"
+          aria-label="Cover image attribution"
+        >
+          <Icon name="info" size={16} />
+        </button>
+      </figure>
+    {/if}
     {#if variants.length}
       {#if game.source === 'catalogue'}<label>Media revision <select data-nav bind:value={selected}>{#each variants as m}<option value={m.media_id}>{m.version || 'Unknown revision'} · {m.filename}</option>{/each}</select></label>{/if}
       <dl>
@@ -36,9 +50,10 @@
       {#if providerScore(record) !== null && record.ratings.overall === null}<dt>Catalogue rating</dt><dd>{providerScore(record)}/10 · vote count unknown</dd>{/if}
       <dt>Source verified</dt><dd>{variant?.verified_at ?? record.verified_at ?? 'Unknown'} · source claim</dd>
       <dt>Exported</dt><dd>{record.exported_at || 'Unknown'}</dd><dt>Imported</dt><dd>{record.imported_at || 'Unknown'}</dd>
-      <dt>Provider game ID</dt><dd>{record.game_id}</dd><dt>Source page</dt><dd>{record.url}</dd>
+      <dt>Provider game ID</dt><dd>{record.game_id}</dd>
+      <dt>Source page</dt>
+      <dd><button type="button" class="inline-link" data-nav onclick={() => app.openCataloguePage(record.id)}>Open in browser</button></dd>
     </dl>
-    {#if record.cover}<p>{record.cover.credit} Attribution: {record.cover.source_url}</p>{/if}
     {#if record.provenance && Object.keys(record.provenance).length}
       <details><summary data-nav>Field provenance</summary>
         <p>Each value retains its source and export date. Export dates do not certify when the source page was captured.</p>
@@ -47,7 +62,6 @@
         {/each}</dl>
       </details>
     {/if}
-    <button class="btn glass small" data-nav onclick={() => app.openCataloguePage(record.id)}>Open source in browser</button>
     {#if game.source === 'catalogue' && variant && candidates.length}
       <div class="linker"><label>Existing {platformLabel[game.platform]} installation<select data-nav bind:value={installation}><option value="">Choose an installation</option>{#each candidates as candidate}<option value={candidate.id}>{candidate.title} · {candidate.serial ?? candidate.id}</option>{/each}</select></label>
         <p>Confirm this is the same regional revision. Linking changes metadata only; it does not rename files, merge games, move saves or change the launch method.</p>
@@ -72,7 +86,24 @@
   dl { display:grid; grid-template-columns:130px minmax(0,1fr); gap:10px; font-size:13px; margin:18px 0; }
   dt { color:var(--text-dim); text-transform:capitalize; } dd { margin:0; overflow-wrap:anywhere; }
   label { display:grid; gap:8px; font-size:13px; min-width:0; }
-  select { width:100%; min-width:0; padding:10px; border:1px solid var(--line); border-radius:8px; background:var(--field); color:var(--text); font:inherit; }
+  select { width:100%; min-width:0; }
   .linker { margin-top:22px; } button { margin:4px 6px 4px 0; }
-  .source-cover { display:block; width:140px; max-width:100%; height:auto; border-radius:8px; margin:16px 0; }
+  .source-cover-wrap { position:relative; display:inline-block; margin:16px 0; max-width:100%; }
+  .source-cover { display:block; width:140px; max-width:100%; height:auto; border-radius:8px; }
+  .cover-credit {
+    position:absolute; right:6px; bottom:6px;
+    display:grid; place-items:center;
+    width:28px; height:28px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    background:var(--surface-strong);
+    color:var(--text-soft);
+    cursor:pointer;
+  }
+  .inline-link {
+    padding:0; border:0; background:none;
+    color:var(--accent); font:inherit; font-size:inherit;
+    text-decoration:underline; text-underline-offset:3px;
+    cursor:pointer;
+  }
 </style>

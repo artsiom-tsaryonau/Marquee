@@ -52,6 +52,7 @@
             ? 'Play'
             : 'Reconnect',
   );
+  const playReady = $derived(!!g && g.installed && !g.mediaMissing && g.setupState !== 'missing');
 </script>
 
 {#if !g}
@@ -96,19 +97,26 @@
       </div>
     {/if}
     <div class="actions">
-      {#if g.source === 'catalogue' && g.metadata}
-        <button class="btn primary big" data-nav onclick={() => g.metadata && app.openCataloguePage(g.metadata.id)}>Open source page in browser</button>
+      {#if g.source === 'catalogue'}
+        <p class="catalogue-note" role="status">Not in your library — catalogue discovery only. Open the source page from the facts panel when you want to browse Vimm’s Lair.</p>
       {:else if offline && g.setupState === 'runner_missing'}
         {#if g.platform === 'ps2'}<InstallMenu tone="primary" size="big" />
         {:else}<button class="btn primary big" data-nav onclick={() => app.go('tools')}><Icon name="settings" /> Set up {g.platform === 'ps1' ? 'DuckStation' : g.platform === 'genesis' ? 'BlastEm' : g.platform === 'ds' ? 'melonDS' : g.platform === 'neogeo' ? 'FinalBurn Neo' : 'emulator'}</button>{/if}
       {:else}
-        <button class="btn primary big" class:play={g.installed && !g.mediaMissing && g.setupState !== 'missing'} data-nav disabled={!!g.mediaMissing} onclick={() => {
-          if (g.lutris) void app.openLutrisGame(g);
-          else if (offline && g.setupState === 'missing') app.explainBios();
-          else if (g.installed) app.play(g);
-        }}>
-          <Icon name={g.installed && g.setupState !== 'missing' ? 'play' : 'download'} size={24} />
-          {playLabel}
+        <button
+          class="btn primary big"
+          class:play={playReady}
+          data-nav
+          disabled={!!g.mediaMissing}
+          aria-label={playReady ? playLabel : undefined}
+          onclick={() => {
+            if (g.lutris) void app.openLutrisGame(g);
+            else if (offline && g.setupState === 'missing') app.explainBios();
+            else if (g.installed) app.play(g);
+          }}
+        >
+          <Icon name={g.installed && g.setupState !== 'missing' ? 'play' : 'download'} size={playReady ? 28 : 24} />
+          {#if !playReady}{playLabel}{/if}
         </button>
       {/if}
       {#if offline && g.serial && !g.coverUrl}
@@ -174,6 +182,10 @@
       <dl>
         <dt>Source</dt>
         <dd><span class="pill">{sourceLabel[g.source]}</span></dd>
+        {#if g.metadata?.url}
+          <dt>Source page</dt>
+          <dd><button type="button" class="facts-link" data-nav onclick={() => app.openCataloguePage(g.metadata!.id)}>Open in browser</button></dd>
+        {/if}
         <dt>Platform</dt>
         <dd>{platformLabel[g.platform]}{g.platform === 'unknown' && g.metadata ? ` · ${g.metadata.system}` : ''}</dd>
         {#if g.region}<dt>Region</dt><dd>{g.region}</dd>{/if}
@@ -223,7 +235,7 @@
   .about { white-space:pre-line; line-height:1.6; max-width:70ch; color:var(--text-soft); }
   .variant-picker { display:flex; flex-wrap:wrap; gap:18px; padding:16px; border-radius:14px; margin:16px 0; align-items:end; }
   .variant-picker label { display:grid; gap:8px; font-size:12px; color:var(--text-soft); }
-  .variant-picker select { max-width:100%; color:var(--text); background:var(--field); border:1px solid var(--line); border-radius:8px; padding:10px; font:inherit; }
+  .variant-picker select { max-width:100%; min-height:42px; }
   .variant-picker span, .media-credit { font-size:12px; color:var(--text-dim); }
   .shot img { width:100%; height:100%; object-fit:cover; }
   .page {
@@ -300,6 +312,27 @@
     flex-wrap: wrap;
     gap: 10px;
     margin-top: 4px;
+  }
+  .catalogue-note {
+    margin: 0;
+    padding: 12px 16px;
+    border-radius: 12px;
+    background: var(--field);
+    border: 1px solid var(--line);
+    font-size: 14px;
+    color: var(--text-soft);
+    max-width: 52ch;
+  }
+  .facts-link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    font-size: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
   }
   .body {
     display: grid;
