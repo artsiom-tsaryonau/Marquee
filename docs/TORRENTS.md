@@ -21,6 +21,13 @@ Limitation: torrents created by `librqbit` are not flagged `private`, so anyone 
 
 BIOS and firmware are not seeded unless you point the command at them.
 
+## VPN
+
+- **Your own devices on one network:** no VPN is needed.
+- **Devices at different sites:** use a mesh VPN (Tailscale, or plain WireGuard) rather than a consumer VPN. It gives every device a stable private address, so `--peer 100.x.y.z:51413` works with no port forwarding and the traffic is encrypted. The same network would serve Apollo/Moonlight remote play and the AIRCloud web UIs; it is tracked as the parked **Mesh VPN** item in `aircloud-documentation/initiatives/next-steps.md` (revival reasons noted there, 2026-10-21).
+- **ExpressVPN (or any consumer VPN):** useful only if you ever use public torrents. It does not connect your devices to each other and, as far as we know (unchecked), has no port forwarding, so it cannot help a seeder be reached.
+- **Planned: `bind_interface` setting.** `librqbit` can bind all sockets to one network interface (`SO_BINDTODEVICE` on Linux). Naming the VPN's interface (for example `tailscale0`) would act as a kill switch: if the interface is gone the client has no network and refuses to start. Not implemented; whether ExpressVPN's Linux app exposes a usable interface is untested.
+
 ## CLI
 
 ```sh
