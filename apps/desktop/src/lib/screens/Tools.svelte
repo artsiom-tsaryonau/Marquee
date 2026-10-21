@@ -11,6 +11,7 @@
   import InstallMenu from '../components/InstallMenu.svelte';
   import LutrisSource from '../components/LutrisSource.svelte';
   import PurpleLauncher from '../components/PurpleLauncher.svelte';
+  import Mark, { hasMark } from '../components/Mark.svelte';
   import ToolCard from '../components/ToolCard.svelte';
   import Icon from '../components/Icon.svelte';
 
@@ -126,7 +127,7 @@
   </div>
   <div class="filters" data-nav-row aria-label="Platforms">
     <button class="chip" class:on={!platform} data-nav aria-pressed={!platform} onclick={() => (platform = '')}>All platforms <span>{all.length}</span></button>
-    {#each platforms as p}<button class="chip" class:on={platform === p} data-nav aria-pressed={platform === p} onclick={() => (platform = p)}>{labelOf(p)} <span>{all.filter((i) => i.platforms.includes(p)).length}</span></button>{/each}
+    {#each platforms as p}<button class="chip" class:on={platform === p} data-nav aria-pressed={platform === p} title={labelOf(p)} onclick={() => (platform = p)}>{#if hasMark(p)}<Mark id={p} size={18} /><span class="sr">{labelOf(p)}</span>{:else}{labelOf(p)}{/if} <span>{all.filter((i) => i.platforms.includes(p)).length}</span></button>{/each}
   </div>
 
   {#if app.launcherError}<div class="empty glass-panel" role="alert"><p>{app.launcherError}</p><button class="btn glass" data-nav onclick={() => app.loadLaunchers()}>Try again</button></div>{/if}

@@ -5,6 +5,7 @@
   import Artwork from './Artwork.svelte';
   import Logo from './Logo.svelte';
   import Icon from './Icon.svelte';
+  import Mark, { hasMark } from './Mark.svelte';
 
   let {
     game,
@@ -73,7 +74,7 @@
     {#if !game.coverUrl}
       <div class="logo"><Logo {game} size={shape === 'wide' ? 'md' : 'sm'} /></div>
     {/if}
-    <span class="source">{sourceLabel[game.source]}</span>
+    <span class="source" title={sourceLabel[game.source]}>{#if hasMark(game.source)}<Mark id={game.source} size={14} /><span class="sr">{sourceLabel[game.source]}</span>{:else}{sourceLabel[game.source]}{/if}</span>
     {#if game.favorite}<span class="fav"><Icon name="star" size={14} filled /></span>{/if}
     {#if status?.tone === 'dim'}
       <span class="status dim icon" title="Not installed"><Icon name="download" size={13} /></span>

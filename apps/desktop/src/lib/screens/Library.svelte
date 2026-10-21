@@ -3,6 +3,7 @@
   import { scale } from 'svelte/transition';
   import { app } from '../state.svelte';
   import { platformLabel, sourceLabel } from '../labels';
+  import Mark, { hasMark } from '../components/Mark.svelte';
   import { fuzzy } from '../format';
   import { groupGames, launchMethod, matchesVariant, methodLabel, type LaunchMethod } from '../unified';
   import type { Source, Platform } from '../types';
@@ -72,7 +73,7 @@
 
   const filtering = $derived(!!query || !!platform || !!method || sources.size > 0 || installedOnly || favOnly);
   function clearFilters() { query = ''; platform = ''; method = ''; sources = new Set(); installedOnly = false; favOnly = false; }
-  const dur = $derived(app.reduceMotion ? 0 : 260);
+  const dur = $derived(app.motionReduced || app.visualEffects === 'balanced' ? 0 : 260);
 </script>
 
 <svelte:window onkeydown={onKey} />
@@ -81,7 +82,7 @@
   <header class="library-heading"><div><span class="eyebrow">Your collection</span><h1>{collection === 'ps2' ? 'PlayStation 2' : 'Library'}</h1><p>Choose a game, then choose how you play.</p></div><div class="heading-actions"><button class="btn glass small" data-nav onclick={() => app.go('tools')}><Icon name="controller" size={16} /> Tools & launchers</button><button class="btn glass small" data-nav onclick={() => app.addSystemFolder('ps1')}><Icon name="plus" size={16} /> Add PS1 folder</button><button class="btn primary small" data-nav onclick={() => app.addPs2Folder()}><Icon name="plus" size={16} /> Add PS2 folder</button></div></header>
   <div class="categories" data-nav-row aria-label="Game platforms">
     <button class="chip" class:on={!platform} data-nav aria-pressed={!platform} onclick={() => platform = ''}>All platforms</button>
-    {#each platforms as p}<button class="chip" class:on={platform === p} data-nav aria-pressed={platform === p} onclick={() => platform = p}>{platformLabel[p]} <span>{app.games.filter((g) => g.platform === p).length}</span></button>{/each}
+    {#each platforms as p}<button class="chip" class:on={platform === p} data-nav aria-pressed={platform === p} title={platformLabel[p]} onclick={() => platform = p}>{#if hasMark(p)}<Mark id={p} size={18} /><span class="sr">{platformLabel[p]}</span>{:else}{platformLabel[p]}{/if} <span>{app.games.filter((g) => g.platform === p).length}</span></button>{/each}
   </div>
   <div class="bar glass-panel">
     <label class="search">
@@ -91,7 +92,7 @@
     </label>
     <div class="chips" data-nav-row>
       {#each allSources as s (s)}
-        <button class="chip" class:on={sources.has(s)} data-nav onclick={() => toggle(s)}>{sourceLabel[s]}</button>
+        <button class="chip" class:on={sources.has(s)} data-nav title={sourceLabel[s]} onclick={() => toggle(s)}>{#if hasMark(s)}<Mark id={s} size={18} /><span class="sr">{sourceLabel[s]}</span>{:else}{sourceLabel[s]}{/if}</button>
       {/each}
       <span class="sep"></span>
       <button class="chip" class:on={installedOnly} data-nav onclick={() => (installedOnly = !installedOnly)}>Installed</button>
