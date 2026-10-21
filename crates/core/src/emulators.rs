@@ -41,6 +41,16 @@ pub struct PackageHint {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub struct DirectDownload {
+    pub url: String,
+    pub sha256: String,
+    pub version: String,
+    /// Folder inside the archive that holds the program, when it is wrapped in one.
+    #[serde(default)]
+    pub archive_root: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct EmulatorDef {
     pub id: String,
     pub name: String,
@@ -50,8 +60,17 @@ pub struct EmulatorDef {
     #[serde(default)]
     pub kind: Option<String>,
     pub systems: Vec<String>,
+    /// GitHub `owner/repo` whose latest release carries the download. Leave empty
+    /// and give `download` instead to use a direct link.
+    #[serde(default)]
     pub github: String,
+    #[serde(default)]
     pub asset_suffix: String,
+    /// A direct link to an archive (`.AppImage`, `.zip`, `.tar.gz`) with its pinned
+    /// SHA-256. Changing the link or checksum in the catalogue file is how an
+    /// emulator is updated.
+    #[serde(default)]
+    pub download: Option<DirectDownload>,
     #[serde(default)]
     pub asset_excludes: Vec<String>,
     /// The release keeps one tag forever, so the asset checksum identifies a version.
@@ -288,7 +307,10 @@ pub fn info(
         name: def.name.clone(),
         systems: def.systems.clone(),
         integrated: def.kind.is_some(),
-        upstream: def.github.clone(),
+        upstream: def
+            .download
+            .as_ref()
+            .map_or_else(|| def.github.clone(), |d| d.url.clone()),
         requirement: def.requirement.clone(),
         installed_version: installed.filter(|_| present).map(|i| i.version.clone()),
         latest_version: latest.map(str::to_string),
@@ -368,6 +390,25 @@ fn pick(def: &EmulatorDef, release: &serde_json::Value) -> Result<Release> {
 }
 
 fn latest(def: &EmulatorDef) -> Result<Release> {
+    if let Some(d) = &def.download {
+        let sha256 = d.sha256.to_ascii_lowercase();
+        if sha256.len() != 64 || !sha256.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err(AppError::new(
+                "NETWORK",
+                format!(
+                    "{} has no valid pinned SHA-256 in its catalogue file",
+                    def.name
+                ),
+            ));
+        }
+        let name = d.url.rsplit('/').next().unwrap_or("emulator").to_string();
+        return Ok(Release {
+            version: d.version.clone(),
+            name,
+            url: d.url.clone(),
+            sha256,
+        });
+    }
     let json = http::get_json(&format!(
         "https://api.github.com/repos/{}/releases/latest",
         def.github
@@ -409,7 +450,10 @@ pub fn install(paths: &Paths, def: &EmulatorDef, sink: &Arc<dyn EventSink>) -> R
     let work = tempfile::Builder::new()
         .prefix(".install-")
         .tempdir_in(&prefix)?;
-    let part = work.path().join("download.AppImage");
+    let part = work.path().join(format!(
+        "download-{}",
+        release.name.replace(['/', '\\'], "_")
+    ));
     say(sink, &def.id, format!("Downloading {}…", release.name));
     let mut last = 0u64;
     let got = http::download_file(
@@ -427,35 +471,65 @@ pub fn install(paths: &Paths, def: &EmulatorDef, sink: &Arc<dyn EventSink>) -> R
     if got != release.sha256 {
         return Err(AppError::new(
             "NETWORK",
-            "download did not match the checksum GitHub published for it",
+            "download did not match its published or pinned checksum",
         ));
     }
-    set_executable(&part)?;
     say(sink, &def.id, "Unpacking…");
-    let output = Command::new(&part)
-        .arg("--appimage-extract")
-        .current_dir(work.path())
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
-        .output()
-        .map_err(|e| AppError::new("SPAWN_FAILED", format!("could not unpack: {e}")))?;
-    // Some AppImages extract to a symlink (`squashfs-root -> ./AppDir`). Use the real folder,
-    // and only if it stays inside the staging area.
-    let root = fs::canonicalize(work.path().join("squashfs-root"))
-        .ok()
-        .filter(|real| real.starts_with(fs::canonicalize(work.path()).unwrap_or_default()))
-        .unwrap_or_else(|| work.path().join("squashfs-root"));
-    if !output.status.success() || !root.join(&def.binary).is_file() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(AppError::new(
-            "SPAWN_FAILED",
-            format!(
-                "unpacking failed: {}",
-                stderr.lines().rev().take(4).collect::<Vec<_>>().join(" | ")
-            ),
-        ));
-    }
+    let lower = release.name.to_ascii_lowercase();
+    let root = if lower.ends_with(".zip") || lower.ends_with(".tar.gz") || lower.ends_with(".tgz") {
+        let out = work.path().join("extracted");
+        fs::create_dir_all(&out)?;
+        if lower.ends_with(".zip") {
+            crate::ports::extract_zip(&part, &out)?;
+        } else {
+            crate::ports::extract_tar_gz(&part, &out)?;
+        }
+        let root = match def
+            .download
+            .as_ref()
+            .and_then(|d| d.archive_root.as_deref())
+        {
+            Some(sub) if !sub.contains("..") && !sub.starts_with('/') => out.join(sub),
+            _ => out,
+        };
+        if !root.join(&def.binary).is_file() {
+            return Err(AppError::new(
+                "SPAWN_FAILED",
+                format!(
+                    "the archive has no {} (check `binary`/`archive_root`)",
+                    def.binary
+                ),
+            ));
+        }
+        root
+    } else {
+        set_executable(&part)?;
+        let output = Command::new(&part)
+            .arg("--appimage-extract")
+            .current_dir(work.path())
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .output()
+            .map_err(|e| AppError::new("SPAWN_FAILED", format!("could not unpack: {e}")))?;
+        // Some AppImages extract to a symlink (`squashfs-root -> ./AppDir`). Use the real
+        // folder, and only if it stays inside the staging area.
+        let root = fs::canonicalize(work.path().join("squashfs-root"))
+            .ok()
+            .filter(|real| real.starts_with(fs::canonicalize(work.path()).unwrap_or_default()))
+            .unwrap_or_else(|| work.path().join("squashfs-root"));
+        if !output.status.success() || !root.join(&def.binary).is_file() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(AppError::new(
+                "SPAWN_FAILED",
+                format!(
+                    "unpacking failed: {}",
+                    stderr.lines().rev().take(4).collect::<Vec<_>>().join(" | ")
+                ),
+            ));
+        }
+        root
+    };
     let current = prefix.join("current");
     let old = prefix.join(format!(".old-{}", uuid::Uuid::new_v4()));
     let had_previous = current.exists();
@@ -597,6 +671,23 @@ pub fn sync_runners(db: &Db, paths: &Paths) -> Result<()> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn a_direct_link_uses_its_pinned_checksum_and_version() {
+        let mut def = find("duckstation").unwrap();
+        def.download = Some(DirectDownload {
+            url: "https://example.invalid/dl/Emu-1.2.tar.gz".into(),
+            sha256: "A".repeat(64),
+            version: "1.2".into(),
+            archive_root: Some("Emu-1.2".into()),
+        });
+        let r = latest(&def).unwrap();
+        assert_eq!(r.name, "Emu-1.2.tar.gz");
+        assert_eq!(r.version, "1.2");
+        assert_eq!(r.sha256, "a".repeat(64));
+        def.download.as_mut().unwrap().sha256 = "not-a-hash".into();
+        assert_eq!(latest(&def).err().unwrap().code, "NETWORK");
+    }
 
     #[test]
     fn catalogue_parses_and_rolling_releases_are_identified_by_checksum() {

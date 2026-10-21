@@ -24,7 +24,7 @@ Marquee does not download BIOS files or commercial games.
 | CLI (`marquee`) | **Works** without GTK. Same core as desktop. Use `--data-dir` for isolation. |
 | Desktop (`./scripts/run.sh desktop`) | Optimized standalone window with embedded UI. NVIDIA/Wayland now defaults to accelerated shared-memory transport; see [live rendering correction](DESKTOP_RENDERING.md). Software mode is an explicit fallback. Native folder-picker / Play clicks are **not live-tested**. |
 | Persistent library | SQLite schema **v4** after the shared PS1 root-system work (artwork v2, session recovery v3) at `$XDG_DATA_HOME/marquee/library.db` (or `--data-dir` / `MARQUEE_DATA_DIR`). `artwork` table + migrate v1→2. Newer `user_version` is rejected. |
-| In-app PCSX2 install | **Built.** Recommended path unpacks the official AppImage into `$XDG_DATA_HOME/marquee/runners/pcsx2/current` (no wizard, no Flatpak). Host Flatpak is optional and does not skip unpack. Tests isolate host PCSX2 (`Core::open_isolated`). |
+| In-app PCSX2 install | **Built, single channel.** Downloads the official AppImage, verifies it, unpacks it into `$XDG_DATA_HOME/marquee/runners/pcsx2/current` and deletes the download. Flatpak and keep-as-AppImage were removed 2026-10-21; host copies are never discovered. First launch seeds `PCSX2.ini` so no setup wizard appears (see [EMULATORS](EMULATORS.md)). |
 | Serial covers | **Built.** xlenore/ps2-covers JPEG cache, `convertFileSrc` + asset protocol. ScreenScraper/SteamGridDB still [follow-up](ENRICHMENT.md#ps2-metadata-matching-and-cached-artwork). |
 | Real PCSX2 Play → quit → duration | **Pending.** Fake runner `/bin/sleep` records duration in tests. That is not the gate. |
 | Controller in Tauri WebView | **Pending.** Browser Gamepad API + focus engine exist; `gilrs` not added. Browser gamepad is not evidence. |
@@ -48,7 +48,7 @@ ScreenScraper, SteamGridDB, Steam/Lutris, other emulators, BIN/CUE/CHD play, who
 - Fedora (or similar) with Rust, Node 22+, pnpm
 - For the desktop window: `./scripts/setup.sh` (WebKit 4.1, DBus, and the rest of the [Tauri Fedora list](https://v2.tauri.app/start/prerequisites/))
 - A folder of `.iso` files you already own
-- PCSX2 (Install in the app unpacks the official AppImage into Marquee; an existing AppImage / Flatpak `net.pcsx2.PCSX2` is optional), then add BIOS inside PCSX2 yourself
+- PCSX2 (Install in the app downloads and unpacks it into Marquee), then drop your BIOS files or a zip into `<data dir>/bios-inbox`, or use Tools → BIOS import
 
 ```bash
 cd apps/desktop
@@ -88,8 +88,7 @@ Tests must use `--data-dir` / `Core::open_isolated`. Never point them at the rea
 
 ```text
 $XDG_DATA_HOME/marquee/runners/pcsx2/current/usr/bin/pcsx2-qt -batch -fullscreen -nogui -- /path/to/game.iso
-<pcsx2.AppImage or pcsx2-qt> -batch -fullscreen -nogui -- /path/to/game.iso
-flatpak run net.pcsx2.PCSX2 -batch -fullscreen -nogui -- /path/to/game.iso
+(managed) runners/pcsx2/current/usr/bin/pcsx2-qt -batch -fullscreen -nogui -- /path/to/game.iso
 ```
 
 ### BIOS / setup status
@@ -111,13 +110,12 @@ Marquee never copies BIOS or rewrites PCSX2 settings.
 | `RUNNER_MISSING` | Install PCSX2 from Settings / the empty library, then Open setup for BIOS. |
 | `SETUP_MISSING` | Open PCSX2 setup and add BIOS files. |
 | `INSTALL_BUSY` | An install is already running. |
-| `NETWORK` | Flathub, GitHub, or the cover host could not be reached, or a checksum failed. |
+| `NETWORK` | GitHub or the cover host could not be reached, or a checksum failed. |
 | `NOT_FOUND` | No cover for that serial (kept as skipped). |
 | `LAUNCH_BUSY` | A game is already running. |
 | `INSTANCE_BUSY` | Another Marquee process owns this data directory. |
-| `SPAWN_FAILED` | Could not start PCSX2. Check the executable/Flatpak and ISO path. |
+| `SPAWN_FAILED` | Could not start PCSX2. Check the managed install and ISO path. |
 
-Flatpak may hide the library folder from PCSX2. Grant that folder, not the whole filesystem.
 
 ---
 
@@ -131,15 +129,15 @@ PS2 vertical slice implemented before the direct-store milestones. Metadata matc
 - SQLite (rusqlite bundled, WAL, foreign keys, 5s busy timeout). Editions keep UUID, `scan_title` vs `display_title`, favourite.
 - Recursive case-insensitive `.iso` scan, no symlink following, skipped formats counted.
 - Bounded `SYSTEM.CNF` / `BOOT2` serial. Filename title if missing. Moved files = missing + new, never auto-merged.
-- PCSX2 discovery (unpacked tree / AppImage / `pcsx2-qt` / Flatpak). One session, flock lock, spawn without `sh -c`, playtime on successful exit only.
+- PCSX2 discovery (Marquee's unpacked tree only). One session, flock lock, spawn without `sh -c`, playtime on successful exit only.
 - Tauri 2 + dialog + single-instance. Desktop vs explicit demo API. Empty library never sample-falls-back.
 - `catalog/systems/ps2.json` built-in registry (no command fields).
 - `scripts/setup.sh` for WebKit 4.1 and DBus devel.
 
 **In the working tree (not pushed)**
 
-- In-app PCSX2 install: **unpack** the official GitHub AppImage into `runners/pcsx2/current` (default). Optional keep-as-AppImage or Flathub. Provenance `marquee_installed_pcsx2`. Isolated `XDG_CONFIG_HOME` under `pcsx2/xdg-config/`.
-- Install **dropdown → dialog of runnable rows** (Recommended unpack / Unpack / AppImage file / Flathub / Open setup).
+- In-app PCSX2 install: **unpack** the official GitHub AppImage into `runners/pcsx2/current` (only channel). Provenance `marquee_installed_pcsx2`. Isolated `XDG_CONFIG_HOME` under `pcsx2/xdg-config/`.
+- Install **dropdown → dialog of runnable rows** (Recommended / Open setup).
 - Serial covers from xlenore/ps2-covers (`SLUS_209.63` → `SLUS-20963.jpg`), cached JPEG, HTTP outside the DB lock. 404 keeps procedural art.
 - Schema v2 `artwork` table; reject a newer `user_version`; abandon stale `running` sessions on open (no playtime).
 - Tests isolate host PCSX2 (`open_isolated` / `discover_host: false`).
@@ -158,7 +156,7 @@ Host while building: Fedora Wayland, rustc 1.96.1, Node 24.18.0, pnpm 12.14.0. W
 | Desktop persistent backend; empty library | **Pass** on isolated `MARQUEE_DATA_DIR` (0 roots / 0 editions). Empty Home/Library keep console layout. |
 | ISO import; skipped formats counted | **Done** in core/CLI/tests. Desktop picker wired (`dialog` plugin), not live-tested. |
 | Rescan/restart keep IDs, favourites, titles | **Done** (automated). |
-| One PCSX2 variant launched end-to-end | **Pending.** Discovery + argv implemented (unpacked preferred). Host may already have Flatpak PCSX2; tests must not launch it. |
+| One PCSX2 variant launched end-to-end | **Partly done:** managed PCSX2, Vice City (USA), exit 0, 254 s recorded (2026-10-21). Relaunch and restart-persistence still to confirm. |
 | BIOS missing / unverified / launch-tested | **Done** in core. Open-setup not live-tested. |
 | Supervised duration persisted once | Fake runner **yes**. Real PCSX2 **no**. |
 | Reload / duplicate launch / interrupted sessions | **Done** in core: duplicate launch blocked; matching live processes are recovered; already-dead interrupted sessions retain checkpointed time. See [CORRECTION_PASS.md](CORRECTIONS.md). Desktop UI reload still live-pending. |
@@ -178,7 +176,7 @@ Isolated data directories only. No commercial ISOs or BIOS in the repo.
 | Item | Value |
 | --- | --- |
 | Host | Fedora Linux, Wayland (NVIDIA: DMA-BUF workaround required) |
-| Primary PCSX2 variant | **Pending live Play.** Flatpak id `net.pcsx2.PCSX2` may exist on the host; tests must not launch it. |
+| Primary PCSX2 variant | **Live Play observed 2026-10-21:** managed PCSX2 booted Vice City (USA) from the CLI; session ended `exit 0`, 254 s, stored once. The 254 s run was started by the agent and quit by the user; picture and input were not independently verified, and relaunch/restart checks remain. |
 | Desktop compile | **Pass** (`cargo check -p marquee-desktop`) |
 | Window | **Opens** via `./scripts/run.sh desktop`. Plain Wayland without the env dies with Gdk protocol error 71 on this NVIDIA host. |
 | Empty UI chrome | **Pass** in the browser (`?splash=0&empty=1`): hero, ghost rows, Library grid, Ports empty banner. Native WebView of the same shell: process up; not re-screenshoted after the look change. |
@@ -203,15 +201,14 @@ Fake-runner tests do **not** close the real-emulator gate.
 | 10 | UI reload during fake session | Partial (core yes, desktop pending) |
 | 11 | Missing file vs offline folder | Automated |
 | 12 | Keyboard / controller in Tauri | Keyboard in demo; Tauri / `gilrs` pending |
-| 13 | AppImage and Flatpak argv | Automated; live launch pending |
+| 13 | AppImage and Flatpak argv | **Removed** with host discovery |
 | 14 | Install dropdown → dialog → click a channel | **Pass** in the browser demo Settings. Native install click pending. |
 | 15 | Fetch covers after import | Automated skip/empty; live xlenore fetch pending |
 
 | Variant | Discovery | Argv | Live launch |
 | --- | --- | --- | --- |
-| Unpacked `runners/pcsx2/current` | Yes (preferred) | `-batch -fullscreen -nogui -- <iso>` | Pending |
-| AppImage / `pcsx2-qt` | Yes | Same flags | Pending |
-| Flatpak `net.pcsx2.PCSX2` | Yes (optional extra) | Same flags after `flatpak run …` | Pending |
+| Unpacked `runners/pcsx2/current` | Yes (only variant) | `-batch -fullscreen -nogui -- <iso>` | **Booted and exited 0** (2026-10-21) |
+| Host AppImage / `pcsx2-qt` / Flatpak | **Removed** (not discovered) | n/a | n/a |
 | `--allow-fake` | Tests only | No PCSX2 flags | Automated; not an emulator gate |
 
 ---
@@ -222,7 +219,7 @@ Fake-runner tests do **not** close the real-emulator gate.
 
 1. Restart the desktop window (`./scripts/run.sh desktop` on this NVIDIA Wayland host) so the look, install, covers, and session reclaim are in the binary.
 2. **Add a PS2 `.iso` folder** (native picker). Confirm no sample games, skipped-format summary if needed, covers after import.
-3. If PCSX2 is missing, **Install → Recommended** (unpack into Marquee). Open setup; add your own BIOS. Host Flatpak does not skip this.
+3. If PCSX2 is missing, **Install → Recommended** (unpack into Marquee). Put your BIOS in `bios-inbox`; no setup window is needed.
 4. **Play → quit emulator → duration once → selection restored.** Relaunch without stale busy. This is the release gate.
 5. Keep `scripts/check.sh` green.
 
@@ -234,7 +231,7 @@ Marquee **owns** the PCSX2 tree, the same way `cx-script` owns `//DEPS` under `.
 
 **Recommended** downloads the official `linux-appimage-x64-Qt.AppImage` from GitHub, checks the release sha256, and unpacks it with `--appimage-extract` into `$XDG_DATA_HOME/marquee/runners/pcsx2/current`. Play runs `usr/bin/pcsx2-qt` from that folder. No Flatpak, no FUSE, no host packages, no installer wizard. Config/BIOS for that copy live under `$XDG_DATA_HOME/marquee/pcsx2/xdg-config/PCSX2/` (Marquee creates an empty `bios/` dir; you drop files you already own).
 
-Other dialog rows: **Unpack into Marquee** (same as Recommended), **Keep as AppImage** (run the file; may need FUSE), **Flathub** (optional user Flatpak), **Open setup**. Host Flatpak does **not** skip a Marquee unpack. CLI: `marquee runners install [--channel auto|unpacked|appimage|flatpak]` (`auto` = unpacked).
+Dialog rows: **Recommended** and **Open setup**. CLI: `marquee runners install [--channel auto|unpacked]`; other channels are rejected.
 
 Never downloads BIOS or ISOs. Play uses `-batch -fullscreen -nogui` to hide PCSX2's main window while showing the game, then exit on game shutdown. This does not replace completing setup or supplying a BIOS. Open setup is the GUI for adding BIOS. Provenance is stored as `marquee_installed_pcsx2`.
 

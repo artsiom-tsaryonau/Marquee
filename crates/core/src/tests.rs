@@ -213,19 +213,6 @@ fn launch_argv_keeps_metacharacters_inert() {
     let dash = PathBuf::from("/games/-leading.iso");
     let argv = runners::launch_argv(&runner, &dash, &[]).unwrap();
     assert_eq!(argv.last().unwrap(), "/games/-leading.iso");
-
-    let flatpak = crate::model::Runner {
-        command: vec!["flatpak".into(), "run".into(), "net.pcsx2.PCSX2".into()],
-        source: "flatpak".into(),
-        ..runner
-    };
-    let argv =
-        runners::launch_argv(&flatpak, Path::new("/media/quote\"and$meta.iso"), &[]).unwrap();
-    assert_eq!(argv[0], "flatpak");
-    assert_eq!(argv[1], "run");
-    assert_eq!(argv[2], "--filesystem=/media/quote\"and$meta.iso:ro");
-    assert_eq!(argv[3], "net.pcsx2.PCSX2");
-    assert_eq!(argv.last().unwrap(), "/media/quote\"and$meta.iso");
 }
 
 #[test]
@@ -308,17 +295,13 @@ fn ps1_root_imports_iso_and_uses_duckstation_argv() {
     assert_eq!(pair_media.path.extension().unwrap(), "cue");
 
     let duck = crate::model::Runner {
-        id: "runner.duckstation.flatpak".into(),
+        id: "runner.duckstation.marquee".into(),
         kind: RunnerKind::Duckstation,
         display_name: "DuckStation".into(),
-        command: vec![
-            "flatpak".into(),
-            "run".into(),
-            "org.duckstation.DuckStation".into(),
-        ],
+        command: vec!["/data/runners/duckstation/current/AppRun".into()],
         bios_state: BiosState::Unverified,
         bios_hint: None,
-        source: "flatpak".into(),
+        source: "marquee".into(),
         available: true,
     };
     let img = PathBuf::from("/games/ps1/Cave.iso");
@@ -326,10 +309,7 @@ fn ps1_root_imports_iso_and_uses_duckstation_argv() {
     assert_eq!(
         argv,
         vec![
-            "flatpak",
-            "run",
-            "--filesystem=/games/ps1/Cave.iso:ro",
-            "org.duckstation.DuckStation",
+            "/data/runners/duckstation/current/AppRun",
             "-batch",
             "-fullscreen",
             "-nogui",

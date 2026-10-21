@@ -154,10 +154,10 @@ test('back cancels launching without changing the underlying route', () => {
 
 test('install dropdown options are executable actions', () => {
   const pcsx2 = installables.find((tool) => tool.id === 'pcsx2');
-  assert.ok(pcsx2.options.length >= 3);
-  assert.equal(installOption('pcsx2', 'unpacked').run.channel, 'unpacked');
-  assert.equal(installOption('pcsx2', 'flatpak').run.channel, 'flatpak');
-  assert.equal(installOption('pcsx2', 'appimage').run.channel, 'appimage');
+  assert.ok(pcsx2.options.length >= 2);
+  assert.equal(installOption('pcsx2', 'auto').run.channel, 'auto');
+  assert.equal(installOption('pcsx2', 'flatpak'), undefined);
+  assert.equal(installOption('pcsx2', 'appimage'), undefined);
   assert.equal(installOption('pcsx2', 'setup').run.type, 'setup');
 });
 

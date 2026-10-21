@@ -1,6 +1,6 @@
 # Managed emulators and BIOS
 
-Updated 2026-10-21. Marquee installs emulators and holds BIOS images inside its own data folder, so everything can be removed on demand. Package managers (Flatpak and others) are an advanced alternative, never the default.
+Updated 2026-10-21. Marquee installs emulators and holds BIOS images inside its own data folder, so everything can be removed on demand. **Policy (2026-10-21):** Marquee installs, configures and runs emulators itself, from archives named in catalogue files. It does not use Flatpak or other package managers, and it no longer discovers host copies of emulators. Setup that an emulator would normally ask the user for is written by Marquee before launch.
 
 ## Current catalogue and integration boundary
 
@@ -15,7 +15,7 @@ Updated 2026-10-21. Marquee installs emulators and holds BIOS images inside its 
 | xemu | Original Xbox | Managed lifecycle and standalone opening |
 | mGBA | GB / GBC / GBA | Opt-in pinned source-build pilot, Qt/SDL standalone tools; no library adapter |
 
-PCSX2 remains integrated through its dedicated installer. A catalogue entry is implementation of acquisition/opening, not proof of a successful current upstream install, complete configuration isolation, firmware readiness or a playable game. Install requires a matching upstream AppImage with a published checksum; missing or changed packaging must produce an error. Additional platforms still need system descriptors, media import, launch flags, prerequisite checks, save behavior and live acceptance before their games appear as playable library entries. Standalone emulator lifetime is not recorded as game playtime.
+PCSX2 is integrated through its dedicated installer (`tools.rs`), which now has one channel: download the official AppImage, verify it, unpack it into Marquee's data folder, then delete the download. A catalogue entry is implementation of acquisition/opening, not proof of a successful current upstream install, complete configuration isolation, firmware readiness or a playable game. Install requires a matching upstream AppImage with a published checksum; missing or changed packaging must produce an error. Additional platforms still need system descriptors, media import, launch flags, prerequisite checks, save behavior and live acceptance before their games appear as playable library entries. Standalone emulator lifetime is not recorded as game playtime.
 
 ## What is needed to install and manage DuckStation
 
@@ -30,7 +30,7 @@ Verified against the upstream release on 2026-10-21.
 | Running without FUSE | The AppImage is unpacked with `--appimage-extract` into `runners/duckstation/current` (Fedora has no FUSE 2 by default). The launcher is `AppRun`. |
 | Isolation | Setting `XDG_CONFIG_HOME` is enough: DuckStation puts its whole user folder (settings, BIOS, memory cards, save states, shaders) in `$XDG_CONFIG_HOME/duckstation`. Nothing was written to `~/.config` or `~/.local/share` in the check. |
 | BIOS | DuckStation searches `duckstation/bios` under that folder and picks the image matching the disc's region itself. Marquee only has to put the files there. |
-| First run | DuckStation shows its own setup wizard once (`SetupWizardIncomplete`). Marquee does not pre-create its settings file, because a half-written one risks a reset. |
+| First run | Before each library launch Marquee sets `[Main] SetupWizardIncomplete = false` in `duckstation/settings.ini` (creating the file if absent) and touches no other key; DuckStation fills its own defaults. Checked on this host: the flag went `true` → `false` and DuckStation started. |
 | Launch flags | `-batch -fullscreen -nogui <image>` (already used by the launcher code). |
 
 ## What the catalogue contains
@@ -77,26 +77,33 @@ The same operations are API commands: `list_emulators`, `check_emulator_updates`
 
 - Marquee downloads and unpacks emulator binaries. **Target:** firmware acquisition jobs from authorized sources (same job UI as store downloads). **Today:** import a folder or file via Tools, CLI, or API; Marquee identifies regions and stores copies locally. The app does not ship BIOS files in the installer.
 - `bios import` reads each file's contents to identify it (a PS1 `Version x.y dd/mm/yy <A|E|J>` line, a PS2 `ROMVER` record), so odd filenames work. Unrecognised files are not copied. PS2 NVRAM/MEC/ROM sidecars of a recognised image are copied with it.
-- **PS2 region matching:** before launching with Marquee's PCSX2, Marquee picks the newest BIOS of the game's region and writes it to `[Filenames] BIOS` in `PCSX2.ini`. This only happens once PCSX2 has written that file itself, and the key name is unverified against a live launch. With no match, PCSX2 keeps its own choice.
+- **PS2 first run and region matching:** before launching with Marquee's PCSX2, Marquee picks the newest BIOS of the game's region and writes `[Filenames] BIOS`. If `PCSX2.ini` does not exist yet it writes the smallest file PCSX2 accepts (`[UI] SettingsVersion = 1`, `SetupWizardIncomplete = false`, the BIOS), so the wizard never opens. An existing file keeps all its other settings. With no usable BIOS nothing is written. Verified live on this host with Vice City (USA) and `SCPH-70012.bin`.
+- **BIOS inbox:** any recognised BIOS file or `.zip` placed in `<data dir>/bios-inbox` (plus an optional folder in the `bios_inbox` setting) is imported at the next launch, without a click. Already-present files are skipped. Marquee still never downloads BIOS files. See [RetroBIOS notes](#retrobios-reference) for what other emulators will need.
 - **PS1 region matching** is done by DuckStation itself from the BIOS folder.
 
 ## Tools screen
 
-Emulators appear as picture cards in the Library's style: platform chips (from each emulator's systems), Installed/Updates chips, and the search box. The picture is the emulator's own icon, copied out of the unpacked AppImage into the art cache the first time it is listed, over generated art. Cards open a settings dialog with status, install/update/open, **launch arguments**, install locations, the package-manager hint, and remove with or without saves.
+Emulators appear as picture cards in the Library's style: platform chips (from each emulator's systems), Installed/Updates chips, and the search box. The picture is the emulator's own icon, copied out of the unpacked AppImage into the art cache the first time it is listed, over generated art. Cards open a settings dialog with status, install/update/open, **launch arguments**, install locations, and remove with or without saves.
 
 Launch arguments are saved per emulator (`emulator.<id>.config`), validated (at most 16, 512 characters each, no line breaks) and added to the command for both Open and library launches. API: `configure_emulator {id, args}` (no CLI subcommand yet).
 
-## Package managers (advanced)
+## Package managers: not used
 
-Each catalogue entry may list `packages`: a manager and the command you could run yourself (for DuckStation: `flatpak install --user flathub org.duckstation.DuckStation`). `list_emulators` returns them as `alternatives` so a screen can show a copyable suggestion. Marquee never runs them. It still detects a Flatpak or native copy as a separate runner, but prefers its own managed one.
+Flatpak, distro packages and loose AppImages found on the host are not discovered or run. Runner rows left by older versions (`flatpak`, `native`, `appimage` sources) are kept only because past sessions reference them; Marquee marks them unusable. The optional `packages` hints in catalogue files are display text only and will be removed.
 
 ## Adding another emulator
 
-1. Add `catalog/emulators/<id>.json` (copy `duckstation.json`): GitHub repo, asset suffix and excludes, `rolling` if the tag never changes, the launcher path inside the unpacked AppImage, the user-data folder name, optional BIOS folder and package hints.
+1. Add `catalog/emulators/<id>.json` (copy `duckstation.json`). Give **either** a GitHub source (`github`, `asset_suffix`, `asset_excludes`, `rolling` when the tag never changes) **or** a direct link:
+
+   ```json
+   "download": { "url": "https://example.com/Emu-1.2-linux.tar.gz", "sha256": "<64 hex>", "version": "1.2", "archive_root": "Emu-1.2" }
+   ```
+
+   `.AppImage`, `.zip` and `.tar.gz` are supported. A direct link must carry a pinned SHA-256; a GitHub asset must publish one. Marquee verifies it, unpacks into a staging folder and swaps the install in only on success, so an update means changing `version` and `sha256`. Also set `binary` (the executable inside the unpacked archive, relative to `archive_root`), the user-data folder name, and the optional BIOS folder.
 2. List the file in `CATALOGUE` in `crates/core/src/emulators.rs`.
 3. If it is a new emulator family, add a `RunnerKind` in `model.rs`, map its systems in `runners::preferred_kind`, and add its launch flags to `runners::launch_argv`.
 
-Install, update checks, uninstall, runner registration and isolation then come from the catalogue. Limits today: AppImage releases only (no zip/tar emulators yet), and the emulator must honour `XDG_CONFIG_HOME` for its user folder. PCSX2 still uses its older dedicated installer (`tools.rs`); moving it onto the catalogue is a follow-up.
+Install, update checks, uninstall, runner registration and isolation then come from the catalogue. Limits today: `.zip`/`.tar.gz`/direct-link support is unit-tested for link and checksum handling but no direct-link emulator has been installed end to end; `.7z` and other formats are unsupported; the emulator must honour `XDG_CONFIG_HOME` for its user folder. PCSX2 still uses its older dedicated installer (`tools.rs`); moving it onto the catalogue is a follow-up.
 
 ## Game-only windows and headless emulation
 
@@ -181,3 +188,7 @@ The program runs in its local OCI image, so Podman stays a runtime prerequisite;
 - PCSX2 is not yet on the catalogue.
 - Settings profiles ("recommended settings for this machine") are planned, not built; see the [roadmap](ROADMAP.md).
 - The new Tools layout has been type-checked and built but not yet looked at in a live window.
+
+## RetroBIOS reference
+
+[Abdess/retrobios](https://github.com/Abdess/retrobios) publishes per-platform BIOS packs and, more usefully, source-verified per-emulator profiles (`emulators/<name>.yml`) listing the files each emulator reads. Findings checked 2026-10-21: PCSX2 accepts any 4-8 MB image with a valid ROM directory and derives its `.rom1/.rom2/.nvm/.mec` names from it; DuckStation identifies images by MD5 across 105 known entries and picks by console region; Flycast has a built-in HLE BIOS and needs real files only for a short list of games and for arcade systems; RPCS3 needs `PS3UPDAT.PUP`; xemu needs four configured files (boot ROM, flash ROM, EEPROM, HDD image). The packs hold copyrighted material (the repository's `NOTICE` says it is not covered by its MIT licence), so Marquee imports files the user supplies and does not fetch them. A per-emulator firmware requirements list built from these profiles is planned work.

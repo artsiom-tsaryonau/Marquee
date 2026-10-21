@@ -2,7 +2,7 @@
 //! inside them (never by filename), so a game can be paired with a BIOS of its
 //! region and the whole set can be deleted in one step.
 //!
-//! Marquee never downloads BIOS images. The user supplies them.
+//! BIOS storage and identification. Acquisition jobs are planned; folder import is the current fallback.
 
 use crate::error::{AppError, Result};
 use crate::paths::Paths;
@@ -296,7 +296,7 @@ pub fn best_for<'a>(files: &'a [BiosFile], game_region: Option<&str>) -> Option<
 pub fn select_for_pcsx2(xdg_config: &Path, game_region: Option<&str>) -> Result<Option<String>> {
     let bios_dir = xdg_config.join("PCSX2").join("bios");
     let ini = xdg_config.join("PCSX2").join("inis").join("PCSX2.ini");
-    if !ini.is_file() || !bios_dir.is_dir() {
+    if !bios_dir.is_dir() {
         return Ok(None);
     }
     let mut files = Vec::new();
@@ -313,14 +313,88 @@ pub fn select_for_pcsx2(xdg_config: &Path, game_region: Option<&str>) -> Result<
     let Some(chosen) = best_for(&files, game_region) else {
         return Ok(None);
     };
-    let text = fs::read_to_string(&ini)?;
+    // First run: seed the smallest file PCSX2 accepts (it resets files that lack
+    // a matching SettingsVersion) so its setup wizard never opens. Marquee owns
+    // BIOS and folder setup for this managed copy.
+    let text = if ini.is_file() {
+        fs::read_to_string(&ini)?
+    } else {
+        fs::create_dir_all(ini.parent().unwrap_or(xdg_config))?;
+        "[UI]\nSettingsVersion = 1\n".to_string()
+    };
     let updated = set_ini_value(&text, "Filenames", "BIOS", &chosen.file);
+    let updated = set_ini_value(&updated, "UI", "SetupWizardIncomplete", "false");
     if updated != text {
         let mut tmp = tempfile::NamedTempFile::new_in(ini.parent().unwrap_or(xdg_config))?;
         std::io::Write::write_all(&mut tmp, updated.as_bytes())?;
         tmp.persist(&ini).map_err(|e| AppError::from(e.error))?;
     }
     Ok(Some(chosen.file.clone()))
+}
+
+/// Make DuckStation's first run silent: it fills every other setting with its
+/// own defaults, so Marquee only writes the keys it owns. BIOS is found by
+/// DuckStation itself from `duckstation/bios`.
+pub fn seed_duckstation(xdg_config: &Path) -> Result<()> {
+    let ini = xdg_config.join("duckstation").join("settings.ini");
+    let text = if ini.is_file() {
+        fs::read_to_string(&ini)?
+    } else {
+        String::new()
+    };
+    let updated = set_ini_value(&text, "Main", "SetupWizardIncomplete", "false");
+    if updated != text {
+        let parent = ini.parent().unwrap_or(xdg_config);
+        fs::create_dir_all(parent)?;
+        let mut tmp = tempfile::NamedTempFile::new_in(parent)?;
+        std::io::Write::write_all(&mut tmp, updated.as_bytes())?;
+        tmp.persist(&ini).map_err(|e| AppError::from(e.error))?;
+    }
+    Ok(())
+}
+
+/// Folder Marquee watches for BIOS files or zips: drop them in and the next
+/// launch imports whatever is recognised. A saved `bios_inbox` setting adds one more.
+pub fn inbox_dirs(paths: &Paths, extra: Option<&str>) -> Vec<std::path::PathBuf> {
+    let mut dirs = vec![paths.data_dir.join("bios-inbox")];
+    if let Some(extra) = extra.filter(|e| !e.is_empty()) {
+        dirs.push(std::path::PathBuf::from(extra));
+    }
+    dirs
+}
+
+/// Import every recognisable BIOS from the inbox folders, opening `.zip` files
+/// into a temporary folder first. Never fails a launch: problems are skipped.
+pub fn import_inbox(paths: &Paths, extra: Option<&str>) -> ImportReport {
+    let mut total = ImportReport::default();
+    for dir in inbox_dirs(paths, extra) {
+        if !dir.is_dir() {
+            continue;
+        }
+        let mut reports = Vec::new();
+        reports.push(import(paths, &dir));
+        let mut zips = Vec::new();
+        collect_files(&dir, 2, &mut zips);
+        for zip_path in zips
+            .into_iter()
+            .filter(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("zip")))
+        {
+            if let Ok(tmp) = tempfile::tempdir() {
+                let ok = fs::File::open(&zip_path)
+                    .ok()
+                    .and_then(|f| zip::ZipArchive::new(f).ok())
+                    .is_some_and(|mut z| z.extract(tmp.path()).is_ok());
+                if ok {
+                    reports.push(import(paths, tmp.path()));
+                }
+            }
+        }
+        for r in reports.into_iter().flatten() {
+            total.added.extend(r.added);
+            total.ignored += r.ignored;
+        }
+    }
+    total
 }
 
 fn set_ini_value(text: &str, section: &str, key: &str, value: &str) -> String {
@@ -455,18 +529,28 @@ mod tests {
     }
 
     #[test]
-    fn pcsx2_selection_edits_one_key_and_never_creates_a_settings_file() {
+    fn pcsx2_selection_seeds_first_run_and_edits_keys_in_place() {
         let t = tempfile::tempdir().unwrap();
         let xdg = t.path().join("xdg");
         let bios = xdg.join("PCSX2/bios");
         fs::create_dir_all(&bios).unwrap();
         fs::write(bios.join("eu.bin"), ps2(b'E', "0200")).unwrap();
         fs::write(bios.join("us.bin"), ps2(b'A', "0160")).unwrap();
-        // No settings file yet: leave PCSX2's first run alone.
-        assert_eq!(select_for_pcsx2(&xdg, Some("PAL")).unwrap(), None);
-        assert!(!xdg.join("PCSX2/inis/PCSX2.ini").exists());
+        // No settings file yet: seed a minimal one that skips the wizard.
         let ini = xdg.join("PCSX2/inis/PCSX2.ini");
-        fs::create_dir_all(ini.parent().unwrap()).unwrap();
+        assert_eq!(
+            select_for_pcsx2(&xdg, Some("PAL")).unwrap().as_deref(),
+            Some("eu.bin")
+        );
+        let seeded = fs::read_to_string(&ini).unwrap();
+        assert!(seeded.contains("SettingsVersion = 1"));
+        assert!(seeded.contains("SetupWizardIncomplete = false"));
+        assert!(seeded.contains("BIOS = eu.bin"));
+        // No usable BIOS: nothing is created.
+        let empty = t.path().join("empty");
+        fs::create_dir_all(empty.join("PCSX2/bios")).unwrap();
+        assert_eq!(select_for_pcsx2(&empty, Some("PAL")).unwrap(), None);
+        assert!(!empty.join("PCSX2/inis/PCSX2.ini").exists());
         fs::write(
             &ini,
             "[UI]\nTheme = dark\n[Filenames]\nBIOS = us.bin\nOther = 1\n",
@@ -480,6 +564,39 @@ mod tests {
         assert!(text.contains("BIOS = eu.bin") && text.contains("Other = 1"));
         assert!(text.contains("Theme = dark"));
         assert_eq!(select_for_pcsx2(&xdg, Some("JP")).unwrap(), None);
+    }
+
+    #[test]
+    fn duckstation_seed_skips_wizard_and_keeps_other_settings() {
+        let t = tempfile::tempdir().unwrap();
+        seed_duckstation(t.path()).unwrap();
+        let ini = t.path().join("duckstation/settings.ini");
+        assert_eq!(
+            fs::read_to_string(&ini).unwrap(),
+            "\n[Main]\nSetupWizardIncomplete = false\n".trim_start_matches('\n')
+        );
+        fs::write(&ini, "[Main]\nSetupWizardIncomplete = true\nA = 1\n").unwrap();
+        seed_duckstation(t.path()).unwrap();
+        let text = fs::read_to_string(&ini).unwrap();
+        assert!(text.contains("SetupWizardIncomplete = false") && text.contains("A = 1"));
+    }
+
+    #[test]
+    fn inbox_imports_a_zip_of_bios_images() {
+        use std::io::Write;
+        let t = tempfile::tempdir().unwrap();
+        let paths = paths(t.path());
+        let inbox = paths.data_dir.join("bios-inbox");
+        fs::create_dir_all(&inbox).unwrap();
+        let mut zw = zip::ZipWriter::new(fs::File::create(inbox.join("b.zip")).unwrap());
+        zw.start_file("us.bin", zip::write::SimpleFileOptions::default())
+            .unwrap();
+        zw.write_all(&ps2(b'A', "0160")).unwrap();
+        zw.finish().unwrap();
+        let report = import_inbox(&paths, None);
+        assert_eq!(report.added.len(), 1);
+        assert!(paths.pcsx2_bios_dir().join("us.bin").is_file());
+        assert!(import_inbox(&paths, None).added.is_empty());
     }
 
     #[test]

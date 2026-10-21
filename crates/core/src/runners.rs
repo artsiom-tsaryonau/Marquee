@@ -3,21 +3,14 @@ use crate::error::{path_display, AppError, Result};
 use crate::model::{BiosState, Runner, RunnerKind};
 use serde_json::json;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 const FAKE_RUNNER_ID: &str = "runner.fake";
 const PCSX2_UNPACKED_ID: &str = "runner.pcsx2.unpacked";
-const PCSX2_APPIMAGE_ID: &str = "runner.pcsx2.appimage";
-const PCSX2_FLATPAK_ID: &str = "runner.pcsx2.flatpak";
-pub(crate) const FLATPAK_APP: &str = "net.pcsx2.PCSX2";
-const DUCKSTATION_FLATPAK_ID: &str = "runner.duckstation.flatpak";
-pub(crate) const DUCKSTATION_FLATPAK_APP: &str = "org.duckstation.DuckStation";
 
 pub fn refresh(
     db: &Db,
     allow_fake: bool,
     extra_appimages: &[PathBuf],
-    discover_host: bool,
     marquee_bios: Option<&Path>,
 ) -> Result<Vec<Runner>> {
     if allow_fake {
@@ -43,68 +36,21 @@ pub fn refresh(
             "marquee",
         )?;
     }
-    if let Some(appimage) = find_pcsx2_appimage(extra_appimages, discover_host) {
-        let (state, hint) = probe_appimage_bios(&appimage, marquee_bios);
-        db.upsert_runner(
-            PCSX2_APPIMAGE_ID,
-            RunnerKind::Pcsx2.as_str(),
-            "PCSX2 (AppImage)",
-            &[appimage.to_string_lossy().into_owned()],
-            state,
-            hint.as_deref(),
-            "appimage",
-        )?;
-    }
-    if discover_host && flatpak_pcsx2_installed() {
-        let (state, hint) = probe_flatpak_bios();
-        db.upsert_runner(
-            PCSX2_FLATPAK_ID,
-            RunnerKind::Pcsx2.as_str(),
-            "PCSX2 (Flatpak)",
-            &["flatpak".into(), "run".into(), FLATPAK_APP.into()],
-            state,
-            hint.as_deref(),
-            "flatpak",
-        )?;
-    }
-    if discover_host && flatpak_installed(DUCKSTATION_FLATPAK_APP) {
-        let (state, hint) =
-            probe_flatpak_bios_for(".var/app/org.duckstation.DuckStation/config/duckstation/bios");
-        db.upsert_runner(
-            DUCKSTATION_FLATPAK_ID,
-            RunnerKind::Duckstation.as_str(),
-            "DuckStation (Flatpak)",
-            &[
-                "flatpak".into(),
-                "run".into(),
-                DUCKSTATION_FLATPAK_APP.into(),
-            ],
-            state,
-            hint.as_deref(),
-            "flatpak",
-        )?;
-    }
-    if discover_host {
-        if let Some(bin) = which("duckstation-qt").or_else(|| which("duckstation")) {
+    // Marquee owns its emulators. Host copies (Flatpak, system packages, loose
+    // AppImages) found by older versions are made unusable, never picked up.
+    for row in db.list_runners()? {
+        if matches!(row.source.as_str(), "flatpak" | "native" | "appimage")
+            && row.command_json != "[]"
+        {
+            // Past sessions reference the row, so keep it but make it unusable.
             db.upsert_runner(
-                "runner.duckstation.native",
-                "duckstation",
-                "DuckStation (native)",
-                &[path_display(&bin)],
+                &row.id,
+                &row.kind.clone(),
+                &row.display_name,
+                &[],
                 BiosState::Unverified,
-                Some("Open DuckStation setup to select a PS1 BIOS"),
-                "native",
-            )?;
-        }
-        if let Some(bin) = find_duckstation_appimage() {
-            db.upsert_runner(
-                "runner.duckstation.appimage",
-                "duckstation",
-                "DuckStation (AppImage)",
-                &[path_display(&bin)],
-                BiosState::Unverified,
-                Some("Open DuckStation setup to select a PS1 BIOS"),
-                "appimage",
+                Some("Host install ignored: Marquee manages its own emulators"),
+                &row.source,
             )?;
         }
     }
@@ -208,31 +154,6 @@ pub fn launch_argv(runner: &Runner, img: &Path, extra: &[String]) -> Result<Vec<
     if runner.kind == RunnerKind::Fake {
         return Ok(argv);
     }
-    if argv
-        .first()
-        .and_then(|p| Path::new(p).file_name())
-        .is_some_and(|name| name == "flatpak")
-        && argv.get(1).is_some_and(|arg| arg == "run")
-    {
-        // One-shot read access; never change persistent Flatpak overrides.
-        // A CUE needs its contained companion tracks. Other formats need only
-        // the selected image, not the whole library or the user's home.
-        let is_cue = img
-            .extension()
-            .is_some_and(|e| e.eq_ignore_ascii_case("cue"));
-        let grant = if is_cue {
-            img.parent().unwrap_or(img)
-        } else {
-            img
-        };
-        let text = grant
-            .to_str()
-            .ok_or_else(|| AppError::new("PATH", "Flatpak media paths must be UTF-8"))?;
-        if !grant.is_absolute() || text.contains(':') {
-            return Err(AppError::new("PATH", "Flatpak cannot grant this media path. Use an absolute path without a colon, or a native emulator."));
-        }
-        argv.insert(2, format!("--filesystem={text}:ro"));
-    }
     if runner.kind == RunnerKind::Pcsx2 {
         // Hide the main library window while keeping the game's render window.
         argv.extend(["-batch".into(), "-fullscreen".into(), "-nogui".into()]);
@@ -281,13 +202,6 @@ fn command_available(command: &[String]) -> bool {
     if !executable(Path::new(bin)) && which(bin).is_none() {
         return false;
     }
-    if Path::new(bin)
-        .file_name()
-        .is_some_and(|name| name == "flatpak")
-        && command.get(1).is_some_and(|s| s == "run")
-    {
-        return command.get(2).is_some_and(|id| flatpak_installed(id));
-    }
     true
 }
 
@@ -303,36 +217,6 @@ pub(crate) fn which(bin: &str) -> Option<PathBuf> {
             executable(&candidate).then_some(candidate)
         })
     })
-}
-
-fn find_duckstation_appimage() -> Option<PathBuf> {
-    let home = PathBuf::from(std::env::var_os("HOME")?);
-    find_duckstation_in(&[
-        home.join("Applications"),
-        home.join(".local/bin"),
-        home.join("Downloads"),
-    ])
-}
-
-fn find_duckstation_in(dirs: &[PathBuf]) -> Option<PathBuf> {
-    for dir in dirs {
-        let Ok(entries) = std::fs::read_dir(dir) else {
-            continue;
-        };
-        let mut paths: Vec<_> = entries.flatten().map(|e| e.path()).collect();
-        paths.sort();
-        if let Some(path) = paths.into_iter().find(|p| {
-            let name = p
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_ascii_lowercase();
-            name.contains("duckstation") && name.ends_with(".appimage") && executable(p)
-        }) {
-            return Some(path);
-        }
-    }
-    None
 }
 
 pub fn find_extracted_bin(root: &Path) -> Option<PathBuf> {
@@ -363,63 +247,6 @@ fn find_unpacked_pcsx2(extra: &[PathBuf]) -> Option<PathBuf> {
     None
 }
 
-fn find_pcsx2_appimage(extra: &[PathBuf], discover_host: bool) -> Option<PathBuf> {
-    for extra_path in extra {
-        if extra_path.is_file() {
-            let name = extra_path
-                .file_name()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_ascii_lowercase();
-            if name.contains("pcsx2") {
-                return Some(extra_path.clone());
-            }
-        } else if extra_path.is_dir() {
-            if let Some(found) = scan_appimage_dir(extra_path) {
-                return Some(found);
-            }
-        }
-    }
-    if !discover_host {
-        return None;
-    }
-    let home = PathBuf::from(std::env::var_os("HOME")?);
-    let dirs = [
-        home.join("Applications"),
-        home.join(".local/bin"),
-        PathBuf::from("/opt"),
-    ];
-    for dir in dirs {
-        if let Some(found) = scan_appimage_dir(&dir) {
-            return Some(found);
-        }
-    }
-    which("pcsx2-qt").or_else(|| which("pcsx2"))
-}
-
-fn scan_appimage_dir(dir: &Path) -> Option<PathBuf> {
-    let entries = std::fs::read_dir(dir).ok()?;
-    for entry in entries.flatten() {
-        let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
-        if name.contains("pcsx2") && name.ends_with(".appimage") {
-            return Some(entry.path());
-        }
-    }
-    None
-}
-
-fn flatpak_pcsx2_installed() -> bool {
-    flatpak_installed(FLATPAK_APP)
-}
-
-fn flatpak_installed(app_id: &str) -> bool {
-    Command::new("flatpak")
-        .args(["info", app_id])
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false)
-}
-
 fn probe_appimage_bios(bin: &Path, marquee_bios: Option<&Path>) -> (BiosState, Option<String>) {
     // Default BIOS folders are hints. An empty default dir is unverified, not missing.
     let home = std::env::var_os("HOME").map(PathBuf::from);
@@ -439,7 +266,6 @@ fn probe_appimage_bios(bin: &Path, marquee_bios: Option<&Path>) -> (BiosState, O
         candidates.push(dir.to_path_buf());
     }
     candidates.push(home.join(".config/PCSX2/bios"));
-    candidates.push(home.join(".var/app/net.pcsx2.PCSX2/config/PCSX2/bios"));
     if let Some(parent) = bin.parent() {
         candidates.push(parent.join("bios"));
     }
@@ -452,31 +278,6 @@ fn probe_appimage_bios(bin: &Path, marquee_bios: Option<&Path>) -> (BiosState, O
         BiosState::Unverified,
         Some("PCSX2 BIOS folder was not resolved from config; open setup to confirm".into()),
     )
-}
-
-fn probe_flatpak_bios() -> (BiosState, Option<String>) {
-    probe_flatpak_bios_for(".var/app/net.pcsx2.PCSX2/config/PCSX2/bios")
-}
-
-fn probe_flatpak_bios_for(relative: &str) -> (BiosState, Option<String>) {
-    let home = match std::env::var_os("HOME") {
-        Some(h) => PathBuf::from(h),
-        None => {
-            return (
-                BiosState::Unverified,
-                Some("HOME unset; Flatpak BIOS path unresolved".into()),
-            )
-        }
-    };
-    let dir = home.join(relative);
-    if bios_dir_has_files(&dir) {
-        (BiosState::Unverified, Some(path_display(&dir)))
-    } else {
-        (
-            BiosState::Unverified,
-            Some("Flatpak BIOS path not confirmed; open setup to confirm".into()),
-        )
-    }
 }
 
 fn bios_dir_has_files(dir: &Path) -> bool {
@@ -526,51 +327,4 @@ pub fn open_setup(db: &Db, runner_id: &str, xdg_config: Option<&Path>) -> Result
             .with_context(json!({ "argv": runner.command }))
     })?;
     Ok(())
-}
-
-#[cfg(test)]
-mod discovery_correction_tests {
-    use super::*;
-
-    #[test]
-    fn flatpak_cue_grants_just_its_folder_and_no_persistent_overrides() {
-        let runner = Runner {
-            id: "test.duck".into(),
-            kind: RunnerKind::Duckstation,
-            display_name: "DuckStation".into(),
-            command: vec![
-                "flatpak".into(),
-                "run".into(),
-                DUCKSTATION_FLATPAK_APP.into(),
-            ],
-            bios_state: BiosState::Unverified,
-            bios_hint: None,
-            source: "flatpak".into(),
-            available: true,
-        };
-        let args = launch_argv(&runner, Path::new("/games/My disc/disc.cue"), &[]).unwrap();
-        assert_eq!(args[2], "--filesystem=/games/My disc:ro");
-        assert_eq!(args[3], DUCKSTATION_FLATPAK_APP);
-        assert_eq!(args.last().unwrap(), "/games/My disc/disc.cue");
-        assert!(!args
-            .iter()
-            .any(|a| a == "override" || a.contains("filesystem=home")));
-        assert_eq!(
-            launch_argv(&runner, Path::new("/games/colon:folder/disc.cue"), &[])
-                .unwrap_err()
-                .code,
-            "PATH"
-        );
-    }
-    #[test]
-    fn duckstation_appimage_discovery_requires_an_executable_file() {
-        use std::os::unix::fs::PermissionsExt;
-        let dir = tempfile::tempdir().unwrap();
-        let image = dir.path().join("DuckStation-x64.AppImage");
-        std::fs::write(&image, b"fixture").unwrap();
-        std::fs::set_permissions(&image, std::fs::Permissions::from_mode(0o644)).unwrap();
-        assert!(find_duckstation_in(&[dir.path().into()]).is_none());
-        std::fs::set_permissions(&image, std::fs::Permissions::from_mode(0o755)).unwrap();
-        assert_eq!(find_duckstation_in(&[dir.path().into()]), Some(image));
-    }
 }

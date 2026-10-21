@@ -94,7 +94,6 @@ Unknown systems are rejected at `add-root` with `ROOT_OFFLINE` (`known: ps2, ps1
 
 ```text
 duckstation-qt -batch -fullscreen -nogui /path/to/game.iso
-flatpak run org.duckstation.DuckStation -batch -fullscreen -nogui /path/to/game.iso
 ```
 
 DuckStation does **not** take PCSX2's `--` separator; the image is a positional argument.
@@ -110,9 +109,9 @@ A stored `selected_runner_id` is honoured only when it belongs to that family (o
 
 ### BIOS / setup status
 
-DuckStation needs a PS1 BIOS, and the same three states apply (`missing` blocks Play; `unverified` does not). The Flatpak path probed is `~/.var/app/org.duckstation.DuckStation/config/duckstation`.
+DuckStation needs a PS1 BIOS, and the same three states apply (`missing` blocks Play; `unverified` does not). Only Marquee's managed DuckStation is used.
 
-Firmware acquisition jobs are planned ([media acquisition](MEDIA_ACQUISITION.md)). Today: `marquee bios import <folder>` or Tools import for managed DuckStation (`~/.local/share/marquee/duckstation/xdg-config/duckstation/bios`). External Flatpak DuckStation still uses its own BIOS UI. See [Managed emulators and BIOS](EMULATORS.md).
+Firmware acquisition jobs are planned ([media acquisition](MEDIA_ACQUISITION.md)). Today: `marquee bios import <folder>` or Tools import for managed DuckStation (`~/.local/share/marquee/duckstation/xdg-config/duckstation/bios`). See [Managed emulators and BIOS](EMULATORS.md).
 
 ### Errors
 
@@ -145,7 +144,7 @@ Real library (`~/.local/share/marquee/library.db`), PS1 root `./roms/ps1`:
 
 | Check | State |
 | --- | --- |
-| DuckStation discovery (unpacked / Flatpak) | **Not installed on this host** — code path only |
+| Managed DuckStation (unpacked) | **Installed; launched from Marquee** with the first-run wizard suppressed (2026-10-21). Picture, input and exit/duration not yet confirmed. |
 | Live PS1 Play → quit → duration | **Pending** |
 | DuckStation BIOS probe | Code path only |
 | PS2 serial covers / PS2 Play gate | Still pending, unchanged — see [PS2.md](PS2.md) |
@@ -189,7 +188,7 @@ uniform placeholder. Treat a PS1 cover as "a" cover, not necessarily the exact d
 
 ## Next
 
-1. Install DuckStation (Flatpak `org.duckstation.DuckStation`, or an unpacked build) and close the live Play gate.
+1. Install DuckStation from Tools (managed, no Flatpak) and close the live Play gate: boot, input, exit, duration once.
 2. Add a PS1 BIOS in DuckStation; confirm `missing` → `unverified`/`launch-tested`.
 3. Confirm covers for a disc that *does* carry a serial.
 4. Still PS2-only for now: `.cue`/`.bin` pairing, multi-disc, `.pbp`.

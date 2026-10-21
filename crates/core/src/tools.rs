@@ -2,7 +2,7 @@ use crate::error::{AppError, Result};
 use crate::http;
 use crate::model::CoreEvent;
 use crate::paths::Paths;
-use crate::runners::{self, FLATPAK_APP};
+use crate::runners;
 use crate::sessions::EventSink;
 use serde_json::json;
 use std::fs;
@@ -13,14 +13,13 @@ use std::sync::Arc;
 pub const TOOL_PCSX2: &str = "pcsx2";
 const GITHUB_LATEST: &str = "https://api.github.com/repos/PCSX2/pcsx2/releases/latest";
 const APPIMAGE_SUFFIX: &str = "linux-appimage-x64-Qt.AppImage";
-const FLATHUB_REPO: &str = "https://dl.flathub.org/repo/flathub.flatpakrepo";
 
+/// Marquee installs one way only: download the official release, verify it, and
+/// unpack it into its own data folder. Flatpak and loose AppImages are not used.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Pcsx2Channel {
     Auto,
     Unpacked,
-    AppImage,
-    Flatpak,
 }
 
 impl Pcsx2Channel {
@@ -28,28 +27,21 @@ impl Pcsx2Channel {
         match raw {
             "auto" | "" => Ok(Self::Auto),
             "unpacked" => Ok(Self::Unpacked),
-            "flatpak" => Ok(Self::Flatpak),
-            "appimage" => Ok(Self::AppImage),
             other => Err(AppError::new(
                 "RUNNER_MISSING",
-                format!("unknown PCSX2 channel: {other}"),
+                format!("unknown PCSX2 channel: {other} (Marquee installs PCSX2 itself; only the managed install exists)"),
             )),
         }
     }
 
     pub fn resolve(self) -> Self {
-        match self {
-            Self::Auto => Self::Unpacked,
-            other => other,
-        }
+        Self::Unpacked
     }
 
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Auto => "auto",
             Self::Unpacked => "unpacked",
-            Self::Flatpak => "flatpak",
-            Self::AppImage => "appimage",
         }
     }
 }
@@ -57,26 +49,15 @@ impl Pcsx2Channel {
 #[derive(Debug, Clone)]
 pub enum InstallOutcome {
     AlreadyPresent,
-    Flatpak,
-    AppImage { path: PathBuf },
     Unpacked { bin: PathBuf },
 }
 
 pub fn already_have(
-    channel: Pcsx2Channel,
+    _channel: Pcsx2Channel,
     paths: &Paths,
-    runners: &[crate::model::Runner],
+    _runners: &[crate::model::Runner],
 ) -> bool {
-    match channel.resolve() {
-        Pcsx2Channel::Unpacked => {
-            runners::find_extracted_bin(&paths.pcsx2_unpacked_current()).is_some()
-        }
-        Pcsx2Channel::AppImage => paths.pcsx2_appimage_path().is_file(),
-        Pcsx2Channel::Flatpak => runners
-            .iter()
-            .any(|r| r.id == "runner.pcsx2.flatpak" && r.available),
-        Pcsx2Channel::Auto => unreachable!(),
-    }
+    runners::find_extracted_bin(&paths.pcsx2_unpacked_current()).is_some()
 }
 
 pub fn install_pcsx2(
@@ -90,22 +71,8 @@ pub fn install_pcsx2(
         channel: resolved.as_str().into(),
     });
     prepare_pcsx2_home(paths)?;
-    let outcome = match resolved {
-        Pcsx2Channel::Unpacked => {
-            let bin = install_unpacked(paths, &sink)?;
-            InstallOutcome::Unpacked { bin }
-        }
-        Pcsx2Channel::Flatpak => {
-            install_flatpak(&sink)?;
-            InstallOutcome::Flatpak
-        }
-        Pcsx2Channel::AppImage => {
-            let path = download_official_appimage(&sink, &paths.pcsx2_appimage_path())?;
-            InstallOutcome::AppImage { path }
-        }
-        Pcsx2Channel::Auto => unreachable!(),
-    };
-    Ok(outcome)
+    let bin = install_unpacked(paths, &sink)?;
+    Ok(InstallOutcome::Unpacked { bin })
 }
 
 fn prepare_pcsx2_home(paths: &Paths) -> Result<()> {
@@ -120,39 +87,6 @@ fn emit_progress(sink: &Arc<dyn EventSink>, message: impl Into<String>) {
     });
 }
 
-fn install_flatpak(sink: &Arc<dyn EventSink>) -> Result<()> {
-    if runners::which("flatpak").is_none() {
-        return Err(AppError::new(
-            "RUNNER_MISSING",
-            "flatpak is not installed. Install Flatpak or choose the AppImage channel.",
-        ));
-    }
-    emit_progress(sink, "Adding Flathub (user) if needed…");
-    run_argv(
-        &[
-            "flatpak".into(),
-            "remote-add".into(),
-            "--user".into(),
-            "--if-not-exists".into(),
-            "flathub".into(),
-            FLATHUB_REPO.into(),
-        ],
-        sink,
-    )?;
-    emit_progress(sink, "Installing net.pcsx2.PCSX2 from Flathub…");
-    run_argv(
-        &[
-            "flatpak".into(),
-            "install".into(),
-            "--user".into(),
-            "--noninteractive".into(),
-            "flathub".into(),
-            FLATPAK_APP.into(),
-        ],
-        sink,
-    )
-}
-
 fn install_unpacked(paths: &Paths, sink: &Arc<dyn EventSink>) -> Result<PathBuf> {
     let dest = paths.pcsx2_unpacked_current();
     if let Some(bin) = runners::find_extracted_bin(&dest) {
@@ -162,6 +96,7 @@ fn install_unpacked(paths: &Paths, sink: &Arc<dyn EventSink>) -> Result<PathBuf>
     let archive = download_official_appimage(sink, &paths.pcsx2_appimage_path())?;
     emit_progress(sink, "Unpacking AppImage into Marquee’s data dir…");
     extract_appimage(&archive, &dest)?;
+    let _ = fs::remove_file(&archive);
     let bin = runners::find_extracted_bin(&dest)
         .ok_or_else(|| AppError::new("SPAWN_FAILED", "unpacked AppImage has no pcsx2-qt binary"))?;
     emit_progress(sink, format!("Unpacked {}", bin.display()));
@@ -299,52 +234,6 @@ fn appimage_asset(release: &serde_json::Value) -> Result<GithubAsset> {
     Ok(GithubAsset { name, url, sha256 })
 }
 
-fn run_argv(argv: &[String], sink: &Arc<dyn EventSink>) -> Result<()> {
-    let (bin, args) = argv
-        .split_first()
-        .ok_or_else(|| AppError::new("SPAWN_FAILED", "install command is empty"))?;
-    if bin.contains('/') || bin.contains('\\') {
-        let path = Path::new(bin);
-        if !path.is_absolute() {
-            return Err(AppError::new(
-                "SPAWN_FAILED",
-                "refusing relative installer path",
-            ));
-        }
-    }
-    emit_progress(sink, argv.join(" "));
-    let output = Command::new(bin)
-        .args(args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .map_err(|err| {
-            AppError::new("SPAWN_FAILED", err.to_string()).with_context(json!({ "argv": argv }))
-        })?;
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    for line in stdout.lines().chain(stderr.lines()) {
-        let line = line.trim();
-        if !line.is_empty() {
-            emit_progress(sink, line);
-        }
-    }
-    if !output.status.success() {
-        let tail = stderr.lines().rev().take(8).collect::<Vec<_>>().join("\n");
-        return Err(AppError::new(
-            "SPAWN_FAILED",
-            if tail.is_empty() {
-                format!("{bin} exited {}", output.status)
-            } else {
-                tail
-            },
-        )
-        .with_context(json!({ "argv": argv, "status": output.status.code() })));
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -374,7 +263,7 @@ mod tests {
     }
 
     #[test]
-    fn auto_channel_unpacks_instead_of_flatpak() {
+    fn auto_channel_always_unpacks() {
         assert_eq!(Pcsx2Channel::Auto.resolve(), Pcsx2Channel::Unpacked);
     }
 

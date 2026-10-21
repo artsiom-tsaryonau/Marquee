@@ -131,6 +131,17 @@ pub fn launch(
                 let _ = crate::bios::select_for_pcsx2(home, media.region.as_deref());
             }
         }
+        // Marquee's DuckStation carries its own XDG_CONFIG_HOME in the command
+        // (`env XDG_CONFIG_HOME=… <program>`); skip its first-run wizard there.
+        if runner.kind == RunnerKind::Duckstation && runner.source == "marquee" {
+            if let Some(home) = runner
+                .command
+                .iter()
+                .find_map(|a| a.strip_prefix("XDG_CONFIG_HOME="))
+            {
+                let _ = crate::bios::seed_duckstation(Path::new(home));
+            }
+        }
         (session, argv, runner.kind, isolate)
     };
 

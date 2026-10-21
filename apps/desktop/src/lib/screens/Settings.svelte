@@ -39,7 +39,7 @@
       <div class="item"><div><strong>{system.emulator}</strong><span>{runner ? `${runner.display_name} · ${runner.bios_state === 'launch_tested' ? 'previously launched' : runner.bios_state}` : 'No available emulator detected'}</span>
         {#if runner?.bios_hint}<span>{runner.bios_hint}</span>{/if}
         {#if system.id === 'ps2' && app.installingPcsx2}<span>{app.installProgress || 'Installing…'}</span>{/if}
-        {#if !runner && system.id === 'ps1'}<span>Install DuckStation, then refresh detection. Native commands, AppImages and Flatpak are supported.</span>{/if}
+        {#if !runner && system.id === 'ps1'}<span>Install DuckStation from Tools; Marquee downloads and configures it for you.</span>{/if}
       </div><div class="row-actions">
         {#if system.id === 'ps2'}<InstallMenu tone="primary" size="small" />{:else if !runner}<a class="btn glass small" data-nav href="https://github.com/stenzek/duckstation" target="_blank" rel="noreferrer">Get DuckStation ↗</a>{/if}
         <button class="btn glass small" data-nav onclick={() => app.openSetup(runner?.id, system.id)} disabled={!runner}>Open setup</button>

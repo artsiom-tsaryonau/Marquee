@@ -44,3 +44,7 @@ The audit used the real collection read-only: **11 disc entries (9 PS1, 2 PS2)**
 - Full game-boot detection and crash-aware gameplay accounting are future work.
 - Controller/renderer surfaces and real gameplay were not tested; unit tests passing is not release acceptance.
 - Historical statistics from earlier failed sessions need an explicit reconciliation policy, not a silent reset.
+
+## 2026-10-21 — hands-off emulator setup
+
+PCSX2's first launch opened its setup wizard and exited under `-batch -nogui` (`SPAWN_FAILED`, exit 1). Marquee now writes the minimal valid `PCSX2.ini` itself, seeds DuckStation's `SetupWizardIncomplete`, imports BIOS files/zips from `bios-inbox`, and ignores host (Flatpak, system, loose AppImage) emulators. After this, a live PCSX2 launch of Vice City (USA) ended `exit 0` after 254 s with the session stored. The earlier "PCSX2 Flatpak could not read the ISO" and DuckStation AppImage-discovery findings (F5) are superseded: those code paths were removed. Note: building with a plain `cargo build` here may write to a temporary `CARGO_TARGET_DIR`; use `CARGO_TARGET_DIR=$PWD/target` to refresh `target/release/marquee`.

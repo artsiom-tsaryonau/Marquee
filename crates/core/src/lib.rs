@@ -151,7 +151,8 @@ impl Core {
             if let Some(path) = db.get_setting("pcsx2_appimage_path")? {
                 extra.push(PathBuf::from(path));
             }
-            runners::refresh(db, self.allow_fake, &extra, self.discover_host, Some(&bios))?;
+            // Marquee owns its emulators: only its own managed installs are discovered.
+            runners::refresh(db, self.allow_fake, &extra, Some(&bios))?;
             emulators::sync_runners(db, &self.paths)?;
             runners::snapshot(db)
         })
@@ -193,13 +194,6 @@ impl Core {
                     tools::InstallOutcome::Unpacked { bin } => {
                         self.set_setting("pcsx2_unpacked_path", &bin.to_string_lossy())?;
                         self.set_setting("marquee_installed_pcsx2", "unpacked")?;
-                    }
-                    tools::InstallOutcome::AppImage { path } => {
-                        self.set_setting("pcsx2_appimage_path", &path.to_string_lossy())?;
-                        self.set_setting("marquee_installed_pcsx2", "appimage")?;
-                    }
-                    tools::InstallOutcome::Flatpak => {
-                        self.set_setting("marquee_installed_pcsx2", "flatpak")?;
                     }
                     tools::InstallOutcome::AlreadyPresent => {}
                 }
@@ -257,6 +251,15 @@ impl Core {
         extra_args: &[String],
         sink: Arc<dyn EventSink>,
     ) -> Result<Session> {
+        // Hands-off setup: pick up any BIOS dropped into the inbox folder.
+        let inbox = self
+            .with_db(|db| db.get_setting("bios_inbox"))
+            .ok()
+            .flatten();
+        let imported = bios::import_inbox(&self.paths, inbox.as_deref());
+        if !imported.added.is_empty() {
+            let _ = self.refresh_runners();
+        }
         sessions::launch(
             Arc::clone(&self.db),
             edition_id,

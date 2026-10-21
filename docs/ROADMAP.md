@@ -27,12 +27,12 @@ These are implemented capabilities; live acceptance gates are recorded separatel
 | Area | Current state |
 | --- | --- |
 | Core and surfaces | Rust core/CLI, Tauri/Svelte desktop, shared authenticated loopback browser surface, event hub, MIT application license |
-| Disc library | PS2 ISO/PCSX2 and PS1 ISO/CHD/CUE/DuckStation; platform categories, independent defaults, CUE dependency/offset validation, and temporary read-only Flatpak media grants. See [corrections](CORRECTIONS.md); live gates remain open |
+| Disc library | PS2 ISO/PCSX2 and PS1 ISO/CHD/CUE/DuckStation; platform categories, independent defaults and CUE dependency/offset validation. See [corrections](CORRECTIONS.md); live gates remain open |
 | Sessions and corrections | Persistent sessions, recovery/checkpoint work, staged port updates, mutation invalidation, and per-file scan warnings; see [correction report](CORRECTIONS.md) |
 | Native ports | Five managed recipes; binary installation is not proof that required game data is ready |
 | Unified library UI | Platform/run-method/source filters, explicit grouping, edition/run selectors, Jak/OpenGOAL reference assets; persistent normalized backend remains planned |
 | Tools | Persisted external shortcuts, readiness checks, pinning, detected presets, structured executable/arguments/cwd (edited in a dialog), Purple setup, and managed emulator/BIOS panels with platform filters, picture cards and a settings dialog; see [Tools](LAUNCHERS.md) |
-| Managed emulators | Seven catalogue recipes: DuckStation, PPSSPP, RPCS3, Flycast, Azahar, Cemu, xemu. Install/open/update/remove with verified AppImages and isolated data; DuckStation connects to PS1 disc launch, the other six currently open independently. PCSX2 retains its dedicated installer. See [emulator management](EMULATORS.md) |
+| Managed emulators | Seven catalogue recipes: DuckStation, PPSSPP, RPCS3, Flycast, Azahar, Cemu, xemu. Install/open/update/remove with verified AppImages and isolated data; DuckStation connects to PS1 disc launch, the other six currently open independently. PCSX2 retains its dedicated installer (managed unpack only). Flatpak, loose AppImages and host emulators are no longer used; catalogue files may name direct `.zip`/`.tar.gz`/`.AppImage` links with a pinned SHA-256. First-run wizards are suppressed by Marquee (PCSX2, DuckStation) and BIOS files or zips dropped in `bios-inbox` import automatically. See [emulator management](EMULATORS.md) |
 | BIOS management | PS1/PS2 list/import/remove today (folder fallback); target is firmware acquisition jobs from authorized sources. Region identification support. Not evidence of live compatibility |
 | Legacy Lutris bridge | Local read-only installed/cache projection and handoffs exist. Current code auto-discovers an existing database. Moving this behind an optional legacy integration is planned; documentation changes do not disable it |
 | Direct Steam/Epic/GOG | Not implemented as end-to-end native store integrations. Command shortcuts and Lutris cache entries do not count as direct integrations |
@@ -43,7 +43,7 @@ These are implemented capabilities; live acceptance gates are recorded separatel
 
 - [x] Correct mixed PS1/PS2 categorization, per-system setup/defaults, CUE availability and identity refresh, root-conflict reporting, and failed-launch accounting. The real collection validates as 9 PS1 + 2 PS2 entries with stable IDs.
 - [x] Add Purple installation/opening with managed umu/GE-Proton, dependency checkpoints, cancellation and diagnostics. Aion 2 sign-in/gameplay is unverified.
-- [x] Add seven managed emulator catalogue entries and the Tools install/open/update/remove panel, plus BIOS import/management. Native/Flatpak discovery remains an alternative.
+- [x] Add seven managed emulator catalogue entries and the Tools install/open/update/remove panel, plus BIOS import/management. Native/Flatpak discovery was removed 2026-10-21.
 - [x] Rework the Tools emulator area to match the Library: platform and status filter chips, picture cards (the emulator's own icon over generated art), and a per-emulator settings dialog (status, launch arguments, install locations, package-manager hint, remove with or without saves). The launcher editor is now a dialog too. Launch arguments are saved per emulator and added to Open and library launches. Not yet checked in a live browser/desktop session.
 - [ ] Observe PS1 and PS2 retail boot/input/exit/restart gates; test Purple sign-in and Aion 2 gameplay separately.
 - [ ] Verify each additional emulator's actual installation, isolation, prerequisites and successful opening on this host. Add system-specific media/game adapters before advertising library Play for PSP, PS3, Dreamcast, 3DS, Wii U or Xbox.

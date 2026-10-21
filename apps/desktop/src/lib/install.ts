@@ -1,4 +1,4 @@
-export type Pcsx2Channel = 'auto' | 'unpacked' | 'flatpak' | 'appimage';
+export type Pcsx2Channel = 'auto' | 'unpacked';
 
 export type InstallRun =
   | { type: 'pcsx2'; channel: Pcsx2Channel }
@@ -29,30 +29,9 @@ export const installables: Installable[] = [
       {
         id: 'auto',
         title: 'Recommended',
-        detail: 'Download the official AppImage and unpack it into Marquee’s data dir. No Flatpak, no host packages, no installer wizard.',
+        detail: 'Download the official release, verify it, and unpack it into Marquee’s data dir. No Flatpak, no host packages, no setup wizard.',
         hint: 'Managed by Marquee',
         run: { type: 'pcsx2', channel: 'auto' },
-      },
-      {
-        id: 'unpacked',
-        title: 'Unpack into Marquee',
-        detail: 'Same as Recommended: extract linux-appimage-x64-Qt.AppImage to ~/.local/share/marquee/runners/pcsx2/current.',
-        hint: 'No FUSE',
-        run: { type: 'pcsx2', channel: 'unpacked' },
-      },
-      {
-        id: 'appimage',
-        title: 'Keep as AppImage',
-        detail: 'Save the official AppImage and run it as a file (may need FUSE).',
-        hint: '~57 MB',
-        run: { type: 'pcsx2', channel: 'appimage' },
-      },
-      {
-        id: 'flatpak',
-        title: 'Flathub',
-        detail: 'Installs net.pcsx2.PCSX2 as a user Flatpak (--user --noninteractive). Optional; Marquee does not need it.',
-        hint: 'flatpak',
-        run: { type: 'pcsx2', channel: 'flatpak' },
       },
       {
         id: 'setup',
