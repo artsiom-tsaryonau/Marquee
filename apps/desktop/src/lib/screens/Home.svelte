@@ -165,8 +165,8 @@
   .hero-art {
     position: absolute;
     inset: 0 0 auto 0;
-    height: calc(var(--hero-h) + 160px);
-    z-index: -1;
+    height: 100%;
+    max-height: 370px;
     overflow: hidden;
     z-index: 0;
     -webkit-mask-image: linear-gradient(180deg, #000 58%, transparent),
@@ -182,8 +182,8 @@
   }
   /* A cover or generated art is not a wide picture: show it as a dim, soft backdrop and
      keep the sharp version for the poster. */
-  .hero-art.blurred .hero-layer { filter: blur(36px) saturate(0.7) brightness(0.5); transform: scale(1.25); }
-  .hero-art.blurred { -webkit-mask-image: linear-gradient(180deg, #000 50%, transparent); mask-image: linear-gradient(180deg, #000 50%, transparent); }
+  .hero-art.blurred .hero-layer { filter: blur(36px) saturate(0.7) brightness(0.3); transform: scale(1.25); }
+  .hero-art.blurred { -webkit-mask-image: linear-gradient(180deg, #000 20%, transparent 95%); mask-image: linear-gradient(180deg, #000 20%, transparent 95%); }
   .hero-cover {
     width: 100%;
     height: 100%;
@@ -226,7 +226,7 @@
     align-self: flex-end;
     width: clamp(120px, 14vw, 190px);
     aspect-ratio: 2 / 3;
-    object-fit: cover;
+    object-fit: contain;
     border-radius: var(--radius);
     box-shadow: 0 24px 50px -16px rgb(0 0 0 / 0.9), 0 0 0 1px rgb(255 255 255 / 0.08);
   }

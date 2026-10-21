@@ -4,8 +4,6 @@
   import { platformLabel, sourceLabel } from '../labels';
   import { cleanTitle, hours, titleRegion } from '../format';
   import { app } from '../state.svelte';
-  import Artwork from './Artwork.svelte';
-  import Logo from './Logo.svelte';
   import Icon from './Icon.svelte';
   import Mark, { hasMark } from './Mark.svelte';
 
@@ -16,9 +14,17 @@
   }: { game: GameEntry; shape?: 'cover' | 'wide'; showTitle?: boolean } = $props();
 
   const status = $derived(gameStatus(game));
+  const imageUrl = $derived(shape === 'wide' ? game.heroUrl ?? game.coverUrl : game.coverUrl);
+  let loaded = $state<{ url: string; ratio: number }>();
+  let failedUrl = $state<string>();
+  const hasImage = $derived(!!imageUrl && failedUrl !== imageUrl);
+  // Reserve a plausible case size until the real artwork dimensions arrive.
+  const defaultRatio = $derived(shape === 'wide' && game.heroUrl ? 16 / 9 : ['ps1', 'ds', '3ds', 'dreamcast'].includes(game.platform) ? 1 : 2 / 3);
+  const ratio = $derived(hasImage && loaded && loaded.url === imageUrl ? loaded.ratio : defaultRatio);
 </script>
 
-<div class="wrap {shape}">
+<div class="wrap {shape}" style="--art-ratio:{ratio}">
+  <div class="stage">
   <button
     class="card"
     data-nav
@@ -27,26 +33,29 @@
     onclick={() => app.open(game)}
     aria-label={`${cleanTitle(game.title)}${status ? ` · ${status.label}` : ''}`}
   >
-    <div class="art" class:generated={!game.coverUrl}>
-      {#if game.coverUrl}
-        <img class="cover-img" src={game.coverUrl} alt="" loading="lazy" decoding="async" />
+    <div class="art" class:generated={!hasImage}>
+      {#if hasImage}
+        <img class="cover-img" src={imageUrl} alt="" loading="lazy" decoding="async"
+          onload={(event) => {
+            const image = event.currentTarget;
+            if (image instanceof HTMLImageElement && image.naturalHeight && imageUrl) loaded = { url: imageUrl, ratio: image.naturalWidth / image.naturalHeight };
+          }}
+          onerror={() => { failedUrl = imageUrl; }} />
       {:else}
-        <Artwork art={game.art} grain={shape === 'wide'} />
+        <div class="fallback">
+          {#if hasMark(game.platform)}<Mark id={game.platform} size={28} />{:else}<Icon name="controller" size={28} />{/if}
+          <span class="fallback-title">{cleanTitle(game.title)}</span>
+          <span class="plat">{platformLabel[game.platform]}</span>
+        </div>
       {/if}
     </div>
-    <div class="shade"></div>
-    {#if !game.coverUrl && !showTitle}
-      <div class="logo"><Logo {game} size={shape === 'wide' ? 'md' : 'sm'} /></div>
-    {:else if !game.coverUrl && game.platform !== 'unknown'}
-      <!-- The title is written under the card; repeating it on generated art is noise. -->
-      <span class="plat">{platformLabel[game.platform]}</span>
-    {/if}
     <span class="source" title={sourceLabel[game.source]}>{#if hasMark(game.source)}<Mark id={game.source} size={14} /><span class="sr">{sourceLabel[game.source]}</span>{:else}{sourceLabel[game.source]}{/if}</span>
     {#if game.favorite}<span class="fav"><Icon name="star" size={14} filled /></span>{/if}
     {#if status}
       <span class="status {status.tone}">{status.label}</span>
     {/if}
   </button>
+  </div>
   {#if showTitle}
     <div class="caption">
       <span class="t" title={game.title}>{cleanTitle(game.title)}</span>
@@ -57,61 +66,70 @@
 
 <style>
   .wrap {
+    --art-h: calc(var(--cover-w) * 1.5);
     flex: none;
     width: var(--cover-w);
   }
   .wrap.wide {
-    width: calc(var(--cover-w) * 2.1);
+    --art-h: calc(var(--cover-w) * 1.25);
+    width: calc(var(--art-h) * clamp(0.55, var(--art-ratio), 2.2));
+  }
+  .stage {
+    height: var(--art-h);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
   }
   .card {
     position: relative;
     display: block;
-    width: 100%;
-    aspect-ratio: 2 / 3;
+    width: min(100%, calc(var(--art-h) * var(--art-ratio)));
+    aspect-ratio: var(--art-ratio);
+    max-height: 100%;
+    flex: none;
     border: 0;
     padding: 0;
     border-radius: var(--radius);
     overflow: hidden;
     cursor: pointer;
-    background: hsl(var(--accent-h) 30% 15%);
-    box-shadow: 0 10px 30px -12px rgb(0 0 0 / 0.7);
+    background: transparent;
     transition: box-shadow 180ms var(--ease);
     outline: none;
-  }
-  .wide .card {
-    aspect-ratio: 16 / 9.4;
   }
   .card:hover,
   .card:focus-visible {
     z-index: 2;
-    box-shadow:
-      0 0 0 2px hsl(var(--accent-h) 95% 72%),
-      0 0 32px 4px hsl(var(--accent-h) 95% 60% / 0.55),
-      0 24px 50px -16px rgb(0 0 0 / 0.9);
+    box-shadow: 0 0 0 2px hsl(var(--accent-h) 95% 72%);
   }
-  .art {
-    position: absolute;
-    inset: 0;
+  .card:focus-visible {
+    outline: 3px solid var(--text);
+    outline-offset: 4px;
   }
-  .cover-img {
-    width: 100%;
+  .art { position: absolute; inset: 0; }
+  .cover-img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .art.generated {
+    background: linear-gradient(150deg, hsl(var(--accent-h) 12% 19%), hsl(var(--accent-h) 10% 10%));
+    color: #eee;
+  }
+  .fallback {
     height: 100%;
-    object-fit: cover;
-    display: block;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 42px 12px;
+    text-align: center;
   }
-  .shade {
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(180deg, transparent 45%, rgb(0 0 0 / 0.65));
-  }
-  .art.generated { filter:saturate(.5) brightness(.8); }
-  .wide .cover-img { object-fit:contain; }
-  .logo {
-    position: absolute;
-    left: 12px;
-    right: 12px;
-    bottom: 42px;
-    text-align: left;
+  .fallback-title {
+    font-size: 14px;
+    font-weight: 700;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
   }
   .source,
   .status {
@@ -179,6 +197,7 @@
     font-weight: 650;
     font-size: 14px;
     line-height: 1.25;
+    min-height: 2.5em;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     line-clamp: 2;
@@ -187,15 +206,10 @@
     overflow-wrap: anywhere;
   }
   .plat {
-    position: absolute;
-    left: 12px;
-    right: 12px;
-    bottom: 42px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: rgb(255 255 255 / 0.8);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: rgb(255 255 255 / 0.65);
   }
   .caption .m {
     color: var(--text-dim);

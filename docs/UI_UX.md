@@ -16,14 +16,19 @@ compatibility/Epic, then GOG remain the store milestones.
 - Global Add games opens the Library system picker instead of assuming PS2.
   Existing folder imports remain the supported flow; this pass does not add
   store connections. A subsequent roadmap step adds the [archive importer](INTAKE.md).
-- Cards show readable titles underneath, with calmer generated art. Offline
+- Cards show readable titles underneath, with quiet platform-mark/title fallbacks, including failed cover loads. Offline
   drives, missing files, missing emulators, missing firmware, wishlists,
   catalogue records and uninstalled entries keep distinct status text.
-  Landscape shelves contain portrait covers rather than cropping them across
-  the full landscape frame. Shelf arrows and thin scrollbars expose scrolling.
+  Continue playing uses equal-height artwork with variable widths measured from
+  the image, preserving portrait, square and landscape proportions. Main grids
+  keep equal invisible slots with bottom-aligned, uncropped covers. Real artwork
+  has no colored side panels or resting border/shadow; hover follows its bounds
+  and keyboard/controller focus has a distinct outline. Shelf arrows and thin
+  scrollbars expose scrolling.
 - Game pages use a consistent title, separate release details, labeled primary
   actions and optional identification/metadata details. Portrait art becomes a
-  soft background with a foreground cover at larger widths. Title editing has
+  soft background with a foreground cover at larger widths. Home confines its
+  darker cover backdrop to the hero so it fades before the shelves. Title editing has
   visible Save/Cancel controls under Manage game. Favorites expose pressed
   state. Descriptions use their supplied source instead of a fixed credit.
 - Recommendations require matching genre and a launchable installation,
@@ -108,3 +113,17 @@ remain backend/workflow milestones. This pass does not simulate their completion
 Persisted scan history, richer recommendations and provider-specific metadata
 editing are further improvements; missing files still use existing library
 management rather than a new relocation wizard.
+
+## Mixed artwork follow-up
+
+Continue playing prefers dedicated landscape art when available, otherwise the
+original cover. Image dimensions determine card proportions after loading; an
+estimated platform case ratio reserves space before that. Exceptionally narrow
+or wide images have bounded shelf widths and remain contained without cropping.
+Captions reserve two title lines. Missing artwork shows a muted surface with
+platform identity and a readable title instead of repeated geometric pictures.
+The hero foreground poster also contains the full cover.
+
+Svelte checks, frontend regression tests and production compilation validate the
+change; rendered layout, image-load movement, hover/focus and native gamepad
+acceptance at the sizes above still require a live UI surface.
