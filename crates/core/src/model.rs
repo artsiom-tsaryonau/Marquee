@@ -108,6 +108,19 @@ pub struct MediaFile {
     pub skip_reason: Option<String>,
 }
 
+/// What is known about a game beyond its files. Every field is optional.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GameInfo {
+    pub genre: Option<String>,
+    pub year: Option<i64>,
+    pub developer: Option<String>,
+    pub publisher: Option<String>,
+    pub players: Option<i64>,
+    pub description: Option<String>,
+    /// Where it came from, e.g. `libretro+thegamesdb`.
+    pub source: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Edition {
     pub id: String,
@@ -125,6 +138,8 @@ pub struct Edition {
     pub serial: Option<String>,
     pub region: Option<String>,
     pub cover_path: Option<PathBuf>,
+    #[serde(default)]
+    pub info: Option<GameInfo>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

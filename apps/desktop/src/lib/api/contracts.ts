@@ -43,6 +43,18 @@ export interface Edition {
   serial: string | null;
   region: string | null;
   cover_path: string | null;
+  info?: GameInfo | null;
+}
+
+/** Genre, year, developer, publisher, players and description, from libretro and TheGamesDB. */
+export interface GameInfo {
+  genre: string | null;
+  year: number | null;
+  developer: string | null;
+  publisher: string | null;
+  players: number | null;
+  description: string | null;
+  source: string;
 }
 
 export interface MediaFile {

@@ -22,18 +22,18 @@ use std::io::{Read, Write};
 use std::path::Path;
 use std::time::{Duration, SystemTime};
 
-const DB_BASE: &str = "https://raw.githubusercontent.com/libretro/libretro-database/master/metadat";
+pub(crate) const DB_BASE: &str = "https://raw.githubusercontent.com/libretro/libretro-database/master/metadat";
 const THUMB_BASE: &str = "https://thumbnails.libretro.com";
 const MAX_HASH_BYTES: u64 = 1024 * 1024 * 1024;
-const DAT_MAX_BYTES: u64 = 40 * 1024 * 1024;
+pub(crate) const DAT_MAX_BYTES: u64 = 40 * 1024 * 1024;
 const DAT_MAX_AGE: Duration = Duration::from_secs(60 * 60 * 24 * 30);
 
 /// How one system is looked up. `dat` is a No-Intro list; None means only the
 /// file/title name is tried against the thumbnails.
-struct Source {
-    system: &'static str,
-    thumbs: &'static str,
-    dat: Option<&'static str>,
+pub(crate) struct Source {
+    pub(crate) system: &'static str,
+    pub(crate) thumbs: &'static str,
+    pub(crate) dat: Option<&'static str>,
 }
 
 const SOURCES: &[Source] = &[
@@ -89,11 +89,11 @@ const SOURCES: &[Source] = &[
     },
 ];
 
-fn source_for(system: &str) -> Option<&'static Source> {
+pub(crate) fn source_for(system: &str) -> Option<&'static Source> {
     SOURCES.iter().find(|s| s.system == system)
 }
 
-fn encode(s: &str) -> String {
+pub(crate) fn encode(s: &str) -> String {
     let mut out = String::new();
     for b in s.bytes() {
         if b.is_ascii_alphanumeric() || b"-_.~".contains(&b) {
@@ -182,22 +182,22 @@ pub fn crcs_of(path: &Path) -> Result<Vec<u32>> {
 }
 
 #[derive(Serialize, Deserialize, Default)]
-struct CrcCache(BTreeMap<String, (u64, i64, Vec<u32>)>);
+pub(crate) struct CrcCache(pub BTreeMap<String, (u64, i64, Vec<u32>)>);
 
-fn load<T: for<'a> Deserialize<'a> + Default>(p: &Path) -> T {
+pub(crate) fn load<T: for<'a> Deserialize<'a> + Default>(p: &Path) -> T {
     fs::read(p)
         .ok()
         .and_then(|b| serde_json::from_slice(&b).ok())
         .unwrap_or_default()
 }
 
-fn save<T: Serialize>(p: &Path, v: &T) {
+pub(crate) fn save<T: Serialize>(p: &Path, v: &T) {
     if let Ok(b) = serde_json::to_vec(v) {
         let _ = fs::write(p, b);
     }
 }
 
-fn fresh(path: &Path) -> bool {
+pub(crate) fn fresh(path: &Path) -> bool {
     fs::metadata(path)
         .and_then(|m| m.modified())
         .ok()
@@ -205,7 +205,7 @@ fn fresh(path: &Path) -> bool {
         .is_some_and(|age| age < DAT_MAX_AGE)
 }
 
-fn load_dat(dir: &Path, name: &str) -> Result<HashMap<u32, String>> {
+pub(crate) fn load_dat(dir: &Path, name: &str) -> Result<HashMap<u32, String>> {
     let file = dir.join(format!("{}.dat", thumb_name(name)));
     if !fresh(&file) {
         let url = format!("{DB_BASE}/no-intro/{}.dat", encode(name));
@@ -264,7 +264,11 @@ pub fn names_agree(wanted: &str, found: &str) -> bool {
     }
     let (short, long) = if a.len() <= b.len() { (&a, &b) } else { (&b, &a) };
     // "Tetris" must not stand in for "Tetris Effect".
-    a == b || (long.contains(short.as_str()) && short.len() * 10 >= long.len() * 8)
+    // ...and "Underground" must not stand in for "Underground 2".
+    a == b
+        || (long.contains(short.as_str())
+            && short.len() * 10 >= long.len() * 8
+            && !long.replacen(short.as_str(), "", 1).chars().any(|c| c.is_ascii_digit()))
 }
 
 /// No-Intro tags that mark homebrew, prototypes and unlicensed releases.
@@ -362,7 +366,7 @@ struct Task<'a> {
 
 const MISS_TTL_SECS: u64 = 14 * 24 * 3600;
 
-fn now_secs() -> u64 {
+pub(crate) fn now_secs() -> u64 {
     SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
         .map(|d| d.as_secs())
@@ -581,6 +585,8 @@ mod tests {
         ));
         assert!(!names_agree("Crazy Taxi", "Crazy Machines 2"));
         assert!(!names_agree("Tetris", "Tetris Effect"));
+        assert!(!names_agree("Need for Speed - Underground (USA)", "Need for Speed: Underground 2"));
+        assert!(names_agree("Need for Speed - Underground (USA)", "Need for Speed: Underground"));
         assert!(looks_retail("Super Mario Bros. (USA)"));
         assert!(!looks_retail("Pitfall! (World) (Homebrew)"));
         assert!(!looks_retail("Alter Ego (World)"));

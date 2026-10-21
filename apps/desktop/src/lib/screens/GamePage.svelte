@@ -144,6 +144,11 @@
 
   <div class="body">
     <div class="main">
+      {#if g.description}
+        <h3>About</h3>
+        <p class="about">{g.description}</p>
+        <p class="media-credit">Description from TheGamesDB.</p>
+      {/if}
       <CatalogueDetails game={g} />
       {#if g.screenshots?.length}
       <h3>Screenshots · OpenGOAL</h3>
@@ -184,6 +189,8 @@
         {#if g.lutris}<dt>Library provider</dt><dd>Lutris · {g.installed ? 'configured installation' : 'cached store listing'}</dd>{/if}
         <dt>Genre</dt>
         <dd>{g.genre}{g.year ? ` · ${g.year}` : ''}</dd>
+        {#if g.developer}<dt>Developer</dt><dd>{g.developer}</dd>{/if}
+        {#if g.publisher && g.publisher !== g.developer}<dt>Publisher</dt><dd>{g.publisher}</dd>{/if}
         {#if g.serial}
           <dt>Serial</dt>
           <dd>{g.serial}{g.region ? ` · ${g.region}` : ''}</dd>
@@ -213,6 +220,7 @@
 {/if}
 
 <style>
+  .about { white-space:pre-line; line-height:1.6; max-width:70ch; color:var(--text-soft); }
   .variant-picker { display:flex; flex-wrap:wrap; gap:18px; padding:16px; border-radius:14px; margin:16px 0; align-items:end; }
   .variant-picker label { display:grid; gap:8px; font-size:12px; color:var(--text-soft); }
   .variant-picker select { max-width:100%; color:var(--text); background:var(--field); border:1px solid var(--line); border-radius:8px; padding:10px; font:inherit; }

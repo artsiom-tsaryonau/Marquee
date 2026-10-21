@@ -341,6 +341,7 @@ pub fn snapshot_editions(db: &Db) -> Result<Vec<Edition>> {
                 id: row.id,
                 system: row.system,
                 title: row
+    let infos = crate::romfacts::list(db)?;
                     .display_title
                     .clone()
                     .unwrap_or_else(|| row.scan_title.clone()),
@@ -358,6 +359,7 @@ pub fn snapshot_editions(db: &Db) -> Result<Vec<Edition>> {
             })
         })
         .collect()
+                info: infos.get(&row.id).cloned(),
 }
 
 pub fn find_media_for_edition(db: &Db, edition_id: &str) -> Result<Option<MediaFile>> {

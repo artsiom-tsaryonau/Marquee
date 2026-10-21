@@ -23,7 +23,6 @@ The library is mostly public-domain and homebrew Game Boy Color and NES ROMs, so
 
 ## Not done
 
-- Descriptions, genre, release year and developer: the libretro `metadat/` lists have them keyed by the same checksums, but the UI has no field for them yet.
 - Disc images are not hashed (too large); PS1/PS2 use the serial, Dreamcast and others only the title.
 - Genesis and Neo Geo arcade sets are not looked up (no emulator for the first, ZIP set names for the second).
 - IGDB and TheGamesDB are not used yet. A key for TheGamesDB is in `.env` but nothing reads it.

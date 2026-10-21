@@ -38,6 +38,11 @@ export interface GameEntry {
   languages?: string[];
   revision?: string;
   players?: number;
+  developer?: string;
+  publisher?: string;
+  /** Plain text, from TheGamesDB. */
+  description?: string;
+  descriptionSource?: string;
   id: string;
   /** Explicit catalogue identity, independent of a concrete installation ID. */
   canonicalId?: string;

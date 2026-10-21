@@ -167,6 +167,7 @@ impl Db {
                 COMMIT;",
             )?;
         }
+        crate::romfacts::ensure_table(&self.conn)?;
         if version > SCHEMA_VERSION {
             return Err(crate::error::AppError::new(
                 "DB",

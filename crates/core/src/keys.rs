@@ -75,6 +75,15 @@ pub const KEYS: &[KeyDef] = &[
         secret: true,
     },
     KeyDef {
+        id: "thegamesdb",
+        env: "THE_GAMES_DB_API_KEY",
+        label: "TheGamesDB API key",
+        description: "Descriptions and player counts for cartridge and disc games. The free allowance is about 1,000 lookups a month; Marquee asks once per game and remembers.",
+        help: "Free: thegamesdb.net, sign in, request an API key.",
+        used_by: "Game info",
+        secret: true,
+    },
+    KeyDef {
         id: "rawg",
         env: "RAWG_API_KEY",
         label: "RAWG API key",

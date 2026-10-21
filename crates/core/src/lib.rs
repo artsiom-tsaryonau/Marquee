@@ -23,6 +23,8 @@ pub mod ports;
 pub mod purple;
 pub mod runners;
 pub mod romart;
+pub mod romfacts;
+pub mod runners;
 pub mod server;
 pub mod sessions;
 pub mod source_builds;
@@ -226,6 +228,8 @@ impl Core {
             }
         }
         Ok(artwork::finish(report, sink))
+        romart::run(self, edition_id, &mut report);
+        romfacts::run(self, edition_id);
     }
         romart::run(self, edition_id, &mut report);
 
