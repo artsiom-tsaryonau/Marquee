@@ -22,7 +22,6 @@ bios/
 # samples and generated catalog dumps
 sample/
 data/
-scripts/vimm/
 
 # Emulators are downloaded by Marquee into its own data folder, never committed.
 # catalog/emulators/*.json (the download recipes) stay tracked.
@@ -40,3 +39,39 @@ firmware/
 *.srm
 *.state
 *.mcd
+
+# Game images anywhere in the repo (only roms/ is meant to hold them, and it is ignored)
+*.iso
+*.chd
+*.cue
+*.cdi
+*.gdi
+*.nes
+*.sfc
+*.smc
+*.gb
+*.gbc
+*.z64
+*.n64
+*.v64
+*.pce
+*.smd
+*.ngp
+
+# Local databases and their backups (the real library lives outside the repo)
+*.db
+*.db-wal
+*.db-shm
+*.db.bak*
+
+# Build, tooling and log output
+*.log
+.svelte-kit/
+.vite/
+coverage/
+*.tsbuildinfo
+.pnpm-store/
+
+# Signing keys and certificates
+*.pem
+*.key
