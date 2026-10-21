@@ -19,6 +19,21 @@ The profile is a development-session capture, not a frame-time benchmark; no FPS
 ./scripts/run.sh dev         # explicit browser development server with hot reload
 ```
 
+Dev startup checks the library backend before launching Vite. It opens and
+prints the dev origin's authenticated `#token=…` address, rather than expecting
+a token saved at the production origin to be present at port 1420. API and art
+proxies follow the actual backend port, including a port selected after a
+collision. `MARQUEE_DATA_DIR` and `--data-dir PATH` select the same database
+as desktop; `MARQUEE_DEV_PORT` changes the Vite port.
+
+An already running web-enabled desktop is reused only after authenticating
+and checking its library path. For a desktop outside the default backend port
+range, set `MARQUEE_API_URL=http://127.0.0.1:PORT`. A desktop started without
+web access holds the library lock: close it or relaunch with `scripts/run.sh both` before dev. Failed backend startup stops the command instead of leaving
+an empty Vite surface. Stopping dev terminates its own process groups and
+leaves a reused desktop/backend running. Direct `pnpm dev` remains the raw
+frontend command and requires a manually supplied backend token/address.
+
 The desktop/both modes use `target/release/marquee-desktop`, resolving custom Cargo target directories through `cargo metadata`. They build on first launch and when source files or source-directory mtimes are newer than the executable, excluding dependency/build-output directories. Directory mtimes also detect deleted source inputs. `MARQUEE_REBUILD=1` forces rebuilding. Build errors stop launch; a failed build never silently opens an older executable. `pnpm run:desktop` and `pnpm build:desktop` are equivalent entry points.
 
 ## Rendering policy

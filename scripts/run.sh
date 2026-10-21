@@ -52,15 +52,7 @@ case "$mode" in
     cd "$root" && exec cargo run -q -p marquee-cli -- run web "$@"
     ;;
   dev)
-    if (exec 3<>/dev/tcp/127.0.0.1/1420) 2>/dev/null; then
-      echo "Port 1420 is already in use (a stale Vite server?). Stop it first so the UI cannot be an old build." >&2
-      exit 1
-    fi
-    cd "$root"
-    cargo run -q -p marquee-cli -- run web "$@" &
-    server=$!
-    trap 'kill "$server" 2>/dev/null || true' EXIT
-    cd apps/desktop && pnpm dev
+    exec node "$root/scripts/dev.mjs" "$@"
     ;;
   *)
     echo "usage: scripts/run.sh desktop|web|dev|both|build [args...]" >&2

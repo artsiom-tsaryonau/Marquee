@@ -91,7 +91,7 @@ function discSnapshot() {
 }
 test('mixed disc library keeps PS1 categories and setup separate from PS2', () => {
   const [ps1, ps2] = gamesFromSnapshot(discSnapshot());
-  assert.equal(ps1.platform, 'ps1'); assert.equal(ps1.genre, 'PS1'); assert.equal(ps1.setupState, 'runner_missing'); assert.equal(ps1.runnerId, undefined);
+  assert.equal(ps1.platform, 'ps1'); assert.equal(ps1.genre, ''); assert.equal(ps1.setupState, 'runner_missing'); assert.equal(ps1.runnerId, undefined);
   assert.equal(ps2.platform, 'ps2'); assert.equal(ps2.runnerId, 'pcsx2');
 });
 test('DS and Neo Geo entries use their own platforms and runner readiness', () => {

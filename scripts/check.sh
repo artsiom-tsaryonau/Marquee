@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-node scripts/tests/run.test.mjs
+node --test scripts/tests/*.test.mjs
 
 if [ -f Cargo.toml ]; then
   cargo fmt --all --check

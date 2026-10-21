@@ -17,7 +17,7 @@
   const choices = $derived(g ? variants.filter((x) => editionKey(x) === editionKey(g)) : []);
   function choose(id: string) { app.chooseVariant(id); }
   const port = $derived(g?.source === 'port' ? app.ports.find((p) => `port:${p.id}` === g.id) : undefined);
-  const similar = $derived(g ? app.games.filter((x) => canonicalId(x) !== canonicalId(g) && (x.genre === g.genre || x.source === g.source)).slice(0, 10) : []);
+  const similar = $derived(g ? app.games.filter((x) => canonicalId(x) !== canonicalId(g) && ((!!g.genre && x.genre === g.genre) || x.source === g.source)).slice(0, 10) : []);
   const dur = $derived(app.motionReduced ? 0 : 360);
   const offline = $derived(!!g && g.source === 'rom' && g.platform !== 'unknown');
   const emulator = $derived(g?.runnerName?.replace(' (Marquee)', '') ?? (g?.platform === 'ps1' ? 'DuckStation' : g?.platform === 'ps2' ? 'PCSX2' : 'its emulator'));
@@ -187,8 +187,8 @@
         <dt>Last played</dt>
         <dd>{g.lastPlayed ? ago(g.lastPlayed) : '—'}</dd>
         {#if g.lutris}<dt>Library provider</dt><dd>Lutris · {g.installed ? 'configured installation' : 'cached store listing'}</dd>{/if}
-        <dt>Genre</dt>
-        <dd>{g.genre}{g.year ? ` · ${g.year}` : ''}</dd>
+        {#if g.genre}<dt>Genre</dt><dd>{g.genre}</dd>{/if}
+        {#if g.year}<dt>Released</dt><dd>{g.year}</dd>{/if}
         {#if g.developer}<dt>Developer</dt><dd>{g.developer}</dd>{/if}
         {#if g.publisher && g.publisher !== g.developer}<dt>Publisher</dt><dd>{g.publisher}</dd>{/if}
         {#if g.serial}

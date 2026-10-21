@@ -42,11 +42,11 @@ export function editionToGame(edition: Edition, snap: LibrarySnapshot): GameEntr
     title: edition.title,
     tagline: edition.serial
       ? `${edition.serial}${edition.region ? ` · ${edition.region}` : ''}`
-      : platform === 'ps1' ? 'PlayStation disc' : platform === 'ps2' ? 'PlayStation 2 disc' : platform === 'unknown' ? 'Unknown platform' : `${edition.system.toUpperCase()} game`,
+      : '',
     platform,
     source: 'rom',
     installed: !edition.missing,
-    genre: edition.info?.genre ?? edition.system.toUpperCase(),
+    genre: edition.info?.genre ?? '',
     year: edition.info?.year ?? 0,
     developer: edition.info?.developer ?? undefined,
     publisher: edition.info?.publisher ?? undefined,

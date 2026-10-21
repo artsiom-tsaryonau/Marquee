@@ -12,6 +12,8 @@ const stampBuild = (): Plugin => ({
   },
 });
 
+const apiTarget = process.env.MARQUEE_API_URL ?? 'http://127.0.0.1:47820';
+
 // Tauri expects a fixed port and no auto-opened browser; harmless in a plain browser too.
 export default defineConfig(({ command }) => ({
   plugins: [svelte(), stampBuild()],
@@ -22,8 +24,8 @@ export default defineConfig(({ command }) => ({
     strictPort: true,
     // Browser dev against a running Marquee: same origin, same data.
     proxy: {
-      '/api': { target: 'http://127.0.0.1:47820', changeOrigin: true },
-      '/art': { target: 'http://127.0.0.1:47820', changeOrigin: true },
+      '/api': { target: apiTarget, changeOrigin: true },
+      '/art': { target: apiTarget, changeOrigin: true },
     },
   },
 }));
