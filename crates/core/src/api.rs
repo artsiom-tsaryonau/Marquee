@@ -78,6 +78,7 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
             let edition = maybe(&args, "edition_id");
             out(core.refresh_artwork(edition.as_deref(), Some(sink))?)
         }
+        "set_display_mode" => out(core.set_display_mode(&text(&args, "mode")?)?),
         "prune_library" => out(core.prune_missing()?),
         "list_emulators" => out(core.list_emulators()?),
         "build_emulator" => out(core.build_emulator(&text(&args, "id")?)?),

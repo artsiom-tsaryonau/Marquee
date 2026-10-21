@@ -101,6 +101,10 @@ Verified on this host (2026-10-21): all three installed through `marquee emulato
 
 Not covered yet, and why: **Sega Genesis/Mega Drive** and **Neo Geo Pocket** have no emulator with a checksummed Linux download that Marquee can fetch (ares publishes no Linux build; mGBA publishes no checksums). They need a source-build recipe or a different emulator. **mGBA** is not used for Game Boy because Mesen covers it. The UI maps these systems to platforms and launches them; "Add folder" buttons for them are not built yet (use `marquee library add-root --system <id> <folder>`).
 
+## Window or fullscreen
+
+Games open in a **window** by default. Settings → Games → "Open games in" (setting `display_mode`, API `set_display_mode`) switches every emulator to fullscreen, effective on the next Play. PCSX2 and DuckStation get `-nofullscreen` or `-fullscreen`. Catalogue emulators take `fullscreen_args` or `windowed_args` from their entry: Mesen and RMG add `--fullscreen` only in fullscreen mode, Flycast gets `-config window:fullscreen=yes` or `=no` because it remembers the last mode. Checked on this host: the command lines switch with the setting and PCSX2 and Flycast stayed running in both modes; I could not see the windows, so the actual window size and decorations are unverified. A window or fullscreen change you make inside an emulator is still that emulator's own to remember (Mesen and RMG), so a launch does not reset it.
+
 ## Keeping the library to real games
 
 `marquee prune` (API `prune_library`) removes library entries whose files no longer exist, but only ones never played, not favourites and without a custom title; anything with history stays and shows as missing. Marquee never deletes game files itself.

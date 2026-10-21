@@ -108,7 +108,8 @@ pub fn launch(
             )
         })?;
         runners::require_launchable(&runner)?;
-        let argv = runners::launch_argv(&runner, &media.path, extra_args)?;
+        let fullscreen = db.get_setting("display_mode")?.as_deref() == Some("fullscreen");
+        let argv = runners::launch_argv(&runner, &media.path, extra_args, fullscreen)?;
         let session_id = Uuid::new_v4().to_string();
         let started = now_rfc3339();
         db.insert_session(&session_id, edition_id, &runner.id, &started, "running")?;

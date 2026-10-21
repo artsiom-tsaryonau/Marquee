@@ -198,7 +198,7 @@ fn launch_argv_keeps_metacharacters_inert() {
         available: true,
     };
     let iso = PathBuf::from("/games/weird/My Game's (USA) --iso.iso");
-    let argv = runners::launch_argv(&runner, &iso, &[]).unwrap();
+    let argv = runners::launch_argv(&runner, &iso, &[], true).unwrap();
     assert_eq!(
         argv,
         vec![
@@ -211,7 +211,7 @@ fn launch_argv_keeps_metacharacters_inert() {
         ]
     );
     let dash = PathBuf::from("/games/-leading.iso");
-    let argv = runners::launch_argv(&runner, &dash, &[]).unwrap();
+    let argv = runners::launch_argv(&runner, &dash, &[], true).unwrap();
     assert_eq!(argv.last().unwrap(), "/games/-leading.iso");
 }
 
@@ -305,7 +305,9 @@ fn ps1_root_imports_iso_and_uses_duckstation_argv() {
         available: true,
     };
     let img = PathBuf::from("/games/ps1/Cave.iso");
-    let argv = runners::launch_argv(&duck, &img, &[]).unwrap();
+    let windowed = runners::launch_argv(&duck, &img, &[], false).unwrap();
+    assert_eq!(windowed[1..3], ["-batch", "-nofullscreen"]);
+    let argv = runners::launch_argv(&duck, &img, &[], true).unwrap();
     assert_eq!(
         argv,
         vec![
@@ -969,7 +971,7 @@ fn cartridge_systems_scan_pick_their_emulator_and_build_argv() {
         None
     );
     let rom = PathBuf::from("/roms/My Game's (USA).nes");
-    let argv = runners::launch_argv(&mesen, &rom, &["--x".into()]).unwrap();
+    let argv = runners::launch_argv(&mesen, &rom, &["--x".into()], true).unwrap();
     assert_eq!(
         argv,
         vec![
@@ -980,6 +982,10 @@ fn cartridge_systems_scan_pick_their_emulator_and_build_argv() {
             "/roms/My Game's (USA).nes"
         ]
     );
+    // Windowed (the default): no fullscreen flag at all for Mesen, an explicit
+    // -nofullscreen for the Qt emulators that remember the last mode.
+    let argv = runners::launch_argv(&mesen, &rom, &[], false).unwrap();
+    assert!(!argv.iter().any(|a| a.contains("fullscreen")), "{argv:?}");
 }
 
 #[test]

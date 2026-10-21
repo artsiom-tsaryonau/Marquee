@@ -85,6 +85,20 @@
     {/each}
   </section>
 
+  <section class="glass-panel">
+    <h2>Games</h2>
+    <div class="item">
+      <div>
+        <strong>Open games in</strong>
+        <span>Applies to every emulator Marquee starts, the next time you press Play.</span>
+      </div>
+      <select data-nav aria-label="How games open" value={app.runnerSettings.display_mode ?? 'window'} onchange={(e) => app.setDisplayMode(e.currentTarget.value as 'window' | 'fullscreen')}>
+        <option value="window">A window</option>
+        <option value="fullscreen">Fullscreen</option>
+      </select>
+    </div>
+  </section>
+
   {#if app.webUrl}
   <section class="glass-panel">
     <h2>Web access</h2>

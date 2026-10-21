@@ -249,6 +249,17 @@ impl Core {
         self.with_db(|db| db.set_setting(key, value))
     }
 
+    /// How games open: `window` (default) or `fullscreen`.
+    pub fn set_display_mode(&self, mode: &str) -> Result<()> {
+        if !matches!(mode, "window" | "fullscreen") {
+            return Err(AppError::new(
+                "BAD_REQUEST",
+                "display mode must be `window` or `fullscreen`",
+            ));
+        }
+        self.set_setting("display_mode", mode)
+    }
+
     pub fn select_runner(&self, runner_id: &str) -> Result<()> {
         let runners = self.refresh_runners()?;
         let Some(runner) = runners.iter().find(|r| r.id == runner_id && r.available) else {

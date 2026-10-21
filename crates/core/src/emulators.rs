@@ -180,6 +180,12 @@ pub struct EmulatorDef {
     /// Extra `NAME=value` environment for every start (for example a locale).
     #[serde(default)]
     pub env: Vec<String>,
+    /// Added before the launch arguments when games open fullscreen.
+    #[serde(default)]
+    pub fullscreen_args: Vec<String>,
+    /// Added when games open in a window (for emulators that remember fullscreen).
+    #[serde(default)]
+    pub windowed_args: Vec<String>,
     /// Config files written before launch when missing (skips first-run wizards).
     #[serde(default)]
     pub seed: Vec<SeedFile>,

@@ -265,6 +265,13 @@ pub struct Settings {
     pub selected_runner_id: Option<String>,
     #[serde(default)]
     pub selected_runner_ids: std::collections::BTreeMap<String, String>,
+    /// `window` (default) or `fullscreen`: how games open.
+    #[serde(default = "default_display_mode")]
+    pub display_mode: String,
+}
+
+fn default_display_mode() -> String {
+    "window".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

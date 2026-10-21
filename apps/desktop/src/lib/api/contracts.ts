@@ -104,6 +104,7 @@ export interface Settings {
   last_focus: string | null;
   selected_runner_id: string | null;
   selected_runner_ids?: Record<string, string>;
+  display_mode?: 'window' | 'fullscreen';
 }
 
 export interface LibrarySnapshot {
@@ -250,6 +251,7 @@ export interface LibraryApi {
   scan(rootId?: string): Promise<ScanReport>;
   listRunners(): Promise<Runner[]>;
   selectRunner(id: string): Promise<void>;
+  setDisplayMode(mode: 'window' | 'fullscreen'): Promise<void>;
   launch(editionId: string): Promise<Session>;
   setFavourite(editionId: string, favorite: boolean): Promise<void>;
   setDisplayTitle(editionId: string, title: string): Promise<void>;

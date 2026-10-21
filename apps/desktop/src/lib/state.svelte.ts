@@ -391,6 +391,15 @@ class AppState {
     }
   }
 
+  async setDisplayMode(mode: 'window' | 'fullscreen') {
+    try {
+      await this.api.setDisplayMode(mode);
+      this.applySnapshot(await this.api.snapshot());
+    } catch (err) {
+      this.notify((err as { message?: string }).message ?? 'Could not change how games open');
+    }
+  }
+
   async chooseRunner(id: string) {
     try {
       await this.api.selectRunner(id);

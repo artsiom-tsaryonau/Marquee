@@ -149,7 +149,13 @@ pub fn uses_marquee_prefix(runner: &Runner) -> bool {
     runner.source == "marquee"
 }
 
-pub fn launch_argv(runner: &Runner, img: &Path, extra: &[String]) -> Result<Vec<String>> {
+/// `fullscreen` is the user's display mode: games open in a window unless it is set.
+pub fn launch_argv(
+    runner: &Runner,
+    img: &Path,
+    extra: &[String],
+    fullscreen: bool,
+) -> Result<Vec<String>> {
     if runner.command.is_empty() {
         return Err(AppError::new("RUNNER_MISSING", "runner command is empty"));
     }
@@ -160,26 +166,45 @@ pub fn launch_argv(runner: &Runner, img: &Path, extra: &[String]) -> Result<Vec<
     if runner.kind == RunnerKind::Emulator {
         // The emulator's own catalogue entry says how to start a game; `{rom}`
         // is replaced by the image path as one argument (no shell involved).
-        let template = emulator_for_runner(&runner.id)
-            .map(|d| d.launch)
+        let def = emulator_for_runner(&runner.id);
+        let template = def
+            .as_ref()
+            .map(|d| d.launch.clone())
             .unwrap_or_else(|| vec!["{rom}".into()]);
         argv.extend(extra.iter().cloned());
+        if let Some(d) = &def {
+            let mode = if fullscreen {
+                &d.fullscreen_args
+            } else {
+                &d.windowed_args
+            };
+            argv.extend(mode.iter().cloned());
+        }
         let rom = img.to_string_lossy();
         argv.extend(template.iter().map(|a| a.replace("{rom}", &rom)));
         return Ok(argv);
     }
     if runner.kind == RunnerKind::Pcsx2 {
         // Hide the main library window while keeping the game's render window.
-        argv.extend(["-batch".into(), "-fullscreen".into(), "-nogui".into()]);
+        argv.extend(["-batch".into(), screen_flag(fullscreen), "-nogui".into()]);
         argv.extend(extra.iter().cloned());
         argv.push("--".into());
     } else {
         // Batch exits on game shutdown; nogui hides the main library window.
-        argv.extend(["-batch".into(), "-fullscreen".into(), "-nogui".into()]);
+        argv.extend(["-batch".into(), screen_flag(fullscreen), "-nogui".into()]);
         argv.extend(extra.iter().cloned());
     }
     argv.push(img.to_string_lossy().into_owned());
     Ok(argv)
+}
+
+fn screen_flag(fullscreen: bool) -> String {
+    if fullscreen {
+        "-fullscreen"
+    } else {
+        "-nofullscreen"
+    }
+    .into()
 }
 
 pub(crate) fn emulator_for_runner(runner_id: &str) -> Option<crate::emulators::EmulatorDef> {

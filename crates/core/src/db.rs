@@ -244,6 +244,10 @@ impl Db {
             last_collection: self.get_setting("last_collection")?,
             last_focus: self.get_setting("last_focus")?,
             selected_runner_id: self.get_setting("selected_runner_id")?,
+            display_mode: match self.get_setting("display_mode")?.as_deref() {
+                Some("fullscreen") => "fullscreen".into(),
+                _ => "window".into(),
+            },
             selected_runner_ids: ["ps1", "ps2"]
                 .into_iter()
                 .filter_map(

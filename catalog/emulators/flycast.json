@@ -15,8 +15,6 @@
   "requirement": "Built-in HLE BIOS boots most games; a few need real dc_boot.bin/dc_flash.bin (import via bios-inbox planned)",
   "kind": "emulator",
   "launch": [
-    "-config",
-    "window:fullscreen=yes",
     "{rom}"
   ],
   "firmware": [
@@ -31,5 +29,13 @@
       "dir": "flycast",
       "note": "Dreamcast boot ROM. Flycast's built-in HLE BIOS boots most games without it; a short list of titles need the real one."
     }
+  ],
+  "fullscreen_args": [
+    "-config",
+    "window:fullscreen=yes"
+  ],
+  "windowed_args": [
+    "-config",
+    "window:fullscreen=no"
   ]
 }

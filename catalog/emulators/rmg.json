@@ -14,10 +14,12 @@
   "binary": "AppRun",
   "config_subdir": "RMG",
   "launch": [
-    "--fullscreen",
     "--quit-after-emulation",
     "--nogui",
     "{rom}"
   ],
-  "requirement": "No firmware needed"
+  "requirement": "No firmware needed",
+  "fullscreen_args": [
+    "--fullscreen"
+  ]
 }
