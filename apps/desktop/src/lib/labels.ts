@@ -31,5 +31,5 @@ export const platformLabel: Record<Platform, string> = {
 };
 
 /** Emulator catalogue system ids, as people say them. */
-const systemNames: Record<string, string> = { genesis: 'Genesis / Mega Drive', ds: 'Nintendo DS', neogeo: 'Neo Geo', ps1: 'PlayStation', ps2: 'PlayStation 2', ps3: 'PlayStation 3', psp: 'PSP', dreamcast: 'Dreamcast', wiiu: 'Wii U', xbox: 'Xbox', '3ds': 'Nintendo 3DS', gb: 'Game Boy', gbc: 'Game Boy Color', gba: 'Game Boy Advance' };
+const systemNames: Record<string, string> = { genesis: 'Genesis / Mega Drive', ds: 'Nintendo DS', neogeo: 'Neo Geo', ps1: 'PlayStation', ps2: 'PlayStation 2', ps3: 'PlayStation 3', ps4: 'PlayStation 4', ps5: 'PlayStation 5', psp: 'PSP', dreamcast: 'Dreamcast', wiiu: 'Wii U', xbox: 'Xbox', '3ds': 'Nintendo 3DS', gb: 'Game Boy', gbc: 'Game Boy Color', gba: 'Game Boy Advance' };
 export const systemLabel = (id: string): string => systemNames[id] ?? id.toUpperCase();

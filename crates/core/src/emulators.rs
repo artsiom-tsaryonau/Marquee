@@ -36,6 +36,8 @@ const CATALOGUE: &[&str] = &[
     include_str!("../../../catalog/emulators/rmg.json"),
     include_str!("../../../catalog/emulators/melonds.json"),
     include_str!("../../../catalog/emulators/fbneo.json"),
+    include_str!("../../../catalog/emulators/shadps4.json"),
+    include_str!("../../../catalog/emulators/kytyps5.json"),
 ];
 
 /// A file Marquee writes into an emulator's config folder before it starts, only
@@ -169,6 +171,12 @@ pub struct EmulatorDef {
     pub download: Option<DirectDownload>,
     #[serde(default)]
     pub asset_excludes: Vec<String>,
+    /// When set, pick a GitHub release asset whose name contains this (case-insensitive).
+    #[serde(default)]
+    pub asset_contains: Option<String>,
+    /// AppImage member inside a verified `.zip` when it is not a direct `download.appimage`.
+    #[serde(default)]
+    pub archive_appimage: Option<String>,
     /// The release keeps one tag forever, so the asset checksum identifies a version.
     #[serde(default)]
     pub rolling: bool,
@@ -416,6 +424,8 @@ pub fn info(
             "duckstation" => "Library Play hides the main window with -nogui and shows the game fullscreen. A display is still required.",
             "mgba" => "Open uses Qt. To launch only the game window, add --marquee-sdl, -f, then an absolute game path as separate arguments. This is not displayless emulation or an integrated library session.",
             "rpcs3" => "Upstream supports --no-gui --fullscreen with a boot target, and a separate --headless mode. Marquee currently opens the tool; it has no PS3 game adapter.",
+            "shadps4" => "Experimental. Marquee installs the official Linux SDL build and opens the upstream launcher. No PS4 library adapter or automated firmware flow yet.",
+            "kytyps5" => "Experimental research runner. Marquee unpacks the published Linux tarball and opens kyty_launcher. Compatibility and config paths are upstream-defined.",
             _ => "Marquee currently opens this emulator’s own interface. Direct game launch and displayless execution need a separate verified adapter; no generic headless flag is applied.",
         }.into(),
         source_build: crate::source_builds::supported(&def.id),
@@ -464,6 +474,10 @@ fn pick(def: &EmulatorDef, release: &serde_json::Value) -> Result<Release> {
         .and_then(|v| v.as_str())
         .ok_or_else(|| AppError::new("NETWORK", "GitHub release has no tag"))?;
     let suffix = def.asset_suffix.to_ascii_lowercase();
+    let contains = def
+        .asset_contains
+        .as_deref()
+        .map(str::to_ascii_lowercase);
     let asset = release
         .get("assets")
         .and_then(|v| v.as_array())
@@ -472,7 +486,12 @@ fn pick(def: &EmulatorDef, release: &serde_json::Value) -> Result<Release> {
         .find(|a| {
             a.get("name").and_then(|n| n.as_str()).is_some_and(|n| {
                 let lower = n.to_ascii_lowercase();
-                lower.ends_with(&suffix) && !def.asset_excludes.iter().any(|x| lower.contains(x))
+                let matches = if let Some(needle) = &contains {
+                    lower.contains(needle)
+                } else {
+                    lower.ends_with(&suffix)
+                };
+                matches && !def.asset_excludes.iter().any(|x| lower.contains(x))
             })
         })
         .ok_or_else(|| {
@@ -612,7 +631,12 @@ pub fn install(paths: &Paths, def: &EmulatorDef, sink: &Arc<dyn EventSink>) -> R
             Some(sub) if !sub.contains("..") && !sub.starts_with('/') => out.join(sub),
             _ => out,
         };
-        let root = if let Some(member) = def.download.as_ref().and_then(|d| d.appimage.as_deref()) {
+        let appimage_member = def
+            .download
+            .as_ref()
+            .and_then(|d| d.appimage.as_deref())
+            .or(def.archive_appimage.as_deref());
+        let root = if let Some(member) = appimage_member {
             let path = Path::new(member);
             if path.is_absolute()
                 || path
@@ -1036,6 +1060,21 @@ mod tests {
         assert_eq!(picked.url, "u3");
         assert_eq!(picked.sha256, "c5e6f045f6a2");
         assert_eq!(picked.version, "latest-c5e6f045");
+    }
+
+    #[test]
+    fn github_assets_can_be_picked_by_substring() {
+        let def = find("shadps4").unwrap();
+        let release = json!({
+            "tag_name": "v.0.20.0",
+            "assets": [
+                {"name": "shadps4-macos-sdl-0.20.0.zip", "browser_download_url": "u1", "digest": "sha256:aaaa"},
+                {"name": "shadps4-linux-sdl-0.20.0.zip", "browser_download_url": "u2", "digest": "sha256:bbbbccccdddd"}
+            ]
+        });
+        let picked = pick(&def, &release).unwrap();
+        assert_eq!(picked.url, "u2");
+        assert_eq!(picked.sha256, "bbbbccccdddd");
     }
 
     #[test]

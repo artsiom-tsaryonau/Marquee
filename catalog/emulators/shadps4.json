@@ -1,0 +1,17 @@
+{
+  "id": "shadps4",
+  "name": "shadPS4",
+  "systems": [
+    "ps4"
+  ],
+  "github": "shadps4-emu/shadPS4",
+  "asset_contains": "shadps4-linux-sdl",
+  "asset_excludes": [
+    "macos",
+    "win"
+  ],
+  "archive_appimage": "Shadps4-sdl.AppImage",
+  "binary": "AppRun",
+  "config_subdir": "shadPS4",
+  "requirement": "Experimental PS4 emulator. You supply games and any firmware the title needs. Marquee opens the upstream UI; library import and per-game launch are not integrated yet."
+}

@@ -1,0 +1,13 @@
+{
+  "id": "kytyps5",
+  "name": "KytyPS5",
+  "systems": [
+    "ps5"
+  ],
+  "github": "KytyPS5/KytyPS5",
+  "asset_suffix": "Linux-x86_64.tar.gz",
+  "asset_excludes": [],
+  "binary": "kyty_launcher",
+  "config_subdir": "KytyPS5",
+  "requirement": "Experimental PS5 research runner. Expect frequent upstream breakage, manual game setup, and narrow title compatibility. Not a substitute for playing on real hardware."
+}

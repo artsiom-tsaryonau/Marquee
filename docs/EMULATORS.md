@@ -20,6 +20,8 @@ Updated 2026-10-21. Marquee installs emulators and holds BIOS images inside its 
 | mGBA | GB / GBC / GBA | Opt-in pinned source build, Qt/SDL standalone tools; no library adapter |
 | melonDS | Nintendo DS | Pinned source build, `.nds` folder scanning and library Play; saves/states isolated |
 | FinalBurn Neo | Neo Geo | Pinned SDL2 source build, intact ZIP scanning, BIOS/legacy-set diagnostics and library adapter; complete matching sets required |
+| shadPS4 | PS4 | Managed lifecycle and standalone opening (experimental) |
+| KytyPS5 | PS5 | Managed lifecycle and standalone opening (experimental research build) |
 
 PCSX2 is a normal catalogue entry (`catalog/emulators/pcsx2.json`, runner `runner.pcsx2.marquee`): the same verified-download-and-unpack path as every other emulator. The old dedicated installer (`tools.rs`) is gone. An install made by it is adopted as-is on the next refresh (recorded as version `adopted`), and its old `runner.pcsx2.unpacked` row is disabled, so nothing is downloaded twice (checked on this host). The install command `install_pcsx2` remains for the install dialog and delegates to the catalogue. A catalogue entry is implementation of acquisition/opening, not proof of a successful current upstream install, complete configuration isolation, firmware readiness or a playable game. Binary installation requires a matching upstream artifact with a published checksum; source recipes instead verify their pinned commit and record image/recipe receipts. Missing or changed packaging produces an error. Additional platforms still need system descriptors, media import, launch flags, prerequisite checks, save behavior and live acceptance before their games appear as playable library entries. Standalone emulator lifetime is not recorded as game playtime.
 
@@ -53,7 +55,7 @@ Verified against the upstream release on 2026-10-21.
 
 "Verified" means: the release was downloaded, matched its published checksum, unpacked, and started with its own `XDG_CONFIG_HOME`, `XDG_DATA_HOME` and `XDG_CACHE_HOME`; nothing appeared in `~/.config`, `~/.local/share` or `~/.cache`. It does **not** mean a game was played. This table records the earlier binary-install check. The current integration table above supersedes its adapter coverage; catalogue entries with a configured runner kind can register library runners.
 
-mGBA's published binary remains excluded by the checksum policy; it now has a separate [managed source-build pilot](#source-builds-mgba-pilot). **melonDS** now has a pinned source recipe (and support for its verified ZIP-wrapped AppImage). **Dolphin** needs a different acquisition recipe, and **shadPS4** is a ZIP-packaged experimental follow-up. Building a program does not add its systems to library import.
+mGBA's published binary remains excluded by the checksum policy; it now has a separate [managed source-build pilot](#source-builds-mgba-pilot). **melonDS** now has a pinned source recipe (and support for its verified ZIP-wrapped AppImage). **Dolphin** needs a different acquisition recipe. **shadPS4** and **KytyPS5** install from verified GitHub release assets (Linux SDL ZIP with an inner AppImage, and a Linux x86_64 tarball respectively); neither has a library game adapter yet. Building a program does not add its systems to library import.
 
 See [game-only windows versus displayless execution](#game-only-windows-and-headless-emulation). PCSX2 library launches now include `-nogui`; DuckStation already did. Both still show the actual game window.
 
