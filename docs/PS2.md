@@ -223,7 +223,7 @@ Fake-runner tests do **not** close the real-emulator gate.
 4. **Play → quit emulator → duration once → selection restored.** Relaunch without stale busy. This is the release gate.
 5. Keep `scripts/check.sh` green.
 
-PS2 metadata follow-up: [PS2_METADATA_FOLLOWUP.md](ENRICHMENT.md#ps2-metadata-matching-and-cached-artwork). In parallel, the next product increment is [direct installed Steam import](STORE_INTEGRATION.md#s1a-installed-steam-games--first-implementation-task); Epic and GOG follow in the roadmap. Do not insert a Lutris milestone.
+PS2 metadata follow-up: [PS2_METADATA_FOLLOWUP.md](ENRICHMENT.md#ps2-metadata-matching-and-cached-artwork). The next product increment is the [manager preparation foundation](MARQUEE_MANAGER.md#implementation-sequence-and-gates); [direct installed Steam import](STORE_INTEGRATION.md#s1a-installed-steam-games) may continue alongside it. Epic and GOG retain their order in the roadmap. Do not insert a Lutris milestone.
 
 ### On-demand PCSX2 install (built)
 

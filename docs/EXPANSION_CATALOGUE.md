@@ -1,5 +1,11 @@
 # Marquee expansion catalogue
 
+Current planning authority (2026-10-22): [roadmap](ROADMAP.md),
+[hidden manager](MARQUEE_MANAGER.md), and [added console preparation](CONSOLE_PREPARATION.md).
+This catalogue retains research/candidate ideas; it does not select a Switch or
+Xbox 360 runner or establish support for the owner's new games. Preparation jobs
+belong in the manager. Sequence suggestions below are subordinate to the current roadmap.
+
 Researched 2026-10-20. These are integration candidates and product proposals, not implemented adapters or locally tested compatibility claims. Follow the linked upstream documentation when implementing each adapter; releases, supported game revisions and Linux packaging change.
 
 **Implementation update, 2026-10-21:** PS1 ISO/CHD/CUE and PS2 ISO adapters, five managed native ports, and seven [managed emulator launchers](EMULATORS.md) now exist. DuckStation connects to library-disc launch; PPSSPP, RPCS3, Flycast, Azahar, Cemu and xemu currently open independently. These install/open recipes do not imply media import or per-game launch support for their platforms. PS1/PS2 retail live gates and wider compatibility acceptance remain open. See the [roadmap](ROADMAP.md) and [correction pass](CORRECTIONS.md). Other entries below remain candidates unless explicitly marked implemented.
@@ -180,9 +186,9 @@ Expand the current narrow TypeScript `Platform` list when these real adapters ar
 
 Compatibility and installation are separate axes. Suggested readiness states are: missing runner, missing firmware, missing content, unsupported revision, offline volume, untested, ready, running and failed. Experimental is a property of a runner/profile, not a synonym for installed.
 
-When launching, pass an executable and argument array rather than constructing a shell command. **Marquee-managed unpack is the default for emulators** (PCSX2 proven: AppImage extract under `$XDG_DATA_HOME/marquee/runners/pcsx2/current`). Prefer that tree over a host Flatpak; keep host copies as optional extra runners. Pin a known working version per profile and retain a rollback path before updating. Preserve the original data and back up settings that an adapter changes. Emulator/port recipes do not embed copyrighted files; acquisition goes through the shared [media job layer](MEDIA_ACQUISITION.md) and direct-store adapters for owned titles.
+When launching, pass an executable and argument array rather than constructing a shell command. **Marquee-managed unpack is the default for emulators** (PCSX2 proven: AppImage extract under `$XDG_DATA_HOME/marquee/runners/pcsx2/current`). Prefer that tree over a host Flatpak; keep host copies as optional extra runners. Pin a known working version per profile and retain a rollback path before updating. Preserve the original data and back up settings that an adapter changes. Emulator/port recipes do not embed copyrighted files; acquisition goes through the shared [media job layer](MARQUEE_MANAGER.md#acquisition-user-flow) and direct-store adapters for owned titles.
 
-Console/port expansion sequence (a separate track after the [direct-store critical path](ROADMAP.md), unless the owner explicitly reprioritizes):
+Historical console/port expansion sequence (candidate order only): the [current roadmap](ROADMAP.md) and [added console preparation](CONSOLE_PREPARATION.md) supersede its priority. The manager foundation now comes first; the five added platforms have their own inventory/recipe gates:
 
 1. **Real library foundation:** Tauri/core/CLI and explicit process tracking. **PS2 ISO path is in the tree** (DB, scan, **unpacked PCSX2**, covers, UI). Direct Steam discovery is the next product task, followed by Epic/Legendary and GOG/gogdl with managed compatibility. A legacy Lutris cache bridge exists but is outside the required architecture. Acceptance still open: a real PCSX2 launch that records actual playtime. See [PS2.md](PS2.md).
 2. **First console shelf:** DuckStation, PPSSPP, Dolphin and mGBA adapters using the same unpack-into-Marquee pattern as PCSX2. Acceptance: prerequisites, supported media, exit/return and save locations work for a tested title per system.

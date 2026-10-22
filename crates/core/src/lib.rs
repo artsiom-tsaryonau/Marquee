@@ -21,9 +21,9 @@ pub mod model;
 pub mod neogeo;
 pub mod paths;
 pub mod ports;
+pub mod preparation;
 pub mod profiles;
 pub mod purple;
-mod rar;
 pub mod romart;
 pub mod romfacts;
 pub mod runners;
@@ -57,6 +57,7 @@ pub struct Core {
     pub purple: Arc<purple::Manager>,
     pub source_builds: source_builds::Manager,
     pub(crate) transfers: transfer::Transfers,
+    pub(crate) preparation: marquee_manager::Client,
 }
 
 impl Core {
@@ -77,6 +78,7 @@ impl Core {
         let db = Db::open(&paths)?;
         let core = Self {
             source_builds: source_builds::Manager::default(),
+            preparation: marquee_manager::Client::for_library_owner(&paths.data_dir),
             transfers: transfer::Transfers::new(&paths.data_dir),
             purple: Arc::new(purple::Manager::new(&paths)),
             paths,

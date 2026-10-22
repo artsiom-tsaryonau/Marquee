@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 function fixture(t) {
   const root = mkdtempSync(join(tmpdir(), 'marquee-launch-test-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
-  for (const dir of ['scripts', 'tools', 'apps/desktop/src', 'crates/core', 'catalog']) mkdirSync(join(root, dir), { recursive: true });
+  for (const dir of ['scripts', 'tools', 'apps/desktop/src', 'crates/core', 'crates/manager', 'crates/media', 'catalog']) mkdirSync(join(root, dir), { recursive: true });
   const script = join(root, 'scripts/run.sh');
   copyFileSync(new URL('../run.sh', import.meta.url), script);
   for (const file of ['Cargo.toml', 'Cargo.lock']) writeFileSync(join(root, file), 'fixture');
@@ -23,6 +23,7 @@ function fixture(t) {
     if(process.env.LAUNCH_TEST_FAIL) process.exit(1);
     const binary = path.join(process.env.LAUNCH_TEST_TARGET, 'release/marquee-desktop');
     fs.mkdirSync(path.dirname(binary), {recursive:true});
+    fs.writeFileSync(path.join(path.dirname(binary), 'marquee-manager'), 'fixture', {mode:0o755});
     fs.writeFileSync(binary, ${JSON.stringify(`#!${process.execPath}
 ${common}
 record({kind:'run',web:process.env.MARQUEE_WEB ?? null,args:process.argv.slice(2),disable:process.env.WEBKIT_DISABLE_DMABUF_RENDERER ?? null});
@@ -72,4 +73,24 @@ test('failed builds never launch a missing or stale binary', (t) => {
   const f = fixture(t);
   assert.notEqual(f.run('desktop', [], { LAUNCH_TEST_FAIL: '1' }).status, 0);
   assert.equal(f.calls().some((c) => c.kind === 'run'), false);
+});
+
+test('a missing manager companion rebuilds the standalone production pair', (t) => {
+  const f = fixture(t);
+  assert.equal(f.run('desktop').status, 0);
+  const before = f.calls().filter(c => c.kind === 'pnpm').length;
+  unlinkSync(join(f.target, 'release/marquee-manager'));
+  assert.equal(f.run('desktop').status, 0);
+  assert.equal(f.calls().filter(c => c.kind === 'pnpm').length, before + 1);
+});
+
+test('manager source changes invalidate the production pair', (t) => {
+  const f = fixture(t);
+  assert.equal(f.run('desktop').status, 0);
+  const source = join(f.root, 'crates/manager/worker.rs');
+  writeFileSync(source, 'changed worker');
+  const future = new Date(Date.now() + 1000);
+  utimesSync(source, future, future);
+  assert.equal(f.run('desktop').status, 0);
+  assert.equal(f.calls().filter(c => c.kind === 'pnpm').length, 2);
 });

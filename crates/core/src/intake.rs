@@ -1,38 +1,14 @@
-//! Archive intake: turn a downloaded `.zip`, `.7z` or `.rar` into library files.
-//!
-//! The archive is inspected first (nothing is written), the system is chosen
-//! from the contents, and files are unpacked into that system's library root
-//! through a staging folder, so a failed or hostile archive never leaves
-//! half-written games behind. Arcade ZIP sets are kept intact because their
-//! emulators read the ZIP itself.
-//!
-//! Limits: entries must stay inside the destination, symlinks are refused,
-//! entry count and total size are capped, actual bytes written may not exceed
-//! the size an entry declares, and free disk space is checked up front.
-//! RAR is read through the bundled UnRAR library (extraction only); encrypted
-//! and multi-volume archives are refused.
-
+//! Legacy immediate intake. Durable jobs use the same shared ArchivePlan.
 use crate::catalog;
 use crate::error::{AppError, Result};
 use crate::Core;
+pub use marquee_media::archive::*;
 use serde::Serialize;
-use sevenz_rust2::{ArchiveReader, Password};
 use std::collections::BTreeSet;
-use std::fs::{self, File};
-use std::io::{Read, Write};
+use std::fs;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
-
-const MAX_ENTRIES: usize = 20_000;
-const MAX_TOTAL: u64 = 128 * 1024 * 1024 * 1024;
 const FREE_MARGIN: u64 = 256 * 1024 * 1024;
-/// A bare `.iso` at least this large is a DVD (PS2); smaller is a CD (PS1).
-const PS2_MIN_ISO: u64 = 750 * 1024 * 1024;
-
-const JUNK_EXT: &[&str] = &[
-    "txt", "nfo", "url", "jpg", "jpeg", "png", "gif", "html", "htm", "diz", "md5", "sha1", "sfv",
-    "db", "ini", "lnk", "pdf",
-];
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -58,345 +34,6 @@ pub struct IntakeReport {
     pub files: Vec<String>,
     pub message: String,
     pub source_removed: bool,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Kind {
-    Zip,
-    SevenZ,
-    Rar,
-}
-
-#[derive(Debug, Clone)]
-struct Entry {
-    /// Name as stored in the archive, used to find the entry again.
-    raw: String,
-    /// Sanitised relative path.
-    rel: PathBuf,
-    size: u64,
-    index: usize,
-}
-
-fn kind_of(path: &Path) -> Result<Kind> {
-    let mut magic = [0u8; 6];
-    let n = File::open(path)?.read(&mut magic)?;
-    if n >= 4 && (&magic[..4] == b"PK\x03\x04" || &magic[..4] == b"PK\x05\x06") {
-        Ok(Kind::Zip)
-    } else if n >= 6 && magic == [b'7', b'z', 0xBC, 0xAF, 0x27, 0x1C] {
-        Ok(Kind::SevenZ)
-    } else if n >= 6 && &magic[..4] == b"Rar!" && magic[4] == 0x1A && magic[5] == 0x07 {
-        Ok(Kind::Rar)
-    } else {
-        Err(AppError::new(
-            "INTAKE_FORMAT",
-            "Only .zip, .7z and .rar archives are supported.",
-        ))
-    }
-}
-
-/// A safe relative path, or None if the name could escape the destination.
-fn safe_rel(name: &str) -> Option<PathBuf> {
-    let n = name.replace('\\', "/");
-    if n.is_empty() || n.starts_with('/') || n.contains('\0') {
-        return None;
-    }
-    let mut out = PathBuf::new();
-    for part in n.split('/') {
-        match part {
-            "" | "." => continue,
-            ".." => return None,
-            p if p.len() > 255 => return None,
-            p => out.push(p),
-        }
-    }
-    if out.as_os_str().is_empty() {
-        None
-    } else {
-        Some(out)
-    }
-}
-
-fn unsafe_entry(name: &str) -> AppError {
-    AppError::new(
-        "INTAKE_UNSAFE",
-        format!("Archive entry has an unsafe path and was refused: {name}"),
-    )
-}
-
-fn list_entries(path: &Path, kind: Kind) -> Result<Vec<Entry>> {
-    let mut out = Vec::new();
-    match kind {
-        Kind::Zip => {
-            let mut zip = zip::ZipArchive::new(File::open(path)?)
-                .map_err(|e| AppError::new("INTAKE_FORMAT", format!("Invalid ZIP: {e}")))?;
-            if zip.len() > MAX_ENTRIES {
-                return Err(AppError::new(
-                    "INTAKE_LIMIT",
-                    "Archive has too many entries",
-                ));
-            }
-            for i in 0..zip.len() {
-                let f = zip
-                    .by_index_raw(i)
-                    .map_err(|e| AppError::new("INTAKE_FORMAT", format!("Invalid ZIP: {e}")))?;
-                if f.is_dir() {
-                    continue;
-                }
-                if f.unix_mode().is_some_and(|m| m & 0o170000 == 0o120000) {
-                    return Err(unsafe_entry(f.name()));
-                }
-                let rel = safe_rel(f.name()).ok_or_else(|| unsafe_entry(f.name()))?;
-                out.push(Entry {
-                    raw: f.name().to_string(),
-                    rel,
-                    size: f.size(),
-                    index: i,
-                });
-            }
-        }
-        Kind::Rar => {
-            let mut archive = crate::rar::Archive::open(path)?;
-            let mut index = 0usize;
-            while let Some(h) = archive.next()? {
-                if index >= MAX_ENTRIES {
-                    return Err(AppError::new(
-                        "INTAKE_LIMIT",
-                        "Archive has too many entries",
-                    ));
-                }
-                let rel = safe_rel(&h.name).ok_or_else(|| unsafe_entry(&h.name))?;
-                if !h.directory {
-                    out.push(Entry {
-                        raw: h.name,
-                        rel,
-                        size: h.size,
-                        index,
-                    });
-                }
-                archive.skip()?;
-                index += 1;
-            }
-        }
-        Kind::SevenZ => {
-            let reader = ArchiveReader::new(File::open(path)?, Password::empty())
-                .map_err(|e| AppError::new("INTAKE_FORMAT", format!("Invalid 7z: {e}")))?;
-            let files = &reader.archive().files;
-            if files.len() > MAX_ENTRIES {
-                return Err(AppError::new(
-                    "INTAKE_LIMIT",
-                    "Archive has too many entries",
-                ));
-            }
-            for (i, f) in files.iter().enumerate() {
-                if f.is_directory() || !f.has_stream() && f.size() == 0 && f.name().ends_with('/') {
-                    continue;
-                }
-                let rel = safe_rel(f.name()).ok_or_else(|| unsafe_entry(f.name()))?;
-                out.push(Entry {
-                    raw: f.name().to_string(),
-                    rel,
-                    size: f.size(),
-                    index: i,
-                });
-            }
-        }
-    }
-    let total = out
-        .iter()
-        .try_fold(0u64, |total, e| total.checked_add(e.size));
-    if total.is_none_or(|size| size > MAX_TOTAL) {
-        return Err(AppError::new(
-            "INTAKE_LIMIT",
-            "Archive would unpack to more than 128 GiB",
-        ));
-    }
-    Ok(out)
-}
-
-fn ext_of(rel: &Path) -> String {
-    rel.extension()
-        .map(|e| e.to_string_lossy().to_lowercase())
-        .unwrap_or_default()
-}
-
-fn is_junk(rel: &Path) -> bool {
-    let name = rel
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    name.starts_with('.')
-        || rel.components().any(|c| c.as_os_str() == "__MACOSX")
-        || JUNK_EXT.contains(&ext_of(rel).as_str())
-}
-
-/// System id for one entry, or None when its extension says nothing.
-fn system_for(rel: &Path, size: u64, has_cue: bool) -> Option<String> {
-    let ext = ext_of(rel);
-    match ext.as_str() {
-        "cue" | "chd" | "pbp" => return Some("ps1".into()),
-        "iso" => {
-            return Some(if size >= PS2_MIN_ISO { "ps2" } else { "ps1" }.into());
-        }
-        "bin" if has_cue => return Some("ps1".into()),
-        "md" | "gen" | "smd" => return Some("genesis".into()),
-        "bin" => return None,
-        _ => {}
-    }
-    catalog::all().ok()?.into_iter().find_map(|d| {
-        let only_zip = d.supported_extensions.iter().all(|e| e == "zip");
-        (!only_zip && d.supports_extension(&ext)).then_some(d.id)
-    })
-}
-
-fn looks_like_neogeo_set(stem: &str, entries: &[Entry]) -> bool {
-    if stem.eq_ignore_ascii_case("neogeo") {
-        return true;
-    }
-    entries.iter().any(|e| {
-        let name = e
-            .rel
-            .file_name()
-            .map(|n| n.to_string_lossy().to_lowercase())
-            .unwrap_or_default();
-        ext_of(&e.rel) == "rom"
-            || (name.len() > 6
-                && name.as_bytes()[..3].iter().all(u8::is_ascii_digit)
-                && name.as_bytes()[3] == b'-')
-    })
-}
-
-fn free_bytes(path: &Path) -> Option<u64> {
-    use std::os::unix::ffi::OsStrExt;
-    let c = std::ffi::CString::new(path.as_os_str().as_bytes()).ok()?;
-    // SAFETY: `c` is a valid NUL-terminated path and `s` is a plain C struct.
-    let mut s: libc::statvfs = unsafe { std::mem::zeroed() };
-    if unsafe { libc::statvfs(c.as_ptr(), &mut s) } != 0 {
-        return None;
-    }
-    Some((s.f_bavail as u64).saturating_mul(s.f_frsize as u64))
-}
-
-/// Copy at most `size` bytes: an entry may not write more than it declared.
-fn copy_limited(reader: &mut dyn Read, out: &mut File, size: u64) -> Result<u64> {
-    let mut limited = reader.take(size.saturating_add(1));
-    let n = std::io::copy(&mut limited, out)?;
-    if n > size {
-        return Err(AppError::new(
-            "INTAKE_LIMIT",
-            "An entry unpacked to more than its declared size",
-        ));
-    }
-    out.flush()?;
-    Ok(n)
-}
-
-fn extract(path: &Path, kind: Kind, wanted: &[(Entry, PathBuf)], staging: &Path) -> Result<()> {
-    let target = |rel_out: &Path| -> Result<PathBuf> {
-        let p = staging.join(rel_out);
-        if let Some(parent) = p.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        Ok(p)
-    };
-    match kind {
-        Kind::Zip => {
-            let mut zip = zip::ZipArchive::new(File::open(path)?)
-                .map_err(|e| AppError::new("INTAKE_FORMAT", format!("Invalid ZIP: {e}")))?;
-            for (entry, rel_out) in wanted {
-                let mut f = zip
-                    .by_index(entry.index)
-                    .map_err(|e| AppError::new("INTAKE_FORMAT", format!("Bad ZIP entry: {e}")))?;
-                let mut out = File::create(target(rel_out)?)?;
-                copy_limited(&mut f, &mut out, entry.size)?;
-            }
-        }
-        Kind::Rar => {
-            let mut archive = crate::rar::Archive::open(path)?;
-            let mut index = 0usize;
-            let mut done = 0usize;
-            while let Some(h) = archive.next()? {
-                if let Some((entry, rel_out)) = wanted.iter().find(|(w, _)| w.index == index) {
-                    if h.directory || h.name != entry.raw || h.size != entry.size {
-                        return Err(AppError::new(
-                            "INTAKE_FORMAT",
-                            "RAR entry changed after inspection",
-                        ));
-                    }
-                    let mut file = File::options()
-                        .write(true)
-                        .create_new(true)
-                        .open(target(rel_out)?)?;
-                    archive.write(&mut file, entry.size)?;
-                    done += 1;
-                } else {
-                    archive.skip()?;
-                }
-                index += 1;
-            }
-            if done != wanted.len() {
-                return Err(AppError::new(
-                    "INTAKE_FORMAT",
-                    "RAR archive ended before all entries were read",
-                ));
-            }
-        }
-        Kind::SevenZ => {
-            let mut reader = ArchiveReader::new(File::open(path)?, Password::empty())
-                .map_err(|e| AppError::new("INTAKE_FORMAT", format!("Invalid 7z: {e}")))?;
-            let mut failure: Option<AppError> = None;
-            reader
-                .for_each_entries(|e, data| {
-                    let Some((entry, rel_out)) = wanted.iter().find(|(w, _)| w.raw == e.name())
-                    else {
-                        return Ok(true);
-                    };
-                    let step = target(rel_out)
-                        .and_then(|p| Ok(File::create(p)?))
-                        .and_then(|mut out| copy_limited(data, &mut out, entry.size));
-                    match step {
-                        Ok(_) => Ok(true),
-                        Err(err) => {
-                            failure = Some(err);
-                            Ok(false)
-                        }
-                    }
-                })
-                .map_err(|e| AppError::new("INTAKE_FORMAT", format!("7z error: {e}")))?;
-            if let Some(err) = failure {
-                return Err(err);
-            }
-        }
-    }
-    Ok(())
-}
-
-/// Files already in `dir` (two levels deep) with the same size and extension
-/// as something just unpacked. Size alone is a hint, not proof, so this only
-/// warns; it never skips or deletes.
-fn possible_duplicates(dir: &Path, wanted: &[(Entry, PathBuf)]) -> Vec<String> {
-    let fresh: Vec<PathBuf> = wanted.iter().map(|(_, r)| dir.join(r)).collect();
-    let mut found = BTreeSet::new();
-    let mut stack = vec![(dir.to_path_buf(), 0usize)];
-    while let Some((d, depth)) = stack.pop() {
-        let Ok(rd) = fs::read_dir(&d) else { continue };
-        for e in rd.flatten() {
-            let p = e.path();
-            let Ok(meta) = e.metadata() else { continue };
-            if meta.is_dir() {
-                if depth < 2 && !e.file_name().to_string_lossy().starts_with('.') {
-                    stack.push((p, depth + 1));
-                }
-            } else if meta.len() >= 64 * 1024 * 1024 && !fresh.contains(&p) {
-                let hit = wanted
-                    .iter()
-                    .any(|(en, rel)| en.size == meta.len() && ext_of(rel) == ext_of(&p));
-                if hit {
-                    found.insert(p.strip_prefix(dir).unwrap_or(&p).display().to_string());
-                }
-            }
-        }
-    }
-    found.into_iter().collect()
 }
 
 impl Core {
@@ -666,6 +303,7 @@ impl Core {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::File;
     use std::io::Write;
 
     fn make_zip(path: &Path, files: &[(&str, &[u8])]) {
@@ -680,6 +318,19 @@ mod tests {
 
     fn core(dir: &Path) -> Core {
         Core::open(Some(dir.to_path_buf()), true).unwrap()
+    }
+
+    #[test]
+    fn preparation_space_refuses_insufficient_or_unknown_capacity_before_writing() {
+        assert_eq!(
+            require_preparation_space(Some(99), 100).unwrap_err().code,
+            "INTAKE_DISK"
+        );
+        assert_eq!(
+            require_preparation_space(None, 100).unwrap_err().code,
+            "INTAKE_DISK"
+        );
+        assert!(require_preparation_space(Some(100), 100).is_ok());
     }
 
     #[test]

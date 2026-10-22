@@ -2,7 +2,7 @@
 
 Updated 2026-10-21. Planning note for **which external ROM/disc sources Marquee should automate**, informed by community indexes such as [FMHY Gaming → ROM sites](https://fmhy.net/gaming#rom-sites). FMHY is a **link directory**, not a host; listing a site here does **not** mean Marquee endorses redistribution or that use is legal in your jurisdiction. Marquee never bundles copyrighted BIOS or ROM files.
 
-This document does **not** change [roadmap](ROADMAP.md) store order (Steam → Epic → GOG). It ranks **disc/ROM connector** work alongside [media acquisition](MEDIA_ACQUISITION.md) and [catalogue metadata](CATALOGUE_METADATA.md).
+Updated boundary (2026-10-22): provider work runs behind the hidden [marquee-manager](MARQUEE_MANAGER.md); this document ranks sources, not job/process ownership. The [roadmap](ROADMAP.md) puts manager preparation first and preserves Steam → Epic → GOG store order. Provider policy here does not forbid user-reviewed generic torrent transport; it does not authorize automation of tracker indexes or gated sites.
 
 ## Principles for any connector
 
@@ -13,7 +13,7 @@ This document does **not** change [roadmap](ROADMAP.md) store order (Steam → E
 | **Verify when possible** | Match [No-Intro](https://no-intro.org/) / [Redump](http://redump.org/) DATs or catalogue SHA-1 before marking installed. |
 | **Headed browser when required** | Sites with bot checks, interstitial ads, or per-download gates use a **user-visible** browser (local connector tooling; not shipped in this repo). |
 | **Metadata ≠ entitlement** | Catalogue import (Vimm JSON, hashes, covers) does not imply a licensed copy or launchable install. |
-| **Secrets stay in core** | Cookies, tokens, and paths live in the job backend; the UI sees progress and errors only. |
+| **Secrets stay backend-side** | Site sessions/cookies stay in the browser; manager/store credentials stay in protected backend storage. UI/events do not carry secrets. |
 
 ## Priority tiers
 
@@ -30,10 +30,10 @@ This document does **not** change [roadmap](ROADMAP.md) store order (Steam → E
 
 | Source | FMHY / community role | Marquee approach | Notes |
 | --- | --- | --- | --- |
-| **Vimm's Lair** | Starred general vault on FMHY | **Downloads job**: catalog browse (metadata via JSON import), **one download at a time**, CDP/headed browser, user completes ads/dialogs | POC in [fmhy-marquee-scrapers](https://github.com/artsiom-tsaryonau/fmhy-marquee-scrapers) (`connectors/vimm/`); respect site rate limits and ToS |
+| **Vimm's Lair** | Starred general vault on FMHY | **Downloads job**: catalog browse (metadata via JSON import), **one download at a time**, paired companion/headed browser (CDP remains research only), user completes ads/dialogs | POC in [fmhy-marquee-scrapers](https://github.com/artsiom-tsaryonau/fmhy-marquee-scrapers) (`connectors/vimm/`); respect site rate limits and ToS |
 | **Catalogue metadata only** | Same vault, saved HTML/JSON | Keep **import-only** path (`catalogue import`); link/match by hash | Implemented; stays separate from download jobs |
 
-**Tier 1 acceptance:** User picks a catalogue row or vault game → job runs → file lands under configured `roms/` layout → library rescan shows install; job fails closed if hash optional-check fails.
+**Tier 1 acceptance:** Reviewed provider selection → manager acquisition → source artifact → supported preparation/validation → installation receipt → library registration. Hash mismatch blocks preparation; missing reference hashes remain explicit. Provider completion alone cannot mark a game installed.
 
 ### Tier 2 — Preservation HTTP mirrors (after Tier 1 job manager)
 
@@ -85,17 +85,17 @@ User can always **import a folder** or use **Open in browser** for sources Marqu
 
 ## Implementation sequence (connector track)
 
-1. **Shared download job manager** (progress, cancel, resume) — same as store milestones in [STORE_INTEGRATION.md](STORE_INTEGRATION.md).
-2. **Vimm download adapter** — implement in core (or a separate optional package); reuse catalogue IDs where possible.
-3. **Post-download verify** — optional SHA-1 / DAT match; surface mismatch in Library.
+1. **Manager foundation** — follow M0–M2 in [MARQUEE_MANAGER.md](MARQUEE_MANAGER.md); reuse its contracts rather than create another queue.
+2. **Vimm browser-worker bridge** — manager M4; keep provider code in the sibling connector repo and reuse catalogue IDs.
+3. **Preparation and receipt publication** — reference-hash/DAT checks when available, explicit unknowns otherwise; mismatch blocks installation. Only the library can register the resulting installation.
 4. **Configurable mirror base URL** — Tier 2 Myrient-style fetches with catalogue-relative paths only.
 5. **Firmware jobs** — authorized paths only (e.g. dump-from-own-console workflows); never scrape BIOS hosts.
 
 ## Related docs
 
-- [Media acquisition](MEDIA_ACQUISITION.md) — product-level automation vs fallback
+- [Media acquisition](MARQUEE_MANAGER.md#acquisition-user-flow) — product-level automation vs fallback
 - [Catalogue metadata](CATALOGUE_METADATA.md) — Vimm JSON import and linking
 - [Expansion catalogue](EXPANSION_CATALOGUE.md) — per-platform launch adapters
-- [Launcher branding](LAUNCHER_BRANDING.md) — unrelated to ROM sources; Tools UI only
+- [Launcher branding](LAUNCHERS.md#launcher-and-store-marks) — unrelated to ROM sources; Tools UI only
 
 Sources checked 2026-10-21: FMHY gaming page (ROM resources, ROM sites, Nintendo ROMs, PlayStation ROMs); Marquee catalogue schema v5 import format in `marquee-core`.

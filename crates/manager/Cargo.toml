@@ -1,0 +1,19 @@
+[package]
+name = "marquee-manager"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Private local preparation worker for Marquee"
+
+[dependencies]
+marquee-media.workspace = true
+libc = "0.2"
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tempfile = "3"
+zip.workspace = true

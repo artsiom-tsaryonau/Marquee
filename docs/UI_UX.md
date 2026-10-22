@@ -127,3 +127,39 @@ The hero foreground poster also contains the full cover.
 Svelte checks, frontend regression tests and production compilation validate the
 change; rendered layout, image-load movement, hover/focus and native gamepad
 acceptance at the sizes above still require a live UI surface.
+
+## Library and Home follow-up (recorded 2026-10-21)
+
+The former root UX checklist recorded these implemented refinements:
+
+- Source dropdown and shared `.ui-select`; run-method filtering removed from the
+  library while edition/run selection stays on the game page. Player mode uses
+  single/multiplayer/co-op; co-op shares multiplayer until richer metadata exists.
+- Grouped platform tags, catalogue source links in metadata, cover attribution,
+  and “Not in library” discovery cards with no Play action.
+- One Add games menu; labeled platform chips ordered by collection size; stores
+  grouped as Other. Search/Installed/Favourites/Filters/Sort form the primary row,
+  with secondary filters on demand and only applicable sorts shown.
+- Search/filter/sort, loaded cards and scroll survive game-page Back navigation;
+  incremental scrolling retains a load-more fallback; Esc clears search.
+- Readable two-line titles, full title on hover, region in subtitles, removed
+  duplicate generated-art titles and corrected zero-hour presentation.
+- Compact Home hero/poster/backdrop, recent-play selection, overview/platform
+  shortcuts, wishlist row and muted slate branding.
+
+Games without files are documented in [the unified library](UNIFIED_LIBRARY.md#games-without-files).
+**Still open:** a library-card preview dialog; the full game page remains current
+behavior. This dated checklist does not close rendered/native/controller gates.
+
+## Presentation goals still to validate or extend
+
+Home shelves must use real library/play/readiness metadata. Canonical pages retain
+edition/run selection, separate saves and provenance-labeled screenshots. Keep
+source/platform/runtime/install filters distinct and paginate or virtualize large
+libraries. Manager Downloads must display measured progress or an explicit handoff.
+Dark/light tokens, reduced motion, restrained effects, idle animation pause and
+clear focus remain shared Desktop/Big Screen goals; Big Screen needs larger
+targets, controller glyphs and reliable Back/context behavior. Native Tauri input
+must be verified independently of browser Gamepad API tests. Capture supported
+sizes/themes/input modes; a build is not visual acceptance. Optional collections,
+notes, save backup, Gamescope and streaming remain [expansion work](EXPANSION_CATALOGUE.md).

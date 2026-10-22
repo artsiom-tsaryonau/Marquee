@@ -26,11 +26,11 @@ build_release() {
 ensure_release() {
   binary="$(release_binary)"
   local rebuild=0 changed
-  if [[ ! -x "$binary" || ${MARQUEE_REBUILD:-0} == 1 ]]; then rebuild=1; fi
+  if [[ ! -x "$binary" || ! -x "$(dirname "$binary")/marquee-manager" || ${MARQUEE_REBUILD:-0} == 1 ]]; then rebuild=1; fi
   if [[ $rebuild == 0 ]]; then
     # Directory mtimes also catch removed inputs; prune build outputs so merely
     # running Vite/pnpm does not invalidate the production executable.
-    changed="$(cd "$root" && find apps/desktop crates/core catalog Cargo.toml Cargo.lock \
+    changed="$(cd "$root" && find apps/desktop crates catalog Cargo.toml Cargo.lock \
       -type d \( -name node_modules -o -name dist -o -name target -o -name gen \) -prune \
       -o -newer "$binary" -print -quit)"
     if [[ -n $changed ]]; then rebuild=1; fi
@@ -48,10 +48,12 @@ case "$mode" in
     build_release "$@"
     ;;
   web)
+    (cd "$root" && cargo build --locked -p marquee-manager)
     (cd "$root/apps/desktop" && pnpm build)
     cd "$root" && exec cargo run -q -p marquee-cli -- run web "$@"
     ;;
   dev)
+    (cd "$root" && cargo build --locked -p marquee-manager)
     exec node "$root/scripts/dev.mjs" "$@"
     ;;
   *)

@@ -2,6 +2,15 @@
 
 Updated 2026-10-21. Marquee installs emulators and holds BIOS images inside its own data folder, so everything can be removed on demand. **Policy (2026-10-21):** Marquee installs, configures and runs emulators itself, from verified archives or reviewed pinned source recipes named in the catalogue. It does not use Flatpak or other package managers, and it no longer discovers host copies of emulators. Setup that an emulator would normally ask the user for is written by Marquee before launch.
 
+## Manager and added collection (planned)
+
+[Marquee manager](MARQUEE_MANAGER.md) will run durable setup/preparation jobs;
+Marquee keeps launch profiles and sessions. Existing core installers described
+below remain implemented behavior until migrated. The owner has added Switch,
+PS3, PS4, original Xbox and Xbox 360 content; [console preparation](CONSOLE_PREPARATION.md)
+records the read-only inventory, missing adapters and per-platform gates. Tool
+installation/opening is not game installation or compatibility acceptance.
+
 ## Current catalogue and integration boundary
 
 | Emulator | Platform | Current Marquee capability |

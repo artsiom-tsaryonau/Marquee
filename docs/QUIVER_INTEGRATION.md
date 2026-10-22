@@ -11,8 +11,9 @@ explicitly schedules this work.
 
 Use Quiver's app-list conventions, release-provider patterns and selected code
 to expand Marquee's managed ports without requiring another launcher. Marquee
-continues to own its UI, library identities, installation jobs, verification,
-game-data setup, runtime selection and sessions.
+continues to own its UI, library identities, runtime selection and sessions;
+the [hidden manager](MARQUEE_MANAGER.md) owns durable preparation/install jobs,
+verification and game-data setup. Quiver must not add a competing job authority.
 
 Quiver uses C#/.NET and Avalonia; Marquee uses Rust and Tauri/Svelte. The preferred
 route is a Rust catalogue importer and selective adaptation of useful logic and

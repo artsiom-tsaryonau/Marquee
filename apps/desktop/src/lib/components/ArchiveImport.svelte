@@ -4,6 +4,7 @@
   import { modal } from '../modal';
   import { systemLabel } from '../labels';
   import Icon from './Icon.svelte';
+  import PreparationJobs from './PreparationJobs.svelte';
   let draft = $state('');
   let error = $state('');
   let listening = true;
@@ -35,7 +36,7 @@
 {#if app.intakeOpen}
   <div class="scrim" data-modal-dismiss role="presentation" onclick={() => (app.intakeOpen = false)}></div>
   <div class="dialog glass-panel" role="dialog" aria-modal="true" aria-labelledby="archive-title" use:modal={() => (app.intakeOpen = false)}>
-    <header><div><h2 id="archive-title">Import game archives</h2><p>ZIP, 7z and RAR archives are checked, extracted into library folders, then scanned.</p></div><button class="btn glass small" data-nav aria-label="Close archive import" onclick={() => (app.intakeOpen = false)}><Icon name="x" /></button></header>
+    <header><div><h2 id="archive-title">Import game archives</h2><p>Review ZIP, 7z and RAR archives, prepare their game files, and add them to your library.</p></div><button class="btn glass small" data-nav aria-label="Close archive import" onclick={() => (app.intakeOpen = false)}><Icon name="x" /></button></header>
     <div class="body">
       {#if app.api.kind === 'desktop'}<p>Choose archives or drop them onto Library. Review the selection before importing.</p>{:else}<p>Enter paths on the computer running Marquee. Browser uploads and files on another computer are not supported.</p>{/if}
       <form onsubmit={(event) => { event.preventDefault(); addPaths(); }}>
@@ -46,6 +47,11 @@
       {#if app.intakePaths.length}
         <h3>Selected archives · {app.intakePaths.length}</h3>
         <ul class="selection">{#each app.intakePaths as path (path)}<li><span>{path}</span><button class="btn glass small" data-nav disabled={app.intakeBusy} aria-label={`Remove ${path}`} onclick={() => (app.intakePaths = app.intakePaths.filter((p) => p !== path))}><Icon name="x" size={14} /></button></li>{/each}</ul>
+      {/if}
+      <PreparationJobs paths={app.intakePaths} />
+      <details><summary data-nav>Legacy immediate importer</summary>
+      <p>This older workflow does not save preparation jobs across restarts.</p>
+      {#if app.intakePaths.length}
         <label class="check"><input type="checkbox" data-nav bind:checked={app.intakeDelete} disabled={app.intakeBusy} /> Remove source archives after successful extraction and size checks</label>
         <p>Original archives are kept by default. System detection uses file types and disc size; review the detected system below. Firmware archives belong in Tools → Import BIOS.</p>
         <button class="btn primary" data-nav disabled={app.intakeBusy} onclick={() => app.importArchives(app.intakePaths, app.intakeDelete)}>{app.intakeBusy ? 'Importing…' : app.intakeResults.some((r) => r.error) ? 'Retry selected archives' : 'Import selected archives'}</button>
@@ -63,6 +69,7 @@
           {/if}
         </article>
       {/each}
+      </details>
     </div>
   </div>
 {/if}

@@ -1,23 +1,87 @@
-# Enrichment and UI follow-up
+# Metadata enrichment: artwork, facts and provider plans
 
-Planning notes aligned 2026-10-21. These retain metadata, visual, and controller goals from the earlier roadmap. They are background/follow-up work; [direct Steam → Epic → GOG](ROADMAP.md) is the critical path. Nothing here gates a supported installed game's Play action.
+Updated 2026-10-22. This document owns current optional ROM artwork/facts behavior
+and future provider research. [Catalogue metadata](CATALOGUE_METADATA.md) owns
+saved provider snapshots and verified/manual links; [UI/UX](UI_UX.md) owns visual
+and controller presentation. [Roadmap](ROADMAP.md) owns priority. Enrichment must
+never gate Play, create ownership, or merge releases by name.
 
-## Implemented baseline (2026-10-21)
+## Implemented artwork and facts
 
-Saved Vimm snapshots retain release/media details and field provenance across
-listing-only refreshes. Serial covers validate decoded image bounds and reject
-stale jobs. Optional ROM enrichment now uses libretro checksum metadata,
-libretro thumbnails, guarded SteamGridDB artwork and TheGamesDB game facts;
-see [artwork and matching limits](ROM_ARTWORK.md), [game facts](ROM_FACTS.md)
-and [catalogue provenance](CATALOGUE_METADATA.md).
+`Fetch covers`, automatic refresh after scans, and `Core::refresh_artwork` use
+`crates/core/src/romart.rs` and `romfacts.rs`. Covers fill gaps without replacing
+existing covers. Missing keys, provider errors and no-match results are nonfatal.
+Settings → API keys supplies configured provider keys, with environment/`.env`
+fallback as documented in the root README.
 
-ScreenScraper is not an active implementation dependency. The provider-specific
-plan below is retained as research, not current runtime behavior. Verified
-cross-provider IDs, artwork edition associations, general field provenance and
-user override editing/precedence remain open. Name-based enrichment must not
-be represented as a verified release mapping or merge installations.
+### Artwork lookup order
 
-The [UI/UX implementation pass](UI_UX.md) adds explicit availability, personal versus catalogue scopes, calmer title/artwork presentation, Settings categories and dialog focus handling. Rendered layout and native controller acceptance remain open.
+1. **PS1/PS2 serial covers** (xlenore sets) — unchanged, see [PS2](PS2.md).
+2. **libretro-database + libretro-thumbnails** for NES, SNES, Game Boy, Game Boy Color, PC Engine, N64 and DS. The ROM is hashed (CRC-32, also without an iNES or SNES copier header), looked up in the No-Intro list to get the **official game name**, and box art (then title screen, then screenshot) is fetched by that name. A messy file name does not matter. No account or key.
+3. **SteamGridDB** (needs `STEAM_GRID_DB_API_KEY` in Settings → API keys or `.env`) for games that still have no cover, but **only** when:
+   - the game has an official No-Intro name that looks retail (not `World`, `Proto`, `Beta`, `Demo`, `Homebrew`, `Aftermarket`, `Unl`, `Pirate`, `Hack`), or
+   - it is a PS1, PS2 or Dreamcast disc image.
+   A search result is used only if its name is essentially the same game (`Tetris` does not match `Tetris Effect`).
+
+Homebrew, public-domain and hacked ROMs are deliberately left without a cover: they share names with famous games and a wrong cover is worse than none.
+
+### Artwork cache and dated measurements
+
+Lists are cached for 30 days under the cache folder (`libretro/`), ROM hashes are cached by path, size and modification time (`romcrc.json`), official names are kept (`romnames.json`), and games that found nothing are not asked again for 14 days (`romart-miss.json`); asking for one game by name bypasses that. Lookups run six at a time. Recorded on the 780-game collection at implementation time: first run about 18 s, repeat run under a second. This is a dated sample, not a current performance guarantee.
+
+### Recorded sample result (2026-10-21)
+
+The library is mostly public-domain and homebrew Game Boy Color and NES ROMs, so very few covers exist for it anywhere: 1 from libretro (Pokémon Platino, matched by checksum), 3 from SteamGridDB, none wrong that I could see. This will matter when commercial games are added (for example through [archive intake](INTAKE.md)).
+
+### Artwork limits
+
+- Disc images are not hashed (too large); PS1/PS2 use the serial, Dreamcast and others only the title.
+- Genesis now has a launch adapter; Genesis and Neo Geo remain absent from the current artwork source list. Emulator support and enrichment support are separate.
+- IGDB is not used by this path. TheGamesDB is used for optional facts as described below.
+
+
+
+### Fact storage and identity limits
+
+Facts are stored in `edition_info`, projected as `Edition.info`, and shown on
+game pages. Gap filling retains existing fields. There is no general user-edit/
+override model. Combined `source` labels identify participating providers, not
+the evidence for each field; catalogue per-field provenance remains separate.
+Name-based TheGamesDB/SteamGridDB matching does not verify a release or resolve
+same-name editions. Unknown facts stay unknown. Fact lookup uses at most three
+workers; selected-game refresh bypasses the ordinary retry delay. Adding a
+platform ID alone does not enable a system absent from the supported source list.
+These checks do not establish live provider availability or accuracy for every title.
+
+Shown on the game page (About text, Genre · year, Developer, Publisher, Players) and used by library search. Filled by `Fetch covers` and by the automatic fetch after a scan. Code: `crates/core/src/romfacts.rs`; stored in the library database table `edition_info`.
+
+### Fact sources
+
+1. **libretro-database** `metadat/genre`, `releaseyear`, `developer`, `publisher`: for NES, SNES, Game Boy, Game Boy Color, PC Engine, N64 and DS. The ROM is matched by checksum, as for [covers](ENRICHMENT.md#implemented-artwork-and-facts). No account.
+2. **TheGamesDB** (key `THE_GAMES_DB_API_KEY`, Settings → API keys): descriptions and player counts for those systems and for PS1, PS2 and Dreamcast, by name; also fills a missing genre or year. Developers and publishers from TheGamesDB are not used (it returns ids that need large lists).
+
+A field is filled once and never overwritten by a later source.
+
+### Fact safeguards
+
+- **Quota.** The earlier implementation note described about 1,000 monthly lookups for its free key; verify current provider allowance when changing this integration. Marquee asks only about games with an official retail name (or disc games), at most 500 per run, once per game, retries a game that found nothing after 7 days, and stops when fewer than 25 lookups are left in the month. Games found are never asked again.
+- **Same game only.** A result is used only if its title is the same game (`Underground` is not `Underground 2`, `Tetris` is not `Tetris Effect`).
+- **No guesses for homebrew.** Homebrew, public-domain and hacked ROMs are not searched by name.
+- The key is part of TheGamesDB's request URL, so request errors are dropped and never logged or shown.
+
+### Fact limits
+
+- PS1, PS2 and Dreamcast get genre and year only from TheGamesDB (libretro has no lists for them).
+- Developers and publishers for disc games.
+- Editing facts by hand.
+
+## Remaining work
+
+Verified cross-provider IDs, exact artwork URLs and edition associations,
+general field provenance, user-edit/override precedence and ambiguity handling
+remain open. ScreenScraper is research, not an active dependency. IGDB/RAWG are
+not used by the implemented ROM path. Existing libretro matching and TheGamesDB
+facts must remain functional independently of future provider work.
 
 ## Metadata and artwork candidates
 
@@ -40,22 +104,6 @@ Use account/store/product/platform/revision identifiers before name matching. A 
 
 Cache provider results with fetch/source/version data, sensible TTLs, offline behavior, and bounded request queues. Recheck provider endpoints, quotas, access, and attribution rules at implementation time instead of inheriting old numeric assumptions. Provider keys remain backend-side; never require an artwork key to launch a game.
 
-## Visual and controller goals
-
-- Home uses real library entries for Continue playing, Recently added, source/platform shelves, and native-port readiness. Any backlog/score-based shelf needs actual available metadata.
-- Canonical game pages show edition and installation/run choices, proper hero art, provenance-labeled screenshots, readiness, and supported Install/Play/Update/Verify/Repair actions. Preserve separate saves and histories.
-- Library filters source, platform, runtime, installed state, and user tags/favorites; paginate or virtualize large collections. Do not claim a frame-rate target is achieved until measured.
-- Download jobs expose real progress, cancellation, retries, and errors across desktop/browser. A client handoff is a different state from a managed install.
-- Dark/light tokens, bundled type, restrained blur, reduced motion, idle animation pause, and clear focus states remain goals. Avoid stacked effects that consume the GPU while a game runs.
-- Desktop and Big Screen share components; Big Screen uses larger targets, controller glyphs, and reliable back/context behavior.
-- Verify a native gamepad input path such as gilrs in Tauri rather than treating browser Gamepad API tests as proof of WebView support. Disabled/inert controls stay outside spatial navigation.
-- Capture and inspect actual layouts at supported sizes and input modes. A production build or reference artwork collection is not visual acceptance evidence.
-
-## Later extras
-
-Store-specific optional facts, collection rules, per-game notes, save backup/restore, Steam shortcut export, Gamescope launch, streaming/RomM adapters, and standalone Windows-app installer recipes remain possible after the core store flows. A standalone installer recipe may provision a prefix/runtime/dependencies and discover shortcuts, but the existing demo wizard is not an implemented installer.
-
-Torrent/tracker integration remains deferred. Keep optional enrichments and additional stores out of S1/E1/G1 acceptance criteria.
 
 ## PS2 metadata matching and cached artwork
 
@@ -69,7 +117,7 @@ Serial-based box art from xlenore/ps2-covers is already in the tree (schema v2 `
 - Cached offline reuse of the last valid match/artwork; fixture-HTTP tests, not live quota-limited calls.
 - Extend the existing `artwork` table (attribution, local-override flag, provider id) rather than adding a second store. Add a provider-match entity (edition ID, provider/external ID, confidence/state, fetched time, user override) only when work starts.
 
-**Deferred:** IGDB, RAWG, RetroAchievements, libretro-database; hash-based auto-relink as a silent merge; CHD/CUE advertising (a media-format ticket).
+**Still outside this provider proposal:** IGDB/RAWG/RetroAchievements integration, silent hash-based relinking and new media-format support. libretro enrichment is already implemented as described above; it is not deferred by this older proposal.
 
 **ScreenScraper**
 

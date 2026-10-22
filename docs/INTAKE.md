@@ -1,4 +1,81 @@
-# Archive intake
+# Archive preparation and intake
+
+Updated 2026-10-22. The M1 manager service now provides **durable, reviewed local
+archive preparation**. The legacy immediate importer remains available below.
+M2 now runs it in a separate hidden `marquee-manager` process; the launcher owns
+library registration. See the [manager lifecycle/delivery contract](MARQUEE_MANAGER.md#implemented-worker-lifecycle-m2).
+
+## Saved preparation workflow (implemented)
+
+Library → Import ZIP/7z/RAR archives → add paths → choose a supported platform →
+**Inspect selected archives** → review files/destination/space → **Approve and
+prepare**. Inspection saves a review only; dropping/selecting files never extracts.
+Preparation history reloads from the backend when the panel is reopened.
+
+- The platform is explicit; no PS1/PS2 ISO size guess is used. Unknown platforms,
+  installers and unsupported package members fail inspection without installing.
+- `ArchivePlan` in `crates/media/src/archive.rs` shares bounded inspection/extraction with the legacy
+  importer. Outputs preserve relative paths; known arcade sets remain intact ZIPs.
+  CUE quote normalization is followed by actual track-manifest validation.
+- Sources are always retained. SHA-256 binds the reviewed archive and is checked
+  before/after extraction. A local hash is integrity evidence, not verified game identity.
+- Each job owns `<data dir>/manager/installations/<job-id>` and a sibling private
+  staging directory. Validate sizes, regular-file paths, CUE dependencies and output
+  hashes, sync staged files/directories, persist the receipt, then promote the
+  whole directory. Existing installations are never overwritten by this recipe.
+- `manager/jobs.db` schema 2 persists jobs, reviews, attempts and receipts/outbox;
+  M1 schema 1 is backed up and adopted under exclusive ownership.
+  `library.db` schema 6 adds only `preparation_receipts`. Root registration, scan
+  and the library receipt record commit in one transaction, then the worker is acknowledged; failed publication
+  rolls back and stays retryable. No existing library reset is required.
+- Restart marks abandoned active jobs interrupted. Retry reconciles partial staging
+  or an already prepared receipt. Registration retry does not extract again and
+  can succeed after the source archive has moved. Lost acknowledgements reuse the
+  committed edition IDs. Changed output files block publication.
+- Cancel is supported before preparation, not during active extraction. Inspecting
+  a cancelled source again explicitly returns it to review. Work continues when
+  the panel or launcher closes. Completed receipts wait for Marquee to reconnect;
+  interrupted jobs require explicit retry. Byte progress and automatic resume remain open.
+
+CLI, over the same service:
+
+```sh
+marquee prepare inspect "/absolute/path/Game.zip" --system genesis
+marquee prepare list                    # reconcile with the library
+marquee prepare start JOB_ID --review-token TOKEN_FROM_INSPECTION  # accept and detach
+marquee prepare run JOB_ID --review-token TOKEN_FROM_INSPECTION
+marquee prepare cancel JOB_ID
+```
+
+`start`/`inspect` and `manager status|start|stop` work without taking the library
+lease. `run` waits for completion and exits nonzero if preparation/publication fails;
+`list` registers pending receipts. Close another library owner before those two
+library-writing CLI commands. The UI reconciles automatically while active.
+API: `preparation_systems`, `inspect_preparation` (`path`, `system`),
+`preparation_jobs`, `start_preparation` (`id`, `review_token`), and
+`cancel_preparation` (`id`). The start command returns after claiming a worker;
+desktop and HTTP share the same dispatch. Concurrent preparation is refused;
+status reads cannot rewrite a live worker's newer state.
+
+### Verification and remaining limits
+
+Synthetic ZIP/7z/RAR tests cover review boundaries, source preservation, v5→v6
+migration with personal entries intact, interruptions around staging/promotion,
+failed publication/rollback, lost acknowledgement, duplicate actions, corrupt
+state, unsupported packages, changed source/output, unsafe paths and CUE failures.
+Space-check tests refuse insufficient or unknown capacity before staging.
+
+Production browser checks used the owner's Sonic Genesis ZIP with isolated
+libraries: inspect → review → prepare → Library entry → reload history; M2 also
+closed the launcher before registration, observed independent completion, then
+reopened and registered once. Worker UI start/stop and M1 pilot adoption passed.
+The original SHA-256 was unchanged and the same job had one attempt. The rendered
+panel was inspected. This is preparation/registration evidence, not a game boot,
+controller/save check or native Tauri picker/drop acceptance. Existing emulator
+prerequisite and launch gates remain open. Five [added console platforms](CONSOLE_PREPARATION.md)
+remain outside this recipe; do not use legacy ISO guessing for their packages.
+
+## Legacy immediate importer
 
 Turns a downloaded `.zip`, `.7z` or `.rar` into library files. `marquee intake <archive-or-folder>...` inspects each archive, picks the system from its contents, unpacks into that system's library folder and rescans. Core API: `Core::intake_archive`; JSON command `intake_archive` (`path`, `delete_source`). Code: `crates/core/src/intake.rs`.
 
@@ -8,7 +85,7 @@ marquee intake "Game (USA).7z" --delete    # remove the archive once verified
 marquee intake x.zip --no-scan             # skip the rescan
 ```
 
-## Desktop and browser UI
+### Legacy desktop and browser UI
 
 Library → Add games → Import ZIP/7z/RAR archives opens the importer. A separate
 Library button reopens progress and results. Desktop can select multiple
@@ -30,7 +107,7 @@ cancellation, watched inboxes and restart-persistent import jobs are not yet
 implemented. Native drop/file-picker and rendered interaction still need live
 acceptance; tests cover shared dispatch and batch failure/recovery behavior.
 
-## What it decides
+### Legacy system detection
 
 | Contents | Result |
 | --- | --- |
@@ -59,7 +136,7 @@ alone does not make that archive playable.
 
 Documents and images in the archive (`.txt`, `.nfo`, `.jpg`, ...) are ignored. A system with no library folder gets one next to your existing roots and is registered.
 
-## Safety
+### Legacy safety
 
 - Entries must stay inside the destination: `..`, absolute paths and symlinks refuse the whole archive before anything is written.
 - At most 20,000 entries and 128 GiB unpacked; an entry may not write more bytes than it declares.
@@ -68,7 +145,7 @@ Documents and images in the archive (`.txt`, `.nfo`, `.jpg`, ...) are ignored. A
 - Existing files with the same name and size are left alone (`AlreadyPresent`). A file of at least 64 MiB with the same size and extension as something already in the folder produces a **possible duplicate** warning, never a skip or delete.
 - `--delete` removes the archive only after every unpacked file is verified by size.
 
-## Limits and not done
+### Legacy limits
 
 - RAR4/RAR5 link and redirection entries (including hardlinks and file copies) are rejected from packed native headers. UnRAR only decompresses bytes through a bounded callback; Marquee creates regular staging files itself, checks CRC errors and refuses short/oversized output. Synthetic RAR fixtures cover both versions and hostile links/paths.
 - `.rar` is read through the bundled UnRAR library (extraction only; encrypted headers/files and multi-volume sets are refused); the format is detected by content, not file name.

@@ -106,7 +106,7 @@ Schema v5 adds `catalogue_records`, `catalogue_systems` and `catalogue_links`.
 Records use a typed, validated JSON payload; links reference existing edition
 IDs. The migration is additive and transactional. It does not rewrite editions,
 media, launch profiles or sessions. Future normalized game/edition migrations
-must use the next available schema number after v5.
+must use the next available schema number after v6 (v6 is allocated to preparation receipts).
 
 Downloaded serial JPEG covers now pass bounded decoding (4096 pixels per side,
 64 MiB decode allocation, 8 MiB download) before atomic publication. Refresh
@@ -119,7 +119,7 @@ Remaining enrichment work: persisted cross-provider mappings with explicit
 acceptance evidence; exact artwork asset URLs and per-variant associations;
 general field/artwork override editing and refresh precedence. Artwork credit
 alone is not a verified release mapping. Optional ROM artwork/facts now make live provider requests (see
-[ROM enrichment](ROM_ARTWORK.md)); those lookups do not create verified
+[ROM enrichment](ENRICHMENT.md#implemented-artwork-and-facts)); those lookups do not create verified
 Vimm-to-provider release mappings.
 
 Commands: `import_catalogue`, `link_catalogue`, `unlink_catalogue`,

@@ -89,6 +89,22 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
             out(core.refresh_artwork(edition.as_deref(), Some(sink))?)
         }
         "set_display_mode" => out(core.set_display_mode(&text(&args, "mode")?)?),
+        "manager_status" => out(core.preparation.status()?),
+        "start_manager" => out(core.preparation.start_manager()?),
+        "stop_manager" => out(core.preparation.stop()?),
+        "preparation_systems" => out(catalog::all()?
+            .into_iter()
+            .map(|d| serde_json::json!({"id":d.id,"name":d.display_name}))
+            .collect::<Vec<_>>()),
+        "preparation_jobs" => out(core.preparation_jobs()?),
+        "inspect_preparation" => out(core.inspect_preparation(
+            std::path::Path::new(&text(&args, "path")?),
+            &text(&args, "system")?,
+        )?),
+        "start_preparation" => {
+            out(core.start_preparation(&text(&args, "id")?, &text(&args, "review_token")?)?)
+        }
+        "cancel_preparation" => out(core.cancel_preparation(&text(&args, "id")?)?),
         "intake_archive" => {
             let path = std::path::PathBuf::from(text(&args, "path")?);
             let delete = args

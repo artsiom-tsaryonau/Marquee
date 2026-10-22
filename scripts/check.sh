@@ -8,6 +8,7 @@ node --test scripts/tests/*.test.mjs
 if [ -f Cargo.toml ]; then
   cargo fmt --all --check
   cargo clippy --workspace --exclude marquee-desktop --all-targets --locked -- -D warnings
+  cargo build -p marquee-manager --locked
   cargo test --workspace --exclude marquee-desktop --locked
   if ! pkg-config --exists webkit2gtk-4.1 || ! pkg-config --exists dbus-1; then
     echo "BLOCKED: Tauri native deps (webkit2gtk-4.1 / dbus-1). On Fedora: ./scripts/setup.sh" >&2

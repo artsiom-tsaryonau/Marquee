@@ -112,6 +112,25 @@ export interface IntakeReport {
 }
 export interface IntakeResult { path: string; report: IntakeReport | null; error: string | null }
 
+export type PreparationState = 'awaiting_review' | 'preparing' | 'interrupted' | 'awaiting_library' | 'registered' | 'failed' | 'cancelled';
+export interface PreparationJob {
+  id: string;
+  source: string;
+  source_size: number;
+  source_sha256: string;
+  destination: string;
+  plan: { system: string; files: { path: string; size: number }[]; keep_archive: boolean; required_bytes: number };
+  review_token: string;
+  state: PreparationState;
+  attempt: number;
+  error: string | null;
+  error_code: string | null;
+  receipt: { id: string; recipe: string; content_verified: boolean } | null;
+  edition_ids: string[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ScanReport {
   scanned: number;
   added: number;
@@ -320,7 +339,17 @@ export interface EmulatorBuildStatus {
 }
 export interface BiosImport { added: BiosFile[]; ignored: number }
 
+export interface ManagerStatus { running: boolean; pid: number | null; stopping: boolean; protocol_version: number; snapshot_polling: boolean; event_replay: boolean; active_cancel: boolean }
+
 export interface LibraryApi {
+  managerStatus(): Promise<ManagerStatus>;
+  startManager(): Promise<ManagerStatus>;
+  stopManager(): Promise<ManagerStatus>;
+  preparationSystems(): Promise<{ id: string; name: string }[]>;
+  preparationJobs(): Promise<PreparationJob[]>;
+  inspectPreparation(path: string, system: string): Promise<PreparationJob>;
+  startPreparation(id: string, reviewToken: string): Promise<PreparationJob>;
+  cancelPreparation(id: string): Promise<PreparationJob>;
   intakeArchive(path: string, deleteSource?: boolean): Promise<IntakeReport>;
   pickArchives(): Promise<string[]>;
   pickTorrent(): Promise<string | null>;

@@ -41,6 +41,14 @@ export function asError(err: unknown): AppError {
 /** The commands are identical on every surface; only the transport (`call`) differs. */
 export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable' | 'pickArchives' | 'pickTorrent' | 'onArchiveDrop'> {
   return {
+    managerStatus: () => call('manager_status'),
+    startManager: () => call('start_manager'),
+    stopManager: () => call('stop_manager'),
+    preparationSystems: () => call('preparation_systems'),
+    preparationJobs: () => call('preparation_jobs'),
+    inspectPreparation: (path, system) => call('inspect_preparation', { path, system }),
+    startPreparation: (id, reviewToken) => call('start_preparation', { id, review_token: reviewToken }),
+    cancelPreparation: (id) => call('cancel_preparation', { id }),
     intakeArchive: (path, deleteSource = false) => call('intake_archive', { path, delete_source: deleteSource }),
     emulatorProfile: (id) => call('emulator_profile', { id }),
     configureEmulatorProfile: (id, config) => call('configure_emulator_profile', { id, config }),

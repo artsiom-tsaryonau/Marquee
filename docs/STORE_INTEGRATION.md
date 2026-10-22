@@ -1,12 +1,12 @@
 # Direct store integration: implementation handoff
 
-Decision date: 2026-10-21. Priority: **Steam → Epic through Legendary → GOG through gogdl**, with the minimum managed compatibility foundation developed alongside Epic. [ROADMAP.md](ROADMAP.md) is the authoritative work order.
+Updated 2026-10-22. Store order remains **Steam → Epic through Legendary → GOG through gogdl**, with the minimum managed compatibility foundation developed alongside Epic. The [roadmap](ROADMAP.md) now puts the [hidden manager foundation](MARQUEE_MANAGER.md) first. Read-only Steam work may continue independently. This document owns store adapter tasks; the manager plan owns shared jobs, artifacts, receipts and process lifecycle.
 
 An explicit subsequent request added the narrow [Purple for Aion 2 recipe](PURPLE.md): managed umu/GE-Proton setup, dependency checkpoints, cancellation and launcher opening now exist. Live Purple/Aion 2 compatibility remains unverified. This is an early C1 increment, not completion of the general runtime manager or a store adapter; preserve its isolated data and receipt contract when generalizing it.
 
 ## Intended user experience
 
-The user wants a single place for games and does not want to configure Lutris. Marquee replaces that role. A supported normal workflow is:
+The user wants a single place for games and does not want to configure Lutris. Marquee supplies that interface; its hidden manager supplies supported custom acquisition and preparation without requiring another full application. A supported normal workflow is:
 
 1. Open Marquee; existing supported installations are detected.
 2. Connect the desired store and complete the store's required sign-in/MFA.
@@ -21,7 +21,8 @@ A manual executable picker, Wine-prefix editor, Lutris database path, or separat
 
 | Component | Responsibility | Does not replace |
 | --- | --- | --- |
-| Marquee | UI, library identity, connections, jobs, dependency setup, runtime policy, prefixes, recipes, lifecycle and diagnostics | Store authentication/ownership requirements |
+| Marquee library/UI | Library identity, connections, runtime/profile selection, review, progress, launch and sessions | Store authentication/ownership requirements |
+| Hidden `marquee-manager` | Custom downloads/torrents, durable preparation/setup jobs, artifacts and receipts; coordinates supported store jobs through their adapters | Official Steam client or store backend protocols |
 | Steam client | Steam account session, install/update/launch, Steam compatibility settings | Marquee's unified library |
 | Legendary | Verified Epic backend operations | Windows compatibility runtime or Marquee UI |
 | GOG adapter + gogdl | Verified GOG account/library and file/launch operations | Windows compatibility runtime or Marquee UI |
@@ -38,16 +39,71 @@ The existing Lutris cache bridge remains in the tree. It is now an explicit opti
 3. **Separate persistent identities.** Store account + store product/build/edition + installation + launch profile. Retain canonical game/edition relationships without collapsing independent saves or entitlements. Use migrations with backups and regression fixtures; preserve existing disc IDs, favorites, personal titles, and sessions.
 4. **Define connection states.** Unconnected, connecting, connected, refreshing, expired/reconnect, cached offline, and unavailable/error. Distinguish an empty account from a failed/private/unsupported response. Define multi-account behavior; never silently mix two users' tokens or ownership.
 5. **Protect credentials.** Keep store/backend tokens in backend-owned protected storage or an OS credential store. Never send secrets in browser snapshots/events, launch diagnostics, logs, or argv where the backend offers a safer supported mechanism. Current API-key settings are not evidence that store authentication is implemented.
-6. **Define persistent jobs.** Job IDs, target product/install, progress/log events, cancellation, retry/resume, errors, restart recovery, and state reconciliation. URI/client handoffs only report the evidence they can observe. Declare unsupported pause/resume/progress instead of simulating it.
+6. **Reuse manager contracts.** Follow [manager data ownership and lifecycle](MARQUEE_MANAGER.md), including durable jobs, review, receipts/outbox, restart recovery and a single library writer. Store adapters retain account/product/backend authority. Official Steam install/update remains a client handoff reconciled from real inventory; declare unsupported pause/resume/progress instead of simulating it. Do not create another queue inside each store UI.
 7. **Manage helpers.** Detect existing suitable versions; select tested builds; record version/integrity/distribution provenance; stage installation; retain rollback. Handle the supported package/portable-build route rather than telling normal users to prepare PATH themselves.
 8. **Extend the shared command/event surface.** Tauri, HTTP, and CLI use the same core operations. Add state refresh/invalidation for connections, library sync, jobs, helper readiness, and sessions. Guard stale async responses and duplicate actions.
 9. **Design lifecycle evidence.** Define how each adapter observes the actual game's start/exit. Steam or store-client process lifetime and a quick launch helper are insufficient. Until tracking is proven, label imported/store-reported time and keep session claims unavailable.
 
 Implement groundwork only to the level the next store needs; do not require a broad framework rewrite before the first installed Steam game can launch.
 
+## Steam inventory implementation
+
+Implemented 2026-10-21. `marquee steam-inspect` and the shared JSON command
+`inspect_steam` report native/Flatpak clients, registered libraries, local app
+manifests, per-library scan completeness and warnings. This is discovery, not a
+connected account or a completed S1A installation/launch flow.
+
+Native roots include XDG Steam storage, `.local/share/Steam`, `.steam/steam`
+and `.steam/root`; existing aliases are canonicalized. Flatpak uses its isolated
+Steam data root and checks the known user/system package metadata before calling
+the client available. No install, login, online sync or Steam command is run.
+
+All numeric `libraryfolders.vdf` entries are considered, supporting modern
+objects and old path values. Registered unavailable roots remain explicit,
+with incomplete scan status rather than being reported as empty libraries.
+Repeated physical library paths are scanned once. A shared native/Flatpak
+library retains both client choices; distinct file copies keep separate stable
+installation IDs. IDs use library location plus app ID, never title matching.
+
+The original bounded KeyValues reader handles objects, quoted/unquoted tokens,
+UTF-8/BOM, escaped quotes/backslashes and line comments. It refuses includes,
+conditional directives, NULs, unbalanced input, excessive nesting, oversized
+files/tokens and duplicate identity fields. This is a reviewed subset for Steam
+text files, not a Source-engine script interpreter. Format reference:
+[Valve's KeyValues implementation](https://github.com/ValveSoftware/source-sdk-2013/blob/master/src/tier1/KeyValues.cpp).
+No upstream implementation code is bundled.
+
+Each manifest must agree with its filename's numeric app ID. A safe single
+installation-folder name is required. Names, build ID, size, state flags, file
+presence and client associations are retained. Only state flags exactly `4`
+are conservatively marked manifest-complete; pending/unknown states remain
+separate. An install directory or complete manifest does not prove ownership,
+application type, game readiness, compatibility or successful launch. Steam
+runtime/tool manifests are not silently classified as games.
+
+Malformed manifests produce per-file warnings without hiding other entries.
+Missing/malformed library configuration warns and scans only the default root;
+it never claims every library was found. Limits bound file size, directory
+entries and manifest/library counts. No source file is modified, and no
+credentials/login cache are read.
+
+### Inventory verification
+
+Eight unit/fixture tests cover parsing, bounds/directives, modern/legacy roots,
+shared and aliased paths, distinct copies, malformed/partial/missing media,
+offline roots and identity/path validation. Tests use temporary directories.
+
+A read-only host inspection found one native client, one library and four
+manifests, with zero parsing warnings. One manifest had both the conservative
+complete flag and an existing install directory. A repeat produced identical
+installation IDs; SHA-256 comparisons confirmed all five source files (library
+configuration plus manifests) were unchanged. Both commands used isolated
+Marquee data directories. Flatpak, game launch and controller/return behavior
+were not exercised live.
+
 ## S1A: installed Steam games
 
-The first read-only detection/parser increment is implemented; see [Steam inventory evidence and remaining gates](STEAM.md). Persistence, UI projection and client launch follow.
+The [read-only inventory increment](#steam-inventory-implementation) is implemented. The tasks below own the remaining persistence, UI projection and client-launch work.
 
 **Prerequisite implemented:** the Lutris bridge is disconnected by default and hidden behind Tools → Legacy integrations unless an explicitly saved connection is enabled. Existing saved configurations, databases, prefixes and accounts are preserved. Available database paths can be suggested without opening them. Tests verify no source reads on a fresh setup, explicit connection/restart/disconnect, and byte-preserved external data. No direct Steam capability is implied.
 
@@ -111,7 +167,7 @@ The first read-only detection/parser increment is implemented; see [Steam invent
 
 ## Scope exclusions for this critical path
 
-No Lutris onboarding milestone, optional launcher import expansion, torrent/tracker integration, universal Windows compatibility claim, automatic destructive prefix reset, or full metadata catalogue is required to ship these stores. Store adapters download owned Steam/Epic/GOG builds. Firmware, discs, and port inputs should use the same job infrastructure and authorized connectors ([media acquisition](MEDIA_ACQUISITION.md)), not a separate manual-only path.
+No Lutris onboarding milestone, optional launcher import expansion, torrent/tracker integration, universal Windows compatibility claim, automatic destructive prefix reset, or full metadata catalogue is required to ship these stores. Store adapters download owned Steam/Epic/GOG builds. Firmware, discs, and port inputs should use the same job infrastructure and authorized connectors ([media acquisition](MARQUEE_MANAGER.md#acquisition-user-flow)), not a separate manual-only path.
 
 The original handoff was documentation-only. The opt-in legacy-bridge prerequisite is now implemented; direct Steam/Epic/GOG adapters and their live gates remain subsequent work.
 

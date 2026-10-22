@@ -3136,6 +3136,7 @@ dependencies = [
  "anyhow",
  "clap",
  "marquee-core",
+ "marquee-manager",
  "marquee-torrent",
  "serde_json",
  "tempfile",
@@ -3150,17 +3151,17 @@ dependencies = [
  "flate2",
  "image",
  "libc",
+ "marquee-manager",
+ "marquee-media",
  "marquee-torrent",
  "rusqlite",
  "serde",
  "serde_json",
- "sevenz-rust2",
  "sha1",
  "sha2",
  "tar",
  "tempfile",
  "tiny_http",
- "unrar_sys",
  "ureq",
  "uuid",
  "zip",
@@ -3177,6 +3178,35 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-dialog",
  "tauri-plugin-single-instance",
+]
+
+[[package]]
+name = "marquee-manager"
+version = "0.0.0"
+dependencies = [
+ "libc",
+ "marquee-media",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "uuid",
+ "zip",
+]
+
+[[package]]
+name = "marquee-media"
+version = "0.0.0"
+dependencies = [
+ "libc",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sevenz-rust2",
+ "tempfile",
+ "unrar_sys",
+ "zip",
 ]
 
 [[package]]

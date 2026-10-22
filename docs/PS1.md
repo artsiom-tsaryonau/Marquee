@@ -111,7 +111,7 @@ A stored `selected_runner_id` is honoured only when it belongs to that family (o
 
 DuckStation needs a PS1 BIOS, and the same three states apply (`missing` blocks Play; `unverified` does not). Only Marquee's managed DuckStation is used.
 
-Firmware acquisition jobs are planned ([media acquisition](MEDIA_ACQUISITION.md)). Today: `marquee bios import <folder>` or Tools import for managed DuckStation (`~/.local/share/marquee/duckstation/xdg-config/duckstation/bios`). See [Managed emulators and BIOS](EMULATORS.md).
+Firmware acquisition jobs are planned ([media acquisition](MARQUEE_MANAGER.md#acquisition-user-flow)). Today: `marquee bios import <folder>` or Tools import for managed DuckStation (`~/.local/share/marquee/duckstation/xdg-config/duckstation/bios`). See [Managed emulators and BIOS](EMULATORS.md).
 
 ### Errors
 

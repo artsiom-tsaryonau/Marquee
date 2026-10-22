@@ -24,6 +24,12 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Manage the hidden worker without opening or locking the library database
+    #[command(subcommand)]
+    Manager(ManagerCmd),
+    /// Durable reviewed local-archive preparation jobs (manager M1)
+    #[command(subcommand)]
+    Prepare(PrepareCmd),
     #[command(subcommand)]
     Catalogue(CatalogueCmd),
     #[command(subcommand)]
@@ -73,6 +79,40 @@ enum Command {
     /// Read-only native/Flatpak Steam clients, library folders and installed manifests
     SteamInspect,
     Health,
+}
+
+#[derive(Subcommand)]
+enum ManagerCmd {
+    Status,
+    Start,
+    Stop,
+}
+
+#[derive(Subcommand)]
+enum PrepareCmd {
+    /// Accept a reviewed job and detach; registration happens when Marquee reconnects
+    Start {
+        id: String,
+        #[arg(long)]
+        review_token: String,
+    },
+    /// Inspect an archive and persist its review; writes no game files
+    Inspect {
+        path: PathBuf,
+        #[arg(long)]
+        system: String,
+    },
+    List,
+    /// Prepare/register a reviewed job, or retry its interrupted phase
+    Run {
+        id: String,
+        #[arg(long)]
+        review_token: String,
+    },
+    /// Cancel before output preparation (keeps source archives)
+    Cancel {
+        id: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -297,8 +337,66 @@ fn run() -> marquee_core::error::Result<()> {
         println!("{}", serde_json::to_string_pretty(&value)?);
         return Ok(());
     }
+    // Worker controls and preparation handoff must work while the launcher
+    // owns library.db, and cannot start recovery/network work in Core.
+    match &args.command {
+        Command::Manager(command) => {
+            let paths = marquee_core::paths::Paths::resolve(args.data_dir.clone())?;
+            let client = marquee_manager::Client::new(&paths.data_dir);
+            let status = match command {
+                ManagerCmd::Status => client.status()?,
+                ManagerCmd::Start => client.start_manager()?,
+                ManagerCmd::Stop => client.stop()?,
+            };
+            println!("{}", serde_json::to_string_pretty(&status)?);
+            return Ok(());
+        }
+        Command::Prepare(PrepareCmd::Inspect { path, system }) => {
+            let paths = marquee_core::paths::Paths::resolve(args.data_dir.clone())?;
+            let client = marquee_manager::Client::new(&paths.data_dir);
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&client.inspect(path, system)?)?
+            );
+            return Ok(());
+        }
+        Command::Prepare(PrepareCmd::Start { id, review_token }) => {
+            let paths = marquee_core::paths::Paths::resolve(args.data_dir.clone())?;
+            let client = marquee_manager::Client::new(&paths.data_dir);
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&client.start_job(id, review_token)?)?
+            );
+            return Ok(());
+        }
+        _ => {}
+    }
     let core = Arc::new(Core::open(args.data_dir, args.allow_fake)?);
     match args.command {
+        Command::Manager(_) => unreachable!("handled without Core"),
+        Command::Prepare(command) => {
+            let value = match command {
+                PrepareCmd::Start { .. } => unreachable!("handled without Core"),
+                PrepareCmd::Inspect { path, system } => {
+                    serde_json::to_value(core.inspect_preparation(&path, &system)?)?
+                }
+                PrepareCmd::List => serde_json::to_value(core.preparation_jobs()?)?,
+                PrepareCmd::Cancel { id } => serde_json::to_value(core.cancel_preparation(&id)?)?,
+                PrepareCmd::Run { id, review_token } => {
+                    let job = core.run_preparation(&id, &review_token)?;
+                    println!("{}", serde_json::to_string_pretty(&job)?);
+                    if job.state != marquee_core::preparation::State::Registered {
+                        return Err(AppError::new(
+                            job.error_code.as_deref().unwrap_or("PREPARATION_FAILED"),
+                            job.error
+                                .unwrap_or_else(|| "Preparation needs attention".into()),
+                        ));
+                    }
+                    return Ok(());
+                }
+            };
+            println!("{}", serde_json::to_string_pretty(&value)?);
+        }
         Command::Catalogue(command) => match command {
             CatalogueCmd::Import { path } => {
                 use std::io::Read;

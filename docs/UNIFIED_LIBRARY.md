@@ -1,6 +1,6 @@
 # Unified games, editions, and launch choices
 
-Updated 2026-10-21. The UI projection and Jak reference example are implemented. [Direct Steam → Epic/Legendary → GOG/gogdl](ROADMAP.md) is the critical path. The normalized library model is shared infrastructure delivered incrementally as stores need it; managed OpenGOAL remains a separate follow-up track. This document does not require Lutris or supersede the store implementation order.
+Updated 2026-10-22. The UI projection and Jak reference example are implemented. The [roadmap](ROADMAP.md) now puts the hidden [manager foundation](MARQUEE_MANAGER.md) first, then preserves Steam → compatibility/Epic → GOG store order. The normalized library model is shared infrastructure delivered incrementally for receipt publication and stores; managed OpenGOAL remains a separate follow-up track. The manager owns artifacts/preparation/receipts; the library owns identities/profiles/sessions. This document does not require Lutris or define a competing job registry.
 
 ## Product decision
 
@@ -42,6 +42,25 @@ Never merge by filename or display title. Equal names can be unrelated games; id
 - Tools exposes detected PCSX2 runners, default selection, setup, installation, native port management/folders, and the planned PC launcher category. Category visibility persists per browser/window. A subsequent UI pass added persisted external launcher shortcuts, detection, pinning, and Open actions; see [Tools and launchers](LAUNCHERS.md). Store library import adapters remain unconnected.
 - Session recovery added schema v3; subsequent PS1 root-system work uses schema v4. The proposed normalized game/edition/installation schema is not implemented by the UI projection and must use a future available migration version.
 
+## Games without files
+
+Library → **Add games → Add a game without files…**: type a title, pick the system and a status (**Wishlist**, or **I own it** when the files are elsewhere). The game appears in the Library with a "Wishlist" or "No files" badge and a disabled **Play · no files yet** button. Code: `crates/core/src/wanted.rs`, table `wanted`.
+
+### Wanted-entry behavior
+
+- A wanted game is an ordinary edition with no media, so favourites, rename, search, covers and facts work unchanged. A typed title is stored as the user's own title, so "remove missing games" keeps it.
+- **Cover and facts by name.** For cartridge systems the typed title is matched to the official libretro No-Intro list (USA release preferred, then Europe, then World, never homebrew over retail), which gives the official name for the libretro cover and the checksum for genre, year, developer and publisher. Descriptions and player counts come from TheGamesDB (see [enrichment](ENRICHMENT.md#fact-storage-and-identity-limits)); disc systems use the title as typed. The same conservative name-match safeguards apply; no match keeps the placeholder. Name matching is not verified release identity.
+- **Files attach themselves.** When a scan or an [archive intake](INTAKE.md) brings in a file for the same system whose name is the same game (`Super Mario Bros. (USA).nes` for "Super Mario Bros."), it is attached to that entry, the wanted status is removed, and Play enables. No duplicate entry is created; your typed title is kept.
+- **Library filter** "Without files" shows wishlist entries and games whose files are currently missing.
+- Game page: **I own this / Move to wishlist**, **Remove** (only for entries without files; a game with files is never removed from here), **Fetch cover**.
+
+### Wanted-entry limits
+
+- Adding is manual and one game at a time; there is no import of a list yet.
+- Matching a file is by name only (not checksum), so a badly named file will not attach; it appears as a separate game and the wanted entry can be removed.
+- Games with several discs share a name, so only the first disc attaches.
+- API: `add_wanted_game`, `set_wanted_status`, `remove_wanted_game`; no CLI command yet.
+
 ## Reference assets and provenance
 
 Local assets: `apps/desktop/public/reference/jak/`. `sources.json` records exact URLs, SHA-256, sizes, retrieval date, and the pinned OpenGOAL repository revision.
@@ -63,7 +82,7 @@ No ISO, BIOS, extracted proprietary assets, or prepackaged game executable was d
 Saved-provider metadata now uses additive schema v5: see [Catalogue metadata](CATALOGUE_METADATA.md).
 Its explicit media links enrich installations without performing canonical-game
 merges or replacing the normalized model proposed below. Future migrations must
-use a version after v5. ROM revision selectors are separate from content editions
+use a version after v6 (v6 is allocated to preparation receipts). ROM revision selectors are separate from content editions
 and run methods.
 
 1. **Retain existing migration coverage, including v3 sessions and v4 PS1 roots.** Keep the correction regressions. Take an SQLite backup before testing any later migration against a real library. Do not reset dirty trees or replace the user's database with demo data.
@@ -72,7 +91,7 @@ and run methods.
 4. **Provide manual linking and undo.** Select two entries → “Same game” → review proposed shared identity → choose content editions. Unlinking changes relationships, never deletes media/history. Verify serial-based mappings and record their provider/revision.
 5. **Introduce a tool adapter contract.** Each adapter declares supported platforms and methods, detection, version probe, setup action, data readiness, argv construction, working directory, environment, and process lifecycle. Store executable and arguments separately. Continue using `Command::args`, never `sh -c`.
 6. **Add OpenGOAL as a managed tool.** Start with the official [launcher](https://github.com/open-goal/launcher) for extraction and settings. Detect an existing install first. Use official release assets, version pinning/digests where published, staging, and rollback. Do not put OpenGOAL into a generic single-binary port recipe until its layout and lifecycle are verified.
-7. **Acquire and extract Jak disc data.** Job selects or downloads the PS2 image from an authorized source, identifies game/region/revision, runs the documented extractor into the chosen install directory, and keeps the source read-only. Report progress/cancellation. Incomplete extraction is “needs game data,” not Ready. Manual ISO pick remains a fallback.
+7. **Acquire and extract Jak disc data.** A manager preparation job selects or downloads the PS2 image from an authorized source, identifies game/region/revision, runs the documented extractor into the chosen install directory, and keeps the source read-only. Report progress/cancellation. Incomplete extraction is “needs game data,” not Ready. Manual ISO pick remains a fallback.
 8. **Launch the correct game.** Validate the installed OpenGOAL runtime's documented CLI and game-selection arguments rather than assuming `gk` alone works for every release. Track the actual game process or a verified wrapper lifecycle. Avoid crediting launcher-menu time.
 9. **Persist the user's default.** Remember edition + installation + profile per canonical game. A default points to a stable ID; a missing default offers available alternatives without silently switching a player's mod/region/save context. Explicit per-game overrides should remain separate from the global tool default.
 10. **Expose save boundaries.** Label per-install save locations and provide “open saves.” Offer copy/import only when a tested converter exists. Version and back up saves before conversion; PCSX2 memory cards and OpenGOAL saves must not be treated as interchangeable files.

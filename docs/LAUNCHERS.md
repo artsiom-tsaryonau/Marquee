@@ -2,7 +2,7 @@
 
 Current shortcut features were implemented 2026-10-20. Direction updated 2026-10-21: [direct store integration](STORE_INTEGRATION.md) is the main workflow; Lutris/Heroic shortcuts are optional legacy tools. Opening their windows is not store-account integration.
 
-The target normal flow detects and manages Steam/Legendary/gogdl/umu/Proton dependencies from Marquee. Users should not need this executable/argument editor to connect stores or play a supported game. The editor remains an advanced escape hatch. Open **Tools** from the sidebar or Library header. Recognisable store/launcher marks are catalogued in [launcher branding](LAUNCHER_BRANDING.md).
+The target normal flow detects and manages Steam/Legendary/gogdl/umu/Proton dependencies from Marquee. Users should not need this executable/argument editor to connect stores or play a supported game. The editor remains an advanced escape hatch. Open **Tools** from the sidebar or Library header. Store/launcher marks and source references are documented [below](#launcher-and-store-marks).
 
 ## What works
 
@@ -50,7 +50,7 @@ No browser or native-app surface is available to this tool session. Rendered lay
 
 ## Legacy Lutris library bridge
 
-**Priority superseded.** Marquee is meant to replace the separate library-manager role and does not need existing Lutris configurations imported. The direction is [direct Steam → Epic/Legendary → GOG/gogdl](ROADMAP.md) with [Marquee-managed compatibility](STORE_INTEGRATION.md). This bridge is optional legacy functionality from the earlier Lutris-first approach: do not expand it into a required source, installer, login flow or Wine-management dependency. The bridge is now disconnected by default and shown through Tools → Legacy integrations. Existing explicitly saved connections remain active.
+**Priority superseded.** Marquee is meant to replace the separate library-manager role and does not need existing Lutris configurations imported. The direction is the hidden [manager foundation](MARQUEE_MANAGER.md), followed by [direct Steam → Epic/Legendary → GOG/gogdl](ROADMAP.md) with [managed compatibility](STORE_INTEGRATION.md). This bridge is optional legacy functionality from the earlier Lutris-first approach: do not expand it into a required source, installer, login flow or Wine-management dependency. The bridge is now disconnected by default and shown through Tools → Legacy integrations. Existing explicitly saved connections remain active.
 
 **Implemented**
 
@@ -66,3 +66,63 @@ Sources checked 2026-10-21: [Lutris](https://github.com/lutris/lutris), [FAQ](ht
 **Remaining legacy-only work:** keep regression coverage; defer account sync, new installer handoffs and migration features. The opt-in/default-onboarding change is implemented.
 
 **Verification.** Seven adapter regression tests pass (native/Flatpak defaults, store-aware matching, installed-only/disconnect, nonmutating reads, encoded handoff URIs, schema/missing-file). On this machine the probe found 4 installed entries and 1,164 cached listings (651 Epic, 215 GOG, 298 Steam), 1,167 entries after matching, and the source database checksum was unchanged. No real game, installer or login was run.
+
+## Launcher and store marks
+
+Tools PNG marks live in `apps/desktop/public/brands/`; their [asset provenance](../apps/desktop/public/brands/README.md)
+is maintained beside them. `brandIcons.ts` maps these to launcher presets and
+Purple/Lutris cards. Library source chips use monochrome SVG paths in `brands.ts`
+(CC0 Simple Icons path data, with trademarks retained by their owners) through
+`Mark.svelte`. The earlier generic-monitor Tools gap has been implemented.
+
+Reuse `brandIcon()` for store connection/job UI. Add SVG paths from Simple Icons
+with existing source comments, or obtain project art from upstream with recorded
+source/version/license. Actual bundled raster assets use `public/brands/`, not a
+second `static/brands/` folder. Update the asset README when adding/replacing one.
+Never use the Simple Icons `proton` mark for Valve Proton: it represents Proton AG.
+Use a neutral glyph and text if suitable Valve artwork is unavailable. Label
+GE-Proton distinctly; runtimes/helpers do not become store identities.
+
+Marks identify the user's tools, not sponsorship. Check current source/branding
+terms when changing assets; the table below is dated research, not current usage
+permission. Steam/Epic marketing guidance and project-code licenses are separate
+from trademark rights. Do not repurpose the PURPLE sphere for unrelated UI.
+
+### Branding reference (researched 2026-10-21)
+
+#### Store clients and library managers
+
+| Entity | Recognisable mark | Official / canonical assets | Simple Icons slug | UI notes |
+| --- | --- | --- | --- | --- |
+| **Steam** | Black locomotive on white (or inverted) | [Steamworks branding](https://partner.steamgames.com/doc/marketing/branding) (partner PDFs; strict for commercial use) | `steam` | Already in `brands.ts`. Library chips OK; wire Tools preset `detected.steam`. |
+| **Epic Games Store** | Shield + “Epic Games” wordmark (not the parent Epic Games logo alone) | [Epic Games Store logo guidelines](https://dev.epicgames.com/docs/epic-games-store/requirements-guidelines/store-assets/logo-guidelines) | `epicgames` (path already stored as `epic`) | Distinguish **store** from Epic corporate mark. |
+| **GOG** | “GOG.com” logotype in frame | [GOG press room](https://www.gog.com/pressroom/press-kit) | `gogdotcom` (stored as `gog`) | Same mark for **gogdl** CLI — it is a GOG protocol tool, not a separate brand. |
+| **Amazon Games** | Orange “smile” / Games branding | Amazon developer / Games press kits (no slug in Simple Icons) | — | Heroic integrates **Nile** for Amazon; use Amazon Games mark only where that store is shown, not for Heroic itself. |
+| **Lutris** | Orange joystick / “Lutris” wordmark | Upstream icon: `lutris/lutris` → `share/icons/hicolor/scalable/apps/lutris.svg` | `lutris` | Flatpak app id `net.lutris.Lutris` uses the same artwork. Legacy bridge only; still worth a correct mark on Tools. |
+| **Heroic Games Launcher** | Purple “H” / shield app icon | [HeroicGamesLauncher](https://github.com/Heroic-Games-Launcher/HeroicGamesLauncher) `public/icon.png`, Flathub `com.heroicgameslauncher.hgl` | `heroicgameslauncher` | Not the Epic shield — Heroic is a third-party launcher. |
+| **Legendary** | Orange “legendary” wordmark / app icon | [legendary-gl/legendary](https://github.com/legendary-gl/legendary) README social image, `assets/windows_icon.ico` | — | CLI-only; tongue-in-cheek MMORPG rarity name. Use project art, not Epic’s store logo. |
+| **NCSOFT PURPLE** | Iridescent sphere with vertical slits + “PURPLE” wordmark | [purple.plaync.com](https://purple.plaync.com/download) product pages; no public vector kit found | — | Managed recipe in [PURPLE.md](PURPLE.md). NC corporate logo is separate (yellow/blue). |
+
+#### Compatibility and runtimes
+
+| Entity | Recognisable mark | Official / canonical assets | Simple Icons slug | UI notes |
+| --- | --- | --- | --- | --- |
+| **Wine** | Wine glass + “Wine” | [winehq.org](https://www.winehq.org/) branding | `wine` | Execution component; optional badge on Windows titles. |
+| **Valve Proton** | Purple/blue “Proton” wordmark (Steam compatibility tool, ~2024) | Shipped with Steam compatibility tools; **not** in the Proton GitHub tree as a standalone kit | — | **Do not** use Simple Icons `proton` — that is **Proton AG** (mail/VPN). |
+| **GE-Proton** | Community “GE” / Proton-GE release art | [GloriousEggroll/proton-ge-custom](https://github.com/GloriousEggroll/proton-ge-custom) release notes / Heroic Wine Manager tiles | — | Not Valve’s mark; label as “GE-Proton” or “custom Proton” in UI copy. |
+| **umu** | Project icon from umu-launcher packaging | [Open-Wine-Components/umu-launcher](https://github.com/Open-Wine-Components/umu-launcher) (check `data/` / AppImage icon) | — | Marquee pins a portable umu zipapp for Purple; show umu mark only on runtime rows, not as a “store”. |
+| **Flatpak** | Green “F” / Flatpak triangle | [flatpak.org](https://flatpak.org/press/) | `flatpak` | Useful for “Lutris (Flatpak)” and Heroic Flatpak hints, not as a game source. |
+
+#### Games and ports
+
+| Entity | Recognisable mark | Official / canonical assets | Simple Icons slug | UI notes |
+| --- | --- | --- | --- | --- |
+| **OpenGOAL** | Jak-inspired launcher artwork | [open-goal/launcher](https://github.com/open-goal/launcher) release assets | — | Port source in library, not a PC store. |
+| **PCSX2 / DuckStation / …** | Upstream emulator icons | Catalogue + managed install copies | — | Already handled per emulator. |
+
+
+### Branding follow-up
+
+- Reuse existing marks in S1/E1/G1 connection and progress UI.
+- Add runtime rows/badges only when the corresponding tool is shown.
+- Replace `steam.png` if a suitable approved upstream in-app asset is obtained.

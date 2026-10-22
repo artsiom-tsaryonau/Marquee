@@ -1,0 +1,21 @@
+[package]
+name = "marquee-media"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Library-independent archive inspection and disc metadata for Marquee"
+
+[features]
+test-fixtures = []
+
+[dependencies]
+libc = "0.2"
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+zip.workspace = true
+sevenz-rust2 = { version = "0.24", default-features = false, features = ["bzip2", "ppmd"] }
+unrar_sys = "=0.5.8"
+
+[dev-dependencies]
+tempfile = "3"

@@ -83,3 +83,6 @@ coverage/
 
 # Torrent files made for the library live in the data dir, not the repo
 *.torrent
+
+# Local acceptance collection, including console key material; never commit.
+sample_images/

@@ -5,6 +5,14 @@ Updated 2026-10-22. The embedded `librqbit` transport supports reviewed local
 Tracker and DHT discovery are independent opt-in settings. No external torrent
 client is required.
 
+## Manager handoff (planned)
+
+The [manager plan](MARQUEE_MANAGER.md) owns future background execution, artifacts,
+installation receipts and migration. M3 adopts this transport and history after
+the hidden worker exists; preserve private/public sessions, discovery choices,
+owned folders and source/seeding retention. The current implementation below
+still runs in a Marquee host process. Do not start a second engine on its state.
+
 ## Download, source package and installation are separate
 
 A torrent transfers exactly its listed files. It may contain archives, installer

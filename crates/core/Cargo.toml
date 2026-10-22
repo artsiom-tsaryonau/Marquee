@@ -6,6 +6,8 @@ license.workspace = true
 description = "Library, scan, runner and session core for Marquee"
 
 [dependencies]
+marquee-media.workspace = true
+marquee-manager.workspace = true
 libc = "0.2"
 flate2.workspace = true
 rusqlite.workspace = true
@@ -17,11 +19,12 @@ tiny_http.workspace = true
 ureq.workspace = true
 uuid.workspace = true
 zip.workspace = true
-sevenz-rust2 = { version = "0.24", default-features = false, features = ["bzip2", "ppmd"] }
 marquee-torrent = { path = "../torrent" }
 anyhow = "1"
 tempfile = "3"
 base64 = "0.22"
 sha1 = "0.10"
 image = { version = "0.25.10", default-features = false, features = ["jpeg"] }
-unrar_sys = "=0.5.8"
+
+[dev-dependencies]
+marquee-media = { workspace = true, features = ["test-fixtures"] }

@@ -5,6 +5,7 @@
   import { uiIsStale } from './lib/build';
   import { app, type Route } from './lib/state.svelte';
   import { startFocusEngine } from './lib/focus';
+  import { pollWhileActive } from './lib/activity';
   import Backdrop from './lib/components/Backdrop.svelte';
   import Icon, { type IconName } from './lib/components/Icon.svelte';
   import Logo from './lib/components/Logo.svelte';
@@ -63,6 +64,11 @@
     updateMotion();
     motion.addEventListener('change', updateMotion);
     void app.boot();
+    // Receipt publication is independent of the import panel. Manager failures
+    // must never prevent the existing library from loading or launching.
+    const stopPreparationPoll = pollWhileActive(async () => {
+      try { await app.api.preparationJobs(); } catch { /* shown in the preparation panel */ }
+    }, () => 5000);
     checkStale();
     window.addEventListener('focus', checkStale);
     // Dev shortcuts: ?route=library&mode=big&theme=light&splash=0&empty=1
@@ -89,6 +95,7 @@
     return () => {
       stop();
       app.disconnect();
+      stopPreparationPoll();
       motion.removeEventListener('change', updateMotion);
       clearInterval(clock);
       clearInterval(sourcePoll);

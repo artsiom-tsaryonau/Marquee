@@ -2,17 +2,19 @@
 
 One console-style launcher for Fedora/Linux for your Steam, Epic, GOG, emulated, and native-port games. Browse one library with a mouse, keyboard, or controller, then choose an edition and a way to run it.
 
-**Product direction (2026-10-21):** Marquee replaces the user's need for a separate library manager. It owns store connections, library sync, install/update jobs, compatibility setup, runtime/prefix selection, and the normal Play flow. Steam uses its official client underneath; Epic uses Legendary; GOG uses a direct adapter and gogdl; non-Steam Windows games use managed umu/Proton. Lutris and Heroic are optional legacy integrations, not prerequisites. These direct store/runtime workflows are the target, not completed features.
+**Product direction (2026-10-22):** Marquee is the library and launcher. A hidden local **`marquee-manager`** will own custom downloads, torrents, source artifacts and preparation/install jobs, with progress and review in Marquee. Durable local-archive preparation now runs in its own background process and continues after the launcher closes; the launcher registers completed receipts when it reconnects. A second full application is not required. Steam retains its official client; Epic uses Legendary and GOG a direct adapter plus gogdl, coordinated through store-specific contracts. Non-Steam runtime setup uses supported managed umu/Proton recipes. Lutris/Heroic remain optional. See the [manager architecture and implementation plan](docs/MARQUEE_MANAGER.md).
 
-**Next implementation order:** direct Steam integration → managed compatibility plus Epic/Legendary → GOG/gogdl. Read-only [Steam client/library/manifest inspection](docs/STEAM.md) is implemented; persistent discovery plus Library/launch integration is the first usable increment; authorized owned-library sync and installation handoff complete the Steam milestone. See the [roadmap](docs/ROADMAP.md) and [step-by-step implementation handoff](docs/STORE_INTEGRATION.md).
+**Next implementation order:** torrent/browser worker adoption → platform recipes. The hidden manager process is implemented for local archives. Durable local-archive preparation/jobs/receipts are implemented; direct stores retain Steam → compatibility/Epic → GOG order after that foundation. Read-only [Steam inventory](docs/STORE_INTEGRATION.md#steam-inventory-implementation) already exists and may continue independently. See the [roadmap](docs/ROADMAP.md), [manager gates](docs/MARQUEE_MANAGER.md#implementation-sequence-and-gates), and [store handoff](docs/STORE_INTEGRATION.md).
 
 **Current working tree:** Rust core/CLI, Tauri/Svelte desktop and shared browser surface; PS2/PCSX2, PS1/DuckStation slice, serial covers, session/correction work, five managed native-port recipes, unified-library UI, external launcher shortcuts, and a legacy read-only Lutris bridge. A narrow [Purple for Aion 2](docs/PURPLE.md) integration now automates its umu/GE-Proton setup and launcher opening; actual Purple/Aion 2 Linux compatibility remains unverified. Direct Steam/Epic/GOG integrations and general Windows-app installation are not implemented end to end. Other “Add a Windows app” recipes remain demo-only. Real emulator launch/exit acceptance is tracked in [PS2](docs/PS2.md) and [PS1](docs/PS1.md); demo/fake-runner tests do not close those gates. Existing Lutris cache projection does not count as a direct store connection.
 
 **Emulation and metadata:** PS1/PS2 disc adapters are joined by Nintendo DS/melonDS, Genesis/BlastEm and Neo Geo/FinalBurn Neo library adapters. melonDS, BlastEm, FBNeo and mGBA have pinned local source recipes using rootless Podman. ZIP/7z/RAR [archive intake](docs/INTAKE.md) extracts cartridges/discs and preserves arcade sets. BIOS import/list/removal remains available for PS1/PS2. Live checks reached NFS Underground's PS2 executable, Pokémon Platino's DS intro and Streets of Rage 2's Genesis intro; full controller/save acceptance remains open. The supplied incomplete Neo Geo set is blocked with a diagnostic. See [emulator management](docs/EMULATORS.md).
 
-Saved Vimm catalogue records retain [field provenance and release identity](docs/CATALOGUE_METADATA.md). Optional [ROM enrichment](docs/ROM_ARTWORK.md) supplies covers and game facts from libretro and configured providers. Title-based enrichment is not a verified release mapping, and artwork credit does not establish shared provider IDs. General field overrides and verified cross-provider mappings remain follow-up work.
+Saved Vimm catalogue records retain [field provenance and release identity](docs/CATALOGUE_METADATA.md). Optional [ROM enrichment](docs/ENRICHMENT.md#implemented-artwork-and-facts) supplies covers and game facts from libretro and configured providers. Title-based enrichment is not a verified release mapping, and artwork credit does not establish shared provider IDs. General field overrides and verified cross-provider mappings remain follow-up work.
 
-Documentation navigation: [docs index](docs/README.md). Broader platform/port ideas remain in the [expansion catalogue](docs/EXPANSION_CATALOGUE.md); [Jak/OpenGOAL and edition/run choices](docs/UNIFIED_LIBRARY.md) remain a separate track. Metadata matching and [ScreenScraper/SteamGridDB](docs/ENRICHMENT.md#ps2-metadata-matching-and-cached-artwork) must never gate Play. **Media goal:** same automation as stores — Marquee should download or copy firmware, discs, and port inputs from authorized sources via jobs; folder import stays a fallback. Today: managed emulators/ports, disc folder scan, BIOS import panel, store adapters and unified download jobs still landing. See [media acquisition](docs/MEDIA_ACQUISITION.md).
+Documentation navigation: [docs index](docs/README.md). Broader platform/port ideas remain in the [expansion catalogue](docs/EXPANSION_CATALOGUE.md); [Jak/OpenGOAL and edition/run choices](docs/UNIFIED_LIBRARY.md) remain a separate track. Metadata matching and [ScreenScraper/SteamGridDB](docs/ENRICHMENT.md#ps2-metadata-matching-and-cached-artwork) must never gate Play. **Media goal:** `marquee-manager` acquires and prepares supported content from configured authorized sources; Marquee registers validated installation receipts and launches games. Downloaded bytes are not an installation. Today, local archive preparation has saved reviews/jobs/receipts and library registration; the manager runs independently while torrent history remains in its original separate workflow. Folder import stays available. See [media acquisition](docs/MARQUEE_MANAGER.md#acquisition-user-flow).
+
+The owner has also added **Switch, PS3, PS4, original Xbox and Xbox 360 games**. These are collection requirements, not completed adapters: RPCS3/shadPS4/xemu have tool entries, but all five still need platform-specific preparation/library work. Their sources are inventoried under ignored `sample_images/`; no console packages or key contents were installed. See the [console preparation plan](docs/CONSOLE_PREPARATION.md).
 
 ## Run
 
@@ -35,7 +37,13 @@ cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev scan
 cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev list --system ps2 --json
 cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev runners install --channel auto
 cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev artwork refresh
-cargo run -p marquee-cli -- intake "Game (USA).zip"    # preserves the source archive
+cargo build -p marquee-manager -p marquee-cli        # scripts/run.sh builds the companion automatically
+cargo run -p marquee-cli -- prepare inspect /absolute/path/Game.zip --system genesis
+cargo run -p marquee-cli -- prepare run JOB_ID --review-token TOKEN_FROM_INSPECTION
+cargo run -p marquee-cli -- prepare start JOB_ID --review-token TOKEN_FROM_INSPECTION  # detach
+cargo run -p marquee-cli -- prepare list             # register pending receipts
+cargo run -p marquee-cli -- manager status           # also: manager start | stop
+cargo run -p marquee-cli -- intake "Game (USA).zip"    # legacy immediate importer
 cargo run -p marquee-cli -- emulators build blastem   # Linux x86_64; Git + rootless Podman
 cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev ports install zelda64recomp   # also: ports list | check | launch
 ```
@@ -54,7 +62,9 @@ Before pushing, run `scripts/check.sh` (there is no hosted CI). It formats and t
 
 ```
 apps/desktop/   Svelte 5 + TypeScript + Vite UI and Tauri 2 shell
-crates/core/    library DB, ISO scan, PCSX2 unpack/argv, serial covers, sessions, ports, command layer (`api`), event hub, local web server
+crates/core/    library DB/receipt import, scan, launch/session adapters, command layer, events, web server
+crates/manager/ hidden preparation worker, private socket/client, jobs/receipts and ownership migration
+crates/media/   shared bounded archive/CUE/ISO helpers, catalogue and errors
 crates/cli/     `marquee` diagnostics over the same core
 catalog/        PS2/PS1 system descriptors, ports/ (one JSON per port)
 scripts/        setup.sh, run.sh, check.sh, make-icon.py

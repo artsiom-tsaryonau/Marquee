@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm build"
+    "beforeDevCommand": "cargo build --locked -p marquee-manager && pnpm dev",
+    "beforeBuildCommand": "cargo build --release --locked -p marquee-manager && pnpm build"
   },
   "app": {
     "windows": [

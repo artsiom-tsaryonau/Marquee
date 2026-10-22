@@ -1,44 +1,58 @@
 # Marquee documentation
 
-Updated 2026-10-21. **Marquee is the user's single game launcher.** Steam, Legendary, gogdl, umu/Proton, native ports, and emulator adapters supply execution/store capabilities. Lutris is optional legacy functionality, not required for store access or compatibility setup.
+Updated 2026-10-22. Marquee is the library and launcher; the hidden
+`marquee-manager` now runs local-archive preparation as a separate background
+process. Torrent/browser adoption remains planned. Steam retains its
+official client; Epic/GOG retain store-specific backends. Existing ready games
+must remain launchable without the manager.
 
 ## Planning authority
 
-1. [Roadmap](ROADMAP.md) — authoritative architecture, priorities, implemented/planned boundary, and milestone acceptance. New order: Steam → managed compatibility plus Epic → GOG.
-2. [Direct store implementation handoff](STORE_INTEGRATION.md) — concrete next tasks, adapter/runtime boundaries, credentials, jobs, and test scenarios.
-3. [Unified library and OpenGOAL](UNIFIED_LIBRARY.md) — game/edition/installation/profile identity and the separate native Jak track. Shared identity work is incremental; OpenGOAL does not jump ahead of the store order.
-4. [Expansion catalogue](EXPANSION_CATALOGUE.md) — platform/port candidates and collection ideas; a separate expansion track.
-5. [Enrichment and UI](ENRICHMENT.md) — background metadata/artwork and later visual/controller polish; never prerequisites for store Play.
-6. [Media acquisition](MEDIA_ACQUISITION.md) — automated firmware/disc/port data jobs; manual import as fallback.
-
-The 2026-10-21 direct-store decision supersedes earlier numbered phases, “Lutris first,” “no Wine management,” and blanket “no game downloads” instructions. Owned-game store downloads are in scope. The same job model should cover firmware, disc images, and port inputs from **authorized sources** (stores, detected installs, configured connectors) — not manual-only workflows. See [media acquisition](MEDIA_ACQUISITION.md). Marquee does not bundle copyrighted BIOS/ROM files in the app.
-
-## Feature and implementation notes
-
-| Document | Purpose and limits |
+| Document | Owns |
 | --- | --- |
-| [PS2](PS2.md) | PCSX2/offline-disc slice, setup, and its still-open live acceptance gate |
-| [PS1](PS1.md) | DuckStation slice and schema-v4 root systems; verify its own live gate independently |
-| [Media acquisition](MEDIA_ACQUISITION.md) | Target: automated firmware/disc/port jobs from authorized sources; manual import as fallback |
-| [Media connector priorities](MEDIA_CONNECTOR_PRIORITIES.md) | FMHY-informed tiers: Vimm/Myrient/DAT verification vs do-not-automate ROM hosts |
-| [Managed emulators and BIOS](EMULATORS.md) | Managed catalogue, DS/Genesis/Neo Geo adapters, pinned local builds, BIOS checks, audio/vsync fixes and dated live acceptance |
-| [Purple for Aion 2](PURPLE.md) | Managed setup/open recipe, runtime pins, retry/cancellation, and the unverified live game gate |
-| [Tools, launchers and legacy Lutris bridge](LAUNCHERS.md) | Generic shortcuts and advanced configuration; the explicitly optional Lutris cache bridge (disconnected by default; saved connections preserved) |
-| [Launcher branding](LAUNCHER_BRANDING.md) | Official marks, Simple Icons slugs, and UI wiring notes for Steam/Epic/GOG/Lutris/Heroic/Purple/runtimes |
-| [Desktop rendering](DESKTOP_RENDERING.md) | Production launch, renderer modes, Balanced/Full effects, and remaining acceptance |
-| [Steam integration](STEAM.md) | Read-only installed inventory, parser/discovery evidence, and next S1A/S1B increments |
-| [Settings profiles](SETTINGS_PROFILES.md) | DuckStation host-aware settings, recipe evidence, ownership and verification limits |
-| [UI/UX implementation](UI_UX.md) | Current interface changes, readiness contracts, tests and remaining visual/native acceptance |
-| [Enrichment, UI and PS2 metadata](ENRICHMENT.md) | Optional metadata/artwork providers and the ScreenScraper/SteamGridDB follow-up |
-| [Catalogue metadata](CATALOGUE_METADATA.md) | Saved-page import, regional revisions/languages, source artwork and ratings, explicit installation links and raw-ISO SHA-1 matching; schema v5 |
-| [Library transfer (BitTorrent)](TORRENTS.md) | Optional private device-to-device transfer: status, privacy defaults, CLI, next steps |
-| [Archive intake](INTAKE.md) | `marquee intake`: unpack `.zip`/`.7z` games into the library; rules, safety limits and gaps |
-| [Games without files](WANTED_GAMES.md) | Wishlist / "owned elsewhere" entries: disabled Play, name-matched cover and facts, files attach on scan |
-| [ROM facts](ROM_FACTS.md) | genre, year, developer, description: sources, TheGamesDB allowance, safeguards |
-| [ROM cover art](ROM_ARTWORK.md) | libretro checksum lookup, guarded artwork/facts enrichment, provider caching and remaining identity/override gaps |
-| [Cleanup](CLEANUP.md) | What can be deleted (build output, backups, quarantined files), what it costs, and what to keep |
-| [Correction history](CORRECTIONS.md) | Condensed 2026-10-20/21 corrections, PS1/PS2 audit outcomes and open gates |
+| [Roadmap](ROADMAP.md) | Product priority, current status and milestone summary |
+| [Marquee manager](MARQUEE_MANAGER.md) | Acquisition flow, architecture, process/data ownership, M0–M6 gates, migration and recovery |
+| [Console preparation](CONSOLE_PREPARATION.md) | Added Switch/PS3/PS4/Xbox/Xbox 360 collection: inventory, format/recipe work and per-platform acceptance |
+| [Store implementation](STORE_INTEGRATION.md) | Current Steam inventory evidence; Steam → compatibility/Epic → GOG tasks and acceptance |
+| [Unified library](UNIFIED_LIBRARY.md) | Game/edition/installation/profile identity, wishlist/without-files behavior and OpenGOAL track |
+| [Connector priorities](MEDIA_CONNECTOR_PRIORITIES.md) | Provider scope and source-specific constraints |
+| [Expansion catalogue](EXPANSION_CATALOGUE.md) | Future platform/port/collection ideas; not implemented capability or a competing work order |
+| [Quiver integration](QUIVER_INTEGRATION.md) | Deferred reuse/integration plan |
 
-Implementation notes can contain dated snapshots. They do not reorder the current roadmap, make unverified live gates complete, or imply planned store/runtime features already exist. For migrations, inspect the actual schema and use the next available version; v4 and v5 are allocated and must not be reused for the proposed normalized unified backend.
+The 2026-10-22 manager decision supersedes launcher-owned universal jobs and puts
+the common preparation foundation ahead of completing direct stores. It does
+not cancel Steam/Epic/GOG, introduce a second required UI, or close any live gate.
+Older dates/numbered phases in feature notes are historical. Store order remains
+Steam → compatibility/Epic → GOG after the manager foundation. M1/M2 preparation APIs, storage and the local process protocol are implemented;
+torrent/browser migration, event replay and console recipes remain proposals.
 
-The direct-store documentation update itself changed no runtime behavior. The subsequent Purple integration adds an explicit, user-triggered setup recipe; it does not install anything at application startup or remove legacy integrations.
+## Current feature references
+
+| Document | Purpose |
+| --- | --- |
+| [PS1](PS1.md), [PS2](PS2.md) | Existing disc adapters and independent open live acceptance gates |
+| [Emulators](EMULATORS.md) | Managed tool catalogue, adapter matrix, source recipes, firmware and live evidence |
+| [Archive preparation](INTAKE.md) | Implemented persistent ZIP/7z/RAR preparation, CLI/API/UI, recovery evidence and legacy intake |
+| [Torrents](TORRENTS.md) | Current embedded transport, history, private/public policy and remaining limits |
+| [Purple](PURPLE.md) | Narrow managed recipe and unverified game compatibility |
+| [Launchers](LAUNCHERS.md) | Shortcuts, optional legacy bridge, branding implementation and source references |
+| [Settings profiles](SETTINGS_PROFILES.md), [controllers](CONTROLLERS.md) | Configuration ownership, input work and acceptance |
+| [UI](UI_UX.md), [desktop rendering](DESKTOP_RENDERING.md) | Current surfaces, readiness presentation and remaining visual/performance gates |
+| [Catalogue metadata](CATALOGUE_METADATA.md) | Provider provenance, release identity and explicit installation links |
+| [Enrichment](ENRICHMENT.md) | Implemented artwork/facts, cache/quota safeguards and future provider research; never gates Play |
+| [Cleanup](CLEANUP.md) | Existing storage cleanup and preservation guidance |
+| [Corrections](CORRECTIONS.md) | Dated findings and evidence retained for audits |
+
+Use actual schema/code state when implementing migrations; v4–v6 are allocated.
+The library and manager will have separate write ownership and durable receipt
+handoff; see the manager plan. M1 prepares local sources only and always preserves originals; no added console
+packages, firmware or keys have been installed.
+
+## Maintenance boundaries
+
+Keep a topic's instructions and evidence in its owning guide above; link to it
+from the roadmap and README rather than copying its checklist. Source-asset
+attribution stays beside assets. Dated correction history and substantial platform,
+settings, controller and rendering guides remain separate because they preserve
+distinct operational instructions or verification evidence. Use git history for
+removed standalone notes; do not recreate redirect-only Markdown files.

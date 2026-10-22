@@ -557,3 +557,30 @@ test('transfer persistence errors stay visible and clear after a successful refr
     await app.refreshTransfers(); assert.equal(app.transferError,''); assert.deepEqual(app.transfers.items,[]);
   } finally {app.api=api;app.runnerSettings=settings;app.transferError='';}
 });
+
+test('preparation commands keep review and execution separate and preserve exact job identity', async () => {
+  const { commands } = await import('../src/lib/api/core');
+  const calls = [];
+  const api = commands(async (name, args) => { calls.push({name,args}); return []; });
+  await api.preparationSystems();
+  await api.inspectPreparation('/archives/game.zip', 'genesis');
+  await api.preparationJobs();
+  assert.equal(calls.some(c => c.name === 'start_preparation'), false);
+  await api.startPreparation('stable-job', 'review-fingerprint');
+  await api.cancelPreparation('other-job');
+  assert.deepEqual(calls, [
+    {name:'preparation_systems',args:undefined},
+    {name:'inspect_preparation',args:{path:'/archives/game.zip',system:'genesis'}},
+    {name:'preparation_jobs',args:undefined},
+    {name:'start_preparation',args:{id:'stable-job',review_token:'review-fingerprint'}},
+    {name:'cancel_preparation',args:{id:'other-job'}},
+  ]);
+});
+
+test('manager controls share the desktop/browser transport and do not launch games', async () => {
+  const { commands } = await import('../src/lib/api/core');
+  const calls=[];
+  const api=commands(async(name,args)=>{calls.push([name,args]);return {};});
+  await api.managerStatus(); await api.startManager(); await api.stopManager();
+  assert.deepEqual(calls,[['manager_status',undefined],['start_manager',undefined],['stop_manager',undefined]]);
+});
