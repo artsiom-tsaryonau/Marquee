@@ -100,6 +100,26 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
         "transfer_status" => out(transfer::status(core)?),
         "transfer_share" => out(transfer::share(core, &text(&args, "edition_id")?)?),
         "transfer_get" => out(transfer::get(core, &text(&args, "link")?)?),
+        "transfer_review" => out(transfer::review(
+            core,
+            std::path::Path::new(&text(&args, "path")?),
+        )?),
+        "transfer_add_file" => {
+            let peers = args
+                .get("peers")
+                .cloned()
+                .map(serde_json::from_value)
+                .transpose()?
+                .unwrap_or_default();
+            out(transfer::add_file(
+                core,
+                std::path::Path::new(&text(&args, "path")?),
+                &text(&args, "review_token")?,
+                peers,
+            )?)
+        }
+        "transfer_pause" => out(transfer::pause(core, &text(&args, "info_hash")?, true)?),
+        "transfer_resume" => out(transfer::pause(core, &text(&args, "info_hash")?, false)?),
         "transfer_stop" => out(transfer::stop(core, &text(&args, "info_hash")?)?),
         "get_torrent_settings" => out(core.torrent_settings()?),
         "set_torrent_settings" => {

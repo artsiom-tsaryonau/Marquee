@@ -282,11 +282,23 @@ impl Core {
     }
 
     pub fn set_torrent_settings(&self, t: &model::TorrentSettings) -> Result<()> {
-        self.set_setting("torrent.enabled", if t.enabled { "1" } else { "0" })?;
-        self.set_setting("torrent.seeding", if t.seeding { "1" } else { "0" })?;
-        self.set_setting("torrent.upload_kbps", &t.upload_kbps.to_string())?;
-        self.set_setting("torrent.download_kbps", &t.download_kbps.to_string())?;
-        self.transfers.reset(t);
+        self.with_db(|db| {
+            let tx = db.conn.unchecked_transaction()?;
+            for (key, value) in [
+                ("torrent.trackers", if t.trackers { "1" } else { "0" }.to_string()),
+                ("torrent.dht", if t.dht { "1" } else { "0" }.to_string()),
+                ("torrent.enabled", if t.enabled { "1" } else { "0" }.to_string()),
+                ("torrent.seeding", if t.seeding { "1" } else { "0" }.to_string()),
+                ("torrent.upload_kbps", t.upload_kbps.to_string()),
+                ("torrent.download_kbps", t.download_kbps.to_string()),
+            ] {
+                tx.execute("INSERT INTO settings(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value", rusqlite::params![key,value])?;
+            }
+            tx.commit()?;
+            self.transfers.reset(t);
+            Ok(())
+        })?;
+        self.events.emit(CoreEvent::LibraryChanged);
         Ok(())
     }
 

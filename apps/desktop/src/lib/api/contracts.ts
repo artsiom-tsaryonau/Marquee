@@ -136,6 +136,8 @@ export interface Settings {
 /** Optional device-to-device library transfer. Off by default. */
 export interface TorrentSettings {
   enabled: boolean;
+  trackers?: boolean;
+  dht?: boolean;
   /** Let other devices download from this one. */
   seeding: boolean;
   /** KiB/s, 0 = unlimited. */
@@ -148,7 +150,10 @@ export interface TransferItem {
   name: string;
   kind: 'share' | 'get';
   edition_id: string | null;
-  state: 'preparing' | 'checking' | 'downloading' | 'sharing' | 'paused' | 'error' | 'starting';
+  state: 'preparing' | 'checking' | 'downloading' | 'sharing' | 'seeding' | 'source_missing' | 'complete' | 'paused' | 'error' | 'starting';
+  files_present?: boolean | null;
+  directory?: string;
+  public?: boolean;
   downloaded: number;
   total: number;
   uploaded: number;
@@ -161,6 +166,17 @@ export interface TransferStatus {
   enabled: boolean;
   seeding: boolean;
   items: TransferItem[];
+}
+
+export interface TorrentReview {
+  info_hash: string;
+  name: string;
+  total: number;
+  files: { path: string; size: number }[];
+  tracker_count: number;
+  private: boolean;
+  review_token: string;
+  directory: string;
 }
 
 export interface LibrarySnapshot {
@@ -307,6 +323,7 @@ export interface BiosImport { added: BiosFile[]; ignored: number }
 export interface LibraryApi {
   intakeArchive(path: string, deleteSource?: boolean): Promise<IntakeReport>;
   pickArchives(): Promise<string[]>;
+  pickTorrent(): Promise<string | null>;
   onArchiveDrop(handler: (paths: string[]) => void): Promise<() => void>;
   emulatorProfile(id: string): Promise<EmulatorProfileStatus>;
   configureEmulatorProfile(id: string, config: EmulatorProfileConfig): Promise<EmulatorProfileStatus>;
@@ -329,6 +346,10 @@ export interface LibraryApi {
   transferStatus(): Promise<TransferStatus>;
   transferShare(editionId: string): Promise<void>;
   transferGet(link: string): Promise<void>;
+  transferReview(path: string): Promise<TorrentReview>;
+  transferAddFile(path: string, reviewToken: string, peers?: string[]): Promise<void>;
+  transferPause(infoHash: string): Promise<void>;
+  transferResume(infoHash: string): Promise<void>;
   transferStop(infoHash: string): Promise<void>;
   launch(editionId: string): Promise<Session>;
   setFavourite(editionId: string, favorite: boolean): Promise<void>;

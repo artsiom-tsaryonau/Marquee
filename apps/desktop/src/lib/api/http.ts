@@ -72,6 +72,9 @@ export const httpApi: LibraryApi = {
     const path = window.prompt('Absolute ZIP/7z/RAR archive path on the computer running Marquee (not a browser upload)');
     return path?.trim() ? [path.trim()] : [];
   },
+  async pickTorrent() {
+    return window.prompt('Absolute .torrent path on the Marquee computer (not a browser upload)')?.trim() || null;
+  },
   onArchiveDrop: async () => () => {},
   async pickRoot() {
     // A browser cannot open a native folder dialog; the path is on the machine running Marquee.

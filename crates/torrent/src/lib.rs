@@ -84,6 +84,76 @@ pub struct Created {
     pub magnet: String,
 }
 
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct FileSummary {
+    pub path: String,
+    pub size: u64,
+}
+
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct Manifest {
+    pub info_hash: String,
+    pub name: String,
+    pub total: u64,
+    pub files: Vec<FileSummary>,
+    pub tracker_count: usize,
+    pub private: bool,
+}
+
+/// Offline metadata validation: no session, sockets, tracker requests or writes.
+pub fn inspect(bytes: &[u8]) -> Result<Manifest> {
+    anyhow::ensure!(
+        bytes.len() <= 4 * 1024 * 1024,
+        "Torrent metadata exceeds 4 MiB"
+    );
+    let meta = librqbit::torrent_from_bytes(bytes).context("invalid torrent metadata")?;
+    let info_hash = meta.info_hash.as_string();
+    let tracker_count = meta.iter_announce().count();
+    let info = meta
+        .info
+        .data
+        .validate()
+        .context("invalid torrent file list")?;
+    let name = info
+        .name()
+        .unwrap_or_else(|| "torrent-content".into())
+        .into_owned();
+    let mut files = Vec::new();
+    let mut total = 0u64;
+    for file in info.iter_file_details() {
+        anyhow::ensure!(files.len() < 20_000, "Torrent has too many files");
+        anyhow::ensure!(
+            !file.attrs().symlink && file.symlink_path.is_none(),
+            "Torrent symlinks are unsupported"
+        );
+        let parts = file.filename.to_vec();
+        anyhow::ensure!(
+            parts.iter().all(|p| !p.is_empty()
+                && p != "."
+                && p != ".."
+                && !p.contains(['/', '\\', ':', '\0'])
+                && p.len() <= 255),
+            "Unsafe torrent filename"
+        );
+        total = total
+            .checked_add(file.len)
+            .ok_or_else(|| anyhow!("Torrent size overflow"))?;
+        anyhow::ensure!(total <= 16 * 1024u64.pow(4), "Torrent exceeds 16 TiB");
+        files.push(FileSummary {
+            path: parts.join("/"),
+            size: file.len,
+        });
+    }
+    Ok(Manifest {
+        info_hash,
+        name,
+        total,
+        files,
+        tracker_count,
+        private: info.info().private,
+    })
+}
+
 pub struct Engine {
     rt: Runtime,
     session: Arc<Session>,
@@ -168,6 +238,7 @@ impl Engine {
             AddTorrent::TorrentFileBytes(torrent.into()),
             data_root,
             vec![],
+            true,
         )
     }
 
@@ -178,20 +249,50 @@ impl Engine {
             Source::TorrentBytes(b) => AddTorrent::TorrentFileBytes(b.into()),
             Source::Link(l) => AddTorrent::Url(l.into()),
         };
-        self.add(add, into, peers)
+        self.add(add, into, peers, false)
     }
 
-    fn add(&self, add: AddTorrent<'_>, into: &Path, peers: Vec<SocketAddr>) -> Result<usize> {
+    /// Resume only inside a caller-validated, exclusively owned transfer folder.
+    pub fn download_owned(
+        &self,
+        source: Source,
+        into: &Path,
+        peers: Vec<SocketAddr>,
+    ) -> Result<usize> {
+        let add = match source {
+            Source::TorrentBytes(bytes) => {
+                inspect(&bytes)?;
+                AddTorrent::TorrentFileBytes(bytes.into())
+            }
+            Source::Link(link) => AddTorrent::Url(link.into()),
+        };
+        self.add(add, into, peers, true)
+    }
+
+    fn add(
+        &self,
+        add: AddTorrent<'_>,
+        into: &Path,
+        peers: Vec<SocketAddr>,
+        overwrite: bool,
+    ) -> Result<usize> {
         std::fs::create_dir_all(into)?;
         let opts = AddTorrentOptions {
-            overwrite: true,
+            overwrite,
             output_folder: Some(into.to_string_lossy().into_owned()),
             initial_peers: if peers.is_empty() { None } else { Some(peers) },
             ..Default::default()
         };
         let resp = self
             .rt
-            .block_on(self.session.add_torrent(add, Some(opts)))
+            .block_on(async {
+                tokio::time::timeout(
+                    Duration::from_secs(60),
+                    self.session.add_torrent(add, Some(opts)),
+                )
+                .await
+                .context("Timed out retrieving torrent metadata; retry when peers are reachable")?
+            })
             .context("adding the torrent")?;
         match resp {
             AddTorrentResponse::Added(id, _) | AddTorrentResponse::AlreadyManaged(id, _) => Ok(id),
@@ -244,6 +345,11 @@ impl Engine {
             .collect()
     }
 
+    pub fn metadata_bytes(&self, id: usize) -> Result<Vec<u8>> {
+        self.handle(id)?
+            .with_metadata(|meta| meta.torrent_bytes.to_vec())
+    }
+
     /// Block until the download has finished and verified, or `timeout` passes.
     pub fn wait_finished(&self, id: usize, timeout: Duration) -> Result<()> {
         let h = self.handle(id)?;
@@ -257,6 +363,11 @@ impl Engine {
     pub fn pause(&self, id: usize) -> Result<()> {
         let h = self.handle(id)?;
         self.rt.block_on(self.session.pause(&h))
+    }
+
+    pub fn resume(&self, id: usize) -> Result<()> {
+        let h = self.handle(id)?;
+        self.rt.block_on(self.session.unpause(&h))
     }
 
     /// Stop and forget a torrent. Files stay on disk unless `delete_files`.

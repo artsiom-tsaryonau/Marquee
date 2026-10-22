@@ -546,3 +546,14 @@ test('archive transport defaults to retaining source files on both surfaces', as
   await api.intakeArchive('/archives/game.zip'); await api.intakeArchive('/archives/game.7z',true);
   assert.deepEqual(calls,[{name:'intake_archive',args:{path:'/archives/game.zip',delete_source:false}},{name:'intake_archive',args:{path:'/archives/game.7z',delete_source:true}}]);
 });
+
+test('transfer persistence errors stay visible and clear after a successful refresh', async () => {
+  const api=app.api, settings=app.runnerSettings;
+  try {
+    app.runnerSettings={...settings,torrents:{enabled:true,seeding:false,upload_kbps:0,download_kbps:0}};
+    app.api={...api,transferStatus:async()=>{throw new Error('Saved transfer state is corrupt; preserved');}};
+    await app.refreshTransfers(); assert.match(app.transferError,/corrupt/);
+    app.api={...api,transferStatus:async()=>({enabled:true,seeding:false,items:[]})};
+    await app.refreshTransfers(); assert.equal(app.transferError,''); assert.deepEqual(app.transfers.items,[]);
+  } finally {app.api=api;app.runnerSettings=settings;app.transferError='';}
+});

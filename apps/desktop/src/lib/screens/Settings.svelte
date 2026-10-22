@@ -1,17 +1,42 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { transferLine } from '../format';
+  import { transferLine, bytes } from '../format';
   import { app } from '../state.svelte';
-  import type { KeyInfo } from '../api/contracts';
+  import type { KeyInfo, TorrentReview } from '../api/contracts';
   import Icon from '../components/Icon.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
 
-  const categories = [['appearance', 'Appearance'], ['games', 'Games and controls'], ['library', 'Library locations'], ['providers', 'Artwork and API keys'], ['devices', 'Device sharing']] as const;
+  const categories = [['appearance', 'Appearance'], ['games', 'Games and controls'], ['library', 'Library locations'], ['providers', 'Artwork and API keys'], ['devices', 'Torrents and devices']] as const;
   let category = $state<string>('appearance');
   let drafts = $state<Record<string, string>>({});
   let link = $state('');
+  let torrentPath = $state('');
+  let torrentReview = $state<TorrentReview | null>(null);
+  let torrentBusy = $state(false);
+  let torrentError = $state('');
+  let peers = $state('');
   $effect(() => { if (app.torrentsOn) return app.watchTransfers(); });
   onMount(() => void app.loadKeys());
+
+  async function reviewTorrent() {
+    torrentBusy = true; torrentError = ''; torrentReview = null;
+    try {
+      const path = await app.api.pickTorrent();
+      if (path) { torrentPath = path; torrentReview = await app.api.transferReview(path); }
+    } catch (err) { torrentError = (err as Error).message; }
+    finally { torrentBusy = false; }
+  }
+
+  async function downloadTorrent() {
+    if (!torrentReview || torrentBusy) return;
+    torrentBusy = true; torrentError = '';
+    try {
+      await app.api.transferAddFile(torrentPath, torrentReview.review_token, peers.split(/[,\s]+/).filter(Boolean));
+      torrentReview = null; peers = '';
+      await app.refreshTransfers();
+    } catch (err) { torrentError = (err as Error).message; }
+    finally { torrentBusy = false; }
+  }
 
   const sourceLabel = (k: KeyInfo) =>
     ({
@@ -110,53 +135,65 @@
   </section>
 
   <section class="glass-panel" hidden={category !== 'devices'}>
-    <h2>Share games between your devices</h2>
+    <h2>Torrents and device transfers</h2>
     <div class="item">
       <div>
-        <strong>Let my own devices send games to each other</strong>
-        <span>Off by default. Works between Marquee installs you control; nothing is published, and there is no public search or tracker. Keep the other device on your home network or a private VPN.</span>
+        <strong>Enable BitTorrent transfers</strong>
+        <span>Off by default. Private device links use direct peers. Torrent files and public magnets use only the discovery options you enable below.</span>
       </div>
-      <label class="pin-choice"><input type="checkbox" data-nav checked={app.torrentSettings.enabled} onchange={(e) => app.setTorrents({ enabled: e.currentTarget.checked })} /> {app.torrentSettings.enabled ? 'On' : 'Off'}</label>
+      <label class="pin-choice"><input type="checkbox" data-nav aria-label="Enable BitTorrent transfers" disabled={app.torrentSettingsBusy} checked={app.torrentSettings.enabled} onchange={(e) => app.setTorrents({ enabled: e.currentTarget.checked })} /> {app.torrentSettings.enabled ? 'On' : 'Off'}</label>
     </div>
     {#if app.torrentSettings.enabled}
+      <div class="item"><div><strong>Tracker discovery for torrent downloads</strong><span>Contact trackers listed in imported torrents or public magnets. Your address is visible to those trackers and peers. Private device shares stay separate.</span></div><label class="pin-choice"><input type="checkbox" data-nav aria-label="Tracker discovery" disabled={app.torrentSettingsBusy} checked={!!app.torrentSettings.trackers} onchange={(e) => app.setTorrents({ trackers:e.currentTarget.checked })} /> Trackers</label></div>
+      <div class="item"><div><strong>DHT discovery for public torrents</strong><span>Find peers through the public DHT network. Disabled for private device shares and torrents marked private.</span></div><label class="pin-choice"><input type="checkbox" data-nav aria-label="DHT discovery" disabled={app.torrentSettingsBusy} checked={!!app.torrentSettings.dht} onchange={(e) => app.setTorrents({ dht:e.currentTarget.checked })} /> DHT</label></div>
       <div class="item">
         <div>
-          <strong>Allow other devices to download from this one</strong>
-          <span>Turn off to only receive. Shared games stay in place; nothing is copied or moved.</span>
+          <strong>Allow uploads and seeding</strong>
+          <span>Applies to private sharing and public torrents. Turn off to receive only. Original downloaded files are required to seed their torrent.</span>
         </div>
-        <label class="pin-choice"><input type="checkbox" data-nav checked={app.torrentSettings.seeding} onchange={(e) => app.setTorrents({ seeding: e.currentTarget.checked })} /> {app.torrentSettings.seeding ? 'Allowed' : 'Receive only'}</label>
+        <label class="pin-choice"><input type="checkbox" data-nav aria-label="Allow uploads and seeding" disabled={app.torrentSettingsBusy} checked={app.torrentSettings.seeding} onchange={(e) => app.setTorrents({ seeding: e.currentTarget.checked })} /> {app.torrentSettings.seeding ? 'Allowed' : 'Receive only'}</label>
       </div>
       <div class="item">
         <div>
           <strong>Upload speed limit</strong>
           <span>Applies to everything this device shares.</span>
         </div>
-        <select data-nav aria-label="Upload speed limit" value={String(app.torrentSettings.upload_kbps)} onchange={(e) => app.setTorrents({ upload_kbps: Number(e.currentTarget.value) })}>
+        <select data-nav aria-label="Upload speed limit" disabled={app.torrentSettingsBusy} value={String(app.torrentSettings.upload_kbps)} onchange={(e) => app.setTorrents({ upload_kbps: Number(e.currentTarget.value) })}>
           <option value="0">No limit</option>
           <option value="1024">1 MB/s</option>
           <option value="5120">5 MB/s</option>
           <option value="20480">20 MB/s</option>
         </select>
       </div>
+      <div class="item"><div><strong>Download speed limit</strong><span>Applies to all downloads.</span></div><select data-nav aria-label="Download speed limit" disabled={app.torrentSettingsBusy} value={String(app.torrentSettings.download_kbps)} onchange={(e) => app.setTorrents({ download_kbps:Number(e.currentTarget.value) })}><option value="0">No limit</option><option value="1024">1 MB/s</option><option value="5120">5 MB/s</option><option value="20480">20 MB/s</option></select></div>
+      <div class="item"><div><strong>Import a torrent file</strong><span>Review filenames, size and destination before starting. Downloading packages does not install a game. Files stay separate from existing installations.</span></div><button class="btn glass small torrent-choose" data-nav disabled={torrentBusy} onclick={reviewTorrent}>Choose .torrent…</button></div>
+      {#if torrentError}<p role="alert">{torrentError}</p>{/if}
+      {#if torrentReview}
+        <div class="item torrent-review"><div><strong>{torrentReview.name}</strong><span>{torrentReview.files.length} files · {bytes(torrentReview.total)} · {torrentReview.tracker_count} trackers · {torrentReview.private ? 'Private torrent' : 'Public torrent'}</span><span>Save to: {torrentReview.directory}</span><span>All listed files will download. No installation or executable launch is performed.</span><details><summary data-nav>Review files</summary><ul class="torrent-files">{#each torrentReview.files.slice(0, 50) as file}<li>{file.path} · {bytes(file.size)}</li>{/each}</ul>{#if torrentReview.files.length > 50}<p>Showing the first 50 files.</p>{/if}</details><label>Direct peers (optional)<input class="transfer-input" data-nav aria-label="Torrent direct peers" placeholder="192.168.1.20:51413" bind:value={peers} /></label></div><div class="row-actions"><button class="btn primary small" data-nav disabled={torrentBusy} onclick={downloadTorrent}>{torrentBusy ? 'Starting…' : 'Download files'}</button><button class="btn glass small" data-nav disabled={torrentBusy} onclick={() => { torrentReview = null; torrentError = ''; }}>Cancel</button></div></div>
+      {/if}
       <div class="item">
         <div>
-          <strong>Get a game from another device</strong>
-          <span>On that device open the game and press Share, then Copy link. Paste it here.</span>
+          <strong>Add a magnet or device link</strong>
+          <span>Paste a magnet link or use Share → Copy link on your other Marquee device. Public magnets need tracker or DHT discovery.</span>
         </div>
         <form class="row-actions" onsubmit={(e) => { e.preventDefault(); if (link.trim()) { void app.getFromLink(link); link = ''; } }}>
-          <input data-nav type="text" placeholder="magnet:?xt=…" aria-label="Game link" bind:value={link} />
+          <input class="transfer-input" data-nav type="text" placeholder="magnet:?xt=…" aria-label="Game link" bind:value={link} />
           <button class="btn glass small" data-nav type="submit" disabled={!link.trim()}>Get</button>
         </form>
       </div>
+      {#if app.transferError}<p role="alert">{app.transferError}</p>{/if}
       {#each app.transfers?.items ?? [] as t (t.info_hash || t.name)}
         <div class="item">
           <div>
             <strong>{t.name}</strong>
-            <span>{t.kind === 'get' ? 'Received' : 'Shared'} · {transferLine(t)}</span>
+            <span>{t.kind === 'get' ? 'Download' : 'Share'} · {transferLine(t)}</span>
+            {#if t.directory}<span>Files: {t.directory}</span>{/if}
+            {#if t.error && t.state !== 'error'}<span role="alert">{t.error}</span>{/if}
             {#if t.state === 'downloading' && t.total}<progress max={t.total} value={t.downloaded} aria-label="Download progress"></progress>{/if}
           </div>
           <div class="row-actions">
             {#if t.link}<button class="btn glass small" data-nav onclick={() => app.copyTransferLink(t)}>Copy link</button>{/if}
+            {#if t.info_hash}<button class="btn glass small" data-nav onclick={() => app.pauseTransfer(t, !['paused','error','source_missing'].includes(t.state))}>{t.state === 'error' ? 'Retry' : ['paused','source_missing'].includes(t.state) ? 'Resume' : 'Pause'}</button>{/if}
             {#if t.info_hash}<button class="btn glass small" data-nav onclick={() => app.stopTransfer(t)}>Stop</button>{/if}
           </div>
         </div>
@@ -389,4 +426,8 @@
     padding: 6px 10px;
     border-radius: 8px;
   }
+  .torrent-choose { white-space: nowrap; flex-shrink: 0; }
+  .torrent-review { align-items: flex-start; }
+  .torrent-files { max-height: 14rem; overflow: auto; overflow-wrap: anywhere; padding-left: 1.2rem; }
+  .transfer-input { min-width: 0; max-width: 100%; border: 1px solid var(--border); background: var(--field); color: var(--text); padding: 8px 10px; border-radius: 8px; font: inherit; }
 </style>

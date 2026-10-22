@@ -31,6 +31,7 @@
   const checkStale = () => void uiIsStale().then((v) => (stale = v));
 
   const dur = $derived(app.motionReduced ? 0 : 260);
+  $effect(() => { if (app.torrentsOn) return app.watchTransfers(); });
 
   // Decorative animation stops when nobody is looking at it: tab hidden, window
   // unfocused, or a game is running on top. Keeps the GPU free for the emulator.

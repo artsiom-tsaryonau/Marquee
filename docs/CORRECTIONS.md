@@ -91,3 +91,20 @@ launches. Upstream binary installation and game compatibility remain live gates.
 imports are scanned before returning the summary. CLI process tests cover a
 corrupt RAR followed by a valid RAR, the real scan, retained source files, and
 success/AlreadyPresent outcomes with `--no-scan`.
+
+## 2026-10-22 — torrent correctness and reviewed downloads
+
+Torrent downloads now use marked, isolated job folders and retain transfer
+history on Stop. Resume is limited to owned regular-file trees; existing game
+installations are not download destinations. State/metadata writes are atomic
+and checked; corrupt state is preserved and reported. Percent decoding is
+UTF-8 safe, and scan completion is persisted only after a successful scan.
+
+Reviewed local torrent files and public magnets support explicit tracker/DHT
+settings in a separate engine from private device sharing. Metadata review is
+offline and bound to the complete file SHA-256; changed files require review
+again. UI/CLI expose progress, locations, pause/resume/retry and source-missing
+history. Missing completed sources require explicit Resume to redownload.
+Downloads do not establish installation or gameplay readiness. See [torrent
+verification and limits](TORRENTS.md). The supplied PS4 package torrent was not
+downloaded; acceptance uses synthetic bytes and loopback peers/trackers.

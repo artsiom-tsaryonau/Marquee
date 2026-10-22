@@ -111,6 +111,28 @@ enum RunCmd {
 enum TorrentCmd {
     /// Show whether transfer is enabled and its limits
     Status,
+    /// Inspect a local torrent without contacting trackers or peers
+    Inspect {
+        path: PathBuf,
+    },
+    /// List durable transfers and download locations
+    List,
+    /// Set opt-in discovery for imported torrents (private device shares are unaffected)
+    Discovery {
+        #[arg(long, action = clap::ArgAction::Set)]
+        trackers: bool,
+        #[arg(long, action = clap::ArgAction::Set)]
+        dht: bool,
+    },
+    Pause {
+        info_hash: String,
+    },
+    Resume {
+        info_hash: String,
+    },
+    Stop {
+        info_hash: String,
+    },
     /// Turn library transfer on
     Enable,
     /// Turn library transfer off
@@ -121,9 +143,14 @@ enum TorrentCmd {
         on: bool,
     },
     /// Limit speeds in KiB/s (0 is unlimited)
-    Limits { upload: u32, download: u32 },
+    Limits {
+        upload: u32,
+        download: u32,
+    },
     /// Make a .torrent for a game file or folder (saved under the data dir)
-    Create { path: PathBuf },
+    Create {
+        path: PathBuf,
+    },
     /// Seed a file or folder until interrupted; prints the address and magnet
     Seed {
         path: PathBuf,
@@ -141,6 +168,9 @@ enum TorrentCmd {
         peers: Vec<std::net::SocketAddr>,
         #[arg(long, default_value_t = 86400)]
         timeout_secs: u64,
+        /// Metadata SHA-256 from torrent inspect; rejects a file changed after review
+        #[arg(long)]
+        review_token: Option<String>,
     },
 }
 
@@ -258,6 +288,15 @@ fn main() -> ExitCode {
 
 fn run() -> marquee_core::error::Result<()> {
     let args = Args::parse();
+    // Inspect must stay offline even if the selected library has enabled jobs.
+    // Do this before Core::open can restore transfers or acquire its DB lease.
+    if let Command::Torrent(TorrentCmd::Inspect { path }) = &args.command {
+        let (manifest, token) = marquee_core::transfer::inspect_file(path)?;
+        let mut value = serde_json::to_value(manifest)?;
+        value["review_token"] = token.into();
+        println!("{}", serde_json::to_string_pretty(&value)?);
+        return Ok(());
+    }
     let core = Arc::new(Core::open(args.data_dir, args.allow_fake)?);
     match args.command {
         Command::Catalogue(command) => match command {
@@ -641,10 +680,27 @@ fn torrent_config(
     Ok(cfg)
 }
 
-fn torrent(core: &Core, command: TorrentCmd) -> marquee_core::error::Result<()> {
+fn torrent(core: &Arc<Core>, command: TorrentCmd) -> marquee_core::error::Result<()> {
     let fail = |e: anyhow::Error| AppError::new("TORRENT", format!("{e:#}"));
     let store = core.paths.data_dir.join("torrents");
     match command {
+        TorrentCmd::Inspect { path } => println!(
+            "{}",
+            serde_json::to_string_pretty(&marquee_core::transfer::review(core, &path)?)?
+        ),
+        TorrentCmd::List => println!(
+            "{}",
+            serde_json::to_string_pretty(&marquee_core::transfer::status(core)?)?
+        ),
+        TorrentCmd::Discovery { trackers, dht } => {
+            let mut settings = core.torrent_settings()?;
+            settings.trackers = trackers;
+            settings.dht = dht;
+            core.set_torrent_settings(&settings)?;
+        }
+        TorrentCmd::Pause { info_hash } => marquee_core::transfer::pause(core, &info_hash, true)?,
+        TorrentCmd::Resume { info_hash } => marquee_core::transfer::pause(core, &info_hash, false)?,
+        TorrentCmd::Stop { info_hash } => marquee_core::transfer::stop(core, &info_hash)?,
         TorrentCmd::Status => println!(
             "{}",
             serde_json::to_string_pretty(&core.torrent_settings()?)?
@@ -722,21 +778,76 @@ fn torrent(core: &Core, command: TorrentCmd) -> marquee_core::error::Result<()> 
             into,
             peers,
             timeout_secs,
+            review_token,
         } => {
-            let cfg = torrent_config(core, &into, "0.0.0.0:0".parse().unwrap())?;
-            let engine = marquee_torrent::Engine::start(&cfg).map_err(fail)?;
-            let src = if source.starts_with("magnet:") || source.starts_with("http") {
-                marquee_torrent::Source::Link(source)
+            std::fs::create_dir_all(&into)?;
+            let destination = std::fs::canonicalize(&into)?;
+            let (hash, result) = if source.starts_with("magnet:") {
+                let mut link = source.clone();
+                for peer in &peers {
+                    link.push_str(&format!("&x.pe={peer}"));
+                }
+                // Queue first, then get its identity from the durable list.
+                let result = marquee_core::transfer::get_at(core, &link, Some(destination.clone()));
+                let hash = marquee_core::transfer::magnet_hash(&source)?;
+                (hash, result)
             } else {
-                marquee_torrent::Source::TorrentBytes(std::fs::read(&source)?)
+                let path = std::path::Path::new(&source);
+                let review = marquee_core::transfer::review(core, path)?;
+                let result = marquee_core::transfer::add_file_at(
+                    core,
+                    path,
+                    review_token.as_deref().unwrap_or(&review.review_token),
+                    peers,
+                    Some(destination.clone()),
+                );
+                (review.manifest.info_hash, result)
             };
-            let id = engine.download(src, &into, peers).map_err(fail)?;
-            engine
-                .wait_finished(id, std::time::Duration::from_secs(timeout_secs))
-                .map_err(fail)?;
-            let p = engine.progress(id).map_err(fail)?;
-            println!("done: {} ({} bytes) in {}", p.name, p.total, into.display());
-            engine.shutdown();
+            if let Err(error) = result {
+                if error.code != "TORRENT_EXISTS" {
+                    return Err(error);
+                }
+                let state = marquee_core::transfer::status(core)?;
+                if !state
+                    .items
+                    .iter()
+                    .any(|e| e.info_hash == hash && e.directory == destination.join(&hash))
+                {
+                    return Err(AppError::new("TORRENT_CONFLICT", "This torrent already has a different destination; use torrent list and resume"));
+                }
+                marquee_core::transfer::pause(core, &hash, false)?;
+            }
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
+            loop {
+                let status = marquee_core::transfer::status(core)?;
+                if let Some(item) = status.items.iter().find(|e| e.info_hash == hash) {
+                    if matches!(item.state.as_str(), "complete" | "sharing" | "seeding") {
+                        println!(
+                            "Downloaded: {} ({} bytes) in {}. Installation is separate.",
+                            item.name,
+                            item.total,
+                            item.directory.display()
+                        );
+                        break;
+                    }
+                    if item.state == "error" || item.state == "source_missing" {
+                        return Err(AppError::new(
+                            "TORRENT",
+                            item.error
+                                .clone()
+                                .unwrap_or_else(|| "Source files are missing".into()),
+                        ));
+                    }
+                }
+                if std::time::Instant::now() >= deadline {
+                    marquee_core::transfer::pause(core, &hash, true)?;
+                    return Err(AppError::new(
+                        "TORRENT_TIMEOUT",
+                        "Download paused after timeout; progress and transfer record were kept",
+                    ));
+                }
+                std::thread::sleep(std::time::Duration::from_millis(250));
+            }
         }
     }
     Ok(())

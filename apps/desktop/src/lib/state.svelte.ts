@@ -509,12 +509,14 @@ class AppState {
 
   // ---- Share games with your own other devices (optional, off by default) ----
   transfers = $state<TransferStatus | null>(null);
+  transferError = $state('');
+  torrentSettingsBusy = $state(false);
   private transferWatchers = 0;
   private transferTimer: ReturnType<typeof setInterval> | undefined;
 
   get torrentsOn() { return !!this.runnerSettings.torrents?.enabled; }
   get torrentSettings(): TorrentSettings {
-    return { enabled: false, seeding: true, upload_kbps: 0, download_kbps: 0, ...this.runnerSettings.torrents };
+    return { enabled: false, seeding: true, trackers: false, dht: false, upload_kbps: 0, download_kbps: 0, ...this.runnerSettings.torrents };
   }
   transferFor(editionId: string): TransferItem | undefined {
     return this.transfers?.items.find((i) => i.edition_id === editionId);
@@ -522,7 +524,8 @@ class AppState {
 
   async refreshTransfers() {
     if (!this.torrentsOn) { this.transfers = null; return; }
-    try { this.transfers = await this.api.transferStatus(); } catch { /* keep the last list */ }
+    try { this.transfers = await this.api.transferStatus(); this.transferError = ''; }
+    catch (err) { this.transferError = (err as { message?: string }).message ?? 'Could not read saved transfers'; }
   }
 
   /** Poll while a screen that shows transfers is open. Returns the cleanup. */
@@ -537,13 +540,15 @@ class AppState {
   }
 
   async setTorrents(patch: Partial<TorrentSettings>) {
+    if (this.torrentSettingsBusy) return;
+    this.torrentSettingsBusy = true;
     try {
       await this.api.setTorrentSettings({ ...this.torrentSettings, ...patch });
       this.applySnapshot(await this.api.snapshot());
       await this.refreshTransfers();
     } catch (err) {
       this.notify((err as { message?: string }).message ?? 'Could not change sharing settings');
-    }
+    } finally { this.torrentSettingsBusy = false; }
   }
 
   async shareGame(game: GameEntry) {
@@ -558,7 +563,7 @@ class AppState {
   async getFromLink(link: string) {
     try {
       await this.api.transferGet(link.trim());
-      this.notify('Fetching from your other device. Progress is under Settings → Share games.');
+      this.notify('Download queued. Progress is under Settings → Torrents and devices.');
       await this.refreshTransfers();
     } catch (err) {
       this.notify((err as { message?: string }).message ?? 'Could not fetch that game');
@@ -573,6 +578,14 @@ class AppState {
     } catch (err) {
       this.notify((err as { message?: string }).message ?? 'Could not stop');
     }
+  }
+
+  async pauseTransfer(item: TransferItem, paused: boolean) {
+    try {
+      if (paused) await this.api.transferPause(item.info_hash);
+      else await this.api.transferResume(item.info_hash);
+      await this.refreshTransfers();
+    } catch (err) { this.notify((err as { message?: string }).message ?? 'Could not change transfer'); }
   }
 
   async copyTransferLink(item: TransferItem) {

@@ -1,6 +1,7 @@
 import type {
   AppError,
   TransferStatus,
+  TorrentReview,
   BiosFile,
   BiosImport,
   EmulatorInfo,
@@ -38,7 +39,7 @@ export function asError(err: unknown): AppError {
 }
 
 /** The commands are identical on every surface; only the transport (`call`) differs. */
-export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable' | 'pickArchives' | 'onArchiveDrop'> {
+export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable' | 'pickArchives' | 'pickTorrent' | 'onArchiveDrop'> {
   return {
     intakeArchive: (path, deleteSource = false) => call('intake_archive', { path, delete_source: deleteSource }),
     emulatorProfile: (id) => call('emulator_profile', { id }),
@@ -59,6 +60,10 @@ export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'su
     transferStatus: () => call<TransferStatus>('transfer_status'),
     transferShare: (editionId) => call<void>('transfer_share', { edition_id: editionId }),
     transferGet: (link) => call<void>('transfer_get', { link }),
+    transferReview: (path) => call<TorrentReview>('transfer_review', { path }),
+    transferAddFile: (path, reviewToken, peers = []) => call<void>('transfer_add_file', { path, review_token: reviewToken, peers }),
+    transferPause: (infoHash) => call<void>('transfer_pause', { info_hash: infoHash }),
+    transferResume: (infoHash) => call<void>('transfer_resume', { info_hash: infoHash }),
     transferStop: (infoHash) => call<void>('transfer_stop', { info_hash: infoHash }),
     launch: (editionId) => call<Session>('launch_game', { edition_id: editionId }),
     setFavourite: (editionId, favorite) => call<void>('set_favourite', { edition_id: editionId, favorite }),

@@ -251,6 +251,8 @@ impl Db {
                 _ => "window".into(),
             },
             torrents: crate::model::TorrentSettings {
+                trackers: self.get_setting("torrent.trackers")?.as_deref() == Some("1"),
+                dht: self.get_setting("torrent.dht")?.as_deref() == Some("1"),
                 enabled: self.get_setting("torrent.enabled")?.as_deref() == Some("1"),
                 seeding: self.get_setting("torrent.seeding")?.as_deref() != Some("0"),
                 upload_kbps: self

@@ -3185,6 +3185,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "librqbit",
+ "serde",
  "tempfile",
  "tokio",
 ]

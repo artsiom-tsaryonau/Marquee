@@ -1,66 +1,135 @@
-# Library transfer (BitTorrent)
+# BitTorrent downloads and device transfers
 
-An optional way to move your own game library between your own devices, using an embedded BitTorrent client ([`librqbit`](https://github.com/ikatson/rqbit)) in `crates/torrent`. It is **off by default** and is not a way to fetch games from third parties.
+Updated 2026-10-22. The embedded `librqbit` transport supports reviewed local
+`.torrent` files, magnets and private device links. Transfers are off by default.
+Tracker and DHT discovery are independent opt-in settings. No external torrent
+client is required.
 
-## Status
+## Download, source package and installation are separate
 
-| Part | State |
-| --- | --- |
-| `marquee-torrent` crate: create `.torrent`, seed, download, progress, limits | Done. Integration test moves a 12 MiB file between two engines on loopback, byte-identical. |
-| Setting `torrents` (`enabled`, `seeding`, `upload_kbps`, `download_kbps`) and the `get_torrent_settings` / `set_torrent_settings` API calls | Done. Default is disabled. |
-| CLI `marquee torrent ...` | Done and checked end to end between two separate data directories (a 40 MB file, identical on arrival). |
-| UI: **Share** / **Copy link** / **Stop sharing** on a game page, and Settings → *Share games between your devices* (switch, receive-only, upload limit, paste a link to get a game, list of transfers with state) | Done. Checked in a browser against a real backend; not yet clicked in the native window. |
-| Backend `transfer_status`, `transfer_share`, `transfer_get`, `transfer_stop` (desktop and web share one API) | Done. A test shares a game on one core and fetches it on another. |
-| Tested across real machines, with 20–50 GB images, restart/resume, NAT | Not tested. |
-| Automatic discovery of your other devices | Not started; today you give the seeder's address. |
+A torrent transfers exactly its listed files. It may contain archives, installer
+packages, disc images or already extracted data. Receiving a PS4 `.pkg` does not
+install a PS4 game. Marquee currently has no PS4 package-install/game-library
+adapter. A completed package download must never be labeled installed or ready
+to play.
 
-## Using it
+Downloads use a separate folder per info-hash, normally
+`<data dir>/torrents/downloads/<info-hash>/`. They never write directly over an
+existing game installation. Completed device transfers with a supported system
+hint register their verified download directory as a library root and scan it;
+failed scans remain retryable. General torrent downloads stay in their download
+folder for the appropriate later import/install workflow.
 
-1. On both devices: **Settings → Share games between your devices → On.**
-2. On the device that has the game: open the game, press **Share**. Large images are checked first ("Preparing to share"); then it says "Sharing with your other devices" and **Copy link** appears.
-3. On the other device: paste the link into **Get a game from another device** and press **Get**. It lands in that device's library folder for the same system and appears after a rescan.
-4. **Stop sharing** only stops serving; your game files are never deleted or moved.
+Saved transfer records include identity, original name, destination, discovery
+mode, source magnet/metadata, peers, pause and completion state. **Stop retains
+the record, torrent metadata and files.** Missing completed payloads are shown
+as source files missing; restart does not silently fetch them again. Explicit
+Resume rechecks/redownloads as needed. Presence checks use filenames/sizes;
+resuming invokes piece verification. Piece hashes verify transfer integrity,
+not publisher authenticity or emulator compatibility.
 
-The link carries the sharing device's address (`x.pe`) and the system (`x.mq`, so the game lands in the right folder). The address is the device's LAN IP and port 51413 (or another free port); set `MARQUEE_TORRENT_HOST` to advertise a different one, such as a Tailscale address. Shares and fetches are remembered and resume when Marquee starts with the setting on. A game stored in its own folder (for example `.cue` plus `.bin`) is shared as that folder.
+This is a torrent transfer/history registry, not yet a universal archive and
+installation registry. The later model should link source artifacts to separate
+installation records (platform, version, patch/DLC, readiness and launch profile).
+Deleting original packages may save space after installation is verified, but
+seeding the original torrent requires its original files. Installed/extracted
+data cannot substitute for a torrent of the packages that produced it.
 
-## Privacy defaults
+## UI
 
-The engine starts with public DHT, tracker announces, local-network discovery and UPnP all **off**. Peers are only the addresses you pass in. `.torrent` files made here carry no tracker. Turning the master switch off refuses every `torrent` command that touches the network (`TORRENT_OFF`); turning seeding off keeps the client download-only.
+Settings → **Torrents and devices**:
 
-Limitation: torrents created by `librqbit` are not flagged `private`, so anyone who learns the info-hash and can reach your listening port could fetch the data. Keep the port on your LAN or VPN (for example Tailscale or WireGuard) and do not share the magnet link. A private-flag and per-peer allow-list are follow-ups.
+1. Enable BitTorrent transfers. Choose upload/seeding policy and speed limits.
+2. For a torrent file, choose **Choose .torrent…**. Desktop opens a native picker;
+   browser users supply an absolute path on the Marquee computer, not an upload.
+3. Review the name, size, files, private flag, tracker count and destination.
+   Review is offline. All listed files download; selective-file download is not
+   implemented. Large lists preview the first 50 filenames.
+4. Enable tracker discovery or DHT if needed, or provide direct peer IP:port
+   addresses. Private torrents cannot use DHT; a tracker or direct peer is needed.
+5. Choose **Download files**. The backend rereads metadata and checks its complete
+   SHA-256 against the review token before starting. Changes require another review.
+6. Progress, errors, file location, Pause, Resume/Retry and Stop remain visible.
+   Status reconciliation runs across the app while transfers are enabled.
 
-BIOS and firmware are not seeded unless you point the command at them.
+The magnet field accepts public magnets or a link copied from another Marquee
+installation's Share action. Links with direct peers use the private engine and
+omit public tracker parameters. Public magnets preserve discovery parameters
+and require enabled discovery. Metadata resolution times out after 60 seconds
+with a retryable error; an unreachable peer is not a completed download.
 
-## VPN
+## Privacy and lifecycle
 
-- **Your own devices on one network:** no VPN is needed.
-- **Devices at different sites:** use a mesh VPN (Tailscale, or plain WireGuard) rather than a consumer VPN. It gives every device a stable private address, so `--peer 100.x.y.z:51413` works with no port forwarding and the traffic is encrypted. The same network would serve Apollo/Moonlight remote play and the AIRCloud web UIs; it is tracked as the parked **Mesh VPN** item in `aircloud-documentation/initiatives/next-steps.md` (revival reasons noted there, 2026-10-21).
-- **ExpressVPN (or any consumer VPN):** useful only if you ever use public torrents. It does not connect your devices to each other and, as far as we know (unchecked), has no port forwarding, so it cannot help a seeder be reached.
-- **Planned: `bind_interface` setting.** `librqbit` can bind all sockets to one network interface (`SO_BINDTODEVICE` on Linux). Naming the VPN's interface (for example `tailscale0`) would act as a kill switch: if the interface is gone the client has no network and refuses to start. Not implemented; whether ExpressVPN's Linux app exposes a usable interface is untested.
+- Private device shares and public torrent downloads use **separate engines**.
+  Turning on public discovery does not publish private-share hashes through DHT
+  or trackers. Local multicast discovery and UPnP remain disabled.
+- Tracker/DHT options contact their respective networks and expose the client's
+  address. These options remain off until selected. Generated device torrents
+  currently have no private flag or authenticated peer allow-list: keep device
+  links/listening ports on a trusted LAN or VPN. This is not encrypted pairing.
+- Upload policy applies to both engines. Speed limits are applied separately to
+  the private and public sessions, not as one aggregate cross-session budget.
+- Completed downloads may continue seeding when uploads are allowed; receive-only
+  completion is shown without claiming that uploading is happening.
+- State and cached metadata are written atomically with synchronization and
+  private temporary-file permissions. Corrupt state and failed writes are errors,
+  never an empty list or a successful mutation. Tracker credentials in metadata
+  or magnet links remain backend-side; the review shows a tracker count.
+- Resume may overwrite partial files **only in a marked job-owned folder**.
+  Unowned folders, symlinks and special files refuse resume. Generic transport
+  downloads refuse overwrite by default. Stop never deletes payloads.
+- Legacy downloads that pointed directly into library folders are retained but
+  refused automatic resume. Existing files are kept; migration to managed
+  download folders remains a separate recovery task. Do not delete those files.
 
 ## CLI
 
 ```sh
-marquee torrent status                  # settings as JSON
-marquee torrent enable                  # master switch (default off)
-marquee torrent seeding false           # download-only
-marquee torrent limits 2048 0           # KiB/s up, down; 0 = unlimited
+# Offline: does not open the library DB or restore/network any existing jobs.
+marquee torrent inspect "/path/to/game.torrent"
 
-# On the device that has the game:
-marquee torrent seed "roms/ps2/Game (USA).iso" --listen 0.0.0.0:51413
-#   prints the .torrent path (under <data dir>/torrents), a magnet link, and the port
+marquee torrent enable
+marquee torrent discovery --trackers true --dht false
+marquee torrent seeding false
+marquee torrent limits 2048 0            # KiB/s up, down; 0 = unlimited
+marquee torrent status                   # settings
+marquee torrent list                     # durable jobs and file locations
 
-# On another device, after copying the .torrent file (or using the magnet):
-marquee torrent get "Game (USA).iso.torrent" --into roms/ps2 --peer 192.168.1.20:51413
+# Downloads into ~/Downloads/Marquee/<info-hash>, not directly into the parent.
+# Optional token is the metadata SHA-256 returned by inspect.
+marquee torrent get "/path/to/game.torrent" --into ~/Downloads/Marquee --review-token <token>
+marquee torrent get 'magnet:?xt=urn:btih:…' --into ~/Downloads/Marquee
+marquee torrent pause <info-hash>
+marquee torrent resume <info-hash>
+marquee torrent stop <info-hash>           # keeps history and files
+
+# Direct transfer without public discovery:
+marquee torrent seed "roms/ps2/Game.iso" --listen 0.0.0.0:51413
+marquee torrent get "/path/to/Game.iso.torrent" --into ~/Downloads/Marquee --peer 192.168.1.20:51413
 ```
 
-`seed` runs until interrupted. `get` verifies every piece and exits when the download is complete. Run `marquee scan` afterwards so the game appears in the library.
+`get` waits for verified completion; its timeout pauses the job and preserves
+progress. Re-running for the same destination resumes its durable record. The
+UI or CLI can resume saved jobs later; background operation lasts only while a
+Marquee process remains running. A standalone `resume` command changes durable
+state; use a running desktop/web process or `get` to keep the transport alive.
+`MARQUEE_TORRENT_HOST` selects the address advertised in private device links,
+for example a LAN or mesh-VPN address. Automatic peer discovery is not implemented.
 
-## Next
+## Verification and remaining work
 
-1. Show share state on library cards, and a choice of advertised address in Settings instead of an environment variable.
-2. Start seeding at login without opening the window (today it runs while Marquee is open); restart-time re-checking of very large images is not optimised.
-3. Peer discovery between your devices (saved addresses first, then mDNS on the LAN).
-4. Private-flag torrents and an allow-list of peer addresses.
-5. Pairing with remote play (Apollo/Moonlight): "play here after download" versus "play remotely". Apollo's app-registration API is unchecked.
-6. Reuse the same flow for [archive intake](ROADMAP.md) and for validating that a received file matches the library hash.
+Synthetic loopback tests cover byte-identical transfer, a real HTTP tracker
+announce, offline metadata review, changed-review rejection, private-session
+isolation, corrupt/write-failed state, unowned/symlink folders, scan failure/retry,
+a partial-download pause/restart/resume, and restart with retained/missing source files followed by explicit redownload.
+A production browser check exercises file review, direct-peer download, stop,
+reload/history and source-missing Resume using disposable databases. The supplied
+Shadow of the Colossus torrent was inspected offline only; its payload was not
+fetched or installed.
+
+Still open: native picker/controller acceptance, external-client interoperability,
+real multi-machine/NAT and 20–50 GB interruption tests, selective-file download,
+a background daemon, interface/VPN binding, authenticated device pairing/private
+flags, universal source/installation records, automatic archive/package install
+jobs and optional remote-play integration. DHT/public tracker configuration is
+implemented; public network availability was not tested in this pass.

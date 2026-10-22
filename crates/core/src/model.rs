@@ -294,8 +294,12 @@ pub struct Settings {
 /// Device-to-device library transfer over BitTorrent. Off by default; when on
 /// it stays private (no public DHT or trackers) unless the user adds peers.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(default)]
 pub struct TorrentSettings {
     pub enabled: bool,
+    /// Public discovery is opt-in and never used for private device shares.
+    pub trackers: bool,
+    pub dht: bool,
     /// Serve pieces to your other devices. Off means download-only.
     pub seeding: bool,
     /// KiB/s; 0 is unlimited.
@@ -307,6 +311,8 @@ impl Default for TorrentSettings {
     fn default() -> Self {
         Self {
             enabled: false,
+            trackers: false,
+            dht: false,
             seeding: true,
             upload_kbps: 0,
             download_kbps: 0,

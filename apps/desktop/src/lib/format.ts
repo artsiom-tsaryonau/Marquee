@@ -74,6 +74,9 @@ export function transferLine(t: { state: string; kind: string; downloaded: numbe
     case 'checking': return 'Checking files…';
     case 'downloading': return `Downloading · ${bytes(t.downloaded)} of ${bytes(t.total)}${t.total ? ` (${Math.floor((t.downloaded / t.total) * 100)}%)` : ''}`;
     case 'paused': return 'Paused';
+    case 'source_missing': return 'Source files missing · record kept · Resume to download again';
+    case 'complete': return 'Download complete · retained files; installation is separate';
+    case 'seeding': return `Download complete · seeding · ${bytes(t.uploaded)} uploaded`;
     case 'error': return t.error ?? 'Something went wrong';
     default: return t.kind === 'get' ? `Done · sharing it onward · ${bytes(t.uploaded)} uploaded` : `Sharing with your other devices · ${bytes(t.uploaded)} uploaded`;
   }

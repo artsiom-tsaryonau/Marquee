@@ -18,6 +18,10 @@ let listenReady: Promise<void> = Promise.resolve();
 export const desktopApi: LibraryApi = {
   kind: 'desktop',
   ...commands(call),
+  async pickTorrent() {
+    const selected = await open({ directory:false, multiple:false, title:'Review torrent download', filters:[{name:'BitTorrent metadata',extensions:['torrent']}] });
+    return typeof selected === 'string' ? selected : null;
+  },
   async pickArchives() {
     const selected = await open({ directory:false, multiple:true, title:'Import ZIP, 7z or RAR game archives', filters:[{name:'Game archives',extensions:['zip','7z','rar']}] });
     return typeof selected === 'string' ? [selected] : selected ?? [];
