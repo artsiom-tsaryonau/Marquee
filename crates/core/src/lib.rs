@@ -23,6 +23,7 @@ pub mod paths;
 pub mod ports;
 pub mod profiles;
 pub mod purple;
+mod rar;
 pub mod romart;
 pub mod romfacts;
 pub mod runners;

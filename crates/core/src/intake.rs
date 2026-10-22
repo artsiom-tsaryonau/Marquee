@@ -155,36 +155,25 @@ fn list_entries(path: &Path, kind: Kind) -> Result<Vec<Entry>> {
             }
         }
         Kind::Rar => {
-            let rar_err = |e: unrar::error::UnrarError| {
-                AppError::new("INTAKE_FORMAT", format!("Invalid RAR: {e}"))
-            };
-            let mut cursor = unrar::Archive::new(path)
-                .open_for_listing()
-                .map_err(rar_err)?;
-            if cursor.has_encrypted_headers() {
-                return Err(AppError::new("INTAKE_FORMAT", "Encrypted RAR archives are not supported"));
-            }
+            let mut archive = crate::rar::Archive::open(path)?;
             let mut index = 0usize;
-            while let Some(h) = cursor.next() {
-                let h = h.map_err(rar_err)?;
+            while let Some(h) = archive.next()? {
                 if index >= MAX_ENTRIES {
-                    return Err(AppError::new("INTAKE_LIMIT", "Archive has too many entries"));
-                }
-                let name = h.filename.to_string_lossy().into_owned();
-                if h.is_encrypted() || h.is_split() {
                     return Err(AppError::new(
-                        "INTAKE_FORMAT",
-                        "Encrypted or multi-volume RAR archives are not supported",
+                        "INTAKE_LIMIT",
+                        "Archive has too many entries",
                     ));
                 }
-                if !h.is_directory() {
-                    // Unix symlinks carry S_IFLNK in the high attribute bits.
-                    if h.file_attr >> 16 & 0o170000 == 0o120000 {
-                        return Err(unsafe_entry(&name));
-                    }
-                    let rel = safe_rel(&name).ok_or_else(|| unsafe_entry(&name))?;
-                    out.push(Entry { raw: name, rel, size: h.unpacked_size, index });
+                let rel = safe_rel(&h.name).ok_or_else(|| unsafe_entry(&h.name))?;
+                if !h.directory {
+                    out.push(Entry {
+                        raw: h.name,
+                        rel,
+                        size: h.size,
+                        index,
+                    });
                 }
+                archive.skip()?;
                 index += 1;
             }
         }
@@ -212,8 +201,10 @@ fn list_entries(path: &Path, kind: Kind) -> Result<Vec<Entry>> {
             }
         }
     }
-    let total: u64 = out.iter().map(|e| e.size).sum();
-    if total > MAX_TOTAL {
+    let total = out
+        .iter()
+        .try_fold(0u64, |total, e| total.checked_add(e.size));
+    if total.is_none_or(|size| size > MAX_TOTAL) {
         return Err(AppError::new(
             "INTAKE_LIMIT",
             "Archive would unpack to more than 128 GiB",
@@ -320,35 +311,33 @@ fn extract(path: &Path, kind: Kind, wanted: &[(Entry, PathBuf)], staging: &Path)
             }
         }
         Kind::Rar => {
-            let rar_err = |e: unrar::error::UnrarError| {
-                AppError::new("INTAKE_FORMAT", format!("RAR error: {e}"))
-            };
-            let mut cursor = unrar::Archive::new(path)
-                .open_for_processing()
-                .map_err(rar_err)?;
+            let mut archive = crate::rar::Archive::open(path)?;
             let mut index = 0usize;
             let mut done = 0usize;
-            while let Some(header) = cursor.read_header().map_err(rar_err)? {
-                cursor = match wanted.iter().find(|(w, _)| w.index == index) {
-                    Some((entry, rel_out)) => {
-                        let dest = target(rel_out)?;
-                        let next = header.extract_to(&dest).map_err(rar_err)?;
-                        let written = fs::metadata(&dest)?.len();
-                        if written > entry.size {
-                            return Err(AppError::new(
-                                "INTAKE_LIMIT",
-                                "An entry unpacked to more than its declared size",
-                            ));
-                        }
-                        done += 1;
-                        next
+            while let Some(h) = archive.next()? {
+                if let Some((entry, rel_out)) = wanted.iter().find(|(w, _)| w.index == index) {
+                    if h.directory || h.name != entry.raw || h.size != entry.size {
+                        return Err(AppError::new(
+                            "INTAKE_FORMAT",
+                            "RAR entry changed after inspection",
+                        ));
                     }
-                    None => header.skip().map_err(rar_err)?,
-                };
+                    let mut file = File::options()
+                        .write(true)
+                        .create_new(true)
+                        .open(target(rel_out)?)?;
+                    archive.write(&mut file, entry.size)?;
+                    done += 1;
+                } else {
+                    archive.skip()?;
+                }
                 index += 1;
             }
             if done != wanted.len() {
-                return Err(AppError::new("INTAKE_FORMAT", "RAR archive ended before all entries were read"));
+                return Err(AppError::new(
+                    "INTAKE_FORMAT",
+                    "RAR archive ended before all entries were read",
+                ));
             }
         }
         Kind::SevenZ => {
@@ -781,5 +770,74 @@ mod tests {
             c.intake_archive(&f, false).unwrap_err().code,
             "INTAKE_FORMAT"
         );
+    }
+
+    #[test]
+    fn stored_rar4_and_rar5_import_real_bytes_and_preserve_sources() {
+        for fixture in ["regular4.rar", "regular5.rar"] {
+            let tmp = tempfile::tempdir().unwrap();
+            let c = core(&tmp.path().join("data"));
+            // Content detection must work independently of the extension.
+            let source = tmp.path().join("download.zip");
+            fs::copy(
+                Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("tests/fixtures/rar")
+                    .join(fixture),
+                &source,
+            )
+            .unwrap();
+            let before = fs::read(&source).unwrap();
+            let report = c.intake_archive(&source, false).unwrap();
+            assert_eq!(report.outcome, Outcome::Imported);
+            assert_eq!(report.system.as_deref(), Some("ds"));
+            assert_eq!(
+                fs::read(report.dest.unwrap().join("Game.nds")).unwrap(),
+                b"synthetic cartridge bytes\n"
+            );
+            assert_eq!(fs::read(&source).unwrap(), before);
+        }
+    }
+
+    #[test]
+    fn rar_links_and_traversal_are_refused_before_extraction() {
+        for fixture in [
+            "symlink4.rar",
+            "symlink5.rar",
+            "hardlink5.rar",
+            "filecopy5.rar",
+            "directory-link5.rar",
+            "traversal5.rar",
+        ] {
+            let tmp = tempfile::tempdir().unwrap();
+            let c = core(&tmp.path().join("data"));
+            let source = Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/fixtures/rar")
+                .join(fixture);
+            let copy = tmp.path().join(fixture);
+            fs::copy(&source, &copy).unwrap();
+            let error = c.intake_archive(&copy, true).unwrap_err();
+            assert_eq!(error.code, "INTAKE_UNSAFE", "{fixture}: {error}");
+            assert!(source.exists());
+            assert!(!tmp.path().join("outside.nds").exists());
+            assert!(!c.paths.data_dir.join("roms").exists());
+        }
+    }
+
+    #[test]
+    fn damaged_rar_payload_leaves_no_partial_game_and_preserves_source() {
+        let tmp = tempfile::tempdir().unwrap();
+        let c = core(&tmp.path().join("data"));
+        let mut bytes = include_bytes!("../tests/fixtures/rar/regular5.rar").to_vec();
+        let offset = bytes.windows(9).position(|v| v == b"synthetic").unwrap();
+        bytes[offset] ^= 1; // Keep valid headers, break the payload's CRC.
+        let source = tmp.path().join("damaged.rar");
+        fs::write(&source, bytes).unwrap();
+        assert_eq!(
+            c.intake_archive(&source, true).unwrap_err().code,
+            "INTAKE_FORMAT"
+        );
+        assert!(source.exists());
+        let root = c.paths.data_dir.join("roms/ds");
+        assert!(fs::read_dir(root).unwrap().next().is_none());
     }
 }

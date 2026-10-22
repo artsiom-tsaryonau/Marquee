@@ -48,3 +48,15 @@ The audit used the real collection read-only: **11 disc entries (9 PS1, 2 PS2)**
 ## 2026-10-21 — hands-off emulator setup
 
 PCSX2's first launch opened its setup wizard and exited under `-batch -nogui` (`SPAWN_FAILED`, exit 1). Marquee now writes the minimal valid `PCSX2.ini` itself, seeds DuckStation's `SetupWizardIncomplete`, imports BIOS files/zips from `bios-inbox`, and ignores host (Flatpak, system, loose AppImage) emulators. After this, a live PCSX2 launch of Vice City (USA) ended `exit 0` after 254 s with the session stored. The earlier "PCSX2 Flatpak could not read the ISO" and DuckStation AppImage-discovery findings (F5) are superseded: those code paths were removed. Note: building with a plain `cargo build` here may write to a temporary `CARGO_TARGET_DIR`; use `CARGO_TARGET_DIR=$PWD/target` to refresh `target/release/marquee`.
+
+## 2026-10-22 — RAR intake validation
+
+RAR inspection now uses the packed UnRAR ABI: the high-level wrapper discarded
+redirection metadata, and its underlying Rust structs used padded layouts that
+misread later native fields. RAR4 Unix symlinks and RAR5 redirections (symlinks,
+hardlinks, junctions, file copies) are rejected before staging. UnRAR runs in
+test/decompression mode with a bounded write callback, never filesystem
+extraction mode. Marquee creates regular files and rejects CRC/size errors.
+Synthetic stored RAR4/RAR5 fixtures exercise successful extraction, links and
+traversal; the callback has an oversized-output regression test. The frontend
+acceptance test and import labels now agree with RAR support.

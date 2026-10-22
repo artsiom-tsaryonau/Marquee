@@ -504,9 +504,10 @@ test('existing archive files are rescanned while skipped archives and invalid ho
   try {
     app.api={...api,intakeArchive:async(path)=>{imports++;return intakeReport(path,'already_present');},scan:async()=>{scans++;return scanReport();},snapshot:async()=>discSnapshot()};
     await app.importArchives(['/archives/old.7z']); assert.equal(scans,1);
-    await app.importArchives(['relative.zip','/archives/no.rar']); assert.equal(imports,1); assert.equal(scans,1);
+    await app.importArchives(['relative.zip','/archives/no.tar']); assert.equal(imports,1); assert.equal(scans,1);
+    await app.importArchives(['/archives/game.rar']); assert.equal(imports,2); assert.equal(scans,2);
     app.api={...app.api,intakeArchive:async(path)=>intakeReport(path,'skipped')};
-    await app.importArchives(['/archives/docs.zip']); assert.equal(scans,1);
+    await app.importArchives(['/archives/docs.zip']); assert.equal(scans,2);
   } finally {app.api=api;}
 });
 

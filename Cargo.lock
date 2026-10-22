@@ -3159,7 +3159,7 @@ dependencies = [
  "tar",
  "tempfile",
  "tiny_http",
- "unrar",
+ "unrar_sys",
  "ureq",
  "uuid",
  "zip",
@@ -5958,18 +5958,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c6f5d3c3b1bf09027a88a6bc961fc00497d651009560b5463668dc81b0fa87a8"
 
 [[package]]
-name = "unrar"
-version = "0.5.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92ec61343a630d2b50d13216dea5125e157d3fc180a7d3f447d22fe146b648fc"
-dependencies = [
- "bitflags 2.13.2",
- "regex",
- "unrar_sys",
- "widestring",
-]
-
-[[package]]
 name = "unrar_sys"
 version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6334,12 +6322,6 @@ dependencies = [
  "windows",
  "windows-core",
 ]
-
-[[package]]
-name = "widestring"
-version = "1.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72069c3113ab32ab29e5584db3c6ec55d416895e60715417b5b883a357c3e471"
 
 [[package]]
 name = "winapi"

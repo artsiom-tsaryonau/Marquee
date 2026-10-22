@@ -474,10 +474,7 @@ fn pick(def: &EmulatorDef, release: &serde_json::Value) -> Result<Release> {
         .and_then(|v| v.as_str())
         .ok_or_else(|| AppError::new("NETWORK", "GitHub release has no tag"))?;
     let suffix = def.asset_suffix.to_ascii_lowercase();
-    let contains = def
-        .asset_contains
-        .as_deref()
-        .map(str::to_ascii_lowercase);
+    let contains = def.asset_contains.as_deref().map(str::to_ascii_lowercase);
     let asset = release
         .get("assets")
         .and_then(|v| v.as_array())

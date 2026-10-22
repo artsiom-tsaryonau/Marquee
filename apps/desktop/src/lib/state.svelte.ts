@@ -426,7 +426,7 @@ class AppState {
       this.notify(describeScan(report));
       if (this.libraryStatus === 'empty' && report.skipped_unsupported && !report.added) {
         this.notify(
-          system === 'ds' ? 'Nothing imported. Extract .nds cartridges from their ZIP/7z archives first.'
+          system === 'ds' ? 'Nothing imported. Extract .nds cartridges from their ZIP/7z/RAR archives first.'
           : system === 'neogeo' ? 'Nothing imported. Keep Neo Geo ROM sets zipped; place neogeo.zip and required parent sets alongside them.'
           : system === 'ps1'
             ? 'Nothing imported. PS1 supports .iso, .chd and .cue with its referenced tracks. Standalone BIN files need a CUE sheet.'

@@ -57,6 +57,7 @@ Documents and images in the archive (`.txt`, `.nfo`, `.jpg`, ...) are ignored. A
 
 ## Limits and not done
 
+- RAR4/RAR5 link and redirection entries (including hardlinks and file copies) are rejected from packed native headers. UnRAR only decompresses bytes through a bounded callback; Marquee creates regular staging files itself, checks CRC errors and refuses short/oversized output. Synthetic RAR fixtures cover both versions and hostile links/paths.
 - `.rar` is read through the bundled UnRAR library (extraction only; encrypted headers/files and multi-volume sets are refused); the format is detected by content, not file name.
 - Desktop drop/file picking and browser host-path UI are implemented. Watched inbox folders and restart-persistent jobs remain open.
 - System detection is by extension and size; it does not read the disc image to tell PS1 from PS2, and does not verify ROM hashes.
