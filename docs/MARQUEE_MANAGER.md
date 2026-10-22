@@ -94,11 +94,11 @@ bridge; legacy JSON remains until explicit cutover.
   `marquee-manager-<uid>/<data-directory-hash>/ipc.sock` (mode 600). Both peers
   check Linux `SO_PEERCRED`. Long isolated data paths do not exceed socket limits.
   No manager TCP port or direct browser endpoint is opened.
-- Protocol v1 uses bounded length-prefixed JSON, typed operations, matching request
+- Protocol v2 uses bounded length-prefixed JSON, typed operations, matching request
   IDs and a version check before mutation. Maximum frame is 32 MiB. The worker
   advertises snapshot polling; event replay and active preparation cancellation are
   unsupported. Browser cancellation is a request/acknowledgement flow. The existing browser/native-host protocol is still a separate bridge.
-- Job state/receipts use private `manager/jobs.db` schema 2; the worker never opens
+- Job state/receipts use private `manager/jobs.db` schema 3; the worker never opens
   `library.db` or holds the library's instance lease. The launcher transactionally
   imports receipts into library schema 6 and sends a fingerprint-bound acknowledgement.
   Failed/lost acknowledgements remain replayable. The active frontend reconciles
@@ -175,7 +175,7 @@ typed stdin, retaining pairing credentials in the host. The CLI reaches the
 private manager socket without taking the library lease. No new browser endpoint,
 cookie export or shell-command interface is introduced.
 
-- Additive `browser_jobs` storage in schema 2 owns new reviewed selections, stable
+- `browser_jobs` storage in schema 3 owns new reviewed selections, stable
   start UUIDs, Chrome download IDs, attribution, last-reported bytes, cancellation
   requests and local completion manifests. Existing preparation records are
   unchanged. Stable start replay and duplicate completion are idempotent.
@@ -187,8 +187,10 @@ cookie export or shell-command interface is introduced.
   Marquee remains pending until the browser applies/acknowledges it; open/refresh
   the companion. Progress is last reported, not an unattended polling promise.
 - Library → **Downloads and archives** shows these jobs. Completed ZIP/7z/RAR
-  files can enter the existing explicit-platform preparation review. This is a
-  handoff, not a durable artifact-to-preparation/receipt link or automatic install.
+  files enter a linked explicit-platform review: the archive is rechecked against
+  download-time SHA-256, and review plus link commit atomically. Repeated inspection
+  reuses one job; changing its platform does not silently replace that review.
+  Preparation still requires approval. Updates/DLC and unsupported packages stay blocked.
 - The installer's explicit `--switch-to-manager` refuses active/corrupt legacy
   jobs, retains pairing and job records, backs up configuration/history and retires
   the JSON v1 write schema under its lock. A marker also blocks stale configured writers. Completed legacy jobs are not adopted automatically;
@@ -201,8 +203,37 @@ cookie export or shell-command interface is introduced.
 Checks exercise native framing → CLI → independent manager with synthetic ZIP
 bytes, attribution rejection, stable replay, restart, completion/history and
 cancellation. A disposable current-UI browser check verifies history, pending
-cancellation and acknowledgement. Live provider-to-preparation/registration/launch,
-artifact links, completed-history adoption and packaged delivery remain M4 gates.
+cancellation and acknowledgement. The synthetic browser flow now reaches a linked
+review, preparation and registered library receipt; replay/restart and source
+removal retain one job/receipt/edition. Injected link/publication failures roll back
+and retry safely. Live provider-to-install/launch, historical adoption, reference
+hash matching and packaged delivery remain M4 gates.
+
+### Browser artifacts, receipts and version cutover
+
+`browser_preparations` links each completed browser job to one preparation job.
+The review and receipt carry immutable `browser_source`: provider selection,
+browser job/download IDs, attribution and the original file path/size/SHA-256.
+The library stores this provenance in its existing transactional receipt payload;
+no library schema change is needed. Legacy local-job IDs and receipt encoding
+remain unchanged when provenance is absent.
+
+Inspect through the UI or `marquee browser inspect BROWSER_JOB_ID --system genesis`.
+This records review only. The normal approval, preparation, receipt publication
+and acknowledgement follow. Source deletion after preparation does not erase
+provenance or trigger download/extraction again; registration can retry from the
+validated outputs. Snapshots report missing/unavailable/size-changed sources
+separately; that availability check is not a fresh content hash.
+
+Manager schema **3** retires older writers that could drop new receipt fields.
+A schema-2 upgrade first writes a mode-600 `jobs-v2-backup-<uuid>.db`, then advances
+the version without rewriting existing payloads. M1 cutover still takes its
+exclusive ownership backup before the subsequent upgrade. Private IPC **v2**
+rejects v1 job/receipt clients before mutation. The browser/native protocol stays
+v1 and pairing is unchanged. Use `marquee manager stop` to drain an older worker
+before starting the compatible pair; explicit Stop alone supports the old protocol.
+No job or receipt operation silently downgrades. Do not restore a backup under
+an active worker; a pre-upgrade backup does not contain later jobs/receipts.
 
 ## Data and ownership contract
 

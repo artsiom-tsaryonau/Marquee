@@ -34,6 +34,8 @@ pub struct Output {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Receipt {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub browser_source: Option<crate::browser::Source>,
     pub id: String,
     pub recipe: String,
     pub source_sha256: String,
@@ -46,6 +48,8 @@ pub struct Receipt {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Job {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub browser_source: Option<crate::browser::Source>,
     pub id: String,
     pub source: PathBuf,
     pub source_size: u64,
@@ -160,7 +164,7 @@ impl Manager {
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
         conn.pragma_update(None, "synchronous", "FULL")?;
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-        if version > 2 {
+        if version > 3 {
             return Err(error(
                 "PREPARATION_VERSION",
                 "Manager database is newer than this build",
@@ -173,8 +177,25 @@ impl Manager {
             conn.execute_batch(
                 "BEGIN IMMEDIATE;
                 CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY, payload TEXT NOT NULL);
-                PRAGMA user_version=2; COMMIT;",
+                PRAGMA user_version=3; COMMIT;",
             )?;
+        }
+        if version == 2 {
+            // The daemon holds the exclusive manager lease before opening its
+            // state. Back up without rewriting payloads; schema 3 retires older
+            // writers that would silently drop browser provenance fields.
+            let backup = self
+                .dir
+                .join(format!("jobs-v2-backup-{}.db", uuid::Uuid::new_v4()));
+            File::options()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(&backup)?;
+            conn.execute("VACUUM INTO ?1", [backup.to_string_lossy().as_ref()])?;
+            File::open(&backup)?.sync_all()?;
+            File::open(&self.dir)?.sync_all()?;
+            conn.execute_batch("BEGIN IMMEDIATE; PRAGMA user_version=3; COMMIT;")?;
         }
         Ok(conn)
     }
@@ -229,6 +250,32 @@ impl Manager {
 
     pub fn inspect(&self, source: &Path, system: &str) -> Result<Job> {
         let _guard = self.claim()?;
+        let mut review = self.build_review(source, system, None)?;
+        let conn = self.database()?;
+        let existing: Option<String> = conn
+            .query_row("SELECT payload FROM jobs WHERE id=?1", [&review.id], |r| {
+                r.get(0)
+            })
+            .optional()?;
+        if let Some(existing) = existing {
+            review = serde_json::from_str(&existing)?;
+            if review.state != State::Cancelled {
+                return Ok(review);
+            }
+            review.state = State::AwaitingReview;
+            review.error = None;
+            review.error_code = None;
+        }
+        self.save(&mut review)?;
+        Ok(review)
+    }
+
+    fn build_review(
+        &self,
+        source: &Path,
+        system: &str,
+        browser_source: Option<crate::browser::Source>,
+    ) -> Result<Job> {
         if !source.is_absolute() || !fs::symlink_metadata(source)?.is_file() {
             return Err(error(
                 "PREPARATION_UNSAFE",
@@ -239,32 +286,27 @@ impl Manager {
         let plan = ArchivePlan::inspect(&source, system)?;
         let hash = digest_file(&source)?;
         let source_size = fs::metadata(&source)?.len();
-        let id = format!(
-            "{:x}",
-            Sha256::digest(serde_json::to_vec(&(RECIPE, &source, &hash, &plan))?)
-        );
+        let identity = if let Some(provenance) = &browser_source {
+            serde_json::to_vec(&(
+                RECIPE,
+                "browser-source-v1",
+                &source,
+                &hash,
+                &plan,
+                provenance,
+            ))?
+        } else {
+            serde_json::to_vec(&(RECIPE, &source, &hash, &plan))?
+        };
+        let id = format!("{:x}", Sha256::digest(identity));
         let destination = self.dir.join("installations").join(&id);
         let review_token = format!(
             "{:x}",
             Sha256::digest(serde_json::to_vec(&(&id, &destination, &plan))?)
         );
-        let conn = self.database()?;
-        if conn
-            .query_row("SELECT 1 FROM jobs WHERE id=?1", [&id], |_| Ok(()))
-            .optional()?
-            .is_some()
-        {
-            let mut job = self.get(&id)?;
-            if job.state == State::Cancelled {
-                job.state = State::AwaitingReview;
-                job.error = None;
-                job.error_code = None;
-                self.save(&mut job)?;
-            }
-            return Ok(job);
-        }
         let now = marquee_media::time::now_rfc3339();
-        let mut job = Job {
+        let job = Job {
+            browser_source,
             id,
             source,
             source_size,
@@ -281,7 +323,105 @@ impl Manager {
             created_at: now.clone(),
             updated_at: now,
         };
-        self.save(&mut job)?;
+        Ok(job)
+    }
+
+    /// A browser completion is not an install. Recheck the exact retained bytes,
+    /// bind the explicit platform review once, then require normal approval.
+    pub fn inspect_browser(&self, browser_id: &str, system: &str) -> Result<Job> {
+        let _guard = self.claim()?;
+        let mut conn = self.browser_database()?;
+        let browser = self.completed_browser(browser_id)?;
+        if browser
+            .selection
+            .link_type
+            .as_deref()
+            .is_some_and(|kind| kind != "base")
+        {
+            return Err(error(
+                "BROWSER_PREPARATION",
+                "Updates and DLC need their own supported preparation workflow",
+            ));
+        }
+        let linked: Option<String> = conn
+            .query_row(
+                "SELECT preparation_id FROM browser_preparations WHERE browser_job_id=?1",
+                [browser_id],
+                |r| r.get(0),
+            )
+            .optional()?;
+        if let Some(id) = &linked {
+            let job = self.get(id)?;
+            if job.plan.system != system {
+                return Err(error(
+                    "BROWSER_PREPARATION",
+                    "This download already has a platform review; its existing job was kept",
+                ));
+            }
+            if job.receipt.is_some() || job.state == State::Preparing {
+                return Ok(job);
+            }
+        }
+        let source = browser.source()?;
+        let evidence = crate::browser::artifact(
+            &source.artifact.filename,
+            &browser.download_root,
+            source.artifact.bytes,
+        )?;
+        if evidence.sha256 != source.artifact.sha256 {
+            return Err(error(
+                "BROWSER_SOURCE_CHANGED",
+                "Downloaded archive changed since completion; no preparation was created",
+            ));
+        }
+        let mut job = self.build_review(&evidence.filename, system, Some(source.clone()))?;
+        if job.source_sha256 != source.artifact.sha256 || job.source_size != source.artifact.bytes {
+            return Err(error(
+                "BROWSER_SOURCE_CHANGED",
+                "Downloaded archive changed during inspection; no preparation was created",
+            ));
+        }
+        let checked = crate::browser::artifact(
+            &source.artifact.filename,
+            &browser.download_root,
+            source.artifact.bytes,
+        )?;
+        if checked.sha256 != source.artifact.sha256 {
+            return Err(error(
+                "BROWSER_SOURCE_CHANGED",
+                "Downloaded archive changed during inspection",
+            ));
+        }
+        if linked.as_ref().is_some_and(|id| *id != job.id) {
+            return Err(error(
+                "BROWSER_PREPARATION",
+                "The saved preparation review differs; existing records were kept",
+            ));
+        }
+        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        let prior: Option<String> = tx
+            .query_row("SELECT payload FROM jobs WHERE id=?1", [&job.id], |r| {
+                r.get(0)
+            })
+            .optional()?;
+        if let Some(prior) = prior {
+            job = serde_json::from_str(&prior)?;
+            if job.browser_source.as_ref() != Some(&source) {
+                return Err(error(
+                    "BROWSER_PREPARATION",
+                    "Preparation provenance does not match this download",
+                ));
+            }
+            if job.state == State::Cancelled {
+                job.state = State::AwaitingReview;
+                job.error = None;
+                job.error_code = None;
+            }
+        }
+        job.updated_at = marquee_media::time::now_rfc3339();
+        tx.execute("INSERT INTO jobs(id,payload) VALUES(?1,?2) ON CONFLICT(id) DO UPDATE SET payload=excluded.payload", params![job.id,serde_json::to_string(&job)?])?;
+        tx.execute("INSERT INTO browser_preparations(browser_job_id,preparation_id) VALUES(?1,?2) ON CONFLICT(browser_job_id) DO NOTHING", params![browser_id,job.id])?;
+        tx.commit()?;
         Ok(job)
     }
 
@@ -351,6 +491,7 @@ impl Manager {
                 })
                 .collect::<Result<Vec<_>>>()?;
             job.receipt = Some(Receipt {
+                browser_source: job.browser_source.clone(),
                 id: job.id.clone(),
                 recipe: RECIPE.into(),
                 source_sha256: job.source_sha256.clone(),
@@ -550,6 +691,19 @@ impl Manager {
 
 impl Receipt {
     pub fn verify(&self, root: &Path) -> Result<()> {
+        if self.browser_source.as_ref().is_some_and(|s| {
+            s.artifact.sha256 != self.source_sha256
+                || s.artifact.content_verified
+                || s.selection
+                    .link_type
+                    .as_deref()
+                    .is_some_and(|kind| kind != "base")
+        }) {
+            return Err(error(
+                "PREPARATION_INVALID",
+                "Receipt browser-source evidence is inconsistent",
+            ));
+        }
         if !fs::symlink_metadata(root)?.is_dir() {
             return Err(error(
                 "PREPARATION_INVALID",
@@ -581,6 +735,228 @@ impl Receipt {
 mod tests {
     use super::*;
     use std::io::Write;
+
+    fn completed(manager: &Manager, source: &Path, kind: Option<&str>) -> String {
+        use crate::browser::{Request, Selection};
+        let selected: Selection = if let Some(kind) = kind {
+            serde_json::from_value(serde_json::json!({"provider":"axekin","game_id":"12","title":"Fixture","source_url":"https://www.axekin.com/games/fixture","mirror_url":"https://mirror.test/12","link_type":kind})).unwrap()
+        } else {
+            serde_json::from_value(serde_json::json!({"provider":"vimm","game_id":"1","media_id":"2","title":"Fixture","source_url":"https://vimm.net/vault/1","format":"0","disc":""})).unwrap()
+        };
+        let client = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        let id = uuid::Uuid::new_v4().to_string();
+        manager
+            .browser_request(
+                client,
+                Request::Start {
+                    id: id.clone(),
+                    selection: selected,
+                    download_root: source.parent().unwrap().into(),
+                },
+            )
+            .unwrap();
+        manager
+            .browser_request(
+                client,
+                Request::Bind {
+                    job_id: id.clone(),
+                    download_id: 7,
+                    url: "https://cdn.test/fixture.zip".into(),
+                    referrer: String::new(),
+                    confirmed: true,
+                },
+            )
+            .unwrap();
+        manager
+            .browser_request(
+                client,
+                Request::Complete {
+                    job_id: id.clone(),
+                    download_id: 7,
+                    filename: source.into(),
+                    bytes: fs::metadata(source).unwrap().len(),
+                },
+            )
+            .unwrap();
+        id
+    }
+
+    #[test]
+    fn v2_upgrade_backs_up_and_preserves_payloads_before_retiring_old_writers() {
+        use std::os::unix::fs::PermissionsExt;
+        let temp = tempfile::tempdir().unwrap();
+        let manager = Manager::new(temp.path());
+        let path = zip(temp.path(), "source.zip", &[("Game.gen", b"fixture")]);
+        let review = manager.inspect(&path, "genesis").unwrap();
+        let conn = manager.database().unwrap();
+        let before: String = conn
+            .query_row("SELECT payload FROM jobs WHERE id=?1", [&review.id], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        conn.pragma_update(None, "user_version", 2).unwrap();
+        drop(conn);
+        let conn = manager.database().unwrap();
+        assert_eq!(
+            conn.query_row("PRAGMA user_version", [], |r| r.get::<_, u32>(0))
+                .unwrap(),
+            3
+        );
+        let after: String = conn
+            .query_row("SELECT payload FROM jobs WHERE id=?1", [&review.id], |r| {
+                r.get(0)
+            })
+            .unwrap();
+        assert_eq!(before, after);
+        let backups: Vec<_> = fs::read_dir(temp.path().join("manager"))
+            .unwrap()
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| {
+                p.file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .starts_with("jobs-v2-backup-")
+            })
+            .collect();
+        assert_eq!(backups.len(), 1);
+        assert_eq!(
+            fs::metadata(&backups[0]).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        let backup = Connection::open(&backups[0]).unwrap();
+        assert_eq!(
+            backup
+                .query_row("PRAGMA user_version", [], |r| r.get::<_, u32>(0))
+                .unwrap(),
+            2
+        );
+        assert_eq!(
+            before,
+            backup
+                .query_row("SELECT payload FROM jobs WHERE id=?1", [&review.id], |r| {
+                    r.get::<_, String>(0)
+                })
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn browser_review_links_atomically_replays_and_retains_immutable_provenance() {
+        let temp = tempfile::tempdir().unwrap();
+        let manager = Arc::new(Manager::new(temp.path()));
+        let path = zip(temp.path(), "source.zip", &[("Game.gen", b"fixture")]);
+        let browser_id = completed(&manager, &path, None);
+        // Inject failure between saving review and linking it: both must roll back.
+        manager.browser_database().unwrap().execute_batch("CREATE TRIGGER fail_browser_link BEFORE INSERT ON browser_preparations BEGIN SELECT RAISE(ABORT,'injected link failure'); END;").unwrap();
+        assert!(manager.inspect_browser(&browser_id, "genesis").is_err());
+        assert!(manager.list().unwrap().is_empty());
+        assert!(manager.browser_jobs().unwrap()[0].preparation_id.is_none());
+        manager
+            .browser_database()
+            .unwrap()
+            .execute_batch("DROP TRIGGER fail_browser_link")
+            .unwrap();
+        let review = manager.inspect_browser(&browser_id, "genesis").unwrap();
+        let repeated = manager.inspect_browser(&browser_id, "genesis").unwrap();
+        assert_eq!(review.id, repeated.id);
+        assert_eq!(manager.list().unwrap().len(), 1);
+        assert_eq!(review.state, State::AwaitingReview);
+        assert!(!review.destination.exists());
+        assert!(manager.inspect_browser(&browser_id, "ds").is_err());
+        let provenance = review.browser_source.as_ref().unwrap();
+        assert_eq!(provenance.browser_job_id, browser_id);
+        assert_eq!(provenance.artifact.sha256, review.source_sha256);
+        let mut prepared = manager.execute(&review.id, &review.review_token).unwrap();
+        assert_eq!(prepared.state, State::AwaitingLibrary);
+        assert_eq!(
+            prepared.receipt.as_ref().unwrap().browser_source,
+            review.browser_source
+        );
+        let receipt_json = serde_json::to_string(prepared.receipt.as_ref().unwrap()).unwrap();
+        fs::remove_file(&path).unwrap();
+        let reopened = Manager::new(temp.path());
+        assert_eq!(
+            reopened.inspect_browser(&browser_id, "genesis").unwrap().id,
+            review.id
+        );
+        assert_eq!(
+            reopened.browser_jobs().unwrap()[0].source_available,
+            Some(false)
+        );
+        assert_eq!(
+            reopened.browser_jobs().unwrap()[0]
+                .preparation_id
+                .as_deref(),
+            Some(review.id.as_str())
+        );
+        let fingerprint = prepared.receipt.as_ref().unwrap().fingerprint().unwrap();
+        prepared = reopened
+            .acknowledge(&review.id, &fingerprint, vec!["edition".into()])
+            .unwrap();
+        assert_eq!(prepared.state, State::Registered);
+        assert_eq!(
+            serde_json::to_string(prepared.receipt.as_ref().unwrap()).unwrap(),
+            receipt_json
+        );
+        assert_eq!(prepared.attempt, 1);
+    }
+
+    #[test]
+    fn browser_changed_archive_and_update_dlc_never_create_preparation_jobs() {
+        let temp = tempfile::tempdir().unwrap();
+        let manager = Manager::new(temp.path());
+        let path = zip(temp.path(), "source.zip", &[("Game.gen", b"fixture")]);
+        let browser_id = completed(&manager, &path, None);
+        let mut bytes = fs::read(&path).unwrap();
+        bytes[0] ^= 1;
+        fs::write(&path, &bytes).unwrap();
+        assert_eq!(
+            manager
+                .inspect_browser(&browser_id, "genesis")
+                .unwrap_err()
+                .code,
+            "BROWSER_SOURCE_CHANGED"
+        );
+        assert!(manager.list().unwrap().is_empty());
+        for kind in ["update", "dlc"] {
+            let path = zip(
+                temp.path(),
+                &format!("{kind}.zip"),
+                &[("Game.gen", b"fixture")],
+            );
+            let id = completed(&manager, &path, Some(kind));
+            assert_eq!(
+                manager.inspect_browser(&id, "genesis").unwrap_err().code,
+                "BROWSER_PREPARATION"
+            );
+        }
+        assert!(manager.list().unwrap().is_empty());
+    }
+
+    #[test]
+    fn legacy_review_and_receipt_serialization_keep_their_original_identity() {
+        let temp = tempfile::tempdir().unwrap();
+        let manager = Manager::new(temp.path());
+        let source = zip(temp.path(), "source.zip", &[("Game.gen", b"fixture")]);
+        let review = manager.inspect(&source, "genesis").unwrap();
+        let expected = format!(
+            "{:x}",
+            Sha256::digest(
+                serde_json::to_vec(&(RECIPE, &review.source, &review.source_sha256, &review.plan))
+                    .unwrap()
+            )
+        );
+        assert_eq!(review.id, expected);
+        assert!(!serde_json::to_value(&review)
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .contains_key("browser_source"));
+        let prepared = manager.execute(&review.id, &review.review_token).unwrap();
+        let value = serde_json::to_value(prepared.receipt.unwrap()).unwrap();
+        assert!(!value.as_object().unwrap().contains_key("browser_source"));
+    }
 
     fn zip(dir: &Path, name: &str, files: &[(&str, &[u8])]) -> PathBuf {
         let path = dir.join(name);

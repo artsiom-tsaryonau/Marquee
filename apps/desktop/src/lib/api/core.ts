@@ -43,6 +43,7 @@ export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'su
   return {
     managerStatus: () => call('manager_status'),
     browserJobs: () => call('browser_jobs'),
+    inspectBrowserPreparation: (id, system) => call('inspect_browser_preparation', { id, system }),
     cancelBrowserJob: (id) => call('cancel_browser_job', { id }),
     startManager: () => call('start_manager'),
     stopManager: () => call('stop_manager'),

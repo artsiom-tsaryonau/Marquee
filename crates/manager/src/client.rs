@@ -50,10 +50,14 @@ impl Client {
         endpoint::socket(&self.data)
     }
 
-    fn exchange<T: DeserializeOwned>(
+    fn exchange<T: DeserializeOwned>(&self, stream: UnixStream, operation: Operation) -> Result<T> {
+        self.exchange_version(stream, operation, protocol::VERSION)
+    }
+    fn exchange_version<T: DeserializeOwned>(
         &self,
         mut stream: UnixStream,
         operation: Operation,
+        version: u32,
     ) -> Result<T> {
         endpoint::same_user(&stream)?;
         stream.set_read_timeout(Some(Duration::from_secs(
@@ -68,14 +72,14 @@ impl Client {
         protocol::write_frame(
             &mut stream,
             &Request {
-                protocol_version: protocol::VERSION,
+                protocol_version: version,
                 request_id: request_id.clone(),
                 operation,
             },
         )
         .map_err(transport_error)?;
         let reply: Reply = protocol::read_frame(&mut stream).map_err(transport_error)?;
-        if reply.protocol_version != protocol::VERSION || reply.request_id != request_id {
+        if reply.protocol_version != version || reply.request_id != request_id {
             return Err(AppError::new(
                 "MANAGER_VERSION",
                 "Manager reply version/request does not match",
@@ -247,6 +251,15 @@ impl Client {
         }
         self.call(Operation::BrowserList, false)
     }
+    pub fn inspect_browser(&self, id: &str, system: &str) -> Result<Job> {
+        self.call(
+            Operation::InspectBrowser {
+                id: id.into(),
+                system: system.into(),
+            },
+            true,
+        )
+    }
     pub fn request_browser_cancel(&self, id: &str) -> Result<crate::browser::Job> {
         self.call(Operation::BrowserCancel { id: id.into() }, false)
     }
@@ -302,6 +315,52 @@ impl Client {
         )
     }
     pub fn stop(&self) -> Result<Status> {
-        self.exchange(self.connect()?, Operation::Stop)
+        match self.exchange(self.connect()?, Operation::Stop) {
+            Err(err) if err.code == "MANAGER_VERSION" => {
+                // Only explicit shutdown may use v1. Never send jobs/receipts
+                // through a client that cannot preserve their provenance.
+                self.exchange_version(self.connect()?, Operation::Stop, 1)
+            }
+            result => result,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::os::unix::net::UnixListener;
+    #[test]
+    fn explicit_stop_can_drain_a_v1_manager_without_downgrading_job_operations() {
+        let temp = tempfile::tempdir().unwrap();
+        let client = Client::new(temp.path());
+        let socket = client.socket_path().unwrap();
+        let listener = UnixListener::bind(&socket).unwrap();
+        let server = std::thread::spawn(move || {
+            for version in [protocol::VERSION, 1] {
+                let (mut stream, _) = listener.accept().unwrap();
+                let request: Request = protocol::read_frame(&mut stream).unwrap();
+                assert_eq!(request.protocol_version, version);
+                assert!(matches!(request.operation, Operation::Stop));
+                let result = if version == 1 {
+                    Ok(
+                        serde_json::json!({"running":true,"pid":null,"stopping":true,"protocol_version":1,"snapshot_polling":true,"event_replay":false,"active_cancel":false}),
+                    )
+                } else {
+                    Err(AppError::new("MANAGER_VERSION", "v1 only"))
+                };
+                protocol::write_frame(
+                    &mut stream,
+                    &Reply {
+                        protocol_version: 1,
+                        request_id: request.request_id,
+                        result,
+                    },
+                )
+                .unwrap();
+            }
+        });
+        assert!(client.stop().unwrap().stopping);
+        server.join().unwrap();
     }
 }

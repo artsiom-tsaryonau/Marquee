@@ -13,7 +13,7 @@ const SYSTEM_EMULATOR: Record<string, string> = {
 };
 /** Backend system id -> UI platform id. */
 const PLATFORM: Record<string, GameEntry['platform']> = {
-  ps1: 'ps1', ps2: 'ps2', ds: 'ds', neogeo: 'neogeo', dreamcast: 'dreamcast', nes: 'nes', snes: 'snes', gb: 'gb', gbc: 'gbc', pce: 'tg16', n64: 'n64',
+  ps1: 'ps1', ps2: 'ps2', genesis: 'genesis', ds: 'ds', neogeo: 'neogeo', dreamcast: 'dreamcast', nes: 'nes', snes: 'snes', gb: 'gb', gbc: 'gbc', pce: 'tg16', n64: 'n64',
 };
 
 function pickRunner(snap: Pick<LibrarySnapshot, 'runners' | 'settings'>, system = 'ps2'): Runner | null {

@@ -95,6 +95,20 @@ fn single_owner_private_socket_protocol_rejection_and_clean_stop() {
     assert_eq!(reply.result.unwrap_err().code, "MANAGER_VERSION");
     assert!(fixture.client.status().unwrap().running);
     assert!(!fixture.client.data_dir().join("manager/stopped").exists());
+    // v1 clients would drop provenance fields before receipt publication.
+    let mut legacy = UnixStream::connect(&socket).unwrap();
+    protocol::write_frame(
+        &mut legacy,
+        &Request {
+            protocol_version: 1,
+            request_id: "legacy-client".into(),
+            operation: Operation::Stop,
+        },
+    )
+    .unwrap();
+    let reply: Reply = protocol::read_frame(&mut legacy).unwrap();
+    assert_eq!(reply.result.unwrap_err().code, "MANAGER_VERSION");
+    assert!(!fixture.client.data_dir().join("manager/stopped").exists());
     let mut stream = UnixStream::connect(&socket).unwrap();
     stream
         .write_all(&((protocol::MAX_FRAME + 1) as u32).to_le_bytes())
@@ -291,7 +305,7 @@ fn m1_cutover_requires_exclusive_ownership_and_preserves_a_private_backup() {
         current
             .query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))
             .unwrap(),
-        2
+        3
     );
     assert!(source.is_file());
 }

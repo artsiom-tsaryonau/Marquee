@@ -166,6 +166,118 @@ mod tests {
     }
 
     #[test]
+    fn browser_artifact_links_survive_failed_publication_source_cleanup_and_restart() {
+        use marquee_manager::browser::{Request, Selection};
+        let dir = Data::new();
+        let data = dir.path().join("data");
+        let source = zip(dir.path(), &[("Game.gen", b"synthetic cartridge")]);
+        let core = open(&data);
+        let client = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        let browser_id = uuid::Uuid::new_v4().to_string();
+        let selected: Selection=serde_json::from_value(serde_json::json!({"provider":"vimm","game_id":"1","media_id":"2","format":"0","disc":"","title":"Synthetic","source_url":"https://vimm.net/vault/1"})).unwrap();
+        core.preparation
+            .browser_request(
+                client,
+                Request::Start {
+                    id: browser_id.clone(),
+                    selection: selected,
+                    download_root: dir.path().into(),
+                },
+            )
+            .unwrap();
+        core.preparation
+            .browser_request(
+                client,
+                Request::Bind {
+                    job_id: browser_id.clone(),
+                    download_id: 7,
+                    url: "https://dl3.vimm.net/fixture.zip".into(),
+                    referrer: "https://vimm.net/vault/1".into(),
+                    confirmed: false,
+                },
+            )
+            .unwrap();
+        core.preparation
+            .browser_request(
+                client,
+                Request::Complete {
+                    job_id: browser_id.clone(),
+                    download_id: 7,
+                    filename: source.clone(),
+                    bytes: fs::metadata(&source).unwrap().len(),
+                },
+            )
+            .unwrap();
+        let review = core
+            .preparation
+            .inspect_browser(&browser_id, "genesis")
+            .unwrap();
+        assert_eq!(
+            review.id,
+            core.preparation
+                .inspect_browser(&browser_id, "genesis")
+                .unwrap()
+                .id
+        );
+        core.with_db(|db| {db.conn.execute_batch("CREATE TRIGGER fail_browser_receipt BEFORE INSERT ON preparation_receipts BEGIN SELECT RAISE(ABORT,'injected publication failure'); END;")?; Ok(())}).unwrap();
+        let failed = core
+            .run_preparation(&review.id, &review.review_token)
+            .unwrap();
+        assert_eq!(failed.state, State::AwaitingLibrary);
+        assert!(core.snapshot().unwrap().editions.is_empty());
+        let fingerprint = failed.receipt.as_ref().unwrap().fingerprint().unwrap();
+        fs::remove_file(&source).unwrap();
+        core.with_db(|db| {
+            db.conn.execute_batch("DROP TRIGGER fail_browser_receipt")?;
+            Ok(())
+        })
+        .unwrap();
+        core.preparation.stop().unwrap();
+        let until = Instant::now() + Duration::from_secs(5);
+        while core.preparation.status().unwrap().running {
+            assert!(Instant::now() < until);
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        drop(core);
+        let core = open(&data);
+        core.preparation.start_manager().unwrap();
+        let registered = core.preparation_jobs().unwrap().remove(0);
+        assert_eq!(registered.state, State::Registered);
+        assert_eq!(registered.attempt, 1);
+        assert_eq!(
+            registered.receipt.as_ref().unwrap().fingerprint().unwrap(),
+            fingerprint
+        );
+        assert_eq!(
+            registered.browser_source.as_ref().unwrap().browser_job_id,
+            browser_id
+        );
+        assert_eq!(
+            core.preparation
+                .inspect_browser(&browser_id, "genesis")
+                .unwrap()
+                .id,
+            review.id
+        );
+        let browser = core.preparation.browser_jobs().unwrap().remove(0);
+        assert_eq!(browser.source_available, Some(false));
+        assert_eq!(browser.preparation_id.as_deref(), Some(review.id.as_str()));
+        core.preparation_jobs().unwrap();
+        assert_eq!(core.snapshot().unwrap().editions.len(), 1);
+        core.with_db(|db| {
+            let payload: String = db.conn.query_row(
+                "SELECT payload FROM preparation_receipts WHERE id=?1",
+                [&review.id],
+                |r| r.get(0),
+            )?;
+            let receipt: Receipt = serde_json::from_str(&payload)?;
+            assert_eq!(receipt.browser_source, registered.browser_source);
+            Ok(())
+        })
+        .unwrap();
+    }
+
+    #[test]
     fn detached_worker_prepares_without_core_and_reconnect_publishes_once() {
         let dir = Data::new();
         let data = dir.path().join("data");

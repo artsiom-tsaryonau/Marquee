@@ -6,7 +6,9 @@ use serde_json::Value;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
-pub const VERSION: u32 = 1;
+// v2 requires provenance-aware receipts. Older clients would otherwise discard
+// unknown receipt fields before publication/fingerprinting.
+pub const VERSION: u32 = 2;
 pub const MAX_FRAME: usize = 32 * 1024 * 1024;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -28,6 +30,10 @@ pub enum Operation {
     BrowserList,
     BrowserCancel {
         id: String,
+    },
+    InspectBrowser {
+        id: String,
+        system: String,
     },
     List,
     Get {

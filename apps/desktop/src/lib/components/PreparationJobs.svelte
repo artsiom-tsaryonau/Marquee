@@ -9,6 +9,7 @@
   let system = $state('');
   let jobs = $state<PreparationJob[]>([]);
   let browserJobs = $state<BrowserJob[]>([]);
+  let browserSystems = $state<Record<string, string>>({});
   let inspecting = $state(false);
   let error = $state('');
   let refreshError = $state('');
@@ -67,6 +68,13 @@
     try { await app.api.cancelBrowserJob(job.job_id); await refresh(); }
     catch (err) { if (mounted) error = (err as Error).message; }
   }
+  async function inspectBrowser(job: BrowserJob, selectedSystem = browserSystems[job.job_id]) {
+    if (inspecting || !selectedSystem) return;
+    inspecting = true; error = '';
+    try { await app.api.inspectBrowserPreparation(job.job_id, selectedSystem); await refresh(); }
+    catch (err) { if (mounted) error = (err as Error).message; }
+    finally { inspecting = false; }
+  }
   onMount(() => {
     mounted = true;
     void app.api.preparationSystems().then(value => { if (mounted) systems = value; }).catch(err => { if (mounted) error = err.message; });
@@ -105,13 +113,26 @@
     <p>The companion uses your existing browser session. Open it and refresh to report progress or apply a cancellation request. Downloaded files need a preparation review before they can enter the library.</p>
   {/if}
   {#each browserJobs as job (job.job_id)}
+    {@const linked = jobs.find(preparation => preparation.id === job.preparation_id)}
     <article>
       <h4>{job.selection.title}</h4>
-      <p>{job.selection.provider === 'vimm' ? 'Vimm' : 'Axekin'} · {job.cancel_requested ? 'Cancellation requested · waiting for browser' : job.state === 'completed' ? 'Downloaded · preparation needed' : job.state === 'waiting' ? 'Waiting for browser download' : job.state === 'downloading' ? 'Downloading in browser' : job.state === 'interrupted' ? 'Interrupted · review the source to retry' : 'Cancelled'}</p>
+      <p>{job.selection.provider === 'vimm' ? 'Vimm' : 'Axekin'} · {linked ? labels[linked.state] : job.cancel_requested ? 'Cancellation requested · waiting for browser' : job.state === 'completed' ? 'Downloaded · preparation needed' : job.state === 'waiting' ? 'Waiting for browser download' : job.state === 'downloading' ? 'Downloading in browser' : job.state === 'interrupted' ? 'Interrupted · review the source to retry' : 'Cancelled'}</p>
       <p>{size(job.bytes)}{job.total ? ` of ${size(job.total)}` : ''} · Last reported by the browser</p>
       {#if job.error}<p class="error">{job.error}</p>{/if}
       {#if job.result}<p class="path">Source: {job.result.filename}</p><p>Local SHA-256 recorded. Game identity and compatibility remain unverified.</p>
-        {#if /\.(zip|7z|rar)$/i.test(job.result.filename)}<button class="btn glass small" data-nav onclick={() => app.queueArchives([job.result!.filename])}>Review archive for preparation</button>
+        {#if job.source_available === false}<p>Source archive is missing, unavailable or changed in size. Download and preparation history are retained.</p>{/if}
+        {#if linked}<p>Linked preparation · {systemLabel(linked.plan.system)} · {linked.state === 'registered' ? `${linked.edition_ids.length} library entries` : 'Review and controls in Preparation history below'}</p>
+          {#if linked.state === 'cancelled'}<button class="btn glass small" data-nav disabled={inspecting || job.source_available === false} onclick={() => inspectBrowser(job, linked.plan.system)}>Review cancelled preparation</button>{/if}
+        {:else if job.preparation_id}<p class="error">Linked preparation could not be loaded. Retry refreshing; no new job will be created.</p>
+        {:else if job.selection.link_type && job.selection.link_type !== 'base'}<p>Updates and DLC need their own supported setup workflow.</p>
+        {:else if /\.(zip|7z|rar)$/i.test(job.result.filename)}
+          <label>Platform for {job.selection.title}
+            <select class="ui-select" data-nav bind:value={browserSystems[job.job_id]} disabled={inspecting || job.source_available === false}>
+              <option value="">Choose a supported platform…</option>
+              {#each systems as option}<option value={option.id}>{option.name}</option>{/each}
+            </select>
+          </label>
+          <button class="btn glass small" data-nav disabled={inspecting || app.intakeBusy || !browserSystems[job.job_id] || job.source_available === false} onclick={() => inspectBrowser(job)}>{inspecting ? 'Inspecting archive…' : 'Inspect downloaded archive'}</button>
         {:else}<p>Add the downloaded game folder through Library to scan supported media.</p>{/if}
       {:else if ['waiting', 'downloading'].includes(job.state)}
         <button class="btn glass small" data-nav disabled={job.cancel_requested} onclick={() => cancelBrowser(job)}>Request cancellation</button>
@@ -125,9 +146,10 @@
       <p><strong>{labels[job.state]}</strong> · {systemLabel(job.plan.system)}</p>
       <p>{job.plan.keep_archive ? 'Keep arcade ZIP intact' : 'Extract game files'} · {job.plan.files.length} files · {size(job.source_size)} source · {size(job.plan.required_bytes)} free space required</p>
       <p class="path">Destination: {job.destination}</p>
+      {#if job.browser_source}<p>Downloaded from {job.browser_source.selection.provider === 'vimm' ? 'Vimm' : 'Axekin'} · {job.browser_source.selection.title}. Download provenance is retained with this review and receipt.</p>{/if}
       <details><summary data-nav>Review files</summary><ul>{#each job.plan.files.slice(0, 100) as file}<li>{file.path} · {size(file.size)}</li>{/each}</ul>{#if job.plan.files.length > 100}<p>Showing the first 100 files.</p>{/if}</details>
       {#if job.error}<p class="error">{job.error}</p>{/if}
-      {#if job.state === 'registered'}<p>Original archive retained. Game launch and compatibility have not been tested by this operation.</p>
+      {#if job.state === 'registered'}<p>Preparation did not delete the source archive. Game launch and compatibility have not been tested by this operation.</p>
       {:else if !['preparing', 'cancelled'].includes(job.state)}
         <div class="actions">
           <button class="btn primary small" data-nav disabled={inspecting || app.intakeBusy || jobs.some(j => j.state === 'preparing')} onclick={() => run(job)}>{job.state === 'awaiting_review' ? 'Approve and prepare' : job.receipt ? 'Retry registration' : 'Retry preparation'}</button>

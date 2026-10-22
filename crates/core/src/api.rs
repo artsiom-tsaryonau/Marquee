@@ -91,6 +91,9 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
         "set_display_mode" => out(core.set_display_mode(&text(&args, "mode")?)?),
         "manager_status" => out(core.preparation.status()?),
         "browser_jobs" => out(core.preparation.browser_jobs()?),
+        "inspect_browser_preparation" => out(core
+            .preparation
+            .inspect_browser(&text(&args, "id")?, &text(&args, "system")?)?),
         "cancel_browser_job" => out(core
             .preparation
             .request_browser_cancel(&text(&args, "id")?)?),

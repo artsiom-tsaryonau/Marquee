@@ -93,6 +93,12 @@ enum ManagerCmd {
 
 #[derive(Subcommand)]
 enum BrowserCmd {
+    /// Recheck completed bytes and bind one platform review; never starts preparation
+    Inspect {
+        id: String,
+        #[arg(long)]
+        system: String,
+    },
     /// Read a typed browser operation from bounded stdin (no credentials)
     Request {
         #[arg(long)]
@@ -376,6 +382,9 @@ fn run() -> marquee_core::error::Result<()> {
                     client.browser_request(client_id, serde_json::from_slice(&bytes)?)?
                 }
                 BrowserCmd::List => serde_json::to_value(client.browser_jobs()?)?,
+                BrowserCmd::Inspect { id, system } => {
+                    serde_json::to_value(client.inspect_browser(id, system)?)?
+                }
                 BrowserCmd::Cancel { id } => {
                     serde_json::to_value(client.request_browser_cancel(id)?)?
                 }

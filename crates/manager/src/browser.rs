@@ -181,12 +181,21 @@ impl State {
         matches!(self, Self::Completed | Self::Interrupted | Self::Cancelled)
     }
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Artifact {
     pub filename: PathBuf,
     pub bytes: u64,
     pub sha256: String,
     pub content_verified: bool,
+}
+/// Immutable provenance carried into both review and receipt. No credentials.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct Source {
+    pub browser_job_id: String,
+    pub selection: Selection,
+    pub artifact: Artifact,
+    pub download_id: u64,
+    pub attribution: String,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Job {
@@ -205,6 +214,33 @@ pub struct Job {
     pub cancel_requested: bool,
     pub error: Option<String>,
     pub result: Option<Artifact>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preparation_id: Option<String>,
+    /// Snapshot availability, not a fresh hash verification; never authority.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_available: Option<bool>,
+}
+impl Job {
+    pub(crate) fn source(&self) -> Result<Source> {
+        if self.state != State::Completed {
+            return Err(invalid("This browser download is not complete"));
+        }
+        Ok(Source {
+            browser_job_id: self.job_id.clone(),
+            selection: self.selection.clone(),
+            artifact: self
+                .result
+                .clone()
+                .ok_or_else(|| invalid("Completed download has no byte evidence"))?,
+            download_id: self
+                .download_id
+                .ok_or_else(|| invalid("Completed download has no browser binding"))?,
+            attribution: self
+                .attribution
+                .clone()
+                .ok_or_else(|| invalid("Completed download has no attribution"))?,
+        })
+    }
 }
 fn root(path: &Path) -> Result<PathBuf> {
     if !path.is_absolute() || !path.is_dir() || fs::symlink_metadata(path)?.file_type().is_symlink()
@@ -217,7 +253,7 @@ fn root(path: &Path) -> Result<PathBuf> {
     }
     Ok(canonical)
 }
-fn artifact(path: &Path, root: &Path, bytes: u64) -> Result<Artifact> {
+pub(crate) fn artifact(path: &Path, root: &Path, bytes: u64) -> Result<Artifact> {
     if bytes == 0 || bytes > MAX_BYTES || !path.is_absolute() {
         return Err(invalid("Invalid completed file size or path"));
     }
@@ -309,21 +345,46 @@ fn artifact(path: &Path, root: &Path, bytes: u64) -> Result<Artifact> {
 }
 
 impl Manager {
-    fn browser_database(&self) -> Result<rusqlite::Connection> {
+    pub(crate) fn browser_database(&self) -> Result<rusqlite::Connection> {
         let db = self.database()?;
         db.execute_batch(
-            "CREATE TABLE IF NOT EXISTS browser_jobs(id TEXT PRIMARY KEY, payload TEXT NOT NULL)",
+            "CREATE TABLE IF NOT EXISTS browser_jobs(id TEXT PRIMARY KEY, payload TEXT NOT NULL);
+             CREATE TABLE IF NOT EXISTS browser_preparations(browser_job_id TEXT PRIMARY KEY, preparation_id TEXT NOT NULL UNIQUE)",
         )?;
         Ok(db)
     }
     pub fn browser_jobs(&self) -> Result<Vec<Job>> {
         let db = self.browser_database()?;
         let mut query = db.prepare("SELECT payload FROM browser_jobs ORDER BY rowid DESC")?;
-        let jobs = query
+        let mut jobs: Vec<Job> = query
             .query_map([], |r| r.get::<_, String>(0))?
             .map(|row| Ok(serde_json::from_str(&row?)?))
-            .collect();
-        jobs
+            .collect::<Result<_>>()?;
+        for job in &mut jobs {
+            job.preparation_id = db
+                .query_row(
+                    "SELECT preparation_id FROM browser_preparations WHERE browser_job_id=?1",
+                    [&job.job_id],
+                    |r| r.get(0),
+                )
+                .optional()?;
+            job.source_available = job.result.as_ref().map(|r| {
+                fs::symlink_metadata(&r.filename).is_ok_and(|m| m.is_file() && m.len() == r.bytes)
+            });
+        }
+        Ok(jobs)
+    }
+    pub(crate) fn completed_browser(&self, id: &str) -> Result<Job> {
+        let payload: Option<String> = self
+            .browser_database()?
+            .query_row("SELECT payload FROM browser_jobs WHERE id=?1", [id], |r| {
+                r.get(0)
+            })
+            .optional()?;
+        let job: Job =
+            serde_json::from_str(&payload.ok_or_else(|| invalid("Unknown browser download"))?)?;
+        job.source()?;
+        Ok(job)
     }
     pub fn request_browser_cancel(&self, id: &str) -> Result<Job> {
         let mut db = self.browser_database()?;
@@ -446,6 +507,8 @@ impl Manager {
                 cancel_requested: false,
                 error: None,
                 result: None,
+                preparation_id: None,
+                source_available: None,
             };
             save(&tx, &mut job)?;
             tx.commit()?;

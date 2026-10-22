@@ -114,6 +114,7 @@ export interface IntakeResult { path: string; report: IntakeReport | null; error
 
 export type PreparationState = 'awaiting_review' | 'preparing' | 'interrupted' | 'awaiting_library' | 'registered' | 'failed' | 'cancelled';
 export interface PreparationJob {
+  browser_source?: { browser_job_id: string; selection: { provider: string; title: string }; artifact: { filename: string; bytes: number; sha256: string; content_verified: boolean } };
   id: string;
   source: string;
   source_size: number;
@@ -343,6 +344,7 @@ export interface ManagerStatus { running: boolean; pid: number | null; stopping:
 
 export interface LibraryApi {
   browserJobs(): Promise<BrowserJob[]>;
+  inspectBrowserPreparation(id: string, system: string): Promise<PreparationJob>;
   cancelBrowserJob(id: string): Promise<BrowserJob>;
   managerStatus(): Promise<ManagerStatus>;
   startManager(): Promise<ManagerStatus>;
@@ -439,6 +441,8 @@ export interface BrowserJob {
   cancel_requested: boolean;
   error: string | null;
   result: { filename: string; bytes: number; sha256: string; content_verified: boolean } | null;
+  preparation_id?: string;
+  source_available?: boolean;
 }
 
 export interface ArtworkReport {

@@ -53,6 +53,9 @@ impl Server {
             }
             Operation::BrowserList => json(self.manager.browser_jobs()?),
             Operation::BrowserCancel { id } => json(self.manager.request_browser_cancel(&id)?),
+            Operation::InspectBrowser { id, system } => {
+                json(self.manager.inspect_browser(&id, &system)?)
+            }
             Operation::List => json(self.manager.list()?),
             Operation::Get { id } => json(self.manager.get(&id)?),
             Operation::Inspect { source, system } => json(self.manager.inspect(&source, &system)?),
