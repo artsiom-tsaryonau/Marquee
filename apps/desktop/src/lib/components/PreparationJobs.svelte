@@ -105,10 +105,11 @@
   {#if refreshError}<p class="error" role="alert">{refreshError}</p>{/if}
   <p>Accepted preparation continues after Marquee closes. Reopen Marquee to add completed games to the library. Interrupted work can be retried; byte progress and cancellation during extraction are not available yet.</p>
   <div class="actions">
-    <span>{manager?.stopping ? 'Manager finishing work before stopping' : manager?.running ? 'Background manager running' : 'Background manager offline'}</span>
-    {#if manager?.running}<button class="btn glass small" data-nav disabled={manager.stopping} onclick={() => controlManager(false)}>Stop manager after current work</button>
+    <span>{manager?.stopping ? 'Manager stopping after preparation' : manager?.running ? 'Background manager running' : 'Background manager offline'}</span>
+    {#if manager?.running}<button class="btn glass small" data-nav disabled={manager.stopping} onclick={() => controlManager(false)}>Stop manager</button>
     {:else}<button class="btn glass small" data-nav onclick={() => controlManager(true)}>Start manager</button>{/if}
   </div>
+  <p>Stopping the manager checkpoints torrents and stops downloads and seeding. Accepted archive preparation finishes before the manager exits. Start it again to resume eligible torrents.</p>
   {#if browserJobs.length}<h3>Browser downloads · {browserJobs.length}</h3>
     <p>The companion uses your existing browser session. Open it and refresh to report progress or apply a cancellation request. Downloaded files need a preparation review before they can enter the library.</p>
   {/if}

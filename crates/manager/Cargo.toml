@@ -7,6 +7,9 @@ description = "Private local preparation worker for Marquee"
 
 [dependencies]
 marquee-media.workspace = true
+marquee-torrent = { path = "../torrent" }
+anyhow = "1"
+tempfile = "3"
 libc = "0.2"
 rusqlite.workspace = true
 serde.workspace = true
@@ -16,5 +19,5 @@ uuid.workspace = true
 url = "2"
 
 [dev-dependencies]
-tempfile = "3"
+tiny_http = "0.12"
 zip.workspace = true

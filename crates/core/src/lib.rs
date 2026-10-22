@@ -97,7 +97,11 @@ impl Core {
         )?;
         core.refresh_runners()?;
         if let Ok(t) = core.torrent_settings() {
-            core.transfers.autostart(&t);
+            if t.enabled && !core.paths.data_dir.join("manager/stopped").exists() {
+                let _ = core
+                    .preparation
+                    .torrent::<transfer::TransferStatus>(marquee_manager::torrent::Request::Status);
+            }
         }
         Ok(core)
     }
@@ -109,7 +113,9 @@ impl Core {
     }
 
     pub fn snapshot(&self) -> Result<LibrarySnapshot> {
-        self.with_db(library::snapshot)
+        let mut snapshot = self.with_db(library::snapshot)?;
+        snapshot.settings.torrents = self.torrent_settings()?;
+        Ok(snapshot)
     }
 
     pub fn health(&self) -> Result<String> {
@@ -280,28 +286,18 @@ impl Core {
     }
 
     pub fn torrent_settings(&self) -> Result<model::TorrentSettings> {
-        Ok(self.with_db(|db| db.load_settings())?.torrents)
+        if marquee_manager::torrent::adopted(&self.paths.data_dir)? {
+            marquee_manager::torrent::read_settings(&self.paths.data_dir)
+        } else {
+            Ok(self.with_db(|db| db.load_settings())?.torrents)
+        }
     }
 
     pub fn set_torrent_settings(&self, t: &model::TorrentSettings) -> Result<()> {
-        let _control = self.transfers.control();
-        self.transfers.checkpoint()?;
-        self.with_db(|db| {
-            let tx = db.conn.unchecked_transaction()?;
-            for (key, value) in [
-                ("torrent.trackers", if t.trackers { "1" } else { "0" }.to_string()),
-                ("torrent.dht", if t.dht { "1" } else { "0" }.to_string()),
-                ("torrent.enabled", if t.enabled { "1" } else { "0" }.to_string()),
-                ("torrent.seeding", if t.seeding { "1" } else { "0" }.to_string()),
-                ("torrent.upload_kbps", t.upload_kbps.to_string()),
-                ("torrent.download_kbps", t.download_kbps.to_string()),
-            ] {
-                tx.execute("INSERT INTO settings(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value", rusqlite::params![key,value])?;
-            }
-            tx.commit()?;
-            self.transfers.reset(t);
-            Ok(())
-        })?;
+        self.preparation
+            .torrent::<()>(marquee_manager::torrent::Request::SetSettings {
+                settings: t.clone(),
+            })?;
         self.events.emit(CoreEvent::LibraryChanged);
         Ok(())
     }

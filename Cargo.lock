@@ -3184,13 +3184,16 @@ dependencies = [
 name = "marquee-manager"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "libc",
  "marquee-media",
+ "marquee-torrent",
  "rusqlite",
  "serde",
  "serde_json",
  "sha2",
  "tempfile",
+ "tiny_http",
  "url",
  "uuid",
  "zip",

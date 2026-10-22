@@ -338,3 +338,179 @@ fn explicit_stop_drains_accepted_work_and_never_auto_restarts_it() {
     assert!(!fixture.client.status().unwrap().running);
     assert!(source.exists());
 }
+
+#[test]
+fn adopted_torrent_survives_client_exit_pause_and_manager_restart() {
+    use marquee_manager::torrent::{Request as Torrent, TorrentSettings, TransferStatus};
+    let fixture = Fixture::new();
+    let data = fixture.client.data_dir();
+    let source_dir = fixture.temp.path().join("seed");
+    fs::create_dir(&source_dir).unwrap();
+    let payload: Vec<u8> = (0..8 * 1024 * 1024u32)
+        .map(|i| (i.wrapping_mul(2654435761) >> 13) as u8)
+        .collect();
+    let source = source_dir.join("synthetic.pkg");
+    fs::write(&source, &payload).unwrap();
+    let mut cfg = marquee_torrent::Config::private(&source_dir);
+    cfg.listen = "127.0.0.1:0".parse().unwrap();
+    let seed = marquee_torrent::Engine::start(&cfg).unwrap();
+    let made = seed.create(&source, vec![]).unwrap();
+    let id = seed.seed(made.bytes.clone(), &source_dir).unwrap();
+    seed.wait_finished(id, Duration::from_secs(5)).unwrap();
+    let hash = made.info_hash.clone();
+    let destination = fixture.temp.path().join("original-downloads");
+    let directory = destination.join(&hash);
+    fs::create_dir_all(&directory).unwrap();
+    fs::write(
+        destination.join(format!(".marquee-transfer-{hash}")),
+        hash.as_bytes(),
+    )
+    .unwrap();
+    fs::create_dir_all(data.join("torrents")).unwrap();
+    fs::write(data.join(format!("torrents/{hash}.torrent")), made.bytes).unwrap();
+    let legacy = serde_json::json!([{"kind":"get","info_hash":hash,"name":"synthetic.pkg","edition_id":null,"system":null,"dir":directory,"destination":destination,"peers":[seed.listen_addr().unwrap()],"paused":true,"owned":true,"downloaded":0,"uploaded":0,"total":payload.len(),"public":true}]);
+    fs::write(
+        data.join("torrents/entries.json"),
+        serde_json::to_vec_pretty(&legacy).unwrap(),
+    )
+    .unwrap();
+    let db = rusqlite::Connection::open(data.join("library.db")).unwrap();
+    db.execute_batch("CREATE TABLE settings(key TEXT PRIMARY KEY,value TEXT); INSERT INTO settings VALUES('torrent.enabled','1'),('torrent.seeding','0'),('torrent.download_kbps','1024');").unwrap();
+    drop(db);
+    let library_before = fs::read(data.join("library.db")).unwrap();
+    let status: TransferStatus = fixture.client.torrent(Torrent::Status).unwrap();
+    assert_eq!(status.items[0].state, "paused");
+    assert_eq!(status.items[0].directory, directory);
+    fixture
+        .client
+        .torrent::<()>(Torrent::Pause {
+            hash: hash.clone(),
+            paused: false,
+        })
+        .unwrap();
+    fixture.wait(|| {
+        let s: TransferStatus = fixture.client.torrent(Torrent::Status).unwrap();
+        s.items[0].downloaded > 0 && s.items[0].downloaded < s.items[0].total
+    });
+    fixture
+        .client
+        .torrent::<()>(Torrent::Pause {
+            hash: hash.clone(),
+            paused: true,
+        })
+        .unwrap();
+    let paused: TransferStatus = fixture.client.torrent(Torrent::Status).unwrap();
+    fixture.client.stop().unwrap();
+    fixture.wait(|| !fixture.client.status().unwrap().running);
+    // A passive status request must not undo an explicit manager stop.
+    assert_eq!(
+        fixture
+            .client
+            .torrent::<TransferStatus>(Torrent::Status)
+            .unwrap_err()
+            .code,
+        "MANAGER_OFFLINE"
+    );
+    assert!(!fixture.client.status().unwrap().running);
+    fixture.client.start_manager().unwrap();
+    let reopened: TransferStatus = fixture.client.torrent(Torrent::Status).unwrap();
+    assert_eq!(reopened.items[0].state, "paused");
+    assert!(reopened.items[0].downloaded >= paused.items[0].downloaded);
+    let mut settings: TorrentSettings = fixture.client.torrent(Torrent::Settings).unwrap();
+    settings.download_kbps = 0;
+    fixture
+        .client
+        .torrent::<()>(Torrent::SetSettings { settings })
+        .unwrap();
+    let transient = fixture.client.clone();
+    transient
+        .torrent::<()>(Torrent::Pause {
+            hash: hash.clone(),
+            paused: false,
+        })
+        .unwrap();
+    drop(transient);
+    // No IPC/status polling: the detached manager heartbeat saves completion.
+    fixture.wait(|| {
+        let rows: serde_json::Value =
+            serde_json::from_slice(&fs::read(data.join("manager/torrents/entries.json")).unwrap())
+                .unwrap();
+        rows[0]["complete"] == true
+    });
+    assert_eq!(fs::read(directory.join("synthetic.pkg")).unwrap(), payload);
+    assert_eq!(
+        fs::read(data.join("library.db")).unwrap(),
+        library_before,
+        "transport must never write library.db or install packages"
+    );
+    fixture.client.stop().unwrap();
+    fixture.wait(|| !fixture.client.status().unwrap().running);
+    fs::remove_file(directory.join("synthetic.pkg")).unwrap();
+    fixture.client.start_manager().unwrap();
+    let missing: TransferStatus = fixture.client.torrent(Torrent::Status).unwrap();
+    assert_eq!(missing.items[0].state, "source_missing");
+    std::thread::sleep(Duration::from_millis(100));
+    assert!(!directory.join("synthetic.pkg").exists());
+    seed.shutdown();
+}
+
+#[test]
+fn background_seed_metadata_and_listener_policy_survive_restart_without_touching_source() {
+    use marquee_manager::torrent::{Created, Request as Torrent, TorrentSettings, TransferStatus};
+    let fixture = Fixture::new();
+    let source = fixture.temp.path().join("source.bin");
+    fs::write(&source, b"synthetic source to retain").unwrap();
+    fixture
+        .client
+        .torrent::<()>(Torrent::SetSettings {
+            settings: TorrentSettings {
+                enabled: true,
+                ..Default::default()
+            },
+        })
+        .unwrap();
+    let created: Created = fixture
+        .client
+        .torrent(Torrent::Create {
+            path: source.clone(),
+            listen: Some("127.0.0.1:0".parse().unwrap()),
+            seed: true,
+        })
+        .unwrap();
+    assert_eq!(
+        marquee_manager::torrent::inspect_file(&created.path)
+            .unwrap()
+            .0
+            .info_hash,
+        created.info_hash
+    );
+    fixture.wait(|| {
+        let state: TransferStatus = fixture.client.torrent(Torrent::Status).unwrap();
+        state.items[0].link.is_some()
+    });
+    fixture.client.stop().unwrap();
+    fixture.wait(|| !fixture.client.status().unwrap().running);
+    assert_eq!(fs::read(&source).unwrap(), b"synthetic source to retain");
+    assert_eq!(
+        fs::read(
+            fixture
+                .client
+                .data_dir()
+                .join("manager/torrents/private-listen.json")
+        )
+        .unwrap(),
+        b"\"127.0.0.1:0\""
+    );
+    fixture.client.start_manager().unwrap();
+    fixture.wait(|| {
+        let state: TransferStatus = fixture.client.torrent(Torrent::Status).unwrap();
+        state.items[0].link.is_some()
+    });
+    fixture
+        .client
+        .torrent::<()>(Torrent::Stop {
+            hash: created.info_hash,
+        })
+        .unwrap();
+    assert_eq!(fs::read(source).unwrap(), b"synthetic source to retain");
+}

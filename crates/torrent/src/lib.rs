@@ -84,13 +84,13 @@ pub struct Created {
     pub magnet: String,
 }
 
-#[derive(Clone, Debug, serde::Serialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct FileSummary {
     pub path: String,
     pub size: u64,
 }
 
-#[derive(Clone, Debug, serde::Serialize)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Manifest {
     pub info_hash: String,
     pub name: String,

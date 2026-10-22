@@ -291,34 +291,7 @@ pub struct Settings {
     pub torrents: TorrentSettings,
 }
 
-/// Device-to-device library transfer over BitTorrent. Off by default; when on
-/// it stays private (no public DHT or trackers) unless the user adds peers.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(default)]
-pub struct TorrentSettings {
-    pub enabled: bool,
-    /// Public discovery is opt-in and never used for private device shares.
-    pub trackers: bool,
-    pub dht: bool,
-    /// Serve pieces to your other devices. Off means download-only.
-    pub seeding: bool,
-    /// KiB/s; 0 is unlimited.
-    pub upload_kbps: u32,
-    pub download_kbps: u32,
-}
-
-impl Default for TorrentSettings {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            trackers: false,
-            dht: false,
-            seeding: true,
-            upload_kbps: 0,
-            download_kbps: 0,
-        }
-    }
-}
+pub use marquee_manager::torrent::TorrentSettings;
 
 fn default_display_mode() -> String {
     "window".into()

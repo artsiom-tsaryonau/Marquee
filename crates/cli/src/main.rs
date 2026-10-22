@@ -214,7 +214,7 @@ enum TorrentCmd {
     Create {
         path: PathBuf,
     },
-    /// Seed a file or folder until interrupted; prints the address and magnet
+    /// Seed a file or folder in the background manager; prints the address and magnet
     Seed {
         path: PathBuf,
         /// Address to accept peers on
@@ -359,6 +359,13 @@ fn run() -> marquee_core::error::Result<()> {
         value["review_token"] = token.into();
         println!("{}", serde_json::to_string_pretty(&value)?);
         return Ok(());
+    }
+    if matches!(&args.command, Command::Torrent(_)) {
+        let paths = marquee_core::paths::Paths::resolve(args.data_dir.clone())?;
+        let client = marquee_manager::Client::new(&paths.data_dir);
+        if let Command::Torrent(command) = args.command {
+            return torrent(&client, command);
+        }
     }
     // Worker controls and preparation handoff must work while the launcher
     // owns library.db, and cannot start recovery/network work in Core.
@@ -547,7 +554,7 @@ fn run() -> marquee_core::error::Result<()> {
                 ));
             }
         }
-        Command::Torrent(command) => torrent(&core, command)?,
+        Command::Torrent(_) => unreachable!("handled without Core"),
         Command::Prune => {
             println!("removed {}", core.prune_missing()?);
         }
@@ -811,118 +818,89 @@ fn run() -> marquee_core::error::Result<()> {
     Ok(())
 }
 
-fn torrent_config(
-    core: &Core,
-    dir: &std::path::Path,
-    listen: std::net::SocketAddr,
-) -> marquee_core::error::Result<marquee_torrent::Config> {
-    let t = core.torrent_settings()?;
-    if !t.enabled {
-        return Err(AppError::new(
-            "TORRENT_OFF",
-            "Library transfer is off. Turn it on with `marquee torrent enable`.",
-        ));
+fn torrent(
+    client: &marquee_manager::Client,
+    command: TorrentCmd,
+) -> marquee_core::error::Result<()> {
+    use marquee_manager::torrent::{Request, TorrentSettings, TransferStatus};
+    if !matches!(
+        command,
+        TorrentCmd::Status | TorrentCmd::List | TorrentCmd::Inspect { .. }
+    ) {
+        client.start_manager()?;
     }
-    let mut cfg = marquee_torrent::Config::private(dir);
-    cfg.listen = listen;
-    cfg.seeding = t.seeding;
-    cfg.upload_bps = (t.upload_kbps > 0).then(|| t.upload_kbps.saturating_mul(1024));
-    cfg.download_bps = (t.download_kbps > 0).then(|| t.download_kbps.saturating_mul(1024));
-    Ok(cfg)
-}
-
-fn torrent(core: &Arc<Core>, command: TorrentCmd) -> marquee_core::error::Result<()> {
-    let fail = |e: anyhow::Error| AppError::new("TORRENT", format!("{e:#}"));
-    let store = core.paths.data_dir.join("torrents");
+    let settings = || {
+        if marquee_manager::torrent::adopted(client.data_dir())? {
+            marquee_manager::torrent::read_settings(client.data_dir())
+        } else {
+            client.torrent::<TorrentSettings>(Request::Settings)
+        }
+    };
+    let status = || client.torrent::<TransferStatus>(Request::Status);
+    let save = |settings| client.torrent::<()>(Request::SetSettings { settings });
+    let pause = |hash: &str, paused| {
+        client.torrent::<()>(Request::Pause {
+            hash: hash.into(),
+            paused,
+        })
+    };
     match command {
         TorrentCmd::Inspect { path } => println!(
             "{}",
-            serde_json::to_string_pretty(&marquee_core::transfer::review(core, &path)?)?
+            serde_json::to_string_pretty(&marquee_core::transfer::inspect_file(&path)?.0)?
         ),
-        TorrentCmd::List => println!(
-            "{}",
-            serde_json::to_string_pretty(&marquee_core::transfer::status(core)?)?
-        ),
+        TorrentCmd::List => println!("{}", serde_json::to_string_pretty(&status()?)?),
         TorrentCmd::Discovery { trackers, dht } => {
-            let mut settings = core.torrent_settings()?;
+            let mut settings = settings()?;
             settings.trackers = trackers;
             settings.dht = dht;
-            core.set_torrent_settings(&settings)?;
+            save(settings)?;
         }
-        TorrentCmd::Pause { info_hash } => marquee_core::transfer::pause(core, &info_hash, true)?,
-        TorrentCmd::Resume { info_hash } => marquee_core::transfer::pause(core, &info_hash, false)?,
-        TorrentCmd::Stop { info_hash } => marquee_core::transfer::stop(core, &info_hash)?,
-        TorrentCmd::Status => println!(
-            "{}",
-            serde_json::to_string_pretty(&core.torrent_settings()?)?
-        ),
+        TorrentCmd::Pause { info_hash } => pause(&info_hash, true)?,
+        TorrentCmd::Resume { info_hash } => pause(&info_hash, false)?,
+        TorrentCmd::Stop { info_hash } => {
+            client.torrent::<()>(Request::Stop { hash: info_hash })?
+        }
+        TorrentCmd::Status => println!("{}", serde_json::to_string_pretty(&settings()?)?),
         TorrentCmd::Enable | TorrentCmd::Disable => {
-            let mut t = core.torrent_settings()?;
+            let mut t = settings()?;
             t.enabled = matches!(command, TorrentCmd::Enable);
-            core.set_torrent_settings(&t)?;
+            save(t.clone())?;
             println!("library transfer {}", if t.enabled { "on" } else { "off" });
         }
         TorrentCmd::Seeding { on } => {
-            let mut t = core.torrent_settings()?;
+            let mut t = settings()?;
             t.seeding = on;
-            core.set_torrent_settings(&t)?;
+            save(t.clone())?;
         }
         TorrentCmd::Limits { upload, download } => {
-            let mut t = core.torrent_settings()?;
+            let mut t = settings()?;
             t.upload_kbps = upload;
             t.download_kbps = download;
-            core.set_torrent_settings(&t)?;
+            save(t.clone())?;
         }
         TorrentCmd::Create { path } => {
-            let cfg = torrent_config(core, &store, "127.0.0.1:0".parse().unwrap())?;
-            let engine = marquee_torrent::Engine::start(&cfg).map_err(fail)?;
-            let made = engine.create(&path, vec![]).map_err(fail)?;
-            let name = path
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_default();
-            let file = store.join(format!("{name}.torrent"));
-            std::fs::write(&file, &made.bytes)?;
-            println!("{}\n{}\n{}", file.display(), made.info_hash, made.magnet);
-            engine.shutdown();
+            let path = std::fs::canonicalize(path)?;
+            let created: marquee_manager::torrent::Created = client.torrent(Request::Create {
+                path,
+                listen: None,
+                seed: false,
+            })?;
+            println!(
+                "{}\n{}\n{}",
+                created.path.display(),
+                created.info_hash,
+                created.magnet
+            );
         }
         TorrentCmd::Seed { path, listen } => {
-            let cfg = torrent_config(core, &store, listen)?;
-            if !cfg.seeding {
-                return Err(AppError::new(
-                    "TORRENT_SEEDING_OFF",
-                    "Seeding is off. Run `marquee torrent seeding true`.",
-                ));
-            }
-            let engine = marquee_torrent::Engine::start(&cfg).map_err(fail)?;
-            let made = engine.create(&path, vec![]).map_err(fail)?;
-            let root = path.parent().unwrap_or(std::path::Path::new("."));
-            let id = engine.seed(made.bytes.clone(), root).map_err(fail)?;
-            let name = path
-                .file_name()
-                .map(|n| n.to_string_lossy().into_owned())
-                .unwrap_or_default();
-            std::fs::create_dir_all(&store)?;
-            let file = store.join(format!("{name}.torrent"));
-            std::fs::write(&file, &made.bytes)?;
-            println!("torrent file: {}", file.display());
-            println!("magnet: {}", made.magnet);
-            if let Some(a) = engine.listen_addr() {
-                println!(
-                    "listening on port {} (use --peer <this-host>:{})",
-                    a.port(),
-                    a.port()
-                );
-            }
-            loop {
-                std::thread::sleep(std::time::Duration::from_secs(5));
-                if let Ok(p) = engine.progress(id) {
-                    println!(
-                        "{:?}: {}/{} bytes, uploaded {}",
-                        p.state, p.downloaded, p.total, p.uploaded
-                    );
-                }
-            }
+            let path = std::fs::canonicalize(path)?;
+            let created: marquee_manager::torrent::Created = client.torrent(Request::Create {
+                path,
+                listen: Some(listen),
+                seed: true,
+            })?;
+            println!("torrent file: {}\nmagnet: {}\nSeeding in marquee-manager; use torrent stop {} to stop.", created.path.display(),created.magnet,created.info_hash);
         }
         TorrentCmd::Get {
             source,
@@ -939,26 +917,29 @@ fn torrent(core: &Arc<Core>, command: TorrentCmd) -> marquee_core::error::Result
                     link.push_str(&format!("&x.pe={peer}"));
                 }
                 // Queue first, then get its identity from the durable list.
-                let result = marquee_core::transfer::get_at(core, &link, Some(destination.clone()));
+                let result = client.torrent::<()>(Request::Get {
+                    link,
+                    destination: Some(destination.clone()),
+                });
                 let hash = marquee_core::transfer::magnet_hash(&source)?;
                 (hash, result)
             } else {
                 let path = std::path::Path::new(&source);
-                let review = marquee_core::transfer::review(core, path)?;
-                let result = marquee_core::transfer::add_file_at(
-                    core,
+                let path = std::fs::canonicalize(path)?;
+                let (manifest, token) = marquee_core::transfer::inspect_file(&path)?;
+                let result = client.torrent::<()>(Request::AddFile {
                     path,
-                    review_token.as_deref().unwrap_or(&review.review_token),
+                    review_token: review_token.unwrap_or(token),
                     peers,
-                    Some(destination.clone()),
-                );
-                (review.manifest.info_hash, result)
+                    destination: Some(destination.clone()),
+                });
+                (manifest.info_hash, result)
             };
             if let Err(error) = result {
                 if error.code != "TORRENT_EXISTS" {
                     return Err(error);
                 }
-                let state = marquee_core::transfer::status(core)?;
+                let state = status()?;
                 if !state
                     .items
                     .iter()
@@ -966,11 +947,11 @@ fn torrent(core: &Arc<Core>, command: TorrentCmd) -> marquee_core::error::Result
                 {
                     return Err(AppError::new("TORRENT_CONFLICT", "This torrent already has a different destination; use torrent list and resume"));
                 }
-                marquee_core::transfer::pause(core, &hash, false)?;
+                pause(&hash, false)?;
             }
             let deadline = std::time::Instant::now() + std::time::Duration::from_secs(timeout_secs);
             loop {
-                let status = marquee_core::transfer::status(core)?;
+                let status = status()?;
                 if let Some(item) = status.items.iter().find(|e| e.info_hash == hash) {
                     if matches!(item.state.as_str(), "complete" | "sharing" | "seeding") {
                         println!(
@@ -991,7 +972,7 @@ fn torrent(core: &Arc<Core>, command: TorrentCmd) -> marquee_core::error::Result
                     }
                 }
                 if std::time::Instant::now() >= deadline {
-                    marquee_core::transfer::pause(core, &hash, true)?;
+                    pause(&hash, true)?;
                     return Err(AppError::new(
                         "TORRENT_TIMEOUT",
                         "Download paused after timeout; progress and transfer record were kept",

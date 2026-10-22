@@ -8,7 +8,8 @@ use std::path::PathBuf;
 
 // v2 requires provenance-aware receipts. Older clients would otherwise discard
 // unknown receipt fields before publication/fingerprinting.
-pub const VERSION: u32 = 2;
+// v3 adds detached torrent authority and requires upgraded companion binaries.
+pub const VERSION: u32 = 3;
 pub const MAX_FRAME: usize = 32 * 1024 * 1024;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -23,6 +24,9 @@ pub struct Request {
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Operation {
     Hello,
+    Torrent {
+        request: crate::torrent::Request,
+    },
     Browser {
         client_id: String,
         request: crate::browser::Request,

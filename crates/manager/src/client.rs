@@ -148,7 +148,26 @@ impl Client {
     }
     pub fn start_manager(&self) -> Result<Status> {
         endpoint::private_directory(&self.data.join("manager"))?;
-        let status = self.status()?;
+        let status = match self.status() {
+            Err(e) if e.code == "MANAGER_VERSION" => {
+                self.stop()?;
+                let deadline = Instant::now() + Duration::from_secs(10);
+                loop {
+                    if self.connect().is_err() {
+                        break;
+                    }
+                    if Instant::now() >= deadline {
+                        return Err(AppError::new(
+                            "MANAGER_STOPPING",
+                            "Older manager is draining accepted work; retry when it has stopped",
+                        ));
+                    }
+                    std::thread::sleep(Duration::from_millis(20));
+                }
+                self.status()?
+            }
+            result => result?,
+        };
         if status.running {
             return Ok(status);
         }
@@ -314,15 +333,32 @@ impl Client {
             false,
         )
     }
-    pub fn stop(&self) -> Result<Status> {
-        match self.exchange(self.connect()?, Operation::Stop) {
-            Err(err) if err.code == "MANAGER_VERSION" => {
-                // Only explicit shutdown may use v1. Never send jobs/receipts
-                // through a client that cannot preserve their provenance.
-                self.exchange_version(self.connect()?, Operation::Stop, 1)
-            }
-            result => result,
+    pub fn torrent<T: DeserializeOwned>(&self, request: crate::torrent::Request) -> Result<T> {
+        crate::migration::adopt_torrents(&self.data, self.library_owned)?;
+        // Also upgrades an older daemon through a drain-only stop before sending
+        // transport commands. No preparation/receipt operation is downgraded.
+        let passive = matches!(
+            request,
+            crate::torrent::Request::Status
+                | crate::torrent::Request::Settings
+                | crate::torrent::Request::Acknowledge { .. }
+        );
+        if !passive || !self.data.join("manager/stopped").exists() {
+            self.start_manager()?;
         }
+        self.call(Operation::Torrent { request }, false)
+    }
+    pub fn stop(&self) -> Result<Status> {
+        for version in [protocol::VERSION, 2, 1] {
+            match self.exchange_version(self.connect()?, Operation::Stop, version) {
+                Err(e) if e.code == "MANAGER_VERSION" => continue,
+                result => return result,
+            }
+        }
+        Err(AppError::new(
+            "MANAGER_VERSION",
+            "No compatible shutdown protocol",
+        ))
     }
 }
 
@@ -337,7 +373,7 @@ mod tests {
         let socket = client.socket_path().unwrap();
         let listener = UnixListener::bind(&socket).unwrap();
         let server = std::thread::spawn(move || {
-            for version in [protocol::VERSION, 1] {
+            for version in [protocol::VERSION, 2, 1] {
                 let (mut stream, _) = listener.accept().unwrap();
                 let request: Request = protocol::read_frame(&mut stream).unwrap();
                 assert_eq!(request.protocol_version, version);

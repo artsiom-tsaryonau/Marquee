@@ -5,13 +5,36 @@ Updated 2026-10-22. The embedded `librqbit` transport supports reviewed local
 Tracker and DHT discovery are independent opt-in settings. No external torrent
 client is required.
 
-## Manager handoff (planned)
+## Background manager and ownership
 
-The [manager plan](MARQUEE_MANAGER.md) owns future background execution, artifacts,
-installation receipts and migration. M3 adopts this transport and history after
-the hidden worker exists; preserve private/public sessions, discovery choices,
-owned folders and source/seeding retention. The current implementation below
-still runs in a Marquee host process. Do not start a second engine on its state.
+`marquee-manager` owns transport execution and writes transfer history. Closing
+Marquee or a CLI client leaves accepted transfers running. A one-second manager
+heartbeat restores eligible opted-in jobs and checkpoints progress without a UI.
+Private/public engines, discovery choices, owned destinations and source retention
+are preserved. The worker never opens `library.db`; a running/reopened launcher
+registers completed private device transfers and retries failed library scans.
+General downloads remain source artifacts, not installed games.
+
+On the first torrent command, the client holds/acquires the library instance lease,
+backs up the exact legacy history and settings to mode-600
+`manager/torrents/legacy-backup.json`, and stages `entries.json` and `settings.json`
+in that directory. The last synchronized write replaces `torrents/entries.json`
+with an ownership marker. Older embedded writers cannot parse that marker and
+fail closed. The manager starts no torrent engine before cutover completes.
+An older live launcher blocks adoption. Corrupt records, changed interrupted
+migration inputs and unsafe state files are preserved and reported as errors.
+Payload folders, `.marquee-transfer-*` markers and cached `torrents/<hash>.torrent`
+files stay in their original locations; no source is moved or downloaded by migration.
+
+After cutover, manager settings are authoritative; legacy SQLite values are not
+reimported. IPC v3 requires a compatible companion; a requested manager start
+can drain an older v1/v2 worker before replacing it. Rollback is manual: stop all
+manager/library owners, preserve the current manager state, then reconcile later
+changes against the backup before restoring legacy history/settings. Restoring
+only the old entry list loses later changes. Never restore it beside a live manager.
+
+The [manager plan](MARQUEE_MANAGER.md) tracks the remaining torrent-to-preparation
+and source/installation receipt links. No general torrent installer is implemented.
 
 ## Download, source package and installation are separate
 
@@ -58,7 +81,7 @@ Settings → **Torrents and devices**:
 5. Choose **Download files**. The backend rereads metadata and checks its complete
    SHA-256 against the review token before starting. Changes require another review.
 6. Progress, errors, file location, Pause, Resume/Retry and Stop remain visible.
-   Status reconciliation runs across the app while transfers are enabled.
+   The manager reconciles status even after the app closes.
 
 The magnet field accepts public magnets or a link copied from another Marquee
 installation's Share action. Links with direct peers use the private engine and
@@ -117,16 +140,30 @@ marquee torrent stop <info-hash>           # keeps history and files
 
 # Direct transfer without public discovery:
 marquee torrent seed "roms/ps2/Game.iso" --listen 0.0.0.0:51413
-marquee torrent get "/path/to/Game.iso.torrent" --into ~/Downloads/Marquee --peer 192.168.1.20:51413
+marquee torrent get "/path/to/<info-hash>.torrent" --into ~/Downloads/Marquee --peer 192.168.1.20:51413
 ```
 
 `get` waits for verified completion; its timeout pauses the job and preserves
 progress. Re-running for the same destination resumes its durable record. The
-UI or CLI can resume saved jobs later; background operation lasts only while a
-Marquee process remains running. A standalone `resume` command changes durable
-state; use a running desktop/web process or `get` to keep the transport alive.
+UI or CLI can resume saved jobs later; execution continues in the manager after
+the client exits. `seed` queues a persistent background share and returns; stop it
+with `torrent stop <info-hash>`. `create` writes hash-named metadata under
+`torrents/created/<info-hash>.torrent` using the manager transport, leaving an
+existing imported job’s tracker metadata intact. Seeded jobs cache metadata at
+`torrents/<info-hash>.torrent`. All torrent commands
+except offline `inspect` use IPC and can run while the launcher owns the library.
+The first adoption alone needs the library lease. A custom `seed --listen` binding
+is retained in `manager/torrents/private-listen.json`; an existing conflicting
+private listener must be stopped before changing its binding. Stop/start the manager
+to change the listener, and keep custom ports available.
 `MARQUEE_TORRENT_HOST` selects the address advertised in private device links,
 for example a LAN or mesh-VPN address. Automatic peer discovery is not implemented.
+
+`manager stop` checkpoints and stops torrents/seeding immediately and drains
+accepted archive preparation before exiting. It keeps enabled/paused preferences;
+explicit Start resumes eligible jobs. Passive status polling respects the stopped
+marker. A per-transfer Stop remains a persistent pause. Existing installed games
+can be read/launched with the manager offline.
 
 ## Verification and remaining work
 
@@ -136,14 +173,19 @@ isolation, corrupt/write-failed state, unowned/symlink folders, scan failure/ret
 a partial-download pause/restart/resume, completed downloads paused/stopped/disabled
 without status polling and reopened with their completion/counters intact, and
 restart with retained/missing source files followed by explicit redownload.
-A production browser check exercises file review, direct-peer download, stop,
+Migration/process tests cover legacy-owner refusal, exact private backups and
+settings/path retention, unchanged-input crash recovery, manager pause/restart/resume,
+client-independent completion checkpoints and no library writes for a synthetic
+package. A Core/real-manager test covers private-device registration, failed scan
+retry, CLI access while the library is leased, and library reads after manager stop.
+An earlier production browser check exercises file review, direct-peer download, stop,
 reload/history and source-missing Resume using disposable databases. The supplied
 Shadow of the Colossus torrent was inspected offline only; its payload was not
 fetched or installed.
 
 Still open: native picker/controller acceptance, external-client interoperability,
 real multi-machine/NAT and 20–50 GB interruption tests, selective-file download,
-a background daemon, interface/VPN binding, authenticated device pairing/private
+interface/VPN binding, authenticated device pairing/private
 flags, universal source/installation records, automatic archive/package install
 jobs and optional remote-play integration. DHT/public tracker configuration is
 implemented; public network availability was not tested in this pass.

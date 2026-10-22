@@ -18,11 +18,32 @@ fn json(value: impl Serialize) -> Result<Value> {
 
 struct Server {
     manager: Arc<Manager>,
+    data: std::path::PathBuf,
+    torrents: std::sync::Mutex<Option<Arc<crate::torrent::Host>>>,
     stopping: AtomicBool,
     connections: AtomicUsize,
     stopped_marker: std::path::PathBuf,
 }
 impl Server {
+    fn torrents(&self) -> Result<Arc<crate::torrent::Host>> {
+        let mut worker = self.torrents.lock().unwrap_or_else(|e| e.into_inner());
+        if self.stopping.load(Ordering::Acquire) {
+            return Err(AppError::new("MANAGER_STOPPING", "Manager is stopping"));
+        }
+        if let Some(worker) = worker.as_ref() {
+            return Ok(worker.clone());
+        }
+        if !crate::migration::torrent_cutover_complete(&self.data)? {
+            return Err(AppError::new(
+                "TORRENT_MIGRATION",
+                "Torrent ownership has not been adopted",
+            ));
+        }
+        let host = Arc::new(crate::torrent::Host::new(&self.data));
+        *worker = Some(host.clone());
+        Ok(host)
+    }
+
     fn status(&self) -> Status {
         Status {
             running: true,
@@ -48,6 +69,7 @@ impl Server {
         }
         match operation {
             Operation::Hello => json(self.status()),
+            Operation::Torrent { request } => self.torrents()?.dispatch(request),
             Operation::Browser { client_id, request } => {
                 self.manager.browser_request(&client_id, request)
             }
@@ -91,6 +113,16 @@ impl Server {
                     .sync_all()?;
                 File::open(self.stopped_marker.parent().expect("manager directory"))?.sync_all()?;
                 self.stopping.store(true, Ordering::Release);
+                if let Some(host) = self
+                    .torrents
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .as_ref()
+                {
+                    if let Err(error) = host.shutdown() {
+                        eprintln!("Torrent shutdown checkpoint failed: {}", error.message);
+                    }
+                }
                 json(self.status())
             }
         }
@@ -156,13 +188,37 @@ pub fn run(data: &Path) -> Result<()> {
     listener.set_nonblocking(true)?;
     let server = Arc::new(Server {
         manager: Arc::new(Manager::new(&data)),
+        data: data.clone(),
+        torrents: std::sync::Mutex::new(None),
         stopping: AtomicBool::new(false),
         connections: AtomicUsize::new(0),
         stopped_marker: data.join("manager/stopped"),
     });
     // Reconcile M1/abandoned checkpoints only after acquiring exclusive ownership.
     server.manager.list()?;
+    let mut heartbeat = std::time::Instant::now();
+    let mut last_error = None;
     loop {
+        if heartbeat.elapsed() >= Duration::from_secs(1) {
+            heartbeat = std::time::Instant::now();
+            if !server.stopping.load(Ordering::Acquire) {
+                // Only the manager reconciles counters/restores opted-in jobs;
+                // closing every UI/CLI client leaves transport execution alive.
+                let result = (|| {
+                    if crate::migration::torrent_cutover_complete(&data)? {
+                        crate::torrent::status(&server.torrents()?)?;
+                    }
+                    Ok::<_, AppError>(())
+                })();
+                let message = result.err().map(|e| e.message);
+                if message != last_error {
+                    if let Some(message) = &message {
+                        eprintln!("Torrent reconciliation: {message}");
+                    }
+                    last_error = message;
+                }
+            }
+        }
         if server.stopping.load(Ordering::Acquire)
             && !server.manager.active()
             && server.connections.load(Ordering::Acquire) == 0

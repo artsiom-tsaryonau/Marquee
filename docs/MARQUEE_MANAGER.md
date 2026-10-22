@@ -59,7 +59,7 @@ five added platforms. Do not maintain a separate acquisition overview/specificat
 | Surface | Current implementation / gap |
 | --- | --- |
 | `crates/torrent` | `librqbit` transport; reuse it rather than rebuild BitTorrent |
-| `crates/core/src/transfer.rs` | Durable torrent history, owned destinations, private/public session separation, restart and scan recovery; currently hosted by Marquee |
+| `crates/manager/src/torrent.rs` / core transfer adapter | Manager owns torrent engines/history/settings; Core chooses library shares and publishes completed private-device roots |
 | `crates/core/src/intake.rs`, `rar.rs` | Reviewed archive intake, bounded extraction, staging, intact arcade ZIPs and CUE normalization; no persistent universal preparation queue |
 | `crates/core/src/instance.rs`, `paths.rs` | One instance lock and library path ownership; process split must respect them |
 | `api.rs`, `hub.rs`, `server.rs`, CLI and Tauri | Shared commands/events and authenticated browser surface; evolve these through a manager client |
@@ -81,7 +81,7 @@ Marquee core/CLI/Tauri → marquee-manager client/protocol → private Unix sock
 bounded archive inspection/extraction and disc helpers; core keeps its existing
 public module paths through re-exports. Legacy immediate intake reuses these
 helpers. `crates/core/src/preparation.rs` now contains only client coordination
-and library receipt publication. Torrent, emulator and runtime workers retain
+and library receipt publication. Torrent workers now run in the manager; emulator and runtime workers retain
 their existing hosting until adoption. Browser jobs support an opt-in manager
 bridge; legacy JSON remains until explicit cutover.
 
@@ -94,7 +94,7 @@ bridge; legacy JSON remains until explicit cutover.
   `marquee-manager-<uid>/<data-directory-hash>/ipc.sock` (mode 600). Both peers
   check Linux `SO_PEERCRED`. Long isolated data paths do not exceed socket limits.
   No manager TCP port or direct browser endpoint is opened.
-- Protocol v2 uses bounded length-prefixed JSON, typed operations, matching request
+- Protocol v3 uses bounded length-prefixed JSON, typed operations, matching request
   IDs and a version check before mutation. Maximum frame is 32 MiB. The worker
   advertises snapshot polling; event replay and active preparation cancellation are
   unsupported. Browser cancellation is a request/acknowledgement flow. The existing browser/native-host protocol is still a separate bridge.
@@ -103,8 +103,9 @@ bridge; legacy JSON remains until explicit cutover.
   imports receipts into library schema 6 and sends a fingerprint-bound acknowledgement.
   Failed/lost acknowledgements remain replayable. The active frontend reconciles
   receipts even when its archive panel is closed, including after reconnect.
-- **Stop manager after current work** drains accepted work and records
-  `manager/stopped`. Polling respects that stop. Explicit Start, Inspect or Prepare
+- **Stop manager** checkpoints/stops torrents and drains accepted archive
+  preparation, then exits. It records `manager/stopped`; polling respects that
+  stop. Explicit Start, Inspect, Prepare or an active torrent command
   re-enables the worker. Unexpected termination leaves an interrupted checkpoint;
   the next start reconciles state without automatically rerunning the job.
 - Worker unavailability or a missing companion does not gate existing library
@@ -118,7 +119,7 @@ Controls, without opening or locking `library.db`:
 ```sh
 marquee manager status
 marquee manager start
-marquee manager stop                  # drain accepted work, then stop
+marquee manager stop                  # stop torrents; drain archive preparation
 marquee prepare inspect /absolute/path/Game.zip --system genesis
 marquee prepare start JOB_ID --review-token TOKEN_FROM_INSPECTION  # accept and detach
 ```
@@ -228,10 +229,11 @@ separately; that availability check is not a fresh content hash.
 Manager schema **3** retires older writers that could drop new receipt fields.
 A schema-2 upgrade first writes a mode-600 `jobs-v2-backup-<uuid>.db`, then advances
 the version without rewriting existing payloads. M1 cutover still takes its
-exclusive ownership backup before the subsequent upgrade. Private IPC **v2**
-rejects v1 job/receipt clients before mutation. The browser/native protocol stays
+exclusive ownership backup before the subsequent upgrade. Private IPC **v3**
+rejects v1/v2 job/receipt clients before mutation. The browser/native protocol stays
 v1 and pairing is unchanged. Use `marquee manager stop` to drain an older worker
-before starting the compatible pair; explicit Stop alone supports the old protocol.
+before starting the compatible pair; explicit Stop alone supports v1/v2 shutdown; requested Start can drain an older
+worker and start its compatible replacement.
 No job or receipt operation silently downgrades. Do not restore a backup under
 an active worker; a pre-upgrade backup does not contain later jobs/receipts.
 
@@ -244,7 +246,8 @@ Marquee recorded exit 0 and one 363-second play in the isolated library. See
 [exact scope and remaining gates](EMULATORS.md#sonic-2-live-acceptance-2026-10-22).
 This validates one preparation/launch recipe, not new browser-job acquisition,
 physical gamepads, other platforms or universal compatibility. The next manager
-milestone remains M3 torrent adoption with its single-owner migration gates.
+milestone is the remaining M3 torrent-to-preparation/receipt link; transport
+ownership and single-owner migration now have synthetic process coverage.
 
 ## Data and ownership contract
 
@@ -348,7 +351,8 @@ are available merely because they appear here:
 
 The manager is one process per data directory, on demand, as the logged-in user;
 no root service or mandatory remote server. Resolve duplicate spawn races with its
-own lock/socket handshake. Launcher shutdown detaches; graceful manager stop drains accepted jobs.
+own lock/socket handshake. Launcher shutdown detaches; graceful manager stop checkpoints/stops torrents
+and drains accepted archive preparation.
 An optional user service can follow packaging acceptance. Autostart/network resume
 policy is explicit and preserves torrent opt-in settings. Manager unavailability
 shows jobs offline with retry; existing Play does not depend on its socket. Launch
@@ -366,23 +370,26 @@ existing Play/import usable.
 | M0 — Contracts and inventory | Record existing state paths/formats; finalize DTOs, storage ownership, capabilities, review/receipt schemas and migration fixtures | Dependency direction is acyclic; library lock/receipt ownership and recovery cases reviewed; no source files moved |
 | M1 — Local preparation slice (implemented) | Explicit-platform `ArchivePlan`, separate durable jobs/reviews/receipts, UI/CLI/API and transactional library consumer | ZIP/7z/RAR fixtures and real Genesis browser registration passed; restart, failed publication, duplicate acknowledgement, changed inputs and low-space checks covered; game launch gates remain separate |
 | M2 — Hidden worker (implemented for local archives) | Separate binary, private socket/client, worker lease, companion build, stop/start and M1 ownership cutover | Process tests and real browser close/reconnect passed; registered outputs remain immutable; distribution bundles and general mutable-update leases remain later work |
-| M3 — Torrent adoption | Manager hosts existing torrent adapters/state; explicit single-owner cutover and source/receipt links | Pause/restart/resume and retained history survive migration; no duplicate engine, lost discovery policy, forced redownload or scan of unsupported packages; seeding protects sources |
+| M3 — Torrent adoption (transport ownership implemented) | Manager hosts existing adapters/state and single-owner cutover; explicit source/preparation/receipt links remain open | Pause/restart/resume and retained history survive migration; no duplicate engine, lost discovery policy, forced redownload or scan of unsupported packages; seeding protects sources |
 | M4 — Browser/provider bridge | Connect paired native host and provider workers to manager job authority; adopt historical completed files only after validation | Browser and host restart, manual attribution, cancel and duplicate events reconcile; one supported provider download reaches a registered game without a separate manual importer |
 | M5 — Console preparation | Read-only inventory for the five added systems, then one platform/format/recipe at a time | [Per-platform gates](CONSOLE_PREPARATION.md) pass; updates/DLC never become separate playable base games; unknown inputs remain visible and blocked |
 | M6 — Other managed setup and stores | Route emulator/port/runtime setup through manager incrementally; use shared jobs for supported Epic/GOG work | Existing isolation/rollback/saves preserved; official Steam remains a delegated client flow; truthful capability/progress and backend ownership |
 
-The first M3 prerequisite is implemented: torrent controls/status/settings changes
-are serialized, and Pause/Stop/settings reset checkpoint live counters and
-completion before discarding engine handles. Retired asynchronous activation or
-share preparation cannot publish state after a settings reset. A synthetic
-loopback regression completes downloads without UI polling, then pauses, stops
-or disables them and reopens the library to verify retained completion and files.
-This does not move engine ownership: torrents still run in the Marquee host.
-The single-owner cutover, backup/migration fixtures, manager heartbeat and
-transport-to-preparation links remain required before marking M3 complete.
+M3 transport ownership and cutover are implemented. The manager hosts the existing
+adapter, private/public engines, durable history and settings, and checkpoints
+eligible jobs every second without a connected UI. Migration requires the library
+lease, retains an exact private backup and original payload paths, and retires
+older embedded writers before the daemon can restore jobs. Pause/Stop/settings
+reset preserve completion/counters without status polling. CLI torrent controls,
+metadata creation and persistent background seeding use IPC while a launcher owns
+the library. Core alone publishes private-device roots and retries scan failures;
+generic package completion never becomes an installation. See
+[torrent migration, lifecycle and exact verification](TORRENTS.md).
 
-M3 torrent adoption is the next default implementation milestone; M4 browser
-worker adoption can be scheduled independently against the working M2 boundary.
+M3 remains open for explicit source-artifact links to reviewed archive preparation
+and immutable installation receipts, large-transfer/live acceptance and packaging.
+The next default step is that torrent-to-preparation slice; M4 live provider
+acceptance can proceed independently. No universal installer is claimed.
 Read-only console inventory has started ([observed files](CONSOLE_PREPARATION.md#observed-source-inventory));
 console preparation recipes remain separate. Do not wait for every provider or
 console to close one transport-to-preparation slice.
