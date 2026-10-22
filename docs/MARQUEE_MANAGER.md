@@ -371,6 +371,16 @@ existing Play/import usable.
 | M5 — Console preparation | Read-only inventory for the five added systems, then one platform/format/recipe at a time | [Per-platform gates](CONSOLE_PREPARATION.md) pass; updates/DLC never become separate playable base games; unknown inputs remain visible and blocked |
 | M6 — Other managed setup and stores | Route emulator/port/runtime setup through manager incrementally; use shared jobs for supported Epic/GOG work | Existing isolation/rollback/saves preserved; official Steam remains a delegated client flow; truthful capability/progress and backend ownership |
 
+The first M3 prerequisite is implemented: torrent controls/status/settings changes
+are serialized, and Pause/Stop/settings reset checkpoint live counters and
+completion before discarding engine handles. Retired asynchronous activation or
+share preparation cannot publish state after a settings reset. A synthetic
+loopback regression completes downloads without UI polling, then pauses, stops
+or disables them and reopens the library to verify retained completion and files.
+This does not move engine ownership: torrents still run in the Marquee host.
+The single-owner cutover, backup/migration fixtures, manager heartbeat and
+transport-to-preparation links remain required before marking M3 complete.
+
 M3 torrent adoption is the next default implementation milestone; M4 browser
 worker adoption can be scheduled independently against the working M2 boundary.
 Read-only console inventory has started ([observed files](CONSOLE_PREPARATION.md#observed-source-inventory));

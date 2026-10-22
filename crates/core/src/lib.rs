@@ -284,6 +284,8 @@ impl Core {
     }
 
     pub fn set_torrent_settings(&self, t: &model::TorrentSettings) -> Result<()> {
+        let _control = self.transfers.control();
+        self.transfers.checkpoint()?;
         self.with_db(|db| {
             let tx = db.conn.unchecked_transaction()?;
             for (key, value) in [

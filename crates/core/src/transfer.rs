@@ -61,6 +61,8 @@ struct Inner {
     errors: Mutex<BTreeMap<String, String>>,
     jobs: Mutex<Vec<Job>>,
     file: Mutex<()>,
+    /// Serialize settings, status and controls; disk-state locking is separate.
+    control: Mutex<()>,
     scans: Mutex<BTreeSet<String>>,
     scan_errors: Mutex<BTreeMap<String, String>>,
     epoch: AtomicU64,
@@ -300,12 +302,33 @@ impl Transfers {
                 errors: Mutex::new(BTreeMap::new()),
                 jobs: Mutex::new(Vec::new()),
                 file: Mutex::new(()),
+                control: Mutex::new(()),
                 scans: Mutex::new(BTreeSet::new()),
                 scan_errors: Mutex::new(BTreeMap::new()),
                 epoch: AtomicU64::new(0),
             }),
         }
     }
+    pub(crate) fn control(&self) -> std::sync::MutexGuard<'_, ()> {
+        self.inner.control.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Save live counters before cancelling or removing their engine handles.
+    /// The caller holds the control lock, including while saving settings.
+    pub(crate) fn checkpoint(&self) -> Result<()> {
+        let engines = self
+            .inner
+            .engines
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone();
+        let progress: BTreeMap<_, _> = engines
+            .iter()
+            .map(|(public, engine)| (*public, engine.list()))
+            .collect();
+        self.inner.checkpoint(&progress)
+    }
+
     pub fn autostart(&self, settings: &TorrentSettings) {
         if !settings.enabled {
             return;
@@ -338,6 +361,36 @@ impl Transfers {
     }
 }
 impl Inner {
+    fn checkpoint(&self, progress: &BTreeMap<bool, Vec<marquee_torrent::Progress>>) -> Result<()> {
+        let entries = self.load()?;
+        let changed = entries.iter().any(|entry| {
+            progress
+                .get(&entry.public)
+                .and_then(|list| list.iter().find(|p| p.info_hash == entry.info_hash))
+                .is_some_and(|p| {
+                    p.downloaded != entry.downloaded
+                        || p.uploaded != entry.uploaded
+                        || p.total != entry.total
+                        || (p.finished && !entry.complete)
+                })
+        });
+        if changed {
+            self.update(|entries| {
+                for entry in entries {
+                    if let Some(p) = progress
+                        .get(&entry.public)
+                        .and_then(|list| list.iter().find(|p| p.info_hash == entry.info_hash))
+                    {
+                        entry.downloaded = p.downloaded;
+                        entry.uploaded = p.uploaded;
+                        entry.total = p.total;
+                        entry.complete |= p.finished;
+                    }
+                }
+            })?;
+        }
+        Ok(())
+    }
     fn entries_path(&self) -> PathBuf {
         self.dir.join("entries.json")
     }
@@ -549,6 +602,11 @@ impl Inner {
                         .download_owned(source, &dir, entry.peers.clone())
                         .map_err(fail)?
                 };
+                let _control = inner.control.lock().unwrap_or_else(|e| e.into_inner());
+                if inner.epoch.load(Ordering::SeqCst) != epoch {
+                    let _ = engine.remove(id, false);
+                    return Ok(());
+                }
                 if entry.kind == "get" {
                     let bytes = engine.metadata_bytes(id).map_err(fail)?;
                     let manifest = marquee_torrent::inspect(&bytes).map_err(fail)?;
@@ -592,6 +650,7 @@ fn peer_string(engine: &Engine) -> Option<String> {
 }
 
 pub fn status(core: &Arc<Core>) -> Result<TransferStatus> {
+    let _control = core.transfers.control();
     let settings = core.torrent_settings()?;
     let inner = &core.transfers.inner;
     let entries = inner.load()?;
@@ -605,32 +664,7 @@ pub fn status(core: &Arc<Core>) -> Result<TransferStatus> {
         .iter()
         .map(|(public, engine)| (*public, engine.list()))
         .collect();
-    let changed = entries.iter().any(|entry| {
-        progress
-            .get(&entry.public)
-            .and_then(|list| list.iter().find(|p| p.info_hash == entry.info_hash))
-            .is_some_and(|p| {
-                p.downloaded != entry.downloaded
-                    || p.uploaded != entry.uploaded
-                    || p.total != entry.total
-                    || (p.finished && !entry.complete)
-            })
-    });
-    if changed {
-        inner.update(|entries| {
-            for entry in entries {
-                if let Some(p) = progress
-                    .get(&entry.public)
-                    .and_then(|list| list.iter().find(|p| p.info_hash == entry.info_hash))
-                {
-                    entry.downloaded = p.downloaded;
-                    entry.uploaded = p.uploaded;
-                    entry.total = p.total;
-                    entry.complete |= p.finished;
-                }
-            }
-        })?;
-    }
+    inner.checkpoint(&progress)?;
     let mut items = Vec::new();
     for entry in entries {
         let p = progress
@@ -792,6 +826,7 @@ pub fn status(core: &Arc<Core>) -> Result<TransferStatus> {
 }
 
 pub fn share(core: &Arc<Core>, edition_id: &str) -> Result<()> {
+    let _control = core.transfers.control();
     let settings = core.torrent_settings()?;
     if !settings.enabled {
         return Err(off());
@@ -855,6 +890,7 @@ pub fn share(core: &Arc<Core>, edition_id: &str) -> Result<()> {
         let result: Result<()> = (|| {
             let engine = inner.engine(&settings, false, epoch)?;
             let made = engine.create(&target, vec![]).map_err(fail)?;
+            let _control = inner.control.lock().unwrap_or_else(|e| e.into_inner());
             if inner.epoch.load(Ordering::SeqCst) != epoch {
                 return Err(off());
             }
@@ -942,6 +978,7 @@ pub fn get(core: &Arc<Core>, link: &str) -> Result<()> {
 }
 
 pub fn get_at(core: &Arc<Core>, link: &str, destination: Option<PathBuf>) -> Result<()> {
+    let _control = core.transfers.control();
     let settings = core.torrent_settings()?;
     if !settings.enabled {
         return Err(off());
@@ -1025,6 +1062,7 @@ pub fn add_file_at(
     peers: Vec<SocketAddr>,
     destination: Option<PathBuf>,
 ) -> Result<()> {
+    let _control = core.transfers.control();
     let settings = core.torrent_settings()?;
     if !settings.enabled {
         return Err(off());
@@ -1097,6 +1135,7 @@ pub fn add_file_at(
 }
 
 pub fn pause(core: &Arc<Core>, hash: &str, paused: bool) -> Result<()> {
+    let _control = core.transfers.control();
     if !paused && !core.torrent_settings()?.enabled {
         return Err(off());
     }
@@ -1154,6 +1193,7 @@ pub fn pause(core: &Arc<Core>, hash: &str, paused: bool) -> Result<()> {
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .remove(hash);
+    core.transfers.checkpoint()?;
     if !paused {
         inner.activate(found, core.torrent_settings()?);
     }
@@ -1161,22 +1201,29 @@ pub fn pause(core: &Arc<Core>, hash: &str, paused: bool) -> Result<()> {
 }
 
 pub fn stop(core: &Arc<Core>, hash: &str) -> Result<()> {
+    let _control = core.transfers.control();
     let inner = &core.transfers.inner;
     let engines = inner
         .engines
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .clone();
-    for engine in engines.values() {
-        if let Some(progress) = engine.list().into_iter().find(|p| p.info_hash == hash) {
-            engine.remove(progress.id, false).map_err(fail)?;
-        }
-    }
     inner.update(|entries| {
         if let Some(e) = entries.iter_mut().find(|e| e.info_hash == hash) {
             e.paused = true;
         }
     })?;
+    for engine in engines.values() {
+        if let Some(progress) = engine.list().into_iter().find(|p| p.info_hash == hash) {
+            engine.pause(progress.id).map_err(fail)?;
+        }
+    }
+    core.transfers.checkpoint()?;
+    for engine in engines.values() {
+        if let Some(progress) = engine.list().into_iter().find(|p| p.info_hash == hash) {
+            engine.remove(progress.id, false).map_err(fail)?;
+        }
+    }
     inner
         .active
         .lock()
@@ -1517,6 +1564,83 @@ mod tests {
         assert!(!receiver.transfers.inner.config(&settings, false).dht);
         done.store(true, Ordering::SeqCst);
         tracker_thread.join().unwrap();
+        seed.shutdown();
+    }
+
+    #[test]
+    fn controls_checkpoint_completed_download_without_status_polling() {
+        let temp = tempfile::tempdir().unwrap();
+        let source = temp.path().join("synthetic.bin");
+        let payload = vec![0x5au8; 1024 * 1024];
+        std::fs::write(&source, &payload).unwrap();
+        let mut cfg = Config::private(temp.path());
+        cfg.listen = "127.0.0.1:0".parse().unwrap();
+        let seed = Engine::start(&cfg).unwrap();
+        let made = seed.create(&source, vec![]).unwrap();
+        let id = seed.seed(made.bytes.clone(), temp.path()).unwrap();
+        seed.wait_finished(id, std::time::Duration::from_secs(5))
+            .unwrap();
+        let torrent = temp.path().join("synthetic.torrent");
+        std::fs::write(&torrent, made.bytes).unwrap();
+
+        for action in ["pause", "stop", "disable"] {
+            let data = temp.path().join(action);
+            let receiver = open(&data);
+            let reviewed = review(&receiver, &torrent).unwrap();
+            add_file(
+                &receiver,
+                &torrent,
+                &reviewed.review_token,
+                vec![seed.listen_addr().unwrap()],
+            )
+            .unwrap();
+            // Observe the transport directly: UI status polling must not be
+            // necessary for a successful control operation to save completion.
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+            loop {
+                let engines = receiver.transfers.inner.engines.lock().unwrap().clone();
+                if engines
+                    .values()
+                    .any(|engine| engine.list().iter().any(|p| p.finished))
+                {
+                    break;
+                }
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "download timed out for {action}"
+                );
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            let before = receiver.transfers.inner.load().unwrap();
+            assert!(!before[0].complete);
+            assert_eq!(before[0].downloaded, 0);
+            match action {
+                "pause" => pause(&receiver, &made.info_hash, true).unwrap(),
+                "stop" => stop(&receiver, &made.info_hash).unwrap(),
+                _ => {
+                    let mut settings = receiver.torrent_settings().unwrap();
+                    settings.enabled = false;
+                    receiver.set_torrent_settings(&settings).unwrap();
+                }
+            }
+            let saved = receiver.transfers.inner.load().unwrap();
+            assert!(saved[0].complete, "{action} lost completion");
+            assert_eq!(
+                saved[0].downloaded,
+                payload.len() as u64,
+                "{action} lost counters"
+            );
+            assert_eq!(
+                std::fs::read(reviewed.directory.join("synthetic.bin")).unwrap(),
+                payload
+            );
+            drop(receiver);
+            let reopened = Arc::new(Core::open_isolated(Some(data), true).unwrap());
+            let item = &status(&reopened).unwrap().items[0];
+            assert_eq!(item.state, "paused");
+            assert_eq!(item.downloaded, payload.len() as u64);
+            assert_eq!(item.files_present, Some(true));
+        }
         seed.shutdown();
     }
 

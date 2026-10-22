@@ -86,6 +86,10 @@ with a retryable error; an unreachable peer is not a completed download.
 - Resume may overwrite partial files **only in a marked job-owned folder**.
   Unowned folders, symlinks and special files refuse resume. Generic transport
   downloads refuse overwrite by default. Stop never deletes payloads.
+- Pause, Stop and settings changes save live transfer counters/completion before
+  removing or resetting engine handles; this does not depend on UI status polls.
+  Controls and status reconciliation are serialized with settings changes, and
+  asynchronous work from a retired engine cannot publish new transfer state.
 - Legacy downloads that pointed directly into library folders are retained but
   refused automatic resume. Existing files are kept; migration to managed
   download folders remains a separate recovery task. Do not delete those files.
@@ -129,7 +133,9 @@ for example a LAN or mesh-VPN address. Automatic peer discovery is not implement
 Synthetic loopback tests cover byte-identical transfer, a real HTTP tracker
 announce, offline metadata review, changed-review rejection, private-session
 isolation, corrupt/write-failed state, unowned/symlink folders, scan failure/retry,
-a partial-download pause/restart/resume, and restart with retained/missing source files followed by explicit redownload.
+a partial-download pause/restart/resume, completed downloads paused/stopped/disabled
+without status polling and reopened with their completion/counters intact, and
+restart with retained/missing source files followed by explicit redownload.
 A production browser check exercises file review, direct-peer download, stop,
 reload/history and source-missing Resume using disposable databases. The supplied
 Shadow of the Colossus torrent was inspected offline only; its payload was not
