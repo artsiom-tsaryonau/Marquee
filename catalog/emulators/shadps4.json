@@ -12,6 +12,7 @@
   ],
   "archive_appimage": "Shadps4-sdl.AppImage",
   "binary": "AppRun",
+  "open_args": ["-b"],
   "config_subdir": "shadPS4",
-  "requirement": "Experimental PS4 emulator. You supply games and any firmware the title needs. Marquee opens the upstream UI; library import and per-game launch are not integrated yet."
+  "requirement": "Experimental PS4 emulator. You supply games and any firmware the title needs. Marquee opens Big Picture mode; library import and per-game launch are not integrated yet."
 }

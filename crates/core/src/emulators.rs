@@ -191,6 +191,9 @@ pub struct EmulatorDef {
     /// Used by systems that run through this emulator (`kind` = `emulator`).
     #[serde(default = "default_launch")]
     pub launch: Vec<String>,
+    /// Arguments required to open the emulator's own UI, without a game.
+    #[serde(default)]
+    pub open_args: Vec<String>,
     /// Extra `NAME=value` environment for every start (for example a locale).
     #[serde(default)]
     pub env: Vec<String>,
@@ -424,7 +427,7 @@ pub fn info(
             "duckstation" => "Library Play hides the main window with -nogui and shows the game fullscreen. A display is still required.",
             "mgba" => "Open uses Qt. To launch only the game window, add --marquee-sdl, -f, then an absolute game path as separate arguments. This is not displayless emulation or an integrated library session.",
             "rpcs3" => "Upstream supports --no-gui --fullscreen with a boot target, and a separate --headless mode. Marquee currently opens the tool; it has no PS3 game adapter.",
-            "shadps4" => "Experimental. Marquee installs the official Linux SDL build and opens the upstream launcher. No PS4 library adapter or automated firmware flow yet.",
+            "shadps4" => "Experimental. Marquee installs the official Linux SDL build and opens Big Picture mode. No PS4 library adapter or automated firmware flow yet.",
             "kytyps5" => "Experimental research runner. Marquee unpacks the published Linux tarball and opens kyty_launcher. Compatibility and config paths are upstream-defined.",
             _ => "Marquee currently opens this emulator’s own interface. Direct game launch and displayless execution need a separate verified adapter; no generic headless flag is applied.",
         }.into(),
@@ -787,7 +790,22 @@ pub fn open(paths: &Paths, def: &EmulatorDef, installed: &Installed, cfg: &Confi
     } else {
         "env"
     };
-    let command = launch_command(paths, &def.id, env, &def.env, &bin, &cfg.args);
+    let mut open_args: Vec<_> = def
+        .open_args
+        .iter()
+        .filter(|arg| {
+            !(cfg.args.contains(arg)
+                || (def.id == "shadps4"
+                    && arg.as_str() == "-b"
+                    && cfg
+                        .args
+                        .iter()
+                        .any(|v| matches!(v.as_str(), "-b" | "--big-picture"))))
+        })
+        .cloned()
+        .collect();
+    open_args.extend(cfg.args.iter().cloned());
+    let command = launch_command(paths, &def.id, env, &def.env, &bin, &open_args);
     let (program, args) = command.split_first().expect("command is never empty");
     let mut child = Command::new(program)
         .args(args)
@@ -1072,6 +1090,52 @@ mod tests {
         let picked = pick(&def, &release).unwrap();
         assert_eq!(picked.url, "u2");
         assert_eq!(picked.sha256, "bbbbccccdddd");
+    }
+
+    #[test]
+    fn shadps4_open_starts_big_picture_and_preserves_user_arguments() {
+        use std::os::unix::fs::PermissionsExt;
+        let temp = tempfile::tempdir().unwrap();
+        let paths = Paths::resolve(Some(temp.path().join("data"))).unwrap();
+        let mut def = find("shadps4").unwrap();
+        let dir = program_dir(&paths, &def.id);
+        fs::create_dir_all(&dir).unwrap();
+        let bin = dir.join("AppRun");
+        fs::write(
+            &bin,
+            "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$MARQUEE_TEST_ARGS\"\n",
+        )
+        .unwrap();
+        fs::set_permissions(&bin, fs::Permissions::from_mode(0o755)).unwrap();
+        let installed = Installed {
+            version: "test".into(),
+            bin: "AppRun".into(),
+        };
+        for (index, (args, expected)) in [
+            (vec![], "-b\n"),
+            (vec!["--show-fps".into()], "-b\n--show-fps\n"),
+            (vec!["--big-picture".into()], "--big-picture\n"),
+            (vec!["-b".into()], "-b\n"),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let capture = temp.path().join(format!("args-{index}"));
+            def.env = vec![format!("MARQUEE_TEST_ARGS={}", capture.display())];
+            open(&paths, &def, &installed, &Config { args }).unwrap();
+            let deadline = std::time::Instant::now() + Duration::from_secs(2);
+            loop {
+                if fs::read_to_string(&capture).ok().as_deref() == Some(expected) {
+                    break;
+                }
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "missing/wrong argv: {:?}",
+                    fs::read_to_string(&capture)
+                );
+                std::thread::sleep(Duration::from_millis(10));
+            }
+        }
     }
 
     #[test]

@@ -75,3 +75,11 @@ CUE names `XS Moto (axekin.com) (En,Fr,De,Es,It) (Track 1).bin`, while the archi
 contains `XS Moto   (Track 1) (axekin.com).bin` (and similarly for the audio
 tracks). This independent provider packaging defect remains a diagnostic;
 Marquee does not silently guess track replacements. Game launch remains untested.
+
+## 2026-10-22 — shadPS4 standalone UI
+
+The SDL build requires `-b`/`--big-picture` to open a UI without a game. The
+catalogue now supplies `open_args: ["-b"]` for standalone Open, preserving
+configured arguments without duplicating either Big Picture flag spelling.
+A process-level stub test captures the actual argv for default and configured
+launches. Upstream binary installation and game compatibility remain live gates.
