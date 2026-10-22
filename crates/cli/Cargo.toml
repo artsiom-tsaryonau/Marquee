@@ -15,3 +15,6 @@ marquee-core.workspace = true
 marquee-torrent = { path = "../torrent" }
 serde_json.workspace = true
 anyhow = "1"
+
+[dev-dependencies]
+tempfile = "3"

@@ -42,6 +42,11 @@ acceptance; tests cover shared dispatch and batch failure/recovery behavior.
 | Only `.bin` (BIOS), or only text/images | Skipped with a hint; use `marquee bios import` for BIOS |
 | Files for more than one system | Skipped; unpack by hand |
 
+The CLI processes the whole archive batch and scans successful imports even if
+another archive fails. If any archive import fails, it exits nonzero with an
+`INTAKE_FAILED` summary; successful files are kept. `--no-scan` suppresses the
+scan without hiding import failures.
+
 The CLI rescans `AlreadyPresent` results too: files unpacked before their adapter existed can enter the library once support is added. `--no-scan` still suppresses this. The core/JSON intake call itself does not scan; API callers must request a scan.
 
 CUE files with provider-style single-quoted `FILE` names are normalized to

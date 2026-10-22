@@ -319,6 +319,7 @@ fn run() -> marquee_core::error::Result<()> {
             }
             archives.sort();
             let mut changed = false;
+            let mut failed = 0usize;
             for a in &archives {
                 match core.intake_archive(a, delete) {
                     Ok(r) => {
@@ -336,12 +337,24 @@ fn run() -> marquee_core::error::Result<()> {
                             r.message
                         );
                     }
-                    Err(e) => println!("{}: error {} - {}", a.display(), e.code, e.message),
+                    Err(e) => {
+                        failed += 1;
+                        println!("{}: error {} - {}", a.display(), e.code, e.message);
+                    }
                 }
             }
             if changed && !no_scan {
                 let report = core.scan(None, None)?;
                 println!("{}", serde_json::to_string_pretty(&report)?);
+            }
+            if failed > 0 {
+                return Err(AppError::new(
+                    "INTAKE_FAILED",
+                    format!(
+                        "{failed} of {} archive imports failed; successful imports were kept",
+                        archives.len()
+                    ),
+                ));
             }
         }
         Command::Torrent(command) => torrent(&core, command)?,

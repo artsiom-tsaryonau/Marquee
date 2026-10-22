@@ -83,3 +83,11 @@ catalogue now supplies `open_args: ["-b"]` for standalone Open, preserving
 configured arguments without duplicating either Big Picture flag spelling.
 A process-level stub test captures the actual argv for default and configured
 launches. Upstream binary installation and game compatibility remain live gates.
+
+## 2026-10-22 — CLI archive failure status
+
+`marquee intake` now exits nonzero after any archive import error, with an
+`INTAKE_FAILED` count. Processing continues for later archives and the successful
+imports are scanned before returning the summary. CLI process tests cover a
+corrupt RAR followed by a valid RAR, the real scan, retained source files, and
+success/AlreadyPresent outcomes with `--no-scan`.

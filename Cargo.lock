@@ -3138,6 +3138,7 @@ dependencies = [
  "marquee-core",
  "marquee-torrent",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
