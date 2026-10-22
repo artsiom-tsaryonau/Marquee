@@ -44,6 +44,14 @@ acceptance; tests cover shared dispatch and batch failure/recovery behavior.
 
 The CLI rescans `AlreadyPresent` results too: files unpacked before their adapter existed can enter the library once support is added. `--no-scan` still suppresses this. The core/JSON intake call itself does not scan; API callers must request a scan.
 
+CUE files with provider-style single-quoted `FILE` names are normalized to
+standard double quotes in the imported copy, preserving names and line endings.
+Re-import also repairs a same-size CUE extracted by the older importer. The
+archive remains unchanged. Missing or mismatched BIN names are not guessed: all
+referenced tracks must actually exist. In the current XS Moto archive, the CUE
+and BIN filenames differ independently of the quoting problem, so quote repair
+alone does not make that archive playable.
+
 Documents and images in the archive (`.txt`, `.nfo`, `.jpg`, ...) are ignored. A system with no library folder gets one next to your existing roots and is registered.
 
 ## Safety

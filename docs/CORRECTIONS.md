@@ -60,3 +60,18 @@ extraction mode. Marquee creates regular files and rejects CRC/size errors.
 Synthetic stored RAR4/RAR5 fixtures exercise successful extraction, links and
 traversal; the callback has an oversized-output regression test. The frontend
 acceptance test and import labels now agree with RAR support.
+
+## 2026-10-22 — provider CUE quote compatibility
+
+Imported CUE FILE delimiters are converted from single to double quotes in
+staging, including on re-import of a same-size legacy copy. This addresses
+DuckStation's double-quote-only parser as well as Marquee's scanner. Names,
+directives and line endings are preserved; malformed/ambiguous quoting refuses
+the import before publication. The source archive is unchanged.
+
+A fresh disposable-library XS Moto RAR retest extracted all ten members and
+normalized every FILE delimiter, but still reported a missing data track: the
+CUE names `XS Moto (axekin.com) (En,Fr,De,Es,It) (Track 1).bin`, while the archive
+contains `XS Moto   (Track 1) (axekin.com).bin` (and similarly for the audio
+tracks). This independent provider packaging defect remains a diagnostic;
+Marquee does not silently guess track replacements. Game launch remains untested.

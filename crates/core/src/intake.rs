@@ -574,7 +574,12 @@ impl Core {
 
         let pending: Vec<&(Entry, PathBuf)> = wanted
             .iter()
-            .filter(|(e, rel)| fs::metadata(dest_dir.join(rel)).map_or(true, |m| m.len() != e.size))
+            .filter(|(e, rel)| {
+                let path = dest_dir.join(rel);
+                fs::metadata(&path).map_or(true, |m| m.len() != e.size)
+                    || (ext_of(rel) == "cue"
+                        && !matches!(crate::cue::normalized_import(&path), Ok(None)))
+            })
             .collect();
         if pending.is_empty() {
             return Ok(report(
@@ -594,6 +599,16 @@ impl Core {
         let result = (|| -> Result<()> {
             let todo: Vec<(Entry, PathBuf)> = pending.iter().map(|p| (*p).clone()).collect();
             extract(archive, kind, &todo, &staging)?;
+            // Repair provider CUE quoting before publishing any files. Replacing
+            // the two delimiter bytes preserves archive size verification.
+            for (_, rel) in &todo {
+                if ext_of(rel) == "cue" {
+                    let path = staging.join(rel);
+                    if let Some(bytes) = crate::cue::normalized_import(&path)? {
+                        fs::write(path, bytes)?;
+                    }
+                }
+            }
             for (_, rel) in &todo {
                 let to = dest_dir.join(rel);
                 if let Some(parent) = to.parent() {
@@ -729,6 +744,38 @@ mod tests {
         let r = c.intake_archive(&zip, false).unwrap();
         assert_eq!(r.outcome, Outcome::KeptArchive);
         assert!(r.dest.unwrap().join("kof98.zip").is_file());
+    }
+
+    #[test]
+    fn provider_cue_quotes_are_repaired_on_import_and_reimport() {
+        let tmp = tempfile::tempdir().unwrap();
+        let c = core(&tmp.path().join("data"));
+        let archive = tmp.path().join("Disc.zip");
+        let cue = b"FILE 'Disc (Track 1).bin' BINARY\r\nTRACK 01 MODE2/2352\r\nINDEX 01 00:00:00\r\nFILE 'Disc (Track 2).bin' BINARY\r\nTRACK 02 AUDIO\r\nINDEX 01 00:00:00\r\n";
+        make_zip(
+            &archive,
+            &[
+                ("Disc.cue", cue),
+                ("Disc (Track 1).bin", b"data"),
+                ("Disc (Track 2).bin", b"audio"),
+            ],
+        );
+        let report = c.intake_archive(&archive, false).unwrap();
+        let imported = report.dest.unwrap().join("Disc/Disc.cue");
+        assert_eq!(crate::cue::manifest(&imported).unwrap().tracks.len(), 2);
+        assert_eq!(fs::read(&imported).unwrap().len(), cue.len());
+        // Simulate a copy extracted by the old importer: same path and size.
+        fs::write(&imported, cue).unwrap();
+        assert_eq!(
+            c.intake_archive(&archive, false).unwrap().outcome,
+            Outcome::Imported
+        );
+        assert!(crate::cue::manifest(&imported).is_ok());
+        assert_eq!(
+            c.intake_archive(&archive, false).unwrap().outcome,
+            Outcome::AlreadyPresent
+        );
+        assert!(archive.exists());
     }
 
     #[test]

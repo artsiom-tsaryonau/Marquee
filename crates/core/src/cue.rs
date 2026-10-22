@@ -12,6 +12,64 @@ use std::path::{Path, PathBuf};
 
 const CUE_MAX_BYTES: u64 = 1024 * 1024;
 
+/// Some providers emit nonstandard single-quoted FILE names. DuckStation
+/// requires double quotes. Normalize delimiters in the imported copy only,
+/// preserving every filename, directive, byte count and line ending.
+pub(crate) fn normalized_import(path: &Path) -> Result<Option<Vec<u8>>> {
+    use std::io::Read;
+    let mut bytes = Vec::new();
+    std::fs::File::open(path)?
+        .take(CUE_MAX_BYTES + 1)
+        .read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > CUE_MAX_BYTES {
+        return Err(AppError::new("INTAKE_FORMAT", "CUE sheet exceeds 1 MiB"));
+    }
+    let changed = normalize_file_quotes(&mut bytes)?;
+    Ok(changed.then_some(bytes))
+}
+
+fn normalize_file_quotes(bytes: &mut [u8]) -> Result<bool> {
+    let mut changed = false;
+    for line in bytes.split_mut(|b| *b == b'\n') {
+        let start = line
+            .iter()
+            .position(|b| !b.is_ascii_whitespace())
+            .unwrap_or(line.len());
+        let line = &mut line[start..];
+        if line.len() < 5
+            || !line[..4].eq_ignore_ascii_case(b"FILE")
+            || !line[4].is_ascii_whitespace()
+        {
+            continue;
+        }
+        let start = 4 + line[4..]
+            .iter()
+            .position(|b| !b.is_ascii_whitespace())
+            .unwrap_or(line.len() - 4);
+        if line.get(start) != Some(&b'\'') {
+            continue;
+        }
+        let end = line.iter().rposition(|b| *b == b'\'').unwrap();
+        let encoding = line[end + 1..].trim_ascii();
+        if end <= start + 1
+            || line[start + 1..end].contains(&b'"')
+            || !line.get(end + 1).is_some_and(u8::is_ascii_whitespace)
+            || ![b"BINARY".as_slice(), b"MOTOROLA", b"AIFF", b"WAVE", b"MP3"]
+                .iter()
+                .any(|v| encoding.eq_ignore_ascii_case(v))
+        {
+            return Err(AppError::new(
+                "INTAKE_FORMAT",
+                "Invalid single-quoted CUE FILE directive",
+            ));
+        }
+        line[start] = b'"';
+        line[end] = b'"';
+        changed = true;
+    }
+    Ok(changed)
+}
+
 /// A parsed CUE sheet.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CueSheet {
@@ -292,6 +350,38 @@ mod tests {
     fn bare_unquoted_file_names_are_accepted() {
         let sheet = parse("FILE game.bin BINARY\nTRACK 01 MODE1/2352\nINDEX 01 00:00:00\n");
         assert_eq!(data_track(&sheet).unwrap().file, "game.bin");
+    }
+
+    #[test]
+    fn import_quote_repair_preserves_names_directives_and_line_endings() {
+        let original = b"REM 'keep this'\r\n  fIlE 'O'Brien (Track 1).bin' BINARY\r\nTRACK 01 MODE2/2352\r\nINDEX 01 00:00:00\r\nFILE \"audio.bin\" WAVE\r\n";
+        let mut repaired = original.to_vec();
+        assert!(normalize_file_quotes(&mut repaired).unwrap());
+        assert_eq!(repaired.len(), original.len());
+        assert_eq!(repaired, b"REM 'keep this'\r\n  fIlE \"O'Brien (Track 1).bin\" BINARY\r\nTRACK 01 MODE2/2352\r\nINDEX 01 00:00:00\r\nFILE \"audio.bin\" WAVE\r\n");
+        assert!(!normalize_file_quotes(&mut repaired).unwrap());
+        assert_eq!(
+            data_track(&parse(std::str::from_utf8(&repaired).unwrap()))
+                .unwrap()
+                .file,
+            "O'Brien (Track 1).bin"
+        );
+    }
+
+    #[test]
+    fn import_refuses_ambiguous_single_quoted_names() {
+        for line in [
+            "FILE 'missing.bin BINARY",
+            "FILE 'O'Brien.bin BINARY",
+            "FILE 'a\"b.bin' BINARY",
+            "FILE 'game.bin'",
+            "FILE 'game.bin'BINARY",
+        ] {
+            assert!(
+                normalize_file_quotes(&mut line.as_bytes().to_vec()).is_err(),
+                "{line}"
+            );
+        }
     }
 
     #[test]
