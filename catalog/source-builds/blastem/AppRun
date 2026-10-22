@@ -31,6 +31,13 @@ args=(run --env SDL_RENDER_DRIVER=software --rm --init --pull=never --network=no
     --env XDG_RUNTIME_DIR --env PULSE_SERVER --env QT_QPA_PLATFORM
     --volume "$config:$config:rw"
     --volume "$data:$data:rw" --volume "$cache:$cache:rw")
+# Prefer the compositor socket already forwarded below. X11 MIT-SHM can fail
+# across private IPC namespaces; do not widen IPC access just to render a game.
+if [[ -n ${SDL_VIDEODRIVER:-} ]]; then
+    args+=(--env "SDL_VIDEODRIVER=$SDL_VIDEODRIVER")
+elif [[ -n ${WAYLAND_DISPLAY:-} && -n ${XDG_RUNTIME_DIR:-} && -S $XDG_RUNTIME_DIR/$WAYLAND_DISPLAY ]]; then
+    args+=(--env SDL_VIDEODRIVER=wayland)
+fi
 if [[ -d /tmp/.X11-unix ]]; then args+=(--volume /tmp/.X11-unix:/tmp/.X11-unix:ro); fi
 if [[ -n ${XDG_RUNTIME_DIR:-} && -d $XDG_RUNTIME_DIR ]]; then
     # A private user-owned runtime directory, with only selected host sockets.
@@ -58,4 +65,10 @@ for arg in "$@"; do
         args+=(--volume "$arg:$arg:ro")
     fi
 done
+# Keep the last attempt's diagnostics outside the game/save directories. A
+# regular file lets the game outlive Marquee; piping output through the launcher
+# would instead risk SIGPIPE when its window closes. mktemp creates mode 600.
+launch_log=$(mktemp "$cache/blastem-launch.XXXXXX")
+exec >"$launch_log" 2>&1
+mv -T -- "$launch_log" "$cache/blastem-last-launch.log"
 exec podman "${args[@]}" "$image" blastem -g "$@"

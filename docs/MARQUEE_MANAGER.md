@@ -235,6 +235,17 @@ before starting the compatible pair; explicit Stop alone supports the old protoc
 No job or receipt operation silently downgrades. Do not restore a backup under
 an active worker; a pre-upgrade backup does not contain later jobs/receipts.
 
+### Existing-source live play gate
+
+The owner's existing Sonic 2 Genesis ZIP passed real local preparation, library
+registration and a core/CLI launch using the managed BlastEm image. The owner
+confirmed video, keyboard input, audio, quick-state restore and clean close;
+Marquee recorded exit 0 and one 363-second play in the isolated library. See
+[exact scope and remaining gates](EMULATORS.md#sonic-2-live-acceptance-2026-10-22).
+This validates one preparation/launch recipe, not new browser-job acquisition,
+physical gamepads, other platforms or universal compatibility. The next manager
+milestone remains M3 torrent adoption with its single-owner migration gates.
+
 ## Data and ownership contract
 
 Keep transport, preparation and library readiness separate. Proposed records:

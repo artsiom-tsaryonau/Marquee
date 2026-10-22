@@ -808,7 +808,17 @@ mod tests {
                 .env("MARQUEE_HOST_XDG_DATA_HOME", root.join("host-data"))
                 .env("XDG_RUNTIME_DIR", root.join("host-runtime"))
                 .env_remove("XAUTHORITY")
+                .env_remove("SDL_VIDEODRIVER")
                 .arg(&game);
+            let _wayland_socket = if id == "blastem" {
+                cmd.env("WAYLAND_DISPLAY", "wayland-test");
+                Some(
+                    std::os::unix::net::UnixListener::bind(root.join("host-runtime/wayland-test"))
+                        .unwrap(),
+                )
+            } else {
+                None
+            };
             assert!(cmd.status().unwrap().success());
             let argv = fs::read_to_string(&log).unwrap();
             assert_eq!(
@@ -838,6 +848,16 @@ mod tests {
                 root.join("config/melonDS/melonDS.toml")
             } else if id == "blastem" {
                 assert!(argv.contains("SDL_RENDER_DRIVER=software"));
+                assert!(argv.contains("SDL_VIDEODRIVER=wayland"));
+                assert!(!argv.contains("--ipc=host"));
+                assert_eq!(
+                    fs::metadata(root.join("cache/blastem-last-launch.log"))
+                        .unwrap()
+                        .permissions()
+                        .mode()
+                        & 0o777,
+                    0o600
+                );
                 assert!(argv.contains("blastem\n-g\n"));
                 assert!(!argv.contains("--device"));
                 assert!(argv.contains(&format!(
@@ -856,6 +876,13 @@ mod tests {
             assert!(cmd.status().unwrap().success());
             assert_eq!(fs::read_to_string(settings).unwrap(), "user corrections");
             assert!(!root.join("injected").exists());
+            if id == "blastem" {
+                cmd.env("SDL_VIDEODRIVER", "dummy");
+                assert!(cmd.status().unwrap().success());
+                let override_argv = fs::read_to_string(&log).unwrap();
+                assert!(override_argv.contains("SDL_VIDEODRIVER=dummy"));
+                assert!(!override_argv.contains("SDL_VIDEODRIVER=wayland"));
+            }
             assert!(Command::new("/bin/bash")
                 .arg(&launcher)
                 .env("PATH", format!("{}:/usr/bin:/bin", tools.display()))

@@ -11,7 +11,7 @@ pub struct Paths {
 
 impl Paths {
     pub fn resolve(data_dir: Option<PathBuf>) -> Result<Self> {
-        let paths = match data_dir {
+        let mut paths = match data_dir {
             Some(root) => Self {
                 config_dir: root.join("config"),
                 cache_dir: root.join("cache"),
@@ -34,6 +34,11 @@ impl Paths {
         fs::create_dir_all(&paths.data_dir)?;
         fs::create_dir_all(&paths.config_dir)?;
         fs::create_dir_all(&paths.cache_dir)?;
+        // Runners use these as XDG paths and container mount sources. Relative
+        // paths are not valid there, and aliases must share one library lease.
+        paths.data_dir = fs::canonicalize(&paths.data_dir)?;
+        paths.config_dir = fs::canonicalize(&paths.config_dir)?;
+        paths.cache_dir = fs::canonicalize(&paths.cache_dir)?;
         Ok(paths)
     }
 
@@ -94,5 +99,42 @@ pub fn path_from_bytes(bytes: &[u8]) -> PathBuf {
     #[cfg(not(unix))]
     {
         PathBuf::from(String::from_utf8_lossy(bytes).into_owned())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn relative_data_paths_become_absolute_before_runner_mounts_and_xdg_environment() {
+        let temp = tempfile::tempdir_in(".").unwrap();
+        let relative = temp
+            .path()
+            .strip_prefix(std::env::current_dir().unwrap())
+            .unwrap()
+            .join("library");
+        assert!(!relative.is_absolute());
+        let paths = Paths::resolve(Some(relative)).unwrap();
+        assert!(paths.data_dir.is_absolute());
+        assert!(paths.config_dir.is_absolute());
+        assert!(paths.cache_dir.is_absolute());
+        assert_eq!(paths.config_dir, paths.data_dir.join("config"));
+        assert_eq!(paths.cache_dir, paths.data_dir.join("cache"));
+        let reopened = Paths::resolve(Some(paths.data_dir.clone())).unwrap();
+        assert_eq!(reopened.data_dir, paths.data_dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn alias_paths_share_one_canonical_library_and_runner_tree() {
+        let temp = tempfile::tempdir().unwrap();
+        let real = temp.path().join("real");
+        fs::create_dir(&real).unwrap();
+        let alias = temp.path().join("alias");
+        std::os::unix::fs::symlink(&real, &alias).unwrap();
+        let paths = Paths::resolve(Some(alias)).unwrap();
+        assert_eq!(paths.data_dir, real);
+        assert_eq!(paths.config_dir, real.join("config"));
+        assert_eq!(paths.cache_dir, real.join("cache"));
     }
 }

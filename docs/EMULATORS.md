@@ -116,7 +116,7 @@ Added 2026-10-21. A system with no dedicated runner kind is one file in `catalog
 
 Verified on this host (2026-10-21): all three installed through `marquee emulators install`, 1,487 images from the local `roms/` folders were scanned into the library (Dreamcast 3, NES 245, SNES 42, GB 26, GBC 1,161, PC Engine 6, N64 4), and one game per emulator was launched with the argument lists above. Flycast (`chroma-circuit`) and RMG (`Kumi-Daiko-Beatoff-64`) stayed running until stopped. **Mesen needed two fixes (2026-10-21).** (1) Its .NET runtime aborts with a C++ `std::bad_cast` on this host (Fedora, ICU libraries) in every code path, even `--help`; `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1` in the entry's `env` fixes it (checked: the process stays up with it and aborts without it). My earlier note that Mesen \"stayed running\" was wrong. (2) With no `settings.json`, Mesen opens a first-run window (storage location, desktop shortcut and icons, default controller mappings) and, when that closes, starts a second copy of itself and exits. Marquee saw the first process end and the game's arguments were lost. The entry now has a `seed` list that writes `Mesen2/settings.json` (`{"Version":"2.1.1","ConfigUpgrade":1}`) only when missing; Mesen reads that as a first run, creates its own defaults (Xbox pad and arrow keys on every port, checked in the file it wrote) and goes straight to the game. A small official icon is fetched at install (`icon_download`, pinned SHA-256) because the zip contains none. Verified: one Mesen process stayed up 15 s through Marquee from a clean folder. **Not verified:** the pictures on screen, input, clean exit and playtime for these systems. Because of that Marquee now treats a normal exit within 10 seconds of launch as a failed start ("the emulator closed itself after Ns without a game being played") instead of a played session; the fake test runner is exempt. 
 
-Not covered yet, and why: **Sega Genesis/Mega Drive** and **Neo Geo Pocket** have no emulator with a checksummed Linux download that Marquee can fetch (ares publishes no Linux build; mGBA publishes no checksums). They need a source-build recipe or a different emulator. **mGBA** is not used for Game Boy because Mesen covers it. The UI maps these systems to platforms and launches them; "Add folder" buttons for them are not built yet (use `marquee library add-root --system <id> <folder>`).
+The earlier Genesis acquisition gap is now covered by the pinned BlastEm source recipe and library adapter described below. Neo Geo Pocket still needs its own managed acquisition recipe and library adapter. mGBA remains a standalone source-built tool; Mesen supplies the current Game Boy library adapter.
 
 ## Installing what you need
 
@@ -373,5 +373,49 @@ supplied Streets of Rage 2 (USA) cartridge through a fresh disposable Marquee
 library. The inspected window reached the opening story sequence, PulseAudio
 reported an uncorked float32 stereo 48 kHz stream, and closing the game window
 ended the 20-second session with exit 0. Neither the SDL audio failure nor the
-OpenGL vsync dialog appeared. Audio quality, controller input and save/load
-round trips remain untested. Test playtime stayed out of the personal library.
+OpenGL vsync dialog appeared. That earlier run did not verify audio quality, input or save/load. Test playtime
+stayed out of the personal library.
+
+
+### Sonic 2 live acceptance (2026-10-22)
+
+The existing Sonic The Hedgehog 2 (World, Rev B / Sonic Compilation) ZIP was
+prepared through the manager in a fresh isolated library, using the installed
+pinned BlastEm image/commit above. No new game download or historical-browser
+job adoption occurred. Source SHA-256 remained
+`d8da4ea73dbea911886f1fc40b479e2363bbf9b2ed92d77e0557e853cd215735`.
+
+The owner confirmed visible gameplay, keyboard movement/play (arrows and W),
+audible game sound, successful quick-state restore and normal window close.
+Backtick created a 141,640-byte `quicksave.state`; L restored the earlier game
+position. Marquee recorded one successful 363-second session with exit 0 and one
+play. The failed pre-fix launches did not count as plays. The personal library
+remained at 856 editions / 29 sessions; test settings, state and playtime stayed
+under ignored `data/manager-pilot/sonic-live-20261022/`.
+
+Two launch issues were exposed:
+
+- Relative `--data-dir` values reached runner XDG/container mount arguments as
+  relative paths and failed with exit 125. Core paths now resolve to canonical
+  absolute directories before constructing runners or taking the library lease.
+- SDL's X11 software path failed with `MIT-SHM / X_ShmPutImage BadValue` on this
+  container/display combination. The managed BlastEm wrapper now prefers native
+  Wayland when its active socket is available and forwarded. Explicit
+  `SDL_VIDEODRIVER` values are respected. IPC remains private; no host-IPC or GPU
+  access was added. X11-only live acceptance remains open. SDL's driver override
+  is documented in the [official SDL2 reference](https://wiki.libsdl.org/SDL2/SDL_HINT_VIDEODRIVER).
+
+The wrapper retains stdout/stderr from the latest attempt in its private
+`xdg-cache/blastem-last-launch.log` (mode 600, replaced on next launch). It uses
+an ordinary file so closing Marquee cannot break the game's output pipe. This
+is a last-attempt diagnostic, not a size-limited historical log service. The
+accepted Wayland run emitted nonfatal libdecor/EGL probe warnings; those alone
+did not indicate failed gameplay.
+
+This closes a title-specific keyboard/audio/emulator-save-state/clean-exit gate.
+Physical controller input, battery-backed in-game saving, persistence across a
+second emulator launch, and focus return to the native Marquee window remain
+untested. The launch was through the real core/CLI, not a fake runner. A timed
+8-second diagnostic probe was explicitly excluded from Enter/crash conclusions.
+New browser acquisition through real provider gates and manager torrent adoption
+remain separate milestones.
