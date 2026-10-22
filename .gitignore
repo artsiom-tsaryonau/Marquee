@@ -42,6 +42,7 @@ firmware/
 *.srm
 *.state
 *.mcd
+*.rar
 
 # Game images anywhere in the repo (only roms/ is meant to hold them, and it is ignored)
 *.iso
