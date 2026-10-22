@@ -187,6 +187,11 @@ The normalized data model is shared infrastructure, implemented incrementally wh
 
 Preserve existing work and correctness gates:
 
+- [Deferred Quiver integration](QUIVER_INTEGRATION.md): reviewed app-list import,
+  selective Rust reuse, native-port installation pilots, later updates/mods and
+  controller/kiosk ideas. Planning only; resume when explicitly scheduled. This
+  does not change the direct-store critical path or add a required launcher.
+
 - [PS2 slice](PS2.md): PCSX2 setup, user-owned ISO/BIOS, live launch/exit/time evidence.
 - [PS1 slice](PS1.md): DuckStation, per-system roots, supported ISO/CHD/CUE, separate live gate.
 - [Managed emulators and BIOS](EMULATORS.md): catalogue lifecycle, source recipes, platform adapters and live acceptance; preserve the distinction between a managed program and an integrated game adapter.
