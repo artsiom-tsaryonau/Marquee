@@ -140,7 +140,7 @@ impl Manager {
         }
     }
 
-    fn database(&self) -> Result<Connection> {
+    pub(crate) fn database(&self) -> Result<Connection> {
         private_dir(&self.dir)?;
         let path = self.dir.join("jobs.db");
         File::options()

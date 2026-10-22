@@ -2,12 +2,13 @@
   import { onMount } from 'svelte';
   import { app } from '../state.svelte';
   import { systemLabel } from '../labels';
-  import type { ManagerStatus, PreparationJob, PreparationState } from '../api/contracts';
+  import type { BrowserJob, ManagerStatus, PreparationJob, PreparationState } from '../api/contracts';
   let { paths }: { paths: string[] } = $props();
   let systems = $state<{id: string; name: string}[]>([]);
   let manager = $state<ManagerStatus | null>(null);
   let system = $state('');
   let jobs = $state<PreparationJob[]>([]);
+  let browserJobs = $state<BrowserJob[]>([]);
   let inspecting = $state(false);
   let error = $state('');
   let refreshError = $state('');
@@ -26,6 +27,7 @@
     try {
       manager = await app.api.managerStatus();
       const next = await app.api.preparationJobs();
+      browserJobs = await app.api.browserJobs();
       if (!mounted) return;
       const changed = next.some(j => j.state === 'registered' && jobs.find(old => old.id === j.id)?.state !== 'registered');
       jobs = next; refreshError = '';
@@ -61,6 +63,10 @@
       if (start) await refresh();
     } catch (err) { if (mounted) error = (err as Error).message; }
   }
+  async function cancelBrowser(job: BrowserJob) {
+    try { await app.api.cancelBrowserJob(job.job_id); await refresh(); }
+    catch (err) { if (mounted) error = (err as Error).message; }
+  }
   onMount(() => {
     mounted = true;
     void app.api.preparationSystems().then(value => { if (mounted) systems = value; }).catch(err => { if (mounted) error = err.message; });
@@ -95,6 +101,23 @@
     {#if manager?.running}<button class="btn glass small" data-nav disabled={manager.stopping} onclick={() => controlManager(false)}>Stop manager after current work</button>
     {:else}<button class="btn glass small" data-nav onclick={() => controlManager(true)}>Start manager</button>{/if}
   </div>
+  {#if browserJobs.length}<h3>Browser downloads · {browserJobs.length}</h3>
+    <p>The companion uses your existing browser session. Open it and refresh to report progress or apply a cancellation request. Downloaded files need a preparation review before they can enter the library.</p>
+  {/if}
+  {#each browserJobs as job (job.job_id)}
+    <article>
+      <h4>{job.selection.title}</h4>
+      <p>{job.selection.provider === 'vimm' ? 'Vimm' : 'Axekin'} · {job.cancel_requested ? 'Cancellation requested · waiting for browser' : job.state === 'completed' ? 'Downloaded · preparation needed' : job.state === 'waiting' ? 'Waiting for browser download' : job.state === 'downloading' ? 'Downloading in browser' : job.state === 'interrupted' ? 'Interrupted · review the source to retry' : 'Cancelled'}</p>
+      <p>{size(job.bytes)}{job.total ? ` of ${size(job.total)}` : ''} · Last reported by the browser</p>
+      {#if job.error}<p class="error">{job.error}</p>{/if}
+      {#if job.result}<p class="path">Source: {job.result.filename}</p><p>Local SHA-256 recorded. Game identity and compatibility remain unverified.</p>
+        {#if /\.(zip|7z|rar)$/i.test(job.result.filename)}<button class="btn glass small" data-nav onclick={() => app.queueArchives([job.result!.filename])}>Review archive for preparation</button>
+        {:else}<p>Add the downloaded game folder through Library to scan supported media.</p>{/if}
+      {:else if ['waiting', 'downloading'].includes(job.state)}
+        <button class="btn glass small" data-nav disabled={job.cancel_requested} onclick={() => cancelBrowser(job)}>Request cancellation</button>
+      {/if}
+    </article>
+  {/each}
   {#if jobs.length}<h3>Preparation history · {jobs.length}</h3>{/if}
   {#each jobs as job (job.id)}
     <article>

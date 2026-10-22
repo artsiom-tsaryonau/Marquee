@@ -171,7 +171,7 @@
     <button class="chip" class:on={!view.discovery} data-nav aria-pressed={!view.discovery} onclick={() => changeScope(false)}>Your library</button>
     <button class="chip" class:on={view.discovery} data-nav aria-pressed={view.discovery} onclick={() => changeScope(true)}>Catalogue discovery</button>
   </div>
-  <div class="archive-entry"><button class="btn glass small" data-nav onclick={() => (app.intakeOpen = true)}><Icon name="download" size={16} />{app.intakeBusy ? app.intakeProgress : app.intakeResults.length ? 'Review archive import' : 'Import ZIP/7z/RAR archives'}</button><span>{app.api.kind === 'desktop' ? 'You can also drop archives onto Library.' : 'Imports use paths on the Marquee computer.'}</span></div>
+  <div class="archive-entry"><button class="btn glass small" data-nav onclick={() => (app.intakeOpen = true)}><Icon name="download" size={16} />{app.intakeBusy ? app.intakeProgress : app.intakeResults.length ? 'Review archive import' : 'Downloads and archives'}</button><span>{app.api.kind === 'desktop' ? 'Import ZIP/7z/RAR files or review companion downloads.' : 'Imports use paths on the Marquee computer.'}</span></div>
   {#if adding}
     <form class="add-game glass-panel" onsubmit={(e) => { e.preventDefault(); void saveGame(); }}>
       <strong>Add a game without files</strong>

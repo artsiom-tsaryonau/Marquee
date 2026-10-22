@@ -81,8 +81,9 @@ Marquee core/CLI/Tauri → marquee-manager client/protocol → private Unix sock
 bounded archive inspection/extraction and disc helpers; core keeps its existing
 public module paths through re-exports. Legacy immediate intake reuses these
 helpers. `crates/core/src/preparation.rs` now contains only client coordination
-and library receipt publication. Torrent, browser, emulator and runtime workers
-retain their existing hosting until their separate adoption milestones.
+and library receipt publication. Torrent, emulator and runtime workers retain
+their existing hosting until adoption. Browser jobs support an opt-in manager
+bridge; legacy JSON remains until explicit cutover.
 
 ## Implemented worker lifecycle (M2)
 
@@ -95,8 +96,8 @@ retain their existing hosting until their separate adoption milestones.
   No manager TCP port or direct browser endpoint is opened.
 - Protocol v1 uses bounded length-prefixed JSON, typed operations, matching request
   IDs and a version check before mutation. Maximum frame is 32 MiB. The worker
-  advertises snapshot polling; event replay and active cancellation are explicitly
-  unsupported. The existing browser/native-host protocol is still a separate bridge.
+  advertises snapshot polling; event replay and active preparation cancellation are
+  unsupported. Browser cancellation is a request/acknowledgement flow. The existing browser/native-host protocol is still a separate bridge.
 - Job state/receipts use private `manager/jobs.db` schema 2; the worker never opens
   `library.db` or holds the library's instance lease. The launcher transactionally
   imports receipts into library schema 6 and sends a fingerprint-bound acknowledgement.
@@ -165,6 +166,43 @@ receipt (with no `library.db` file descriptor), then reopened Marquee. Registrat
 happened once without opening the import panel. UI stop/start passed; original
 source SHA-256 and attempt count were unchanged. This is local Linux process and
 browser evidence, not retail game boot/input/save acceptance or installer-bundle QA.
+
+## Implemented browser job bridge (M4 transport slice)
+
+The sibling scraper companion now has an opt-in manager authority. Its paired
+native host invokes `marquee browser request --client-id EXTENSION_ID` with bounded,
+typed stdin, retaining pairing credentials in the host. The CLI reaches the
+private manager socket without taking the library lease. No new browser endpoint,
+cookie export or shell-command interface is introduced.
+
+- Additive `browser_jobs` storage in schema 2 owns new reviewed selections, stable
+  start UUIDs, Chrome download IDs, attribution, last-reported bytes, cancellation
+  requests and local completion manifests. Existing preparation records are
+  unchanged. Stable start replay and duplicate completion are idempotent.
+- Selection/provider/URL and file-root checks run in the manager. Complete files
+  are opened below the approved root without symlink traversal and hashed outside
+  write transactions. A local hash is evidence, not verified release identity.
+- The companion reconciles its cache from manager snapshots. Lost start
+  acknowledgements never cause another automatic site click. Cancellation from
+  Marquee remains pending until the browser applies/acknowledges it; open/refresh
+  the companion. Progress is last reported, not an unattended polling promise.
+- Library → **Downloads and archives** shows these jobs. Completed ZIP/7z/RAR
+  files can enter the existing explicit-platform preparation review. This is a
+  handoff, not a durable artifact-to-preparation/receipt link or automatic install.
+- The installer's explicit `--switch-to-manager` refuses active/corrupt legacy
+  jobs, retains pairing and job records, backs up configuration/history and retires
+  the JSON v1 write schema under its lock. A marker also blocks stale configured writers. Completed legacy jobs are not adopted automatically;
+  no sources move. The live user registration is unchanged by tests.
+- Chrome owns transfer. Stopping the manager leaves Chrome running; restart and
+  companion refresh reconcile it. There is no browser pause/resume capability or
+  automatic restart of an interrupted download. Old running manager binaries must
+  be stopped/restarted with compatible builds before using the added operations.
+
+Checks exercise native framing → CLI → independent manager with synthetic ZIP
+bytes, attribution rejection, stable replay, restart, completion/history and
+cancellation. A disposable current-UI browser check verifies history, pending
+cancellation and acknowledgement. Live provider-to-preparation/registration/launch,
+artifact links, completed-history adoption and packaged delivery remain M4 gates.
 
 ## Data and ownership contract
 
@@ -277,7 +315,8 @@ coordination must retain a lock/lease that the manager checks before mutation.
 ## Implementation sequence and gates
 
 M1/M2 are implemented for local archives; M0 now has concrete DTO/storage/protocol
-and migration coverage. General transport contracts and M3–M6 remain open. Each increment must leave
+and migration coverage. The M4 browser transport slice above is implemented; broader transport contracts
+and M3–M6 completion gates remain open. Each increment must leave
 existing Play/import usable.
 
 | Increment | Deliverable | Acceptance before continuing |

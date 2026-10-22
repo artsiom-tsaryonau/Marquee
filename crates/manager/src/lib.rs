@@ -1,4 +1,5 @@
 //! Worker service and versioned private local protocol. No library or Core dependency.
+pub mod browser;
 pub mod client;
 pub mod daemon;
 mod endpoint;

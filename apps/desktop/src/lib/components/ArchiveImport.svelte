@@ -36,7 +36,7 @@
 {#if app.intakeOpen}
   <div class="scrim" data-modal-dismiss role="presentation" onclick={() => (app.intakeOpen = false)}></div>
   <div class="dialog glass-panel" role="dialog" aria-modal="true" aria-labelledby="archive-title" use:modal={() => (app.intakeOpen = false)}>
-    <header><div><h2 id="archive-title">Import game archives</h2><p>Review ZIP, 7z and RAR archives, prepare their game files, and add them to your library.</p></div><button class="btn glass small" data-nav aria-label="Close archive import" onclick={() => (app.intakeOpen = false)}><Icon name="x" /></button></header>
+    <header><div><h2 id="archive-title">Downloads and game archives</h2><p>Track companion downloads, review ZIP, 7z and RAR archives, and prepare their game files for your library.</p></div><button class="btn glass small" data-nav aria-label="Close archive import" onclick={() => (app.intakeOpen = false)}><Icon name="x" /></button></header>
     <div class="body">
       {#if app.api.kind === 'desktop'}<p>Choose archives or drop them onto Library. Review the selection before importing.</p>{:else}<p>Enter paths on the computer running Marquee. Browser uploads and files on another computer are not supported.</p>{/if}
       <form onsubmit={(event) => { event.preventDefault(); addPaths(); }}>

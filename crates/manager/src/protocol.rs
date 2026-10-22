@@ -21,6 +21,14 @@ pub struct Request {
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Operation {
     Hello,
+    Browser {
+        client_id: String,
+        request: crate::browser::Request,
+    },
+    BrowserList,
+    BrowserCancel {
+        id: String,
+    },
     List,
     Get {
         id: String,

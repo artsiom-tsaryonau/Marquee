@@ -227,6 +227,29 @@ impl Client {
         }
         self.call(Operation::List, false)
     }
+    pub fn browser_request(
+        &self,
+        client_id: &str,
+        request: crate::browser::Request,
+    ) -> Result<serde_json::Value> {
+        let explicit = matches!(request, crate::browser::Request::Start { .. });
+        self.call(
+            Operation::Browser {
+                client_id: client_id.into(),
+                request,
+            },
+            explicit,
+        )
+    }
+    pub fn browser_jobs(&self) -> Result<Vec<crate::browser::Job>> {
+        if !self.data.join("manager/jobs.db").exists() {
+            return Ok(vec![]);
+        }
+        self.call(Operation::BrowserList, false)
+    }
+    pub fn request_browser_cancel(&self, id: &str) -> Result<crate::browser::Job> {
+        self.call(Operation::BrowserCancel { id: id.into() }, false)
+    }
     pub fn get(&self, id: &str) -> Result<Job> {
         self.call(Operation::Get { id: id.into() }, false)
     }

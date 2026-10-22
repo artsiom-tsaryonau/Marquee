@@ -48,6 +48,11 @@ impl Server {
         }
         match operation {
             Operation::Hello => json(self.status()),
+            Operation::Browser { client_id, request } => {
+                self.manager.browser_request(&client_id, request)
+            }
+            Operation::BrowserList => json(self.manager.browser_jobs()?),
+            Operation::BrowserCancel { id } => json(self.manager.request_browser_cancel(&id)?),
             Operation::List => json(self.manager.list()?),
             Operation::Get { id } => json(self.manager.get(&id)?),
             Operation::Inspect { source, system } => json(self.manager.inspect(&source, &system)?),

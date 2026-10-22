@@ -342,6 +342,8 @@ export interface BiosImport { added: BiosFile[]; ignored: number }
 export interface ManagerStatus { running: boolean; pid: number | null; stopping: boolean; protocol_version: number; snapshot_polling: boolean; event_replay: boolean; active_cancel: boolean }
 
 export interface LibraryApi {
+  browserJobs(): Promise<BrowserJob[]>;
+  cancelBrowserJob(id: string): Promise<BrowserJob>;
   managerStatus(): Promise<ManagerStatus>;
   startManager(): Promise<ManagerStatus>;
   stopManager(): Promise<ManagerStatus>;
@@ -426,6 +428,17 @@ export interface LibraryApi {
   listBios(): Promise<BiosFile[]>;
   importBios(path: string): Promise<BiosImport>;
   removeBios(system: string): Promise<number>;
+}
+
+export interface BrowserJob {
+  job_id: string;
+  selection: { provider: string; title: string; source_url: string; link_type?: string };
+  state: 'waiting' | 'downloading' | 'completed' | 'interrupted' | 'cancelled';
+  bytes: number;
+  total: number | null;
+  cancel_requested: boolean;
+  error: string | null;
+  result: { filename: string; bytes: number; sha256: string; content_verified: boolean } | null;
 }
 
 export interface ArtworkReport {

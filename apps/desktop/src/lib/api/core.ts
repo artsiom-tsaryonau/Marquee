@@ -42,6 +42,8 @@ export function asError(err: unknown): AppError {
 export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable' | 'pickArchives' | 'pickTorrent' | 'onArchiveDrop'> {
   return {
     managerStatus: () => call('manager_status'),
+    browserJobs: () => call('browser_jobs'),
+    cancelBrowserJob: (id) => call('cancel_browser_job', { id }),
     startManager: () => call('start_manager'),
     stopManager: () => call('stop_manager'),
     preparationSystems: () => call('preparation_systems'),

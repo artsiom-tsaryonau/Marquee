@@ -24,6 +24,9 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Paired browser worker bridge; never opens library.db
+    #[command(subcommand)]
+    Browser(BrowserCmd),
     /// Manage the hidden worker without opening or locking the library database
     #[command(subcommand)]
     Manager(ManagerCmd),
@@ -86,6 +89,20 @@ enum ManagerCmd {
     Status,
     Start,
     Stop,
+}
+
+#[derive(Subcommand)]
+enum BrowserCmd {
+    /// Read a typed browser operation from bounded stdin (no credentials)
+    Request {
+        #[arg(long)]
+        client_id: String,
+    },
+    List,
+    /// Request cancellation; the connected browser must acknowledge it
+    Cancel {
+        id: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -340,6 +357,32 @@ fn run() -> marquee_core::error::Result<()> {
     // Worker controls and preparation handoff must work while the launcher
     // owns library.db, and cannot start recovery/network work in Core.
     match &args.command {
+        Command::Browser(command) => {
+            use std::io::Read;
+            let paths = marquee_core::paths::Paths::resolve(args.data_dir.clone())?;
+            let client = marquee_manager::Client::new(&paths.data_dir);
+            let value = match command {
+                BrowserCmd::Request { client_id } => {
+                    let mut bytes = Vec::new();
+                    std::io::stdin()
+                        .take(256 * 1024 + 1)
+                        .read_to_end(&mut bytes)?;
+                    if bytes.len() > 256 * 1024 {
+                        return Err(AppError::new(
+                            "BROWSER_REQUEST",
+                            "Browser request exceeds 256 KiB",
+                        ));
+                    }
+                    client.browser_request(client_id, serde_json::from_slice(&bytes)?)?
+                }
+                BrowserCmd::List => serde_json::to_value(client.browser_jobs()?)?,
+                BrowserCmd::Cancel { id } => {
+                    serde_json::to_value(client.request_browser_cancel(id)?)?
+                }
+            };
+            println!("{}", serde_json::to_string(&value)?);
+            return Ok(());
+        }
         Command::Manager(command) => {
             let paths = marquee_core::paths::Paths::resolve(args.data_dir.clone())?;
             let client = marquee_manager::Client::new(&paths.data_dir);
@@ -373,6 +416,7 @@ fn run() -> marquee_core::error::Result<()> {
     }
     let core = Arc::new(Core::open(args.data_dir, args.allow_fake)?);
     match args.command {
+        Command::Browser(_) => unreachable!("handled without Core"),
         Command::Manager(_) => unreachable!("handled without Core"),
         Command::Prepare(command) => {
             let value = match command {
