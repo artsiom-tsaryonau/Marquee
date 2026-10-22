@@ -180,6 +180,15 @@ enum TorrentCmd {
     },
     /// List durable transfers and download locations
     List,
+    /// List completed torrent files and their linked preparation reviews
+    Artifacts,
+    /// Inspect a completed archive for a platform; approval remains separate
+    Prepare {
+        info_hash: String,
+        path: PathBuf,
+        #[arg(long)]
+        system: String,
+    },
     /// Set opt-in discovery for imported torrents (private device shares are unaffected)
     Discovery {
         #[arg(long, action = clap::ArgAction::Set)]
@@ -363,7 +372,9 @@ fn run() -> marquee_core::error::Result<()> {
     // Do this before Core::open can restore transfers or acquire its DB lease.
     if let Command::Torrent(TorrentCmd::Inspect { path }) = &args.command {
         let (manifest, token) = marquee_core::transfer::inspect_file(path)?;
-        let mut value = serde_json::to_value(manifest)?;
+        let mut value = serde_json::to_value(&manifest)?;
+        value["preparation_files"] =
+            serde_json::to_value(marquee_manager::torrent::preparation_files(&manifest))?;
         value["review_token"] = token.into();
         println!("{}", serde_json::to_string_pretty(&value)?);
         return Ok(());
@@ -833,7 +844,7 @@ fn torrent(
     use marquee_manager::torrent::{Request, TorrentSettings, TransferStatus};
     if !matches!(
         command,
-        TorrentCmd::Status | TorrentCmd::List | TorrentCmd::Inspect { .. }
+        TorrentCmd::Status | TorrentCmd::List | TorrentCmd::Artifacts | TorrentCmd::Inspect { .. }
     ) {
         client.start_manager()?;
     }
@@ -853,6 +864,18 @@ fn torrent(
         })
     };
     match command {
+        TorrentCmd::Artifacts => println!(
+            "{}",
+            serde_json::to_string_pretty(&client.torrent_downloads()?)?
+        ),
+        TorrentCmd::Prepare {
+            info_hash,
+            path,
+            system,
+        } => println!(
+            "{}",
+            serde_json::to_string_pretty(&client.inspect_torrent(&info_hash, &path, &system)?)?
+        ),
         TorrentCmd::Inspect { path } => println!(
             "{}",
             serde_json::to_string_pretty(&marquee_core::transfer::inspect_file(&path)?.0)?

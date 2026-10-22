@@ -114,6 +114,7 @@ export interface IntakeResult { path: string; report: IntakeReport | null; error
 
 export type PreparationState = 'awaiting_review' | 'preparing' | 'interrupted' | 'awaiting_library' | 'registered' | 'failed' | 'cancelled';
 export interface PreparationJob {
+  torrent_source?: { info_hash: string; name: string; relative_path: string; download_directory: string; artifact: { filename: string; bytes: number; sha256: string; content_verified: boolean }; piece_verified: boolean };
   browser_source?: { browser_job_id: string; selection: { provider: string; title: string }; artifact: { filename: string; bytes: number; sha256: string; content_verified: boolean } };
   id: string;
   source: string;
@@ -190,7 +191,10 @@ export interface TransferStatus {
   items: TransferItem[];
 }
 
+export interface TorrentArtifact { path: string; size: number; supported: boolean; reason: string | null; preparation_id: string | null }
+export interface TorrentDownload { info_hash: string; name: string; directory: string; available: boolean; error: string | null; files: TorrentArtifact[] }
 export interface TorrentReview {
+  preparation_files?: { path: string; size: number; supported: boolean; reason: string | null }[];
   info_hash: string;
   name: string;
   total: number;
@@ -345,6 +349,8 @@ export interface BiosImport { added: BiosFile[]; ignored: number }
 export interface ManagerStatus { running: boolean; pid: number | null; stopping: boolean; protocol_version: number; snapshot_polling: boolean; event_replay: boolean; active_cancel: boolean }
 
 export interface LibraryApi {
+  torrentDownloads(): Promise<TorrentDownload[]>;
+  inspectTorrentPreparation(infoHash: string, path: string, system: string): Promise<PreparationJob>;
   browserJobs(): Promise<BrowserJob[]>;
   inspectBrowserPreparation(id: string, system: string): Promise<PreparationJob>;
   cancelBrowserJob(id: string): Promise<BrowserJob>;

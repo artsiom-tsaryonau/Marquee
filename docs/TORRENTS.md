@@ -27,14 +27,14 @@ Payload folders, `.marquee-transfer-*` markers and cached `torrents/<hash>.torre
 files stay in their original locations; no source is moved or downloaded by migration.
 
 After cutover, manager settings are authoritative; legacy SQLite values are not
-reimported. IPC v3 requires a compatible companion; a requested manager start
-can drain an older v1/v2 worker before replacing it. Rollback is manual: stop all
+reimported. IPC v4 requires a compatible companion; a requested manager start
+can drain an older v1/v2/v3 worker before replacing it. Rollback is manual: stop all
 manager/library owners, preserve the current manager state, then reconcile later
 changes against the backup before restoring legacy history/settings. Restoring
 only the old entry list loses later changes. Never restore it beside a live manager.
 
-The [manager plan](MARQUEE_MANAGER.md) tracks the remaining torrent-to-preparation
-and source/installation receipt links. No general torrent installer is implemented.
+The [manager plan](MARQUEE_MANAGER.md) tracks the supported archive handoff and
+remaining platform recipes. No general package installer is implemented.
 
 ## Download, source package and installation are separate
 
@@ -65,6 +65,39 @@ installation records (platform, version, patch/DLC, readiness and launch profile
 Deleting original packages may save space after installation is verified, but
 seeding the original torrent requires its original files. Installed/extracted
 data cannot substitute for a torrent of the packages that produced it.
+
+## Completed archive → reviewed preparation
+
+Open **Downloads and archives** from Library. Completed torrents appear with their
+individual filenames and any linked preparation job. Choose a ZIP, 7z or RAR and
+an explicit supported platform, then **Inspect torrent archive**. The manager
+rechecks the torrent pieces covering that file (including neighboring files at
+piece boundaries), hashes the selected archive, inspects its plan and atomically
+links a single review to `(info-hash, relative path)`. The next step is the normal
+**Approve and prepare** action; completion alone never extracts or registers it.
+
+The review and immutable receipt retain info-hash, selected path, original download
+directory, size and SHA-256. Torrent integrity is verified; release authenticity
+and emulator compatibility remain unverified. A changed file, partial transfer,
+unknown path, missing boundary file or symlink refuses inspection. Filenames
+identifying updates/DLC/firmware/keys and unsupported packages are blocked from
+this base-game workflow. A supported-looking extension is still checked by the
+archive/platform recipe; it is not sufficient for approval.
+
+Repeated review returns the same job; changing its platform does not silently
+replace it. Cancelled reviews can be reopened after validation. Preparation keeps
+original torrent files for seeding, and installs into a separate immutable folder.
+Library registration remains in Core. Failed registration can recover after
+restart or source removal without extracting again or creating another edition;
+the source link and receipt survive cleanup. Missing torrent sources remain in
+history and require explicit Resume to redownload. Installed files cannot seed a
+torrent of its original archives.
+
+Manager job schema **4** backs up schema 2/3 to a private
+`jobs-v<version>-backup-<uuid>.db` before advancing without rewriting payloads.
+IPC **v4** rejects older clients that would discard torrent provenance; only
+shutdown can negotiate v1/v2/v3. Existing reviews without torrent evidence retain
+their original identity and receipt fingerprint. Library schema remains 6.
 
 ## UI
 
@@ -139,6 +172,9 @@ marquee torrent seeding false
 marquee torrent limits 2048 0            # KiB/s up, down; 0 = unlimited
 marquee torrent status                   # settings
 marquee torrent list                     # durable jobs and file locations
+marquee torrent artifacts                # completed files and linked preparation
+marquee torrent prepare <info-hash> Game.zip --system genesis  # inspect; prints review/token
+marquee prepare start <job-id> --review-token <token>          # approve and detach
 
 # Downloads into ~/Downloads/Marquee/<info-hash>, not directly into the parent.
 # Optional token is the metadata SHA-256 returned by inspect.
@@ -192,12 +228,29 @@ package. A Core/real-manager test covers private-device registration, failed sca
 retry, CLI access while the library is leased, and library reads after manager stop.
 An earlier production browser check exercises file review, direct-peer download, stop,
 reload/history and source-missing Resume using disposable databases. The supplied
-Shadow of the Colossus torrent was inspected offline only; its payload was not
-fetched or installed.
+Shadow of the Colossus torrent now has a full receive-only live transport pass
+(see below). Its packages remain uninstalled.
 
 Still open: native picker/controller acceptance, external-client interoperability,
 real multi-machine/NAT and 20–50 GB interruption tests, selective-file download,
 a live public download through the VPN proxy, authenticated device pairing/private
-flags, universal source/installation records, automatic archive/package install
-jobs and optional remote-play integration. DHT/public tracker configuration is
+flags, universal source/installation records, unsupported package preparation recipes and optional remote-play integration. DHT/public tracker configuration is
 implemented; public network availability was not tested in this pass.
+
+## Shadow of the Colossus live transport acceptance (2026-10-22)
+
+With explicit owner approval, the supplied PS4 torrent downloaded all
+**13,584,236,544 bytes**: base package 13,567,262,720 bytes, patch 16,842,752 bytes,
+and DLC 131,072 bytes. Info-hash: `4c4622a0531147d7d549a6aa4048db80d5c526b5`.
+This isolated test enabled tracker/DHT discovery and disabled uploads; recorded
+uploaded bytes were **0**. It ran before the separately added proxy feature and
+is not evidence of VPN/proxy routing. The completed transfer was paused and its
+manager stopped. All three packages were SHA-256 hashed and retained under
+`data/manager-pilot/shadow-torrent-20261022/payload/<info-hash>/`; ignored
+`acceptance.json` records sizes/hashes and the blocked preparation result.
+
+The new artifact listing reports all three `.pkg` files as unsupported for archive
+preparation; a PS4 preparation request returns `TORRENT_PREPARATION`. No `library.db`
+was created in the pilot, and no package was installed/executed. This is a real
+13.58 GB transport/integrity pass, not PS4 installation, title authenticity or game
+boot acceptance. Payloads remain untracked and the original torrent is unchanged.

@@ -62,3 +62,92 @@ fn private_transfer_between_two_engines() {
     a.shutdown();
     b.shutdown();
 }
+
+#[test]
+fn selected_file_verification_checks_neighboring_piece_bytes_and_rejects_changes() {
+    let tmp = tempfile::tempdir().unwrap();
+    let bundle = tmp.path().join("bundle");
+    std::fs::create_dir(&bundle).unwrap();
+    for (name, bytes) in [
+        ("a.bin", vec![1; 73]),
+        ("game.zip", vec![2; 512]),
+        ("z.bin", vec![3; 89]),
+    ] {
+        std::fs::write(bundle.join(name), bytes).unwrap();
+    }
+    let engine = Engine::start(&local(tmp.path())).unwrap();
+    let made = engine.create(&bundle, vec![]).unwrap();
+    let manifest = marquee_torrent::inspect(&made.bytes).unwrap();
+    let selected = &manifest
+        .files
+        .iter()
+        .find(|f| f.path.ends_with("game.zip"))
+        .unwrap()
+        .path;
+    let base = if tmp.path().join(selected).exists() {
+        tmp.path()
+    } else {
+        &bundle
+    };
+    let mut opened = Vec::new();
+    marquee_torrent::verify_file(&made.bytes, selected, |path, _| {
+        opened.push(path.to_string());
+        Ok(std::fs::File::open(base.join(path))?)
+    })
+    .unwrap();
+    assert_eq!(
+        opened.len(),
+        3,
+        "all three files intersect the selected file's boundary piece"
+    );
+    std::fs::write(bundle.join("a.bin"), vec![4; 73]).unwrap();
+    assert!(
+        marquee_torrent::verify_file(&made.bytes, selected, |path, _| Ok(std::fs::File::open(
+            base.join(path)
+        )?))
+        .unwrap_err()
+        .to_string()
+        .contains("piece")
+    );
+    assert!(
+        marquee_torrent::verify_file(&made.bytes, "../game.zip", |path, _| Ok(
+            std::fs::File::open(base.join(path))?
+        ))
+        .is_err()
+    );
+    engine.shutdown();
+}
+
+#[test]
+fn folder_seed_uses_its_top_directory_and_missing_sources_never_create_files() {
+    let temp = tempfile::tempdir().unwrap();
+    let folder = temp.path().join("Bundle");
+    std::fs::create_dir(&folder).unwrap();
+    std::fs::write(folder.join("one.zip"), b"first synthetic source").unwrap();
+    std::fs::write(folder.join("two.pkg"), b"second synthetic source").unwrap();
+    let a = Engine::start(&local(temp.path())).unwrap();
+    let made = a.create(&folder, vec![]).unwrap();
+    let id = a.seed(made.bytes.clone(), temp.path()).unwrap();
+    a.wait_finished(id, Duration::from_secs(5)).unwrap();
+    assert!(!temp.path().join("one.zip").exists());
+    let destination = temp.path().join("download");
+    let b = Engine::start(&local(&destination)).unwrap();
+    let id = b
+        .download_owned(
+            Source::TorrentBytes(made.bytes.clone()),
+            &destination,
+            vec![a.listen_addr().unwrap()],
+        )
+        .unwrap();
+    b.wait_finished(id, Duration::from_secs(10)).unwrap();
+    assert_eq!(
+        std::fs::read(destination.join("one.zip")).unwrap(),
+        b"first synthetic source"
+    );
+    let missing = temp.path().join("missing");
+    std::fs::create_dir(&missing).unwrap();
+    assert!(b.seed(made.bytes, &missing).is_err());
+    assert!(std::fs::read_dir(missing).unwrap().next().is_none());
+    a.shutdown();
+    b.shutdown();
+}

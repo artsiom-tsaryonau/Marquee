@@ -74,6 +74,13 @@ impl Server {
                 self.manager.browser_request(&client_id, request)
             }
             Operation::BrowserList => json(self.manager.browser_jobs()?),
+            Operation::TorrentDownloads => {
+                json(self.manager.torrent_downloads(self.torrents()?.as_ref())?)
+            }
+            Operation::InspectTorrent { hash, path, system } => json(
+                self.manager
+                    .inspect_torrent(self.torrents()?.as_ref(), &hash, &path, &system)?,
+            ),
             Operation::BrowserCancel { id } => json(self.manager.request_browser_cancel(&id)?),
             Operation::InspectBrowser { id, system } => {
                 json(self.manager.inspect_browser(&id, &system)?)

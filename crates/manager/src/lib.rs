@@ -7,6 +7,7 @@ mod migration;
 pub mod protocol;
 pub mod service;
 pub mod torrent;
+pub mod torrent_source;
 pub use client::Client;
 pub use marquee_media::error::{AppError, Result};
 pub use service::{Job, Output, Receipt, State};

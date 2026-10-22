@@ -9,7 +9,8 @@ use std::path::PathBuf;
 // v2 requires provenance-aware receipts. Older clients would otherwise discard
 // unknown receipt fields before publication/fingerprinting.
 // v3 adds detached torrent authority and requires upgraded companion binaries.
-pub const VERSION: u32 = 3;
+// v4 preserves torrent artifact provenance in preparation reviews/receipts.
+pub const VERSION: u32 = 4;
 pub const MAX_FRAME: usize = 32 * 1024 * 1024;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -32,6 +33,12 @@ pub enum Operation {
         request: crate::browser::Request,
     },
     BrowserList,
+    TorrentDownloads,
+    InspectTorrent {
+        hash: String,
+        path: PathBuf,
+        system: String,
+    },
     BrowserCancel {
         id: String,
     },

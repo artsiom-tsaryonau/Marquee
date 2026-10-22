@@ -90,6 +90,12 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
         }
         "set_display_mode" => out(core.set_display_mode(&text(&args, "mode")?)?),
         "manager_status" => out(core.preparation.status()?),
+        "torrent_downloads" => out(core.preparation.torrent_downloads()?),
+        "inspect_torrent_preparation" => out(core.preparation.inspect_torrent(
+            &text(&args, "info_hash")?,
+            std::path::Path::new(&text(&args, "path")?),
+            &text(&args, "system")?,
+        )?),
         "browser_jobs" => out(core.preparation.browser_jobs()?),
         "inspect_browser_preparation" => out(core
             .preparation

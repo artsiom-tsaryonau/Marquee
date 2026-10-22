@@ -153,6 +153,7 @@ pub fn review(core: &Core, path: &Path) -> Result<TorrentReview> {
         .join("torrents/downloads")
         .join(&manifest.info_hash);
     Ok(TorrentReview {
+        preparation_files: marquee_manager::torrent::preparation_files(&manifest),
         manifest,
         review_token,
         directory,

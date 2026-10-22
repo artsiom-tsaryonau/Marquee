@@ -166,6 +166,126 @@ mod tests {
     }
 
     #[test]
+    fn torrent_archive_reaches_one_library_receipt_with_restart_and_source_cleanup() {
+        use marquee_manager::torrent::{Request, TorrentSettings, TransferStatus};
+        let dir = Data::new();
+        let data = dir.path().join("data");
+        let seed_dir = dir.path().join("seed");
+        fs::create_dir(&seed_dir).unwrap();
+        let source = zip(&seed_dir, &[("Game.gen", b"synthetic torrent cartridge")]);
+        let mut cfg = marquee_torrent::Config::private(&seed_dir);
+        cfg.listen = "127.0.0.1:0".parse().unwrap();
+        let seed = marquee_torrent::Engine::start(&cfg).unwrap();
+        let made = seed.create(&source, vec![]).unwrap();
+        let id = seed.seed(made.bytes.clone(), &seed_dir).unwrap();
+        seed.wait_finished(id, Duration::from_secs(5)).unwrap();
+        let torrent = dir.path().join("synthetic.torrent");
+        fs::write(&torrent, &made.bytes).unwrap();
+        let core = open(&data);
+        core.set_torrent_settings(&TorrentSettings {
+            enabled: true,
+            seeding: false,
+            ..Default::default()
+        })
+        .unwrap();
+        let (_, token) = crate::transfer::inspect_file(&torrent).unwrap();
+        core.preparation
+            .torrent::<()>(Request::AddFile {
+                path: torrent,
+                review_token: token,
+                peers: vec![seed.listen_addr().unwrap()],
+                destination: None,
+            })
+            .unwrap();
+        let until = Instant::now() + Duration::from_secs(10);
+        loop {
+            let state: TransferStatus = core.preparation.torrent(Request::Status).unwrap();
+            if state.items[0].state == "complete" {
+                break;
+            }
+            assert!(Instant::now() < until);
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        assert!(
+            core.snapshot().unwrap().editions.is_empty(),
+            "transfer completion cannot register an archive"
+        );
+        let downloads = core.preparation.torrent_downloads().unwrap();
+        let file = downloads[0].files[0].path.clone();
+        let review = core
+            .preparation
+            .inspect_torrent(&made.info_hash, &file, "genesis")
+            .unwrap();
+        assert_eq!(
+            review.id,
+            core.preparation
+                .inspect_torrent(&made.info_hash, &file, "genesis")
+                .unwrap()
+                .id
+        );
+        assert_eq!(review.state, State::AwaitingReview);
+        assert!(!review.destination.exists());
+        assert!(core.preparation.start_job(&review.id, "stale").is_err());
+        core.with_db(|db| {db.conn.execute_batch("CREATE TRIGGER fail_torrent_receipt BEFORE INSERT ON preparation_receipts BEGIN SELECT RAISE(ABORT,'injected publication failure'); END;")?;Ok(())}).unwrap();
+        let failed = core
+            .run_preparation(&review.id, &review.review_token)
+            .unwrap();
+        assert_eq!(failed.state, State::AwaitingLibrary);
+        assert!(core.snapshot().unwrap().editions.is_empty());
+        let fingerprint = failed.receipt.as_ref().unwrap().fingerprint().unwrap();
+        fs::remove_file(&review.source).unwrap();
+        core.with_db(|db| {
+            db.conn.execute_batch("DROP TRIGGER fail_torrent_receipt")?;
+            Ok(())
+        })
+        .unwrap();
+        core.preparation.stop().unwrap();
+        let until = Instant::now() + Duration::from_secs(5);
+        while core.preparation.status().unwrap().running {
+            assert!(Instant::now() < until);
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        drop(core);
+        let core = open(&data);
+        core.preparation.start_manager().unwrap();
+        let registered = core.preparation_jobs().unwrap().remove(0);
+        assert_eq!(registered.state, State::Registered);
+        assert_eq!(registered.attempt, 1);
+        assert_eq!(registered.torrent_source, review.torrent_source);
+        assert_eq!(
+            registered.receipt.as_ref().unwrap().fingerprint().unwrap(),
+            fingerprint
+        );
+        assert_eq!(
+            core.preparation
+                .inspect_torrent(&made.info_hash, &file, "genesis")
+                .unwrap()
+                .id,
+            review.id
+        );
+        let downloads = core.preparation.torrent_downloads().unwrap();
+        assert!(!downloads[0].available);
+        assert_eq!(
+            downloads[0].files[0].preparation_id.as_deref(),
+            Some(review.id.as_str())
+        );
+        core.preparation_jobs().unwrap();
+        assert_eq!(core.snapshot().unwrap().editions.len(), 1);
+        core.with_db(|db| {
+            let payload: String = db.conn.query_row(
+                "SELECT payload FROM preparation_receipts WHERE id=?1",
+                [&review.id],
+                |r| r.get(0),
+            )?;
+            let receipt: Receipt = serde_json::from_str(&payload)?;
+            assert_eq!(receipt.torrent_source, registered.torrent_source);
+            Ok(())
+        })
+        .unwrap();
+        seed.shutdown();
+    }
+
+    #[test]
     fn browser_artifact_links_survive_failed_publication_source_cleanup_and_restart() {
         use marquee_manager::browser::{Request, Selection};
         let dir = Data::new();

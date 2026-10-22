@@ -305,7 +305,7 @@ fn m1_cutover_requires_exclusive_ownership_and_preserves_a_private_backup() {
         current
             .query_row("PRAGMA user_version", [], |r| r.get::<_, i64>(0))
             .unwrap(),
-        3
+        4
     );
     assert!(source.is_file());
 }

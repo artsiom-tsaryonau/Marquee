@@ -95,6 +95,7 @@ pub struct TransferStatus {
 pub struct TorrentReview {
     #[serde(flatten)]
     pub manifest: marquee_torrent::Manifest,
+    pub preparation_files: Vec<FileCandidate>,
     pub review_token: String,
     pub directory: PathBuf,
 }
@@ -1042,6 +1043,7 @@ fn review(core: &Host, path: &Path) -> Result<TorrentReview> {
     let (manifest, review_token) = inspect_file(path)?;
     let directory = core.transfers.inner.download_dir(&manifest.info_hash);
     Ok(TorrentReview {
+        preparation_files: preparation_files(&manifest),
         manifest,
         review_token,
         directory,
@@ -1373,6 +1375,192 @@ pub(crate) fn write_state(path: &Path, bytes: &[u8]) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn completed_archive() -> (
+        tempfile::TempDir,
+        Arc<Host>,
+        crate::service::Manager,
+        String,
+        PathBuf,
+        Vec<u8>,
+    ) {
+        let temp = tempfile::tempdir().unwrap();
+        let host = open(&temp.path().join("data"));
+        let source = temp.path().join("Game.zip");
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(&source).unwrap());
+        zip.start_file("Game.gen", zip::write::SimpleFileOptions::default())
+            .unwrap();
+        zip.write_all(b"synthetic cartridge").unwrap();
+        zip.finish().unwrap();
+        let bytes = std::fs::read(&source).unwrap();
+        let mut config = Config::private(temp.path());
+        config.listen = "127.0.0.1:0".parse().unwrap();
+        let engine = Engine::start(&config).unwrap();
+        let made = engine.create(&source, vec![]).unwrap();
+        engine.shutdown();
+        let dir = host.transfers.inner.download_dir(&made.info_hash);
+        host.transfers
+            .inner
+            .owned_dir_at(&made.info_hash, &dir)
+            .unwrap();
+        std::fs::write(dir.join("Game.zip"), &bytes).unwrap();
+        atomic_write(
+            &host.transfers.inner.torrent_file(&made.info_hash),
+            &made.bytes,
+        )
+        .unwrap();
+        let entry:Entry=serde_json::from_value(serde_json::json!({"kind":"get","info_hash":made.info_hash,"name":"Game.zip","edition_id":null,"system":null,"dir":dir,"peers":[],"owned":true,"complete":true,"paused":true,"total":bytes.len(),"downloaded":bytes.len(),"public":true})).unwrap();
+        host.transfers
+            .inner
+            .update(|entries| entries.push(entry))
+            .unwrap();
+        let manager = crate::service::Manager::new(&host.data);
+        (
+            temp,
+            host,
+            manager,
+            made.info_hash,
+            PathBuf::from("Game.zip"),
+            bytes,
+        )
+    }
+    #[test]
+    fn torrent_review_binds_source_once_and_receipt_survives_source_removal() {
+        let (_temp, host, manager, hash, path, _bytes) = completed_archive();
+        manager.torrent_downloads(&host).unwrap();
+        manager.database().unwrap().execute_batch("CREATE TRIGGER fail_torrent_link BEFORE INSERT ON torrent_preparations BEGIN SELECT RAISE(ABORT,'injected link failure'); END;").unwrap();
+        assert!(manager
+            .inspect_torrent(&host, &hash, &path, "genesis")
+            .is_err());
+        assert!(manager.list().unwrap().is_empty());
+        assert!(manager.torrent_downloads(&host).unwrap()[0].files[0]
+            .preparation_id
+            .is_none());
+        manager
+            .database()
+            .unwrap()
+            .execute_batch("DROP TRIGGER fail_torrent_link")
+            .unwrap();
+        let review = manager
+            .inspect_torrent(&host, &hash, &path, "genesis")
+            .unwrap();
+        assert_eq!(review.state, crate::service::State::AwaitingReview);
+        assert!(!review.destination.exists());
+        let source = review.torrent_source.as_ref().unwrap();
+        assert!(source.valid());
+        assert!(source.piece_verified);
+        assert!(!source.artifact.content_verified);
+        assert_eq!(
+            manager
+                .inspect_torrent(&host, &hash, &path, "genesis")
+                .unwrap()
+                .id,
+            review.id
+        );
+        assert!(manager.inspect_torrent(&host, &hash, &path, "ds").is_err());
+        let downloads = manager.torrent_downloads(&host).unwrap();
+        assert_eq!(
+            downloads[0].files[0].preparation_id.as_deref(),
+            Some(review.id.as_str())
+        );
+        let prepared = manager.execute(&review.id, &review.review_token).unwrap();
+        let receipt = prepared.receipt.as_ref().unwrap();
+        assert_eq!(receipt.torrent_source, review.torrent_source);
+        receipt.verify(&receipt.destination).unwrap();
+        let fingerprint = receipt.fingerprint().unwrap();
+        std::fs::remove_file(&review.source).unwrap();
+        let reopened = crate::service::Manager::new(&host.data);
+        assert_eq!(
+            reopened
+                .inspect_torrent(&host, &hash, &path, "genesis")
+                .unwrap()
+                .id,
+            review.id
+        );
+        assert_eq!(
+            reopened
+                .get(&review.id)
+                .unwrap()
+                .receipt
+                .unwrap()
+                .fingerprint()
+                .unwrap(),
+            fingerprint
+        );
+        let mut invalid = receipt.clone();
+        invalid.torrent_source.as_mut().unwrap().piece_verified = false;
+        assert!(invalid.verify(&invalid.destination).is_err());
+    }
+    #[test]
+    fn changed_partial_unknown_and_update_torrent_files_never_get_prepared() {
+        let (_temp, host, manager, hash, path, bytes) = completed_archive();
+        let source = host.transfers.inner.download_dir(&hash).join(&path);
+        let mut changed = bytes.clone();
+        let last = changed.len() - 1;
+        changed[last] ^= 1;
+        std::fs::write(&source, changed).unwrap();
+        assert!(manager
+            .inspect_torrent(&host, &hash, &path, "genesis")
+            .unwrap_err()
+            .message
+            .contains("piece"));
+        assert!(manager.list().unwrap().is_empty());
+        std::fs::write(&source, &bytes).unwrap();
+        assert!(manager
+            .inspect_torrent(&host, &hash, Path::new("../Game.zip"), "genesis")
+            .is_err());
+        host.transfers
+            .inner
+            .update(|entries| entries[0].complete = false)
+            .unwrap();
+        assert!(manager
+            .inspect_torrent(&host, &hash, &path, "genesis")
+            .is_err());
+        host.transfers
+            .inner
+            .update(|entries| entries[0].complete = true)
+            .unwrap();
+        let review = manager
+            .inspect_torrent(&host, &hash, &path, "genesis")
+            .unwrap();
+        manager.cancel(&review.id).unwrap();
+        let review = manager
+            .inspect_torrent(&host, &hash, &path, "genesis")
+            .unwrap();
+        assert_eq!(review.state, crate::service::State::AwaitingReview);
+        std::fs::write(&source, vec![0; bytes.len()]).unwrap();
+        assert!(manager
+            .inspect_torrent(&host, &hash, &path, "genesis")
+            .is_err());
+        let failed = manager.execute(&review.id, &review.review_token).unwrap();
+        assert_eq!(failed.state, crate::service::State::Failed);
+        assert!(!failed.destination.exists());
+        assert_eq!(manager.list().unwrap().len(), 1);
+        let manifest = marquee_torrent::Manifest {
+            info_hash: hash,
+            name: "bundle".into(),
+            total: 3,
+            files: vec![
+                marquee_torrent::FileSummary {
+                    path: "Game.pkg".into(),
+                    size: 1,
+                },
+                marquee_torrent::FileSummary {
+                    path: "Game-update.zip".into(),
+                    size: 1,
+                },
+                marquee_torrent::FileSummary {
+                    path: "Game-DLC.rar".into(),
+                    size: 1,
+                },
+            ],
+            tracker_count: 0,
+            private: false,
+        };
+        assert!(preparation_files(&manifest)
+            .iter()
+            .all(|f| !f.supported && f.reason.is_some()));
+    }
 
     #[test]
     fn link_round_trips() {
@@ -2063,4 +2251,132 @@ pub(crate) fn create(
         },
         listen: engine.listen_addr(),
     })
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileCandidate {
+    pub path: PathBuf,
+    pub size: u64,
+    pub supported: bool,
+    pub reason: Option<String>,
+}
+pub fn preparation_files(manifest: &marquee_torrent::Manifest) -> Vec<FileCandidate> {
+    manifest.files.iter().map(|file| {
+        let lower=file.path.to_ascii_lowercase();
+        let suffix=Path::new(&lower).extension().and_then(|x| x.to_str()).unwrap_or("");
+        let reason=if !["zip","7z","rar"].contains(&suffix) {
+            Some(if suffix=="pkg" {"Console packages need a platform installer; base games, patches and DLC are not installed by this workflow"} else {"This workflow prepares ZIP, 7z or RAR archives; other media need their supported import/setup workflow"})
+        } else if lower.split(|c:char| !c.is_ascii_alphanumeric()).any(|word| ["update","patch","dlc","firmware","bios","keys"].contains(&word)) {
+            Some("Updates, DLC, firmware and keys need a separate setup workflow")
+        } else {None};
+        FileCandidate {path:file.path.clone().into(),size:file.size,supported:reason.is_none(),reason:reason.map(str::to_string)}
+    }).collect()
+}
+impl Host {
+    pub(crate) fn completed_downloads(&self) -> Result<Vec<crate::torrent_source::Download>> {
+        let _control = self.control()?;
+        self.transfers
+            .inner
+            .load()?
+            .into_iter()
+            .filter(|e| e.kind == "get" && e.complete)
+            .map(|entry| {
+                let manifest = metadata(&self.transfers.inner.torrent_file(&entry.info_hash))
+                    .and_then(|bytes| marquee_torrent::inspect(&bytes).map_err(fail));
+                let available = self.transfers.inner.files_present(&entry);
+                let (files, error) = match manifest {
+                    Ok(manifest) => (
+                        preparation_files(&manifest)
+                            .into_iter()
+                            .map(Into::into)
+                            .collect(),
+                        if available {
+                            None
+                        } else {
+                            Some("Downloaded source files are missing or changed size".into())
+                        },
+                    ),
+                    Err(e) => (vec![], Some(e.message)),
+                };
+                Ok(crate::torrent_source::Download {
+                    info_hash: entry.info_hash,
+                    name: entry.name,
+                    directory: entry.dir,
+                    available,
+                    error,
+                    files,
+                })
+            })
+            .collect()
+    }
+    pub(crate) fn preparation_source(
+        &self,
+        hash: &str,
+        path: &Path,
+    ) -> Result<crate::torrent_source::Source> {
+        let (entry, bytes, manifest) = {
+            let _control = self.control()?;
+            let entry = self
+                .transfers
+                .inner
+                .load()?
+                .into_iter()
+                .find(|e| e.info_hash == hash && e.kind == "get" && e.owned && e.complete)
+                .ok_or_else(|| {
+                    AppError::new(
+                        "TORRENT_PREPARATION",
+                        "Choose a completed download in a job-owned folder",
+                    )
+                })?;
+            let bytes = metadata(&self.transfers.inner.torrent_file(hash))?;
+            let manifest = marquee_torrent::inspect(&bytes).map_err(fail)?;
+            if manifest.info_hash != hash {
+                return Err(AppError::new(
+                    "TORRENT_PREPARATION",
+                    "Cached metadata identity differs from this transfer",
+                ));
+            }
+            (entry, bytes, manifest)
+        };
+        let candidate = preparation_files(&manifest)
+            .into_iter()
+            .find(|f| f.path == path)
+            .ok_or_else(|| {
+                AppError::new(
+                    "TORRENT_PREPARATION",
+                    "Selected path is not in this torrent",
+                )
+            })?;
+        if !candidate.supported {
+            return Err(AppError::new(
+                "TORRENT_PREPARATION",
+                candidate.reason.unwrap_or_default(),
+            ));
+        }
+        let filename = entry.dir.join(path);
+        let verified_sha256 =
+            marquee_torrent::verify_file(&bytes, &path.to_string_lossy(), |relative, size| {
+                Ok(crate::browser::open_completed_file(
+                    &entry.dir.join(relative),
+                    &entry.dir,
+                    size,
+                )?)
+            })
+            .map_err(fail)?;
+        let artifact = crate::browser::artifact(&filename, &entry.dir, candidate.size)?;
+        if artifact.sha256 != verified_sha256 {
+            return Err(AppError::new(
+                "TORRENT_SOURCE_CHANGED",
+                "Torrent archive changed during verification",
+            ));
+        }
+        Ok(crate::torrent_source::Source {
+            info_hash: hash.into(),
+            name: entry.name,
+            relative_path: path.into(),
+            download_directory: entry.dir,
+            artifact,
+            piece_verified: true,
+        })
+    }
 }

@@ -42,6 +42,8 @@ export function asError(err: unknown): AppError {
 export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable' | 'pickArchives' | 'pickTorrent' | 'onArchiveDrop'> {
   return {
     managerStatus: () => call('manager_status'),
+    torrentDownloads: () => call('torrent_downloads'),
+    inspectTorrentPreparation: (infoHash, path, system) => call('inspect_torrent_preparation', { info_hash: infoHash, path, system }),
     browserJobs: () => call('browser_jobs'),
     inspectBrowserPreparation: (id, system) => call('inspect_browser_preparation', { id, system }),
     cancelBrowserJob: (id) => call('cancel_browser_job', { id }),

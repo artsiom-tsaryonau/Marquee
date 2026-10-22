@@ -253,7 +253,7 @@ fn root(path: &Path) -> Result<PathBuf> {
     }
     Ok(canonical)
 }
-pub(crate) fn artifact(path: &Path, root: &Path, bytes: u64) -> Result<Artifact> {
+pub(crate) fn open_completed_file(path: &Path, root: &Path, bytes: u64) -> Result<File> {
     if bytes == 0 || bytes > MAX_BYTES || !path.is_absolute() {
         return Err(invalid("Invalid completed file size or path"));
     }
@@ -265,19 +265,6 @@ pub(crate) fn artifact(path: &Path, root: &Path, bytes: u64) -> Result<Artifact>
         .any(|c| !matches!(c, std::path::Component::Normal(_)))
     {
         return Err(invalid("Completed file must stay inside the approved root"));
-    }
-    let suffix = path
-        .extension()
-        .and_then(|x| x.to_str())
-        .unwrap_or("")
-        .to_ascii_lowercase();
-    if ![
-        "zip", "7z", "rar", "iso", "chd", "cue", "bin", "md", "nes", "sfc", "smc", "nds", "gba",
-        "gb", "gbc", "n64", "z64", "v64", "cso", "pbp",
-    ]
-    .contains(&suffix.as_str())
-    {
-        return Err(invalid("Unsupported downloaded media format"));
     }
     // Walk relative to held directory descriptors; no symlink component can
     // escape the approved root while the file is being opened.
@@ -307,6 +294,27 @@ pub(crate) fn artifact(path: &Path, root: &Path, bytes: u64) -> Result<Artifact>
         // SAFETY: openat returned a new descriptor, now owned by File.
         file = unsafe { File::from_raw_fd(fd) };
     }
+    if !file.metadata()?.is_file() || file.metadata()?.len() != bytes {
+        return Err(invalid("Completed file is missing or changed size"));
+    }
+    Ok(file)
+}
+
+pub(crate) fn artifact(path: &Path, root: &Path, bytes: u64) -> Result<Artifact> {
+    let suffix = path
+        .extension()
+        .and_then(|x| x.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if ![
+        "zip", "7z", "rar", "iso", "chd", "cue", "bin", "md", "nes", "sfc", "smc", "nds", "gba",
+        "gb", "gbc", "n64", "z64", "v64", "cso", "pbp",
+    ]
+    .contains(&suffix.as_str())
+    {
+        return Err(invalid("Unsupported downloaded media format"));
+    }
+    let mut file = open_completed_file(path, root, bytes)?;
     let before = file.metadata()?;
     if !before.is_file() || before.len() != bytes {
         return Err(invalid("Completed file is missing or changed size"));

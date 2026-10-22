@@ -264,6 +264,29 @@ impl Client {
             explicit,
         )
     }
+    pub fn torrent_downloads(&self) -> Result<Vec<crate::torrent_source::Download>> {
+        if !crate::torrent::adopted(&self.data)? {
+            if !self.data.join("torrents/entries.json").exists() {
+                return Ok(vec![]);
+            }
+            crate::migration::adopt_torrents(&self.data, self.library_owned)?;
+        }
+        if !self.data.join("manager/stopped").exists() {
+            self.start_manager()?;
+        }
+        self.call(Operation::TorrentDownloads, false)
+    }
+    pub fn inspect_torrent(&self, hash: &str, path: &Path, system: &str) -> Result<Job> {
+        crate::migration::adopt_torrents(&self.data, self.library_owned)?;
+        self.call(
+            Operation::InspectTorrent {
+                hash: hash.into(),
+                path: path.into(),
+                system: system.into(),
+            },
+            true,
+        )
+    }
     pub fn browser_jobs(&self) -> Result<Vec<crate::browser::Job>> {
         if !self.data.join("manager/jobs.db").exists() {
             return Ok(vec![]);
@@ -349,7 +372,7 @@ impl Client {
         self.call(Operation::Torrent { request }, false)
     }
     pub fn stop(&self) -> Result<Status> {
-        for version in [protocol::VERSION, 2, 1] {
+        for version in [protocol::VERSION, 3, 2, 1] {
             match self.exchange_version(self.connect()?, Operation::Stop, version) {
                 Err(e) if e.code == "MANAGER_VERSION" => continue,
                 result => return result,
@@ -373,7 +396,7 @@ mod tests {
         let socket = client.socket_path().unwrap();
         let listener = UnixListener::bind(&socket).unwrap();
         let server = std::thread::spawn(move || {
-            for version in [protocol::VERSION, 2, 1] {
+            for version in [protocol::VERSION, 3, 2, 1] {
                 let (mut stream, _) = listener.accept().unwrap();
                 let request: Request = protocol::read_frame(&mut stream).unwrap();
                 assert_eq!(request.protocol_version, version);

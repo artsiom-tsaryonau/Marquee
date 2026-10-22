@@ -94,11 +94,11 @@ bridge; legacy JSON remains until explicit cutover.
   `marquee-manager-<uid>/<data-directory-hash>/ipc.sock` (mode 600). Both peers
   check Linux `SO_PEERCRED`. Long isolated data paths do not exceed socket limits.
   No manager TCP port or direct browser endpoint is opened.
-- Protocol v3 uses bounded length-prefixed JSON, typed operations, matching request
+- Protocol v4 uses bounded length-prefixed JSON, typed operations, matching request
   IDs and a version check before mutation. Maximum frame is 32 MiB. The worker
   advertises snapshot polling; event replay and active preparation cancellation are
   unsupported. Browser cancellation is a request/acknowledgement flow. The existing browser/native-host protocol is still a separate bridge.
-- Job state/receipts use private `manager/jobs.db` schema 3; the worker never opens
+- Job state/receipts use private `manager/jobs.db` schema 4; the worker never opens
   `library.db` or holds the library's instance lease. The launcher transactionally
   imports receipts into library schema 6 and sends a fingerprint-bound acknowledgement.
   Failed/lost acknowledgements remain replayable. The active frontend reconciles
@@ -176,7 +176,7 @@ typed stdin, retaining pairing credentials in the host. The CLI reaches the
 private manager socket without taking the library lease. No new browser endpoint,
 cookie export or shell-command interface is introduced.
 
-- `browser_jobs` storage in schema 3 owns new reviewed selections, stable
+- `browser_jobs` storage in schema 4 owns new reviewed selections, stable
   start UUIDs, Chrome download IDs, attribution, last-reported bytes, cancellation
   requests and local completion manifests. Existing preparation records are
   unchanged. Stable start replay and duplicate completion are idempotent.
@@ -226,13 +226,13 @@ provenance or trigger download/extraction again; registration can retry from the
 validated outputs. Snapshots report missing/unavailable/size-changed sources
 separately; that availability check is not a fresh content hash.
 
-Manager schema **3** retires older writers that could drop new receipt fields.
-A schema-2 upgrade first writes a mode-600 `jobs-v2-backup-<uuid>.db`, then advances
-the version without rewriting existing payloads. M1 cutover still takes its
-exclusive ownership backup before the subsequent upgrade. Private IPC **v3**
-rejects v1/v2 job/receipt clients before mutation. The browser/native protocol stays
+Manager schema **4** retires writers that could drop torrent receipt provenance.
+A schema-2/3 upgrade first writes a mode-600 `jobs-v<version>-backup-<uuid>.db`, then
+advances without rewriting existing payloads. M1 cutover still takes its
+exclusive ownership backup before the subsequent upgrade. Private IPC **v4**
+rejects v1/v2/v3 job/receipt clients before mutation. The browser/native protocol stays
 v1 and pairing is unchanged. Use `marquee manager stop` to drain an older worker
-before starting the compatible pair; explicit Stop alone supports v1/v2 shutdown; requested Start can drain an older
+before starting the compatible pair; explicit Stop alone supports v1/v2/v3 shutdown; requested Start can drain an older
 worker and start its compatible replacement.
 No job or receipt operation silently downgrades. Do not restore a backup under
 an active worker; a pre-upgrade backup does not contain later jobs/receipts.
@@ -246,8 +246,9 @@ Marquee recorded exit 0 and one 363-second play in the isolated library. See
 [exact scope and remaining gates](EMULATORS.md#sonic-2-live-acceptance-2026-10-22).
 This validates one preparation/launch recipe, not new browser-job acquisition,
 physical gamepads, other platforms or universal compatibility. The next manager
-milestone is the remaining M3 torrent-to-preparation/receipt link; transport
-ownership and single-owner migration now have synthetic process coverage.
+milestone has a supported torrent archive-to-preparation/receipt path, plus
+a real receive-only PS4 torrent transport pass; platform package installation
+and actual new-acquisition game launch remain separate acceptance gates.
 
 ## Data and ownership contract
 
@@ -370,7 +371,7 @@ existing Play/import usable.
 | M0 — Contracts and inventory | Record existing state paths/formats; finalize DTOs, storage ownership, capabilities, review/receipt schemas and migration fixtures | Dependency direction is acyclic; library lock/receipt ownership and recovery cases reviewed; no source files moved |
 | M1 — Local preparation slice (implemented) | Explicit-platform `ArchivePlan`, separate durable jobs/reviews/receipts, UI/CLI/API and transactional library consumer | ZIP/7z/RAR fixtures and real Genesis browser registration passed; restart, failed publication, duplicate acknowledgement, changed inputs and low-space checks covered; game launch gates remain separate |
 | M2 — Hidden worker (implemented for local archives) | Separate binary, private socket/client, worker lease, companion build, stop/start and M1 ownership cutover | Process tests and real browser close/reconnect passed; registered outputs remain immutable; distribution bundles and general mutable-update leases remain later work |
-| M3 — Torrent adoption (transport ownership implemented) | Manager hosts existing adapters/state and single-owner cutover; explicit source/preparation/receipt links remain open | Pause/restart/resume and retained history survive migration; no duplicate engine, lost discovery policy, forced redownload or scan of unsupported packages; seeding protects sources |
+| M3 — Torrent adoption (supported archive slice implemented) | Manager hosts adapters/state, single-owner cutover and linked archive reviews/receipts; unsupported package recipes and broader live/release gates remain open | Pause/restart/resume and retained history survive migration; no duplicate engine, lost discovery policy, forced redownload or scan of unsupported packages; seeding protects sources |
 | M4 — Browser/provider bridge | Connect paired native host and provider workers to manager job authority; adopt historical completed files only after validation | Browser and host restart, manual attribution, cancel and duplicate events reconcile; one supported provider download reaches a registered game without a separate manual importer |
 | M5 — Console preparation | Read-only inventory for the five added systems, then one platform/format/recipe at a time | [Per-platform gates](CONSOLE_PREPARATION.md) pass; updates/DLC never become separate playable base games; unknown inputs remain visible and blocked |
 | M6 — Other managed setup and stores | Route emulator/port/runtime setup through manager incrementally; use shared jobs for supported Epic/GOG work | Existing isolation/rollback/saves preserved; official Steam remains a delegated client flow; truthful capability/progress and backend ownership |
@@ -386,10 +387,19 @@ the library. Core alone publishes private-device roots and retries scan failures
 generic package completion never becomes an installation. See
 [torrent migration, lifecycle and exact verification](TORRENTS.md).
 
-M3 remains open for explicit source-artifact links to reviewed archive preparation
-and immutable installation receipts, large-transfer/live acceptance and packaging.
-The next default step is that torrent-to-preparation slice; M4 live provider
-acceptance can proceed independently. No universal installer is claimed.
+M3 now links each completed supported archive to one explicit-platform review and
+immutable provenance-bearing receipt. The manager rechecks its torrent pieces,
+including neighboring-file boundary bytes, before inspection. Replays, changed
+sources, cancelled reviews, failed registration, restart and source cleanup are
+covered. A synthetic real-worker/UI flow reaches one registered Genesis game;
+the owner's supplied 13.58 GB PS4 torrent completed receive-only with zero uploads
+and was correctly blocked from package installation. See [exact scope](TORRENTS.md).
+
+Broader large-transfer interruption/NAT, packaging and unsupported platform recipes
+remain open. The next useful gate is a real supported new acquisition through
+preparation and Play; M4 live provider acceptance can proceed independently.
+Console package setup follows M5 one validated platform recipe at a time.
+No universal installer is claimed.
 Read-only console inventory has started ([observed files](CONSOLE_PREPARATION.md#observed-source-inventory));
 console preparation recipes remain separate. Do not wait for every provider or
 console to close one transport-to-preparation slice.

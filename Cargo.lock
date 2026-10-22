@@ -3220,6 +3220,8 @@ dependencies = [
  "anyhow",
  "librqbit",
  "serde",
+ "sha1",
+ "sha2",
  "tempfile",
  "tokio",
  "url",

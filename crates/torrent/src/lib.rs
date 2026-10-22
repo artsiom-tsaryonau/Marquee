@@ -279,9 +279,33 @@ impl Engine {
     /// (the folder that contains the torrent's top-level file or folder).
     /// Existing data is verified, not re-downloaded.
     pub fn seed(&self, torrent: Vec<u8>, data_root: &Path) -> Result<usize> {
+        let manifest = inspect(&torrent)?;
+        let meta = librqbit::torrent_from_bytes(&torrent)?;
+        let root = if meta.info.data.files.is_some() {
+            anyhow::ensure!(
+                !manifest.name.is_empty()
+                    && manifest.name != "."
+                    && manifest.name != ".."
+                    && !manifest.name.contains(['/', '\\', ':', '\0']),
+                "Unsafe torrent root name"
+            );
+            data_root.join(&manifest.name)
+        } else {
+            data_root.to_path_buf()
+        };
+        // An explicit output_folder suppresses librqbit's automatic top folder.
+        // Do not point a folder seed at its parent or create missing source files.
+        anyhow::ensure!(root.is_dir(), "Seed source directory is missing");
+        for file in &manifest.files {
+            let meta = std::fs::symlink_metadata(root.join(&file.path))?;
+            anyhow::ensure!(
+                meta.is_file() && meta.len() == file.size,
+                "Seed source file is missing or changed size"
+            );
+        }
         self.add(
             AddTorrent::TorrentFileBytes(torrent.into()),
-            data_root,
+            &root,
             vec![],
             true,
         )
@@ -436,4 +460,95 @@ pub enum Source {
     TorrentBytes(Vec<u8>),
     /// A `magnet:` link or an http(s) URL to a `.torrent`.
     Link(String),
+}
+
+/// Recheck the pieces intersecting one file, including bytes in neighboring
+/// files at piece boundaries. This is offline integrity, not publisher identity.
+/// Returns the SHA-256 of the selected bytes in those verified pieces.
+/// The caller supplies a safe file opener rooted in its owned download folder.
+pub fn verify_file(
+    bytes: &[u8],
+    selected: &str,
+    mut open: impl FnMut(&str, u64) -> Result<std::fs::File>,
+) -> Result<String> {
+    use sha1::{Digest, Sha1};
+    use std::io::{Read, Seek, SeekFrom};
+    let manifest = inspect(bytes)?;
+    let meta = librqbit::torrent_from_bytes(bytes)?;
+    let info = meta.info.data.validate()?;
+    let piece_length = u64::from(info.info().piece_length);
+    let mut offset = 0u64;
+    let mut selected_range = None;
+    for file in &manifest.files {
+        if file.path == selected {
+            selected_range = Some((offset, offset + file.size));
+        }
+        offset += file.size;
+    }
+    let (start, end) =
+        selected_range.ok_or_else(|| anyhow!("Selected file is not in this torrent"))?;
+    anyhow::ensure!(end > start, "Empty files cannot be prepared");
+    let first_piece = start / piece_length;
+    let range_start = first_piece * piece_length;
+    let range_end = (end.div_ceil(piece_length) * piece_length).min(manifest.total);
+    let hashes: &[u8] = info.info().pieces.as_ref();
+    let mut position = range_start;
+    let mut piece = first_piece;
+    let mut digest = Sha1::new();
+    let mut selected_digest = sha2::Sha256::new();
+    let mut buffer = [0u8; 128 * 1024];
+    offset = 0;
+    for file in &manifest.files {
+        let file_start = offset;
+        offset += file.size;
+        let from = range_start.max(file_start);
+        let to = range_end.min(offset);
+        if from >= to {
+            continue;
+        }
+        let mut input = open(&file.path, file.size)?;
+        let before = input.metadata()?;
+        anyhow::ensure!(
+            before.is_file() && before.len() == file.size,
+            "Torrent source size changed"
+        );
+        input.seek(SeekFrom::Start(from - file_start))?;
+        let mut remaining = to - from;
+        while remaining > 0 {
+            let piece_end = ((piece + 1) * piece_length).min(manifest.total);
+            let take = remaining.min(piece_end - position).min(buffer.len() as u64) as usize;
+            input.read_exact(&mut buffer[..take])?;
+            digest.update(&buffer[..take]);
+            let selected_start = position.max(start);
+            let selected_end = (position + take as u64).min(end);
+            if selected_start < selected_end {
+                selected_digest.update(
+                    &buffer
+                        [(selected_start - position) as usize..(selected_end - position) as usize],
+                );
+            }
+            position += take as u64;
+            remaining -= take as u64;
+            if position == piece_end {
+                let expected = hashes
+                    .get(piece as usize * 20..piece as usize * 20 + 20)
+                    .ok_or_else(|| anyhow!("Missing torrent piece hash"))?;
+                anyhow::ensure!(
+                    digest.finalize_reset().as_slice() == expected,
+                    "Torrent piece {piece} changed; recheck the download before preparation"
+                );
+                piece += 1;
+            }
+        }
+        let after = input.metadata()?;
+        anyhow::ensure!(
+            after.len() == before.len() && after.modified()? == before.modified()?,
+            "Torrent source changed during piece verification"
+        );
+    }
+    anyhow::ensure!(
+        position == range_end,
+        "Incomplete torrent piece verification"
+    );
+    Ok(format!("{:x}", selected_digest.finalize()))
 }

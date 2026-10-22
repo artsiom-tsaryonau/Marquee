@@ -36,6 +36,8 @@ pub struct Output {
 pub struct Receipt {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub browser_source: Option<crate::browser::Source>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub torrent_source: Option<crate::torrent_source::Source>,
     pub id: String,
     pub recipe: String,
     pub source_sha256: String,
@@ -50,6 +52,8 @@ pub struct Receipt {
 pub struct Job {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub browser_source: Option<crate::browser::Source>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub torrent_source: Option<crate::torrent_source::Source>,
     pub id: String,
     pub source: PathBuf,
     pub source_size: u64,
@@ -115,7 +119,7 @@ pub(crate) fn private_dir(path: &Path) -> Result<()> {
     Ok(())
 }
 
-struct Lease<'a>(&'a AtomicBool);
+pub(crate) struct Lease<'a>(&'a AtomicBool);
 impl Drop for Lease<'_> {
     fn drop(&mut self) {
         self.0.store(false, Ordering::Release);
@@ -123,7 +127,7 @@ impl Drop for Lease<'_> {
 }
 
 impl Manager {
-    fn claim(&self) -> Result<Lease<'_>> {
+    pub(crate) fn claim(&self) -> Result<Lease<'_>> {
         self.active
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
             .map_err(|_| {
@@ -164,7 +168,7 @@ impl Manager {
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
         conn.pragma_update(None, "synchronous", "FULL")?;
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-        if version > 3 {
+        if version > 4 {
             return Err(error(
                 "PREPARATION_VERSION",
                 "Manager database is newer than this build",
@@ -177,16 +181,17 @@ impl Manager {
             conn.execute_batch(
                 "BEGIN IMMEDIATE;
                 CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY, payload TEXT NOT NULL);
-                PRAGMA user_version=3; COMMIT;",
+                PRAGMA user_version=4; COMMIT;",
             )?;
         }
-        if version == 2 {
+        if version == 2 || version == 3 {
             // The daemon holds the exclusive manager lease before opening its
-            // state. Back up without rewriting payloads; schema 3 retires older
-            // writers that would silently drop browser provenance fields.
-            let backup = self
-                .dir
-                .join(format!("jobs-v2-backup-{}.db", uuid::Uuid::new_v4()));
+            // state. Back up without rewriting payloads; schema 4 retires older
+            // writers that would silently drop torrent provenance fields.
+            let backup = self.dir.join(format!(
+                "jobs-v{version}-backup-{}.db",
+                uuid::Uuid::new_v4()
+            ));
             File::options()
                 .write(true)
                 .create_new(true)
@@ -195,7 +200,7 @@ impl Manager {
             conn.execute("VACUUM INTO ?1", [backup.to_string_lossy().as_ref()])?;
             File::open(&backup)?.sync_all()?;
             File::open(&self.dir)?.sync_all()?;
-            conn.execute_batch("BEGIN IMMEDIATE; PRAGMA user_version=3; COMMIT;")?;
+            conn.execute_batch("BEGIN IMMEDIATE; PRAGMA user_version=4; COMMIT;")?;
         }
         Ok(conn)
     }
@@ -250,7 +255,7 @@ impl Manager {
 
     pub fn inspect(&self, source: &Path, system: &str) -> Result<Job> {
         let _guard = self.claim()?;
-        let mut review = self.build_review(source, system, None)?;
+        let mut review = self.build_review(source, system, None, None)?;
         let conn = self.database()?;
         let existing: Option<String> = conn
             .query_row("SELECT payload FROM jobs WHERE id=?1", [&review.id], |r| {
@@ -270,11 +275,12 @@ impl Manager {
         Ok(review)
     }
 
-    fn build_review(
+    pub(crate) fn build_review(
         &self,
         source: &Path,
         system: &str,
         browser_source: Option<crate::browser::Source>,
+        torrent_source: Option<crate::torrent_source::Source>,
     ) -> Result<Job> {
         if !source.is_absolute() || !fs::symlink_metadata(source)?.is_file() {
             return Err(error(
@@ -286,7 +292,22 @@ impl Manager {
         let plan = ArchivePlan::inspect(&source, system)?;
         let hash = digest_file(&source)?;
         let source_size = fs::metadata(&source)?.len();
-        let identity = if let Some(provenance) = &browser_source {
+        if browser_source.is_some() && torrent_source.is_some() {
+            return Err(error(
+                "PREPARATION_INVALID",
+                "A preparation source must have one transport identity",
+            ));
+        }
+        let identity = if let Some(provenance) = &torrent_source {
+            serde_json::to_vec(&(
+                RECIPE,
+                "torrent-source-v1",
+                &source,
+                &hash,
+                &plan,
+                provenance,
+            ))?
+        } else if let Some(provenance) = &browser_source {
             serde_json::to_vec(&(
                 RECIPE,
                 "browser-source-v1",
@@ -306,6 +327,7 @@ impl Manager {
         );
         let now = marquee_media::time::now_rfc3339();
         let job = Job {
+            torrent_source,
             browser_source,
             id,
             source,
@@ -374,7 +396,7 @@ impl Manager {
                 "Downloaded archive changed since completion; no preparation was created",
             ));
         }
-        let mut job = self.build_review(&evidence.filename, system, Some(source.clone()))?;
+        let mut job = self.build_review(&evidence.filename, system, Some(source.clone()), None)?;
         if job.source_sha256 != source.artifact.sha256 || job.source_size != source.artifact.bytes {
             return Err(error(
                 "BROWSER_SOURCE_CHANGED",
@@ -492,6 +514,7 @@ impl Manager {
                 .collect::<Result<Vec<_>>>()?;
             job.receipt = Some(Receipt {
                 browser_source: job.browser_source.clone(),
+                torrent_source: job.torrent_source.clone(),
                 id: job.id.clone(),
                 recipe: RECIPE.into(),
                 source_sha256: job.source_sha256.clone(),
@@ -516,7 +539,7 @@ impl Manager {
         self.active.load(Ordering::Acquire)
     }
 
-    fn execute(&self, id: &str, token: &str) -> Result<Job> {
+    pub(crate) fn execute(&self, id: &str, token: &str) -> Result<Job> {
         let mut job = self.get(id)?;
         if job.review_token != token {
             return Err(error(
@@ -691,6 +714,14 @@ impl Manager {
 
 impl Receipt {
     pub fn verify(&self, root: &Path) -> Result<()> {
+        if self.torrent_source.as_ref().is_some_and(|s| {
+            !s.valid() || s.artifact.sha256 != self.source_sha256 || self.browser_source.is_some()
+        }) {
+            return Err(error(
+                "PREPARATION_INVALID",
+                "Receipt torrent-source evidence is inconsistent",
+            ));
+        }
         if self.browser_source.as_ref().is_some_and(|s| {
             s.artifact.sha256 != self.source_sha256
                 || s.artifact.content_verified
@@ -782,63 +813,65 @@ mod tests {
     }
 
     #[test]
-    fn v2_upgrade_backs_up_and_preserves_payloads_before_retiring_old_writers() {
+    fn v2_and_v3_upgrade_back_up_and_preserves_payloads_before_retiring_old_writers() {
         use std::os::unix::fs::PermissionsExt;
-        let temp = tempfile::tempdir().unwrap();
-        let manager = Manager::new(temp.path());
-        let path = zip(temp.path(), "source.zip", &[("Game.gen", b"fixture")]);
-        let review = manager.inspect(&path, "genesis").unwrap();
-        let conn = manager.database().unwrap();
-        let before: String = conn
-            .query_row("SELECT payload FROM jobs WHERE id=?1", [&review.id], |r| {
-                r.get(0)
-            })
-            .unwrap();
-        conn.pragma_update(None, "user_version", 2).unwrap();
-        drop(conn);
-        let conn = manager.database().unwrap();
-        assert_eq!(
-            conn.query_row("PRAGMA user_version", [], |r| r.get::<_, u32>(0))
-                .unwrap(),
-            3
-        );
-        let after: String = conn
-            .query_row("SELECT payload FROM jobs WHERE id=?1", [&review.id], |r| {
-                r.get(0)
-            })
-            .unwrap();
-        assert_eq!(before, after);
-        let backups: Vec<_> = fs::read_dir(temp.path().join("manager"))
-            .unwrap()
-            .flatten()
-            .map(|e| e.path())
-            .filter(|p| {
-                p.file_name()
-                    .unwrap()
-                    .to_string_lossy()
-                    .starts_with("jobs-v2-backup-")
-            })
-            .collect();
-        assert_eq!(backups.len(), 1);
-        assert_eq!(
-            fs::metadata(&backups[0]).unwrap().permissions().mode() & 0o777,
-            0o600
-        );
-        let backup = Connection::open(&backups[0]).unwrap();
-        assert_eq!(
-            backup
-                .query_row("PRAGMA user_version", [], |r| r.get::<_, u32>(0))
-                .unwrap(),
-            2
-        );
-        assert_eq!(
-            before,
-            backup
+        for version in [2, 3] {
+            let temp = tempfile::tempdir().unwrap();
+            let manager = Manager::new(temp.path());
+            let path = zip(temp.path(), "source.zip", &[("Game.gen", b"fixture")]);
+            let review = manager.inspect(&path, "genesis").unwrap();
+            let conn = manager.database().unwrap();
+            let before: String = conn
                 .query_row("SELECT payload FROM jobs WHERE id=?1", [&review.id], |r| {
-                    r.get::<_, String>(0)
+                    r.get(0)
                 })
+                .unwrap();
+            conn.pragma_update(None, "user_version", version).unwrap();
+            drop(conn);
+            let conn = manager.database().unwrap();
+            assert_eq!(
+                conn.query_row("PRAGMA user_version", [], |r| r.get::<_, u32>(0))
+                    .unwrap(),
+                4
+            );
+            let after: String = conn
+                .query_row("SELECT payload FROM jobs WHERE id=?1", [&review.id], |r| {
+                    r.get(0)
+                })
+                .unwrap();
+            assert_eq!(before, after);
+            let backups: Vec<_> = fs::read_dir(temp.path().join("manager"))
                 .unwrap()
-        );
+                .flatten()
+                .map(|e| e.path())
+                .filter(|p| {
+                    p.file_name()
+                        .unwrap()
+                        .to_string_lossy()
+                        .starts_with(&format!("jobs-v{version}-backup-"))
+                })
+                .collect();
+            assert_eq!(backups.len(), 1);
+            assert_eq!(
+                fs::metadata(&backups[0]).unwrap().permissions().mode() & 0o777,
+                0o600
+            );
+            let backup = Connection::open(&backups[0]).unwrap();
+            assert_eq!(
+                backup
+                    .query_row("PRAGMA user_version", [], |r| r.get::<_, u32>(0))
+                    .unwrap(),
+                version
+            );
+            assert_eq!(
+                before,
+                backup
+                    .query_row("SELECT payload FROM jobs WHERE id=?1", [&review.id], |r| {
+                        r.get::<_, String>(0)
+                    })
+                    .unwrap()
+            );
+        }
     }
 
     #[test]
