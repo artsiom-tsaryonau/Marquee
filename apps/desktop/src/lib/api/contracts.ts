@@ -163,6 +163,8 @@ export interface TorrentSettings {
   /** KiB/s, 0 = unlimited. */
   upload_kbps: number;
   download_kbps: number;
+  /** Loopback SOCKS5 proxy for public torrents (e.g. a VPN container); null = direct. */
+  proxy?: string | null;
 }
 
 export interface TransferItem {

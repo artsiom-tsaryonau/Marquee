@@ -16,8 +16,8 @@ use std::time::Duration;
 use anyhow::{anyhow, Context, Result};
 use librqbit::limits::LimitsConfig;
 use librqbit::{
-    AddTorrent, AddTorrentOptions, AddTorrentResponse, CreateTorrentOptions, ListenerMode,
-    ListenerOptions, ManagedTorrent, Session, SessionOptions, TorrentStatsState,
+    AddTorrent, AddTorrentOptions, AddTorrentResponse, ConnectionOptions, CreateTorrentOptions,
+    ListenerMode, ListenerOptions, ManagedTorrent, Session, SessionOptions, TorrentStatsState,
 };
 use tokio::runtime::Runtime;
 
@@ -39,6 +39,10 @@ pub struct Config {
     /// Bytes per second; None is unlimited.
     pub upload_bps: Option<u32>,
     pub download_bps: Option<u32>,
+    /// `socks5://127.0.0.1:1080`: every peer and HTTP tracker connection goes through this
+    /// loopback SOCKS5 proxy (e.g. a VPN container) and nothing else leaves the machine. See
+    /// [`Engine::start`].
+    pub proxy: Option<String>,
 }
 
 impl Config {
@@ -51,8 +55,35 @@ impl Config {
             seeding: true,
             upload_bps: None,
             download_bps: None,
+            proxy: None,
         }
     }
+}
+
+/// Accept only a loopback `socks5://host:port` proxy: a proxied session is bound to the loopback
+/// interface, so a remote proxy could not be reached anyway.
+pub fn check_proxy(url: &str) -> Result<()> {
+    let parsed = url::Url::parse(url).context("invalid proxy URL")?;
+    if parsed.scheme() != "socks5" {
+        return Err(anyhow!("the torrent proxy must be socks5://host:port"));
+    }
+    let loopback = match parsed.host() {
+        // Non-special schemes keep IP literals as domain strings.
+        Some(url::Host::Domain(d)) => {
+            d == "localhost"
+                || d.parse::<std::net::IpAddr>()
+                    .is_ok_and(|ip| ip.is_loopback())
+        }
+        Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
+        Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
+        None => false,
+    };
+    if !loopback || parsed.port().is_none() {
+        return Err(anyhow!(
+            "the torrent proxy must be on this machine, e.g. socks5://127.0.0.1:1080"
+        ));
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -195,6 +226,20 @@ impl Engine {
             ipv4_only: cfg.listen.is_ipv4(),
             ..Default::default()
         });
+        if let Some(proxy) = &cfg.proxy {
+            check_proxy(proxy)?;
+            // Peers and HTTP trackers go through the proxy. librqbit sends DHT, UDP trackers and
+            // uTP directly, so the whole session is also bound to the loopback interface: anything
+            // that does not use the proxy cannot leave the machine (fails closed if the VPN is down).
+            opts.connect = Some(ConnectionOptions {
+                proxy_url: Some(proxy.clone()),
+                ..Default::default()
+            });
+            opts.bind_device_name = Some("lo".into());
+            opts.dht = None;
+            // Inbound peers would arrive on the real interface, not through the tunnel.
+            opts.listen = None;
+        }
         let dir = cfg.download_dir.clone();
         let session = rt
             .block_on(Session::new_with_opts(dir, opts))

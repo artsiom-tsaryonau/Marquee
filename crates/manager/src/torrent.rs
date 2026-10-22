@@ -584,6 +584,7 @@ impl Inner {
             (settings.upload_kbps > 0).then(|| settings.upload_kbps.saturating_mul(1024));
         cfg.download_bps =
             (settings.download_kbps > 0).then(|| settings.download_kbps.saturating_mul(1024));
+        cfg.proxy = if public { settings.proxy.clone() } else { None };
         Ok(cfg)
     }
     fn engine(&self, settings: &TorrentSettings, public: bool, epoch: u64) -> Result<Arc<Engine>> {
@@ -1266,6 +1267,9 @@ pub struct TorrentSettings {
     /// KiB/s; 0 is unlimited.
     pub upload_kbps: u32,
     pub download_kbps: u32,
+    /// Loopback SOCKS5 proxy for public torrents (e.g. a VPN container): `socks5://127.0.0.1:1080`.
+    /// Private device shares never use it.
+    pub proxy: Option<String>,
 }
 
 impl Default for TorrentSettings {
@@ -1277,6 +1281,7 @@ impl Default for TorrentSettings {
             seeding: true,
             upload_kbps: 0,
             download_kbps: 0,
+            proxy: None,
         }
     }
 }
@@ -1309,6 +1314,10 @@ impl Host {
         read_settings(&self.data)
     }
     pub fn set_torrent_settings(&self, settings: &TorrentSettings) -> Result<()> {
+        if let Some(proxy) = &settings.proxy {
+            marquee_torrent::check_proxy(proxy)
+                .map_err(|e| AppError::new("TORRENT_PROXY", e.to_string()))?;
+        }
         let _control = self.control()?;
         self.transfers.checkpoint()?;
         atomic_write(
@@ -1379,6 +1388,37 @@ mod tests {
         assert_eq!(p.name, "Grand Theft Auto (USA) [v4].iso");
         assert_eq!(p.system.as_deref(), Some("ps2"));
         assert_eq!(p.peers, vec!["192.168.1.20:51413".parse().unwrap()]);
+    }
+
+    #[test]
+    fn proxy_applies_to_public_torrents_only_and_must_be_loopback() {
+        let tmp = tempfile::tempdir().unwrap();
+        let host = open(tmp.path());
+        let remote = TorrentSettings {
+            proxy: Some("socks5://10.0.0.5:1080".into()),
+            ..TorrentSettings::default()
+        };
+        let err = host.set_torrent_settings(&remote).unwrap_err();
+        assert!(err.to_string().contains("this machine"), "{err}");
+        let settings = TorrentSettings {
+            proxy: Some("socks5://127.0.0.1:1080".into()),
+            ..TorrentSettings::default()
+        };
+        host.set_torrent_settings(&settings).unwrap();
+        assert_eq!(host.torrent_settings().unwrap().proxy, settings.proxy);
+        let config = |public| {
+            host.transfers
+                .inner
+                .config(&settings, public)
+                .unwrap()
+                .proxy
+        };
+        assert_eq!(config(true), settings.proxy);
+        assert_eq!(
+            config(false),
+            None,
+            "private device shares never use the proxy"
+        );
     }
 
     fn open(dir: &Path) -> Arc<Host> {

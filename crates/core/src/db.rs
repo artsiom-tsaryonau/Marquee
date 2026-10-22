@@ -274,6 +274,8 @@ impl Db {
                     .get_setting("torrent.download_kbps")?
                     .and_then(|v| v.parse().ok())
                     .unwrap_or(0),
+                // Manager-owned; the legacy library database never stored a proxy.
+                proxy: None,
             },
             selected_runner_ids: ["ps1", "ps2"]
                 .into_iter()

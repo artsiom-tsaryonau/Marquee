@@ -210,6 +210,14 @@ enum TorrentCmd {
         upload: u32,
         download: u32,
     },
+    /// Send public torrents through a loopback SOCKS5 proxy (e.g. socks5://127.0.0.1:1080 from
+    /// platform-generic-scripts torrent-vpn); nothing else leaves the machine. --off removes it
+    Proxy {
+        #[arg(required_unless_present = "off")]
+        url: Option<String>,
+        #[arg(long, conflicts_with = "url")]
+        off: bool,
+    },
     /// Make a .torrent for a game file or folder (saved under the data dir)
     Create {
         path: PathBuf,
@@ -872,6 +880,17 @@ fn torrent(
             let mut t = settings()?;
             t.seeding = on;
             save(t.clone())?;
+        }
+        TorrentCmd::Proxy { url, off: _ } => {
+            let mut t = settings()?;
+            t.proxy = url;
+            save(t.clone())?;
+            match &t.proxy {
+                Some(proxy) => {
+                    println!("public torrents use {proxy}; nothing else leaves the machine")
+                }
+                None => println!("public torrents connect directly"),
+            }
         }
         TorrentCmd::Limits { upload, download } => {
             let mut t = settings()?;

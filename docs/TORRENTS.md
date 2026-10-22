@@ -98,6 +98,16 @@ with a retryable error; an unreachable peer is not a completed download.
   address. These options remain off until selected. Generated device torrents
   currently have no private flag or authenticated peer allow-list: keep device
   links/listening ports on a trusted LAN or VPN. This is not encrypted pairing.
+- **VPN for public torrents:** `marquee torrent proxy socks5://127.0.0.1:1080`
+  (`--off` removes it; settings field `proxy`) sends the public engine's peer and
+  HTTP tracker connections through a loopback SOCKS5 proxy, for example the VPN
+  container in platform-generic-scripts `torrent-vpn` (gluetun, ExpressVPN over
+  OpenVPN). The proxied session is also bound to the loopback interface, so what
+  librqbit would send directly (DHT, UDP trackers, uTP) cannot leave the machine:
+  DHT and the inbound listener are off and `udp://` trackers do not respond, which
+  leaves HTTP trackers and given peers. If the VPN is down the proxy is gone and
+  nothing downloads (fails closed). Only loopback `socks5://` URLs are accepted;
+  private device shares never use the proxy.
 - Upload policy applies to both engines. Speed limits are applied separately to
   the private and public sessions, not as one aggregate cross-session budget.
 - Completed downloads may continue seeding when uploads are allowed; receive-only
@@ -167,7 +177,9 @@ can be read/launched with the manager offline.
 
 ## Verification and remaining work
 
-Synthetic loopback tests cover byte-identical transfer, a real HTTP tracker
+Synthetic loopback tests cover byte-identical transfer, download through a test
+SOCKS5 proxy (no listener, proxy relays the peer) and no download with the proxy
+down, a real HTTP tracker
 announce, offline metadata review, changed-review rejection, private-session
 isolation, corrupt/write-failed state, unowned/symlink folders, scan failure/retry,
 a partial-download pause/restart/resume, completed downloads paused/stopped/disabled
@@ -185,7 +197,7 @@ fetched or installed.
 
 Still open: native picker/controller acceptance, external-client interoperability,
 real multi-machine/NAT and 20–50 GB interruption tests, selective-file download,
-interface/VPN binding, authenticated device pairing/private
+a live public download through the VPN proxy, authenticated device pairing/private
 flags, universal source/installation records, automatic archive/package install
 jobs and optional remote-play integration. DHT/public tracker configuration is
 implemented; public network availability was not tested in this pass.
