@@ -1,0 +1,30 @@
+{
+  "apps": {
+    "success": true,
+    "apps": [{
+      "id": "1", "title": "Sonic pilot", "support_hdr": false,
+      "start_virtual_compositor": true, "start_audio_server": true,
+      "icon_png_path": null, "render_node": "/dev/dri/renderD128",
+      "h264_gst_pipeline": "DO_NOT_PRINT_PIPELINE", "hevc_gst_pipeline": "",
+      "av1_gst_pipeline": "", "opus_gst_pipeline": "",
+      "runner": {"type": "process", "run_cmd": "DO_NOT_PRINT_COMMAND"}
+    }]
+  },
+  "clients": {
+    "success": true,
+    "clients": [{"client_id": "71", "app_state_folder": "DO_NOT_PRINT_STATE_PATH", "settings": {"run_uid": 1000, "run_gid": 1000}}]
+  },
+  "sessions": {
+    "success": true,
+    "sessions": [{
+      "client_id": "42", "client_ip": "127.0.0.1", "app_id": "1",
+      "video_width": 1280, "video_height": 720, "video_refresh_rate": 60,
+      "audio_channel_count": 2, "aes_key": "DO_NOT_PRINT_AES_KEY",
+      "aes_iv": "DO_NOT_PRINT_AES_IV", "rtsp_fake_ip": "0.0.0.0", "client_settings": null
+    }]
+  },
+  "pending": {
+    "success": true,
+    "requests": [{"client_ip": "127.0.0.1", "pair_secret": "DO_NOT_PRINT_PAIR_SECRET"}]
+  }
+}

@@ -31,6 +31,7 @@ pub mod server;
 pub mod sessions;
 pub mod source_builds;
 pub mod steam;
+pub mod streaming;
 pub mod transfer;
 pub mod wanted;
 

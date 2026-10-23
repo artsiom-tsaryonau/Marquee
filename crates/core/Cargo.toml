@@ -26,5 +26,8 @@ base64 = "0.22"
 sha1 = "0.10"
 image = { version = "0.25.10", default-features = false, features = ["jpeg"] }
 
+[target.'cfg(unix)'.dependencies]
+socket2 = "0.6"
+
 [dev-dependencies]
 marquee-media = { workspace = true, features = ["test-fixtures"] }

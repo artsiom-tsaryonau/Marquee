@@ -24,6 +24,14 @@ struct Args {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Native local streaming controls; does not open the library or start Wolf
+    Streaming {
+        /// Absolute path to Wolf's Unix API socket (WOLF_SOCKET_PATH)
+        #[arg(long)]
+        socket: PathBuf,
+        #[command(subcommand)]
+        command: StreamingCmd,
+    },
     /// Paired browser worker bridge; never opens library.db
     #[command(subcommand)]
     Browser(BrowserCmd),
@@ -89,6 +97,23 @@ enum ManagerCmd {
     Status,
     Start,
     Stop,
+}
+
+#[derive(Subcommand)]
+enum StreamingCmd {
+    /// Inspect advertised apps, paired clients and active sessions (keys omitted)
+    Inspect,
+    /// Show pending client addresses (pairing secrets omitted)
+    Pending,
+    /// Accept a pending client's PIN; read the four digits from stdin, never argv
+    Pair {
+        #[arg(long)]
+        client_ip: String,
+    },
+    /// Revoke the selected paired client's access
+    Unpair { client_id: String },
+    /// End the selected stream session; this can also stop its running game
+    Stop { session_id: String },
 }
 
 #[derive(Subcommand)]
@@ -366,8 +391,48 @@ fn main() -> ExitCode {
     }
 }
 
+fn streaming(socket: &std::path::Path, command: &StreamingCmd) -> marquee_core::error::Result<()> {
+    use marquee_core::streaming::wolf::WolfClient;
+    use std::io::Read;
+
+    let client = WolfClient::new(socket)?;
+    let value = match command {
+        StreamingCmd::Inspect => serde_json::to_value(client.inspect()?)?,
+        StreamingCmd::Pending => serde_json::to_value(client.pending()?)?,
+        StreamingCmd::Pair { client_ip } => {
+            let mut bytes = Vec::new();
+            std::io::stdin().take(65).read_to_end(&mut bytes)?;
+            if bytes.len() > 64 {
+                return Err(AppError::new(
+                    "STREAMING_PIN",
+                    "Enter only the four-digit PIN shown by Moonlight",
+                ));
+            }
+            let pin = std::str::from_utf8(&bytes)
+                .map_err(|_| AppError::new("STREAMING_PIN", "Enter a four-digit PIN"))?;
+            client.pair(client_ip, pin.trim())?;
+            serde_json::json!({"accepted": true, "message": "PIN accepted by Wolf; confirm pairing in Moonlight"})
+        }
+        StreamingCmd::Unpair { client_id } => {
+            client.unpair(client_id)?;
+            serde_json::json!({"accepted": true})
+        }
+        StreamingCmd::Stop { session_id } => {
+            client.stop_session(session_id)?;
+            serde_json::json!({"accepted": true, "message": "Stop requested; inspect sessions to confirm exit"})
+        }
+    };
+    println!("{}", serde_json::to_string_pretty(&value)?);
+    Ok(())
+}
+
 fn run() -> marquee_core::error::Result<()> {
     let args = Args::parse();
+    // Streaming must remain usable while the desktop holds the library lease.
+    // No data-directory resolution, manager start or transfer recovery here.
+    if let Command::Streaming { socket, command } = &args.command {
+        return streaming(socket, command);
+    }
     // Inspect must stay offline even if the selected library has enabled jobs.
     // Do this before Core::open can restore transfers or acquire its DB lease.
     if let Command::Torrent(TorrentCmd::Inspect { path }) = &args.command {
@@ -451,6 +516,7 @@ fn run() -> marquee_core::error::Result<()> {
     }
     let core = Arc::new(Core::open(args.data_dir, args.allow_fake)?);
     match args.command {
+        Command::Streaming { .. } => unreachable!("handled without Core"),
         Command::Browser(_) => unreachable!("handled without Core"),
         Command::Manager(_) => unreachable!("handled without Core"),
         Command::Prepare(command) => {

@@ -1,6 +1,6 @@
 # Marquee roadmap
 
-Updated 2026-10-22. This document owns product priority and milestone status.
+Updated 2026-10-23. This document owns product priority and milestone status.
 [Marquee manager](MARQUEE_MANAGER.md) owns the acquisition architecture and detailed
 implementation sequence. Dated feature reports do not override these decisions.
 
@@ -25,6 +25,12 @@ without replacing their protocols. Non-Steam runtime setup uses supported manage
 umu/Proton recipes. Lutris/Heroic remain optional, never required onboarding.
 
 ## Work order
+
+The owner has also scheduled [native streaming](STREAMING.md). ST0 implements a
+source-pinned Wolf control adapter and CLI; ST1/ST2 (managed backend build and
+isolated Sonic streaming acceptance) are next on that track. Hosting UI and an
+embedded receiver remain open. This does not mark the existing manager/store
+gates complete or restart the deferred Quiver work.
 
 | Order | Increment | Completion gate |
 | --- | --- | --- |
@@ -58,6 +64,7 @@ enrichment and a separate manager UI remain deferred.
 | Browser/provider work | Opt-in companion → manager job authority, stable replay, attribution, progress/hash history and acknowledged cancellation; Atomic linked platform review and provenance-bearing preparation/library receipts verified with synthetic UI and recovery tests. Legacy completion adoption, live provider-to-install/launch acceptance, reference hashes and packaged delivery remain open |
 | Added console games | Owner reports Switch, PS3, PS4, Xbox and Xbox 360 additions; RPCS3/shadPS4/xemu tools exist, no library descriptors/adapters for the five systems. [Console plan](CONSOLE_PREPARATION.md) owns gaps |
 | Stores | Read-only installed Steam detection/manifests implemented; persistent library/launch and complete Steam/Epic/GOG workflows remain open |
+| Streaming | Native Wolf API v1 source-derived adapter/CLI for inspection, pairing/revocation and explicit session stop; no managed runtime, streaming UI, embedded player or live streaming acceptance yet; [streaming gates](STREAMING.md) |
 | Compatibility | Narrow Purple/Aion 2 setup/open recipe with checkpoints/cancellation; live game compatibility and general runtime lifecycle remain open |
 | UI/metadata | Unified-library presentation, installation distinctions, catalogue provenance and optional artwork/facts; UI grouping is not a completed normalized backend |
 | Legacy bridges | Explicit opt-in read-only Lutris cache bridge, external shortcuts; not a direct account or store integration |
@@ -125,8 +132,9 @@ Keep these open until observed; fixture/demo success does not close them:
 Continue [OpenGOAL/unified library](UNIFIED_LIBRARY.md) and
 [platform expansion](EXPANSION_CATALOGUE.md) against these contracts. Quiver remains
 [planning only](QUIVER_INTEGRATION.md). Artwork/enrichment never gates Play.
-Separate manager UI, remote/NAS service, universal installer, additional providers,
-streaming and advanced collections are later work.
+Separate manager UI, remote/NAS service, universal installer, additional providers
+and advanced collections are later work. Native streaming now has its own
+owner-scheduled [implementation track](STREAMING.md).
 
 ## Verification and handoff
 
