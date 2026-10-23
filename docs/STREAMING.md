@@ -216,6 +216,26 @@ ignored pilot directories; no receiver binary, pairing identity or game data is
 committed. This evidence does not establish a virtual game desktop,
 streamed keyboard/controller support, game audio, saves or reconnect acceptance.
 
+### ST2b progress — 2026-10-24
+
+The [Sonic game pilot contract](STREAMING_GAME_PILOT.md) now composes the managed
+Wolf and BlastEm images through native `streaming game-pilot-build`. It runs the
+emulator directly in Wolf's private Wayland/audio session, mounts one game
+read-only, and keeps test configuration/saves separate. The owner confirmed real
+game video, audio and forwarded keyboard controls. **ST2b launch passed.**
+
+ST2c remains open: the first attempted viewer close also ended the game, so it
+does not establish reconnect. Subsequent acceptance confirmed **F6/F9** restoration
+and backtick/tilde-key plus L restoration. A controlled receiver-process loss and
+reconnect retained the exact BlastEm PID and Wolf session ID; the owner confirmed
+reconnected video/audio/controls. Normal game exit returned 0 and cleared the game
+process and Wolf sessions. The state file persisted and the owned host was stopped.
+
+The keyboard/save/receiver-loss/exit path passed. Physical controller, focus
+isolation and ordinary receiver-window disconnect semantics remain pending;
+the earlier close also ended the game. The pilot remains operator-driven, not
+ST3 lifecycle/UI. See the [evidence and limitations](STREAMING_GAME_PILOT.md#live-evidence).
+
 The first end-to-end test uses the same Fedora machine as both host and receiver:
 Ryzen 9 9950X3D and RTX 5090. Connect Moonlight manually to `127.0.0.1`, using the
 existing loopback-only pilot ports. Keep the receiver on the physical desktop;
@@ -238,20 +258,23 @@ Complete these increments in order and retain separate evidence:
 | ST2c | Streamed gameplay and lifecycle acceptance | Demonstrate forwarded keyboard and controller input separately, save/restore, audio, viewer disconnect/reconnect and normal game exit; reconcile backend/runner lifetime and return to Marquee without disturbing the host desktop |
 
 - [x] Install the receiver; it is not installed by ST1's host build.
-- [ ] Start the reviewed host with explicit ownership and bounded shutdown;
+- [x] Start the reviewed host with explicit ownership and bounded shutdown;
   preserve identity/configuration. Keep game data and test saves isolated.
 - [x] Complete PIN/certificate pairing; confirmed by the live stream, beyond the PIN POST.
-- [ ] Observe synthetic video/audio, then real Sonic video/audio through the client.
-- [ ] Verify input reaches the game through the stream: direct host keyboard
+- [x] Observe synthetic video/audio, then real Sonic video/audio through the client.
+- [x] Verify keyboard input reaches the game through the stream: direct host keyboard
   access must not be mistaken for forwarded input. Track controller acceptance
   separately; working keyboard input does not establish controller support.
-- [ ] Save a state, change the game position, restore it and observe the result
+- [ ] Verify physical controller forwarding and focus/input isolation separately.
+- [x] Save a state, change the game position, restore it and observe the result
   in the receiver. Keep this separate from battery-save persistence.
 - [ ] Define and verify viewer disconnect versus game stop behavior; reconnect to
   the intended session without a duplicate game or competing save writer.
-- [ ] Close the game normally, verify the runner/session ends and return to
-  Marquee. Stop the owned pilot cleanly when testing finishes.
-- [ ] Record exact host/receiver/emulator revisions, codec, resolution/FPS,
+  Controlled receiver-process loss/reconnect passed; ordinary receiver-window
+  disconnect semantics and their native UI remain open.
+- [x] Close the game normally and verify runner/session cleanup; stop the owned
+  pilot cleanly. Automatic focus return to Marquee remains unverified.
+- [x] Record exact host/receiver/emulator revisions, codec, resolution/FPS,
   encoder/decoder, observed audio/input results and available frame/latency stats.
 
 The existing host API, software/NVIDIA encoding probes and local Sonic gameplay

@@ -30,9 +30,11 @@ without inspection. Files in `other` need explicit platform review.
 
 ## Implementation order and gates
 
-1. **E0 — Shared streaming baseline.** Finish synthetic video/audio, then Sonic
-   in Wolf's virtual desktop. Prove streamed input, save restoration, viewer
-   reconnect and game exit. Local Sonic acceptance does not satisfy this gate.
+1. **E0 — Shared streaming baseline.** Synthetic video/audio and Sonic video,
+   audio, keyboard play, state restoration, controlled receiver-loss/reconnect and
+   game exit in Wolf's virtual desktop passed. Complete physical controller,
+   focus isolation and ordinary viewer-window semantics. Local Sonic acceptance
+   alone does not satisfy this gate.
 2. **E1 — Existing lightweight adapters.** Mesen NES → SNES → GB/GBC → PCE,
    followed by melonDS and FinalBurn Neo with valid data. Reuse installed runners
    and shared profiles; fix observed launch/save/input problems before adding

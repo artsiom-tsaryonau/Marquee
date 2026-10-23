@@ -13,6 +13,14 @@ installation/opening is not game installation or compatibility acceptance.
 
 ## Current catalogue and integration boundary
 
+Streaming update, 2026-10-24: the [Sonic pilot](STREAMING_GAME_PILOT.md) runs the
+managed BlastEm build directly inside Wolf's private Wayland/audio session. The
+owner confirmed streamed video/audio/keyboard play and state restoration. Controlled
+receiver-loss/reconnect retained the same game/session, followed by normal game
+exit. Controller/focus and ordinary viewer-window semantics remain open. These
+results are separate from local Sonic acceptance and are not implied by the
+catalogue matrix below.
+
 | Emulator | Platform | Current Marquee capability |
 | --- | --- | --- |
 | PCSX2 | PS2 | Managed lifecycle, region-aware BIOS setup and disc launch |

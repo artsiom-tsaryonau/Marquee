@@ -101,6 +101,11 @@ enum ManagerCmd {
 
 #[derive(Subcommand)]
 enum StreamingCmd {
+    /// Compose the explicit Sonic acceptance image from reviewed local Wolf/BlastEm builds
+    GamePilotBuild {
+        #[arg(long)]
+        blastem_dir: PathBuf,
+    },
     /// Install the checksum-pinned optional Moonlight reference receiver; no window is opened
     ReceiverInstall,
     /// Read the managed reference receiver receipt without opening the library
@@ -421,6 +426,7 @@ fn streaming(
     if matches!(
         command,
         StreamingCmd::Build
+            | StreamingCmd::GamePilotBuild { .. }
             | StreamingCmd::ReceiverInstall
             | StreamingCmd::ReceiverStatus
             | StreamingCmd::RuntimeStatus
@@ -429,6 +435,13 @@ fn streaming(
     ) {
         let paths = marquee_core::paths::Paths::resolve(data_dir)?;
         let value = match command {
+            StreamingCmd::GamePilotBuild { blastem_dir } => {
+                marquee_core::streaming::game_pilot::build(
+                    &paths.data_dir,
+                    blastem_dir,
+                    &std::sync::atomic::AtomicBool::new(false),
+                )?
+            }
             StreamingCmd::ReceiverInstall => {
                 serde_json::to_value(marquee_core::streaming::receiver::install(
                     &paths.data_dir,
@@ -468,6 +481,7 @@ fn streaming(
     let client = WolfClient::new(socket)?;
     let value = match command {
         StreamingCmd::Build
+        | StreamingCmd::GamePilotBuild { .. }
         | StreamingCmd::ReceiverInstall
         | StreamingCmd::ReceiverStatus
         | StreamingCmd::RuntimeStatus

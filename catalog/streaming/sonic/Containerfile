@@ -1,0 +1,11 @@
+ARG BLASTEM_IMAGE
+ARG WOLF_IMAGE
+FROM ${BLASTEM_IMAGE} AS emulator
+FROM ${WOLF_IMAGE}
+RUN dnf install -y SDL2 glew libglvnd-glx mesa-dri-drivers \
+    && dnf clean all
+COPY --from=emulator /opt/blastem /opt/blastem
+COPY game-entrypoint.py game.py /opt/marquee-wolf/
+RUN /opt/blastem/blastem -v && /opt/blastem/blastem -h \
+    && rpm -qa --qf '%{NAME}\t%{VERSION}-%{RELEASE}\t%{LICENSE}\n' | sort > /opt/marquee-wolf/licenses/game-runtime-packages.tsv
+ENTRYPOINT ["python3", "/opt/marquee-wolf/game-entrypoint.py"]
