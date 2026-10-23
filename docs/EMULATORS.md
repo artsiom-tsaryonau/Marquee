@@ -17,7 +17,9 @@ Streaming update, 2026-10-24: the [Sonic pilot](STREAMING_GAME_PILOT.md) runs th
 managed BlastEm build directly inside Wolf's private Wayland/audio session. The
 owner confirmed streamed video/audio/keyboard play and state restoration. Controlled
 receiver-loss/reconnect retained the same game/session, followed by normal game
-exit. Controller/focus and ordinary viewer-window semantics remain open. These
+exit. [Owned-viewer tests](STREAMING_VIEWER.md) also confirmed focus/key release,
+mouse release and explicit receiver disconnect. Controller, automatic focus
+return and the OS window-close button remain open. These
 results are separate from local Sonic acceptance and are not implied by the
 catalogue matrix below.
 

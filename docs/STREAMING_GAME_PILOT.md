@@ -90,15 +90,18 @@ video/audio/controls and normal game exit. BlastEm returned **0**, the game proc
 disappeared and Wolf reported **zero sessions**. The state file persisted. The
 owned pilot host was stopped cleanly afterward.
 
-ST2b and the keyboard/save/receiver-loss/exit portion of ST2c passed. Controller
-forwarding, focus/input isolation, ordinary receiver-window disconnect semantics,
-the native hosting UI and second-device/LAN acceptance remain separate. The
+ST2b and the keyboard/save/receiver-loss/exit portion of ST2c passed. Subsequent
+[owned-viewer acceptance](STREAMING_VIEWER.md) confirmed keyboard focus/key release,
+mouse release, native disconnect and the normal receiver disconnect shortcut,
+all retaining the same game process. Controller forwarding, the OS window-close
+button, automatic focus return, native hosting UI and second-device/LAN acceptance
+remain separate. The
 earlier close action ended the game and is not relabelled as a retained session.
 Do not mark full ST2 complete from the successful ST2b launch.
 
 The owner confirmed on 2026-10-24 that no controller has been purchased yet.
 Defer physical controller acceptance; it does not block keyboard/mouse focus,
-viewer-disconnect work or native hosting UI. Keep that capability unverified.
+native hosting UI. Keep that capability unverified.
 
 Evidence stays in ignored pilot directories. No game, executable image, pairing
 identity or private save is committed. Full repository checks and catalogue/config

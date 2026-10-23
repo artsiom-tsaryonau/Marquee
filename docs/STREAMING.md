@@ -156,12 +156,12 @@ probe. Local documentation links and whitespace checks passed.
 | Step | Work | Gate |
 | --- | --- | --- |
 | ST1 | Local source build and host probe implemented | Source/image pins, software/NVIDIA encoding, real API, restart/stop and receipt rollback passed; OS snapshots, distribution review and packaged lifecycle remain open |
-| ST2 | Fedora-to-itself streaming pilot — next | Moonlight on this machine connects to `127.0.0.1`; synthetic stream first, then isolated Sonic; video/audio, streamed input, save restoration, disconnect/reconnect and exit observed |
+| ST2 | Fedora-to-itself streaming pilot — keyboard/mouse path tested | Synthetic/Sonic video/audio, keyboard/focus, save restoration, receiver-loss/reconnect, explicit viewer disconnect and game exit passed; controller deferred for hardware, window-close button and automatic focus return remain open |
 | ST3 | Native Marquee hosting interface | Pair/revoke clients, show stream quality/state and reconnect/stop actions; map Wolf sessions to library editions and actual runner lifetime; desktop/browser parity without exposing the raw privileged API |
 | ST4 | Marquee receiver | Choose native decoding/rendering design, audit licensing and prove latency/input/focus/audio behavior; playback within Marquee needs a receiver implementation, not just a web video element |
 | ST5 | Second-device/LAN acceptance, then additional hosts | Separate Fedora or other supported receiver; real network latency/bandwidth/input/reconnect checks; Sunshine/Apollo adapters and wake-on-LAN follow capability-specific gates |
 
-## ST2 — Fedora-to-itself streaming (next)
+## ST2 — Fedora-to-itself streaming
 
 ### ST2a progress — 2026-10-24
 
@@ -231,9 +231,11 @@ reconnect retained the exact BlastEm PID and Wolf session ID; the owner confirme
 reconnected video/audio/controls. Normal game exit returned 0 and cleared the game
 process and Wolf sessions. The state file persisted and the owned host was stopped.
 
-The keyboard/save/receiver-loss/exit path passed. Physical controller, focus
-isolation and ordinary receiver-window disconnect semantics remain pending;
-the earlier close also ended the game. The pilot remains operator-driven, not
+The keyboard/save/receiver-loss/exit path passed. Subsequent owned-viewer tests
+below confirmed focus/key release, mouse release and explicit disconnect paths.
+Physical controller, the OS window-close button and automatic focus return remain
+pending. The earlier ambiguous close is not relabelled as a retained session.
+The pilot remains operator-driven, not
 ST3 lifecycle/UI. See the [evidence and limitations](STREAMING_GAME_PILOT.md#live-evidence).
 
 Owner clarification, 2026-10-24: no physical controller is available yet; it has
@@ -241,6 +243,20 @@ not been purchased. Defer that acceptance gate until hardware is available.
 Proceed with keyboard/mouse focus, viewer-disconnect behavior and ST3 native UX;
 controller testing is not a prerequisite for those increments. Keep physical
 controller support explicitly unverified. See [controls planning](CONTROLLERS.md).
+
+### Native viewer ownership and focus — 2026-10-24
+
+The [owned reference viewer](STREAMING_VIEWER.md) adds native CLI open/status/
+disconnect controls with private settings, an exclusive lease, bounded local
+control messages and owned-child cleanup. Disconnect never calls host stop.
+Process liveness is not reported as verified stream readiness. The owner confirmed
+Alt+Tab/key release without stuck input, Ctrl+Alt+Shift+Z mouse release and
+Ctrl+Alt+Shift+Q normal receiver disconnect. The shortcut returned 0 while the
+same Sonic process stayed alive. Native `disconnect-viewer` and owner-crash/
+stale-socket recovery also retained the same game. Full checks and five viewer
+ownership/protocol tests passed. No hosting UI or embedded decoder ships with
+this groundwork; automatic focus return and the OS window-close button remain
+separate checks.
 
 The first end-to-end test uses the same Fedora machine as both host and receiver:
 Ryzen 9 9950X3D and RTX 5090. Connect Moonlight manually to `127.0.0.1`, using the
@@ -271,14 +287,16 @@ Complete these increments in order and retain separate evidence:
 - [x] Verify keyboard input reaches the game through the stream: direct host keyboard
   access must not be mistaken for forwarded input. Track controller acceptance
   separately; working keyboard input does not establish controller support.
-- [ ] Verify keyboard/mouse focus and input isolation.
+- [x] Verify keyboard focus/key release and mouse release on the local receiver.
+- [ ] Verify automatic focus return to Marquee and OS window-close behavior.
 - [ ] Deferred for hardware: verify physical controller forwarding separately.
 - [x] Save a state, change the game position, restore it and observe the result
   in the receiver. Keep this separate from battery-save persistence.
-- [ ] Define and verify viewer disconnect versus game stop behavior; reconnect to
+- [x] Define and verify explicit viewer disconnect versus game stop behavior; reconnect to
   the intended session without a duplicate game or competing save writer.
-  Controlled receiver-process loss/reconnect passed; ordinary receiver-window
-  disconnect semantics and their native UI remain open.
+  Controlled receiver loss/reconnect, native `disconnect-viewer` and the normal
+  receiver disconnect shortcut passed. Native UI controls and the OS window-close
+  button remain separate work.
 - [x] Close the game normally and verify runner/session cleanup; stop the owned
   pilot cleanly. Automatic focus return to Marquee remains unverified.
 - [x] Record exact host/receiver/emulator revisions, codec, resolution/FPS,

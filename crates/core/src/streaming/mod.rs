@@ -3,4 +3,5 @@
 pub mod game_pilot;
 pub mod receiver;
 pub mod runtime;
+pub mod viewer;
 pub mod wolf;

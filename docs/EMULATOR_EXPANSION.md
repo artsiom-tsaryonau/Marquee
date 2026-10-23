@@ -32,9 +32,10 @@ without inspection. Files in `other` need explicit platform review.
 
 1. **E0 — Shared streaming baseline.** Synthetic video/audio and Sonic video,
    audio, keyboard play, state restoration, controlled receiver-loss/reconnect and
-   game exit in Wolf's virtual desktop passed. Complete physical controller,
-   focus isolation and ordinary viewer-window semantics. Local Sonic acceptance
-   alone does not satisfy this gate.
+   game exit in Wolf's virtual desktop passed. Owned-viewer tests also confirmed
+   focus/key release, mouse release and explicit disconnect. Complete the OS
+   window-close and automatic focus-return checks; physical controller remains
+   separate. Local Sonic acceptance alone does not satisfy this gate.
    Physical controller acceptance is deferred because the owner has no controller
    yet; it does not block keyboard/mouse cohorts or native hosting UX.
 2. **E1 — Existing lightweight adapters.** Mesen NES → SNES → GB/GBC → PCE,

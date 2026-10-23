@@ -1,6 +1,6 @@
 # Marquee roadmap
 
-Updated 2026-10-23. This document owns product priority and milestone status.
+Updated 2026-10-24. This document owns product priority and milestone status.
 [Marquee manager](MARQUEE_MANAGER.md) owns the acquisition architecture and detailed
 implementation sequence. Dated feature reports do not override these decisions.
 
@@ -28,7 +28,7 @@ umu/Proton recipes. Lutris/Heroic remain optional, never required onboarding.
 
 The owner has also scheduled [native streaming](STREAMING.md). ST0 implements a
 source-pinned Wolf control adapter and CLI; ST1 now adds a managed local source
-build, software/NVIDIA probes and real host lifecycle acceptance. **Next is ST2:
+build, software/NVIDIA probes and real host lifecycle acceptance. **ST2 tests
 Fedora-to-itself streaming over `127.0.0.1`**, first the synthetic stream, then
 Sonic/BlastEm in a separate virtual Wayland desktop, received by Moonlight on the
 same physical desktop. Pairing, video/audio, streamed input, save restoration and
@@ -42,11 +42,20 @@ synthetic sustained video/ticking audio were observed. A source fix removed an
 incorrect five-second compositor wait for synthetic apps. ST2b now also passed:
 Sonic runs inside Wolf's virtual desktop with user-confirmed video/audio/keyboard
 play. Save restoration with both binding sets, controlled receiver-loss/reconnect
-to the same process/session, and normal game exit also passed. **Next is remaining
-ST2c keyboard/mouse focus and ordinary viewer-disconnect semantics**, then native
-hosting integration; see the [pilot contract](STREAMING_GAME_PILOT.md).
+to the same process/session, and normal game exit also passed. Subsequent tests
+confirmed Alt+Tab without stuck keys, mouse release, the normal disconnect
+shortcut and Marquee's owned-viewer disconnect. **Next is ST3 native hosting UI**,
+building on this tested keyboard/mouse contract; see the [pilot contract](STREAMING_GAME_PILOT.md).
 The owner has no controller yet (2026-10-24). Physical controller acceptance is
 deferred until hardware is available and does not block keyboard/mouse UX or ST3.
+
+Native [owned reference viewer](STREAMING_VIEWER.md) groundwork now separates
+`view`, `viewer-status` and `disconnect-viewer` from host/game stop. The owner
+confirmed focus/key release, mouse release and the disconnect shortcut. Native
+disconnect and owner-crash recovery also kept the same running game. This is a separate reference
+window controlled by the native CLI; hosting UI and an embedded receiver remain
+subsequent increments, not completed by receiver-process ownership.
+The OS window-close button and automatic focus return remain tracked separately.
 
 The owner's follow-on tracks are [collection-driven emulator expansion](EMULATOR_EXPANSION.md)
 and [soundtracks/player](SOUNDTRACKS.md). Validate the already installed lightweight
@@ -65,7 +74,7 @@ capabilities or reasons to delay the active streaming audio/input gates.
 | 6 | C1 + E1 — Compatibility and Epic | One tested managed Windows runtime/prefix path plus direct account/library/install/play through Legendary |
 | 7 | G1 — Direct GOG | Direct account/library, supported gogdl operations and native/Windows install/play |
 | 8 | U1 and M6 continuation | Unified identities/defaults, remaining setup-worker migration, save/controller polish and packaging |
-| Active streaming track | ST2 — Same-machine Fedora pilot | Synthetic/Sonic video/audio/keyboard, save restore, controlled receiver-loss/reconnect and normal game exit passed; focus and ordinary viewer-disconnect semantics next; controller acceptance deferred for hardware; [ST2 acceptance](STREAMING.md#st2--fedora-to-itself-streaming-next) |
+| Active streaming track | ST2 acceptance / ST3 groundwork | Keyboard/mouse focus, save restore, explicit viewer disconnect/reconnect and exit passed; native viewer owner implemented; hosting UI next, controller deferred for hardware; [ST2 acceptance](STREAMING.md#st2--fedora-to-itself-streaming) |
 
 [Manager M0–M6](MARQUEE_MANAGER.md#implementation-sequence-and-gates) supplies
 concrete deliverables and recovery acceptance. M3/M4 are independent after M2;
@@ -88,7 +97,7 @@ enrichment and a separate manager UI remain deferred.
 | Browser/provider work | Opt-in companion → manager job authority, stable replay, attribution, progress/hash history and acknowledged cancellation; Atomic linked platform review and provenance-bearing preparation/library receipts verified with synthetic UI and recovery tests. Legacy completion adoption, live provider-to-install/launch acceptance, reference hashes and packaged delivery remain open |
 | Added console games | Owner reports Switch, PS3, PS4, Xbox and Xbox 360 additions; RPCS3/shadPS4/xemu tools exist, no library descriptors/adapters for the five systems. [Console plan](CONSOLE_PREPARATION.md) owns gaps |
 | Stores | Read-only installed Steam detection/manifests implemented; persistent library/launch and complete Steam/Epic/GOG workflows remain open |
-| Streaming | Native Wolf API controls, local source build, image/rollback receipts and software/NVIDIA probes; real API/start/stop/restart passed. Automatic hosting lifecycle, UI, embedded player and end-to-end streaming acceptance remain open; [streaming gates](STREAMING.md) |
+| Streaming | Native Wolf API/build/probes and owned reference viewer open/status/disconnect; Sonic video/audio/keyboard, saves, focus/key release, mouse release and disconnect/reconnect passed. Hosting lifecycle/UI, embedded player, OS window-close/automatic focus return, deferred controller and second-device gates remain open; [streaming gates](STREAMING.md) |
 | Compatibility | Narrow Purple/Aion 2 setup/open recipe with checkpoints/cancellation; live game compatibility and general runtime lifecycle remain open |
 | UI/metadata | Unified-library presentation, installation distinctions, catalogue provenance and optional artwork/facts; UI grouping is not a completed normalized backend |
 | Legacy bridges | Explicit opt-in read-only Lutris cache bridge, external shortcuts; not a direct account or store integration |

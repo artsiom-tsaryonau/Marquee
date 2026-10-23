@@ -101,6 +101,15 @@ enum ManagerCmd {
 
 #[derive(Subcommand)]
 enum StreamingCmd {
+    /// Open an owned loopback reference viewer; requires the host and receiver already set up
+    View {
+        #[arg(long)]
+        app_id: String,
+    },
+    /// Report receiver-process ownership; does not claim stream readiness
+    ViewerStatus,
+    /// Disconnect only Marquee's owned reference viewer; leave the game running
+    DisconnectViewer,
     /// Compose the explicit Sonic acceptance image from reviewed local Wolf/BlastEm builds
     GamePilotBuild {
         #[arg(long)]
@@ -426,6 +435,9 @@ fn streaming(
     if matches!(
         command,
         StreamingCmd::Build
+            | StreamingCmd::View { .. }
+            | StreamingCmd::ViewerStatus
+            | StreamingCmd::DisconnectViewer
             | StreamingCmd::GamePilotBuild { .. }
             | StreamingCmd::ReceiverInstall
             | StreamingCmd::ReceiverStatus
@@ -435,6 +447,19 @@ fn streaming(
     ) {
         let paths = marquee_core::paths::Paths::resolve(data_dir)?;
         let value = match command {
+            StreamingCmd::View { app_id } => {
+                let socket = socket.ok_or_else(|| {
+                    AppError::new(
+                        "STREAMING_SOCKET",
+                        "Pass the running Wolf host's absolute API socket",
+                    )
+                })?;
+                marquee_core::streaming::viewer::view(&paths.data_dir, socket, app_id)?
+            }
+            StreamingCmd::ViewerStatus => marquee_core::streaming::viewer::status(&paths.data_dir)?,
+            StreamingCmd::DisconnectViewer => {
+                marquee_core::streaming::viewer::disconnect(&paths.data_dir)?
+            }
             StreamingCmd::GamePilotBuild { blastem_dir } => {
                 marquee_core::streaming::game_pilot::build(
                     &paths.data_dir,
@@ -481,6 +506,9 @@ fn streaming(
     let client = WolfClient::new(socket)?;
     let value = match command {
         StreamingCmd::Build
+        | StreamingCmd::View { .. }
+        | StreamingCmd::ViewerStatus
+        | StreamingCmd::DisconnectViewer
         | StreamingCmd::GamePilotBuild { .. }
         | StreamingCmd::ReceiverInstall
         | StreamingCmd::ReceiverStatus
