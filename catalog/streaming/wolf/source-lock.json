@@ -1,0 +1,18 @@
+{
+  "wolf": "2d2ae0021ad812f79a966dd10e8289e0fae98ecb",
+  "compositor": "016b4fc66d62b6a34c37169ecf6d511eef140d7c",
+  "gstreamer_image": "ghcr.io/games-on-whales/gstreamer@sha256:f71d899c3ea3607b65e676ffe789e549e761abefb23e26435541201202abfba9",
+  "rust_image": "docker.io/library/rust@sha256:e18a79fc84dfcfc3ab5ba72290398a644c135c97eaa881447fddc354ee4701a3",
+  "cmake_tags": {
+    "11.1.4": "123913715afeb8a437e6388b4473fcc4753e1c9a",
+    "0.12.0": "a81477931a8aa2ad025c6bda0609f38e09e4d7ec",
+    "v1.8.5": "6c1089bda6d4ae6df34efef1160b84c22e3d2856",
+    "fd136cf": "fd136cfe492b4375b4507718bcca1f044588fc6f",
+    "abb3a48": "abb3a48b3548a9ca7624a86f7e8ddb54804a4c3d",
+    "v3.4.0": "30172438cee64926dc41fdd9c11fb3ba5b2ba9de",
+    "v0.21.0": "6f27b8a49a646df59e7d4a14716dd1c7d74c28cb",
+    "546895a9": "546895a93a29062bb178367b46c7afb72da9881e",
+    "v0.8.2": "c37b5ed7364f4fc1c58e92d13399cd04656e6572"
+  },
+  "mdns_cpp": "0d57ae3db73d94ab2e7ac0a799a9165c8a221c80"
+}

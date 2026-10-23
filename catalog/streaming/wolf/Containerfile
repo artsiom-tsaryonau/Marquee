@@ -1,0 +1,62 @@
+ARG GSTREAMER_IMAGE
+ARG RUST_IMAGE
+FROM ${RUST_IMAGE} AS rust-toolchain
+FROM ${GSTREAMER_IMAGE} AS builder
+RUN dnf install -y ninja-build cmake pkg-config ccache git clang gcc-c++ glibc-static libstdc++-static \
+    boost-devel boost-static libcurl-devel openssl-devel libevdev-devel \
+    pulseaudio-libs-devel libunwind-devel systemd-devel libdrm-devel pciutils-devel \
+    wayland-devel libinput-devel libxkbcommon-devel mesa-libgbm-devel glib2-devel \
+    mesa-libEGL-devel mesa-libGLES-devel libglvnd-devel python3 \
+    && dnf clean all
+COPY --from=rust-toolchain /usr/local/cargo /usr/local/cargo
+COPY --from=rust-toolchain /usr/local/rustup /usr/local/rustup
+ENV CARGO_HOME=/usr/local/cargo RUSTUP_HOME=/usr/local/rustup
+ENV PATH=/usr/local/cargo/bin:${PATH}
+COPY wolf /src/wolf
+COPY compositor /src/compositor
+COPY patch-source.py source-lock.json /recipe/
+RUN python3 /recipe/patch-source.py /src/wolf /recipe/source-lock.json
+RUN cmake -S /src/wolf -B /build -G Ninja \
+    -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_STANDARD=20 -DCMAKE_CXX_EXTENSIONS=OFF \
+    -DCMAKE_CXX_FLAGS=-Wno-missing-template-arg-list-after-template-kw \
+    -DBUILD_SHARED_LIBS=OFF -DBoost_USE_STATIC_LIBS=ON \
+    -DBUILD_FAKE_UDEV_CLI=ON -DBUILD_TESTING=OFF \
+    && cmake --build /build --target wolf fake-udev -j4
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/cargo-target \
+    cd /src/compositor && CARGO_TARGET_DIR=/cargo-target cargo build --release --locked \
+    -p gst-plugin-wayland-display --features cuda,wayland-display-core/cuda \
+    && mkdir -p /out \
+    && cp /cargo-target/release/libgstwaylanddisplaysrc.so /out/ \
+    && cargo metadata --locked --format-version=1 --features gst-plugin-wayland-display/cuda,wayland-display-core/cuda > /out/compositor-dependencies.json
+RUN mkdir -p /licenses/dependencies \
+    && cp /src/wolf/LICENSE /licenses/Wolf-MIT \
+    && cp /src/compositor/LICENSE /licenses/Compositor-MIT \
+    && cp /recipe/source-lock.json /licenses/ \
+    && rpm -qa --qf '%{NAME}\t%{VERSION}-%{RELEASE}\t%{LICENSE}\n' | sort > /licenses/builder-packages.tsv \
+    && cp /out/compositor-dependencies.json /licenses/ \
+    && find /build/_deps -maxdepth 3 -type f -iname '*license*' -exec cp --parents '{}' /licenses/dependencies/ ';'
+
+FROM ${GSTREAMER_IMAGE} AS runtime
+RUN dnf install -y --allowerasing ca-certificates openssl-libs libicu libevdev systemd-libs libcurl \
+    libdrm pciutils-libs libunwind libwayland-server libinput libxkbcommon mesa-libgbm \
+    libglvnd mesa-libGL mesa-libEGL mesa-libGLES hwdata pulseaudio pulseaudio-utils \
+    python3 procps-ng \
+    && dnf clean all
+COPY --from=builder /build/src/moonlight-server/wolf /opt/marquee-wolf/wolf
+COPY --from=builder /build/src/fake-udev/fake-udev /opt/marquee-wolf/fake-udev
+COPY --from=builder /out/libgstwaylanddisplaysrc.so /usr/local/lib64/gstreamer-1.0/
+COPY --from=builder /usr/lib64/libicu*.so.* /usr/lib64/
+COPY --from=builder /licenses /opt/marquee-wolf/licenses
+COPY --from=builder /src/wolf/src/moonlight-server/state/default/config.v7.toml /opt/marquee-wolf/defaults.toml
+COPY entrypoint.py probe.py /opt/marquee-wolf/
+RUN ldconfig && rpm -qa --qf '%{NAME}\t%{VERSION}-%{RELEASE}\t%{LICENSE}\n' | sort > /opt/marquee-wolf/licenses/runtime-packages.tsv
+ENV GST_PLUGIN_PATH=/usr/local/lib64/gstreamer-1.0 \
+    WOLF_LOG_LEVEL=INFO GST_DEBUG=1 RUST_LOG=warn \
+    GST_GL_API=gles2 GST_GL_PLATFORM=egl GST_GL_WINDOW=surfaceless
+WORKDIR /opt/marquee-wolf
+LABEL org.opencontainers.image.source="https://github.com/games-on-whales/wolf" \
+    org.opencontainers.image.revision="2d2ae0021ad812f79a966dd10e8289e0fae98ecb" \
+    io.marquee.integration="wolf-source-pilot-v1"
+ENTRYPOINT ["python3", "/opt/marquee-wolf/entrypoint.py"]

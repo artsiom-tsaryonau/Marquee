@@ -220,7 +220,12 @@ fn cancelled(cancel: &AtomicBool) -> Result<()> {
 
 /// Every subprocess has a deadline and its own process group. Cancellation kills
 /// compiler/Git descendants, not just the shell that started them.
-fn run(command: &mut Command, log: &Path, cancel: &AtomicBool, deadline: Duration) -> Result<()> {
+pub(crate) fn run(
+    command: &mut Command,
+    log: &Path,
+    cancel: &AtomicBool,
+    deadline: Duration,
+) -> Result<()> {
     use std::os::unix::process::CommandExt;
     cancelled(cancel)?;
     let output = fs::OpenOptions::new().create(true).append(true).open(log)?;
@@ -473,7 +478,7 @@ pub fn build(
     })
 }
 
-fn valid_image(image: &str) -> bool {
+pub(crate) fn valid_image(image: &str) -> bool {
     image.strip_prefix("sha256:").is_some_and(|s| {
         s.len() == 64
             && s.bytes()

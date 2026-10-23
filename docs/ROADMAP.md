@@ -27,8 +27,9 @@ umu/Proton recipes. Lutris/Heroic remain optional, never required onboarding.
 ## Work order
 
 The owner has also scheduled [native streaming](STREAMING.md). ST0 implements a
-source-pinned Wolf control adapter and CLI; ST1/ST2 (managed backend build and
-isolated Sonic streaming acceptance) are next on that track. Hosting UI and an
+source-pinned Wolf control adapter and CLI; ST1 now adds a managed local source
+build, software/NVIDIA probes and real host lifecycle acceptance. ST2 (isolated
+Sonic streaming acceptance) is next on that track. Hosting UI and an
 embedded receiver remain open. This does not mark the existing manager/store
 gates complete or restart the deferred Quiver work.
 
@@ -64,7 +65,7 @@ enrichment and a separate manager UI remain deferred.
 | Browser/provider work | Opt-in companion → manager job authority, stable replay, attribution, progress/hash history and acknowledged cancellation; Atomic linked platform review and provenance-bearing preparation/library receipts verified with synthetic UI and recovery tests. Legacy completion adoption, live provider-to-install/launch acceptance, reference hashes and packaged delivery remain open |
 | Added console games | Owner reports Switch, PS3, PS4, Xbox and Xbox 360 additions; RPCS3/shadPS4/xemu tools exist, no library descriptors/adapters for the five systems. [Console plan](CONSOLE_PREPARATION.md) owns gaps |
 | Stores | Read-only installed Steam detection/manifests implemented; persistent library/launch and complete Steam/Epic/GOG workflows remain open |
-| Streaming | Native Wolf API v1 source-derived adapter/CLI for inspection, pairing/revocation and explicit session stop; no managed runtime, streaming UI, embedded player or live streaming acceptance yet; [streaming gates](STREAMING.md) |
+| Streaming | Native Wolf API controls, local source build, image/rollback receipts and software/NVIDIA probes; real API/start/stop/restart passed. Automatic hosting lifecycle, UI, embedded player and end-to-end streaming acceptance remain open; [streaming gates](STREAMING.md) |
 | Compatibility | Narrow Purple/Aion 2 setup/open recipe with checkpoints/cancellation; live game compatibility and general runtime lifecycle remain open |
 | UI/metadata | Unified-library presentation, installation distinctions, catalogue provenance and optional artwork/facts; UI grouping is not a completed normalized backend |
 | Legacy bridges | Explicit opt-in read-only Lutris cache bridge, external shortcuts; not a direct account or store integration |

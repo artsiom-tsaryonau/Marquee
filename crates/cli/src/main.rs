@@ -28,7 +28,7 @@ enum Command {
     Streaming {
         /// Absolute path to Wolf's Unix API socket (WOLF_SOCKET_PATH)
         #[arg(long)]
-        socket: PathBuf,
+        socket: Option<PathBuf>,
         #[command(subcommand)]
         command: StreamingCmd,
     },
@@ -101,6 +101,20 @@ enum ManagerCmd {
 
 #[derive(Subcommand)]
 enum StreamingCmd {
+    /// Build the reviewed Wolf backend in rootless Podman; does not start streaming
+    Build,
+    /// Read the immutable managed backend receipt
+    RuntimeStatus,
+    /// Recheck and select the previous image; does not interrupt running games
+    Rollback,
+    /// Probe the managed image without network access or starting a game
+    Probe {
+        /// Use the host's configured NVIDIA CDI device mapping
+        #[arg(long)]
+        nvidia: bool,
+        #[arg(long)]
+        render_node: Option<PathBuf>,
+    },
     /// Inspect advertised apps, paired clients and active sessions (keys omitted)
     Inspect,
     /// Show pending client addresses (pairing secrets omitted)
@@ -391,12 +405,59 @@ fn main() -> ExitCode {
     }
 }
 
-fn streaming(socket: &std::path::Path, command: &StreamingCmd) -> marquee_core::error::Result<()> {
+fn streaming(
+    socket: Option<&std::path::Path>,
+    command: &StreamingCmd,
+    data_dir: Option<PathBuf>,
+) -> marquee_core::error::Result<()> {
+    use marquee_core::streaming::runtime;
     use marquee_core::streaming::wolf::WolfClient;
     use std::io::Read;
 
+    if matches!(
+        command,
+        StreamingCmd::Build
+            | StreamingCmd::RuntimeStatus
+            | StreamingCmd::Rollback
+            | StreamingCmd::Probe { .. }
+    ) {
+        let paths = marquee_core::paths::Paths::resolve(data_dir)?;
+        let value = match command {
+            StreamingCmd::Build => {
+                eprintln!(
+                    "Building pinned Wolf source; log: {}",
+                    paths.data_dir.join("streaming/wolf/build.log").display()
+                );
+                serde_json::to_value(runtime::build(
+                    &paths.data_dir,
+                    &std::sync::atomic::AtomicBool::new(false),
+                )?)?
+            }
+            StreamingCmd::RuntimeStatus => serde_json::to_value(runtime::status(&paths.data_dir)?)?,
+            StreamingCmd::Rollback => serde_json::to_value(runtime::rollback(&paths.data_dir)?)?,
+            StreamingCmd::Probe {
+                nvidia,
+                render_node,
+            } => runtime::probe(&paths.data_dir, *nvidia, render_node.as_deref())?,
+            _ => unreachable!(),
+        };
+        println!("{}", serde_json::to_string_pretty(&value)?);
+        return Ok(());
+    }
+    let socket = socket.ok_or_else(|| {
+        AppError::new(
+            "STREAMING_SOCKET",
+            "Pass --socket with the absolute path to Wolf's local API socket",
+        )
+    })?;
     let client = WolfClient::new(socket)?;
     let value = match command {
+        StreamingCmd::Build
+        | StreamingCmd::RuntimeStatus
+        | StreamingCmd::Rollback
+        | StreamingCmd::Probe { .. } => {
+            unreachable!("handled above")
+        }
         StreamingCmd::Inspect => serde_json::to_value(client.inspect()?)?,
         StreamingCmd::Pending => serde_json::to_value(client.pending()?)?,
         StreamingCmd::Pair { client_ip } => {
@@ -431,7 +492,7 @@ fn run() -> marquee_core::error::Result<()> {
     // Streaming must remain usable while the desktop holds the library lease.
     // No data-directory resolution, manager start or transfer recovery here.
     if let Command::Streaming { socket, command } = &args.command {
-        return streaming(socket, command);
+        return streaming(socket.as_deref(), command, args.data_dir.clone());
     }
     // Inspect must stay offline even if the selected library has enabled jobs.
     // Do this before Core::open can restore transfers or acquire its DB lease.

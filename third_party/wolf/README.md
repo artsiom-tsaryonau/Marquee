@@ -29,8 +29,11 @@ The retained schema contains field definitions, not live credentials.
 
 Marquee implements its own bounded Rust Unix-socket transport. No Wolf binary,
 compositor, GStreamer plugin, Moonlight decoder, or GPL implementation code is
-vendored in this increment. Wolf's dependency/container/codec licenses need their
-own inventory before distributing a managed backend. Retain this notice and the
+vendored with the ST0 contract. ST1 adds a local source-build recipe under
+`catalog/streaming/wolf/`, with strict source patches for dependency pins,
+sensitive logging and audio startup. Its image retains Wolf/compositor notices,
+CMake dependency licenses, resolved RPM licenses and Cargo dependency metadata.
+Full dependency/container/codec distribution review remains open. Retain this notice and the
 MIT license when redistributing the adapted contract or schema.
 
 Reproduce source inspection (outside the tracked source tree):

@@ -85,9 +85,77 @@ socket creation. Source schema/license comparison and CLI help checks passed.
 
 ## Next milestones and completion gates
 
+### ST1 local source build and host probe — implemented
+
+The native CLI builds Wolf and its Rust Wayland compositor in rootless Podman.
+The recipe is in `catalog/streaming/wolf/`; root Git revisions, the compositor's
+Cargo lock, CMake dependency revisions and base-image digests are pinned. Resolved
+OS package versions/licenses and Rust dependency metadata are retained in the
+image. Fedora repositories remain moving inputs: the receipt identifies an
+immutable local image, not a bit-for-bit reproducible rebuild.
+
+```sh
+cargo run -p marquee-cli -- --data-dir /absolute/path/streaming-pilot streaming build
+cargo run -p marquee-cli -- --data-dir /absolute/path/streaming-pilot streaming runtime-status
+cargo run -p marquee-cli -- --data-dir /absolute/path/streaming-pilot streaming probe
+# Requires an existing NVIDIA CDI mapping; render device numbers are host-specific.
+cargo run -p marquee-cli -- --data-dir /absolute/path/streaming-pilot streaming probe --nvidia --render-node /dev/dri/renderD129
+cargo run -p marquee-cli -- --data-dir /absolute/path/streaming-pilot streaming rollback
+```
+
+Builds are synchronous CLI operations, separate from durable manager jobs. Each
+stage reuses the existing bounded/cancellable process runner. The adapter accepts
+a cancellation flag; detached recovery and UI cancellation remain open. Logs are
+in `<data>/streaming/wolf/build.log`. Build/probe must pass before `current.json`
+is atomically replaced; `previous.json` retains the previous image. Rollback
+probes that image before selecting it. Images, private state and configuration
+are retained. These commands do not open the library or launch games.
+
+The image entrypoint supervises private PulseAudio and Wolf processes. It creates
+a persistent private host identity/configuration and one synthetic app. It does
+not start the upstream Wolf UI, mount a container-management socket or include
+games. Source patches remove dynamic API/query/error log fields and pairing
+secrets, and replace an empty audio-server dereference with an explicit failure.
+CUDA is enabled in both compositor crates; the fake-udev helper's static C/C++
+link dependencies are included. Corrections belong to the reviewed recipe.
+
+Local acceptance on 2026-10-23, targeting the owner's Ryzen 9 9950X3D and RTX
+5090 (observed NVIDIA driver 615.71.09):
+
+- Native build completed. The no-GPU probe loaded compositor/Opus factories and
+  performed software H.264 encoding. NVIDIA CDI plus this host's `renderD129`
+  performed a real NVIDIA H.264 encode. Factory presence alone does not satisfy
+  the selected NVIDIA probe.
+- A rootless container with private state and NVIDIA access started its audio
+  server and Wolf. All six published TCP/UDP ports bound to `127.0.0.1` only.
+  No home, games, input devices, host IPC or container socket were mounted.
+- Marquee read the real app/client/session and pending-pair APIs. Only the
+  synthetic test app was advertised.
+- Both starts ended with Wolf's `Graceful shutdown complete` marker. Private
+  key, certificate and configuration hashes stayed identical across restart.
+- A metadata-only update produced another image ID; native rollback selected the
+  previous image, and a second rollback restored the update. This verifies receipt
+  promotion mechanics, not cross-release configuration migration.
+
+Evidence stays under ignored `data/streaming/` and `data/streaming-pilot/`.
+Pilot containers were stopped; the image receipt remains for ST2. Startup/stop
+was an operator-driven acceptance run. Automatic backend lifecycle ownership,
+desktop hosting UI, packaged installation and full third-party redistribution/
+source-offer review remain open. The license inventory supports that review.
+
+**Still unverified:** streamed video/audio, a virtual desktop rendering a game,
+client pairing/handshake, streamed input and disconnect/reconnect during play.
+No Moonlight receiver was installed. ST2 is the first end-to-end stream gate.
+
+Verification: the full `scripts/check.sh` pass includes source-patch regression,
+Rust workspace/CLI tests, Clippy, desktop compile and Svelte tests/build. Final
+receipt-version/validation changes were rechecked with Clippy, targeted tests and
+a CLI rebuild; the rebuilt CLI also read the existing receipt and passed the GPU
+probe. Local documentation links and whitespace checks passed.
+
 | Step | Work | Gate |
 | --- | --- | --- |
-| ST1 | Reproducible managed Wolf source build and runtime probe | Pin dependencies/base images; audit bundled licenses; build and launch under reviewed Podman permissions; identify GPU/encoder and socket capability; stop/rollback cleanly |
+| ST1 | Local source build and host probe implemented | Source/image pins, software/NVIDIA encoding, real API, restart/stop and receipt rollback passed; OS snapshots, distribution review and packaged lifecycle remain open |
 | ST2 | Isolated Sonic/BlastEm streaming pilot | Reference Moonlight receiver on this machine; virtual Wayland display/audio; video, streamed keyboard/controller, audio, save-state restoration, disconnect/reconnect and clean exit observed |
 | ST3 | Native Marquee hosting interface | Pair/revoke clients, show stream quality/state and reconnect/stop actions; map Wolf sessions to library editions and actual runner lifetime; desktop/browser parity without exposing the raw privileged API |
 | ST4 | Marquee receiver | Choose native decoding/rendering design, audit licensing and prove latency/input/focus/audio behavior; playback within Marquee needs a receiver implementation, not just a web video element |
@@ -106,10 +174,10 @@ do not own gameplay lifetime. Do not equate a receiver process, pairing POST or
 transport connection with game playtime. Keep disconnect, stop stream, and end
 game semantics explicit, and reconcile observed backend state after failures.
 
-ST1 must also review upstream logging: the pinned API implementation can log
-request bodies at DEBUG level. Marquee's redaction does not sanitize Wolf's own
-logs. Managed defaults/patches must prevent PINs and session keys reaching normal
-support bundles. Keep Wolf's command-capable API on a protected local socket.
+The pinned implementation can log request bodies at DEBUG level. ST1's patch
+removes dynamic API/error/query logs and pairing secrets from the managed build,
+in addition to Marquee's response projection. Broader support-bundle review
+remains open. Keep the command-capable API on a protected local socket.
 
 ## Source reuse and replacements
 

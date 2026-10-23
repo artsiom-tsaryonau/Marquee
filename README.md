@@ -18,10 +18,12 @@ The owner has also added **Switch, PS3, PS4, original Xbox and Xbox 360 games**.
 
 ## Run
 
-**Native streaming:** the first source-derived Wolf control adapter is available
-through `marquee streaming --socket /absolute/path/wolf.sock` (inspect, pending,
-pair, unpair, stop). A managed streaming backend, hosting UI and integrated player
-are still upcoming. See [source reuse, commands and acceptance gates](docs/STREAMING.md).
+**Native streaming:** Wolf API controls are available through `marquee streaming
+--socket /absolute/path/wolf.sock` (inspect, pending, pair, unpair, stop). Native
+`streaming build`, `runtime-status`, `probe` and `rollback` manage a pinned local
+source build with software/NVIDIA checks and image receipts. Host lifecycle
+passed locally; an end-to-end game stream, automatic hosting lifecycle, UI and
+integrated player remain upcoming. See [source reuse, commands and gates](docs/STREAMING.md).
 
 Needs Node 22+, pnpm (`corepack enable pnpm`), and Rust for the desktop/CLI. On Fedora, install WebKit and the other Tauri devel packages first:
 
