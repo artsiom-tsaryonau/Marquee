@@ -37,6 +37,18 @@ local loopback success does not prove network performance. Hosting UI and an
 embedded receiver remain open. This does not mark the existing manager/store
 gates complete or restart the deferred Quiver work.
 
+ST2a passed on 2026-10-24: pinned reference receiver installation, pairing and
+synthetic sustained video/ticking audio were observed. A source fix removed an
+incorrect five-second compositor wait for synthetic apps. **Next is ST2b: Sonic
+inside Wolf's virtual desktop**, followed by streamed input/save/lifecycle gates.
+
+The owner's follow-on tracks are [collection-driven emulator expansion](EMULATOR_EXPANSION.md)
+and [soundtracks/player](SOUNDTRACKS.md). Validate the already installed lightweight
+runners after Sonic streaming; then fill Neo Geo Pocket and useful alternative
+runner gaps. Music starts with local attachments/player, then metadata discovery,
+Jellyfin and reviewed acquisition. These are scheduled increments, not implemented
+capabilities or reasons to delay the active streaming audio/input gates.
+
 | Order | Increment | Completion gate |
 | --- | --- | --- |
 | Done: local slice | M0/M1 — Contract/storage slice and archive preparation | Reviewed ZIP/7z/RAR plan → receipt → transactional library registration; recovery tests and real Genesis browser registration passed; see [intake](INTAKE.md) |
@@ -47,7 +59,7 @@ gates complete or restart the deferred Quiver work.
 | 6 | C1 + E1 — Compatibility and Epic | One tested managed Windows runtime/prefix path plus direct account/library/install/play through Legendary |
 | 7 | G1 — Direct GOG | Direct account/library, supported gogdl operations and native/Windows install/play |
 | 8 | U1 and M6 continuation | Unified identities/defaults, remaining setup-worker migration, save/controller polish and packaging |
-| Active streaming track | ST2 — Same-machine Fedora pilot | Reference receiver installation/pairing → synthetic stream → isolated Sonic; [ST2 acceptance](STREAMING.md#st2--fedora-to-itself-streaming-next) |
+| Active streaming track | ST2 — Same-machine Fedora pilot | ST2a receiver/pairing/synthetic video/audio passed; next isolated Sonic, then input/saves/reconnect; [ST2 acceptance](STREAMING.md#st2--fedora-to-itself-streaming-next) |
 
 [Manager M0–M6](MARQUEE_MANAGER.md#implementation-sequence-and-gates) supplies
 concrete deliverables and recovery acceptance. M3/M4 are independent after M2;

@@ -53,6 +53,18 @@ def patch(root, lock):
             '  if (!audio_server) { throw std::runtime_error("Marquee streaming audio server is unavailable"); }\n'
             "  // PulseAudio sink-input router (hostname -> session_id -> virtual_sink_<session>)")
 
+    # Synthetic sources have no Wayland endpoint. Waiting for an empty socket
+    # name kills an otherwise healthy stream after five seconds on this pin.
+    sessions = root / "src/moonlight-server/sessions/moonlight.cpp"
+    replace(sessions,
+            "          auto wl_state = virtual_display::create_wayland_display(ready.wayland_plugin, ready.wayland_socket_name);",
+            "          if (session->app->start_virtual_compositor) {\n"
+            "          auto wl_state = virtual_display::create_wayland_display(ready.wayland_plugin, ready.wayland_socket_name);")
+    replace(sessions,
+            '          logs::log(logs::debug, "[STREAM_SESSION] Start runner");',
+            '          } // Virtual display readiness applies only to compositor apps.\n'
+            '          logs::log(logs::debug, "[STREAM_SESSION] Start runner");')
+
 
 if __name__ == "__main__":
     patch(Path(sys.argv[1]), json.loads(Path(sys.argv[2]).read_text()))

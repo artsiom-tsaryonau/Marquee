@@ -31,7 +31,10 @@ Marquee implements its own bounded Rust Unix-socket transport. No Wolf binary,
 compositor, GStreamer plugin, Moonlight decoder, or GPL implementation code is
 vendored with the ST0 contract. ST1 adds a local source-build recipe under
 `catalog/streaming/wolf/`, with strict source patches for dependency pins,
-sensitive logging and audio startup. Its image retains Wolf/compositor notices,
+sensitive logging, audio startup and compositor readiness. The latter guards
+Wayland display creation/socket checks when a synthetic app explicitly disables
+the virtual compositor; upstream otherwise terminates that stream after five
+seconds. Its image retains Wolf/compositor notices,
 CMake dependency licenses, resolved RPM licenses and Cargo dependency metadata.
 Full dependency/container/codec distribution review remains open. Retain this notice and the
 MIT license when redistributing the adapted contract or schema.

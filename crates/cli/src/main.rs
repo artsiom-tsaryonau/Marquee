@@ -101,6 +101,10 @@ enum ManagerCmd {
 
 #[derive(Subcommand)]
 enum StreamingCmd {
+    /// Install the checksum-pinned optional Moonlight reference receiver; no window is opened
+    ReceiverInstall,
+    /// Read the managed reference receiver receipt without opening the library
+    ReceiverStatus,
     /// Build the reviewed Wolf backend in rootless Podman; does not start streaming
     Build,
     /// Read the immutable managed backend receipt
@@ -417,12 +421,23 @@ fn streaming(
     if matches!(
         command,
         StreamingCmd::Build
+            | StreamingCmd::ReceiverInstall
+            | StreamingCmd::ReceiverStatus
             | StreamingCmd::RuntimeStatus
             | StreamingCmd::Rollback
             | StreamingCmd::Probe { .. }
     ) {
         let paths = marquee_core::paths::Paths::resolve(data_dir)?;
         let value = match command {
+            StreamingCmd::ReceiverInstall => {
+                serde_json::to_value(marquee_core::streaming::receiver::install(
+                    &paths.data_dir,
+                    &std::sync::atomic::AtomicBool::new(false),
+                )?)?
+            }
+            StreamingCmd::ReceiverStatus => {
+                serde_json::to_value(marquee_core::streaming::receiver::status(&paths.data_dir)?)?
+            }
             StreamingCmd::Build => {
                 eprintln!(
                     "Building pinned Wolf source; log: {}",
@@ -453,6 +468,8 @@ fn streaming(
     let client = WolfClient::new(socket)?;
     let value = match command {
         StreamingCmd::Build
+        | StreamingCmd::ReceiverInstall
+        | StreamingCmd::ReceiverStatus
         | StreamingCmd::RuntimeStatus
         | StreamingCmd::Rollback
         | StreamingCmd::Probe { .. } => {

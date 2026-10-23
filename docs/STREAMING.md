@@ -1,6 +1,6 @@
 # Native streaming integration
 
-Updated 2026-10-23. The owner scheduled this track and authorized selective source
+Updated 2026-10-24. The owner scheduled this track and authorized selective source
 reuse or replacement where useful. Marquee owns the interface and session model;
 existing streaming engines supply capture, encoding and transport initially.
 
@@ -143,9 +143,9 @@ was an operator-driven acceptance run. Automatic backend lifecycle ownership,
 desktop hosting UI, packaged installation and full third-party redistribution/
 source-offer review remain open. The license inventory supports that review.
 
-**Still unverified:** streamed video/audio, a virtual desktop rendering a game,
+**At the end of ST1, still unverified:** streamed video/audio, a virtual desktop rendering a game,
 client pairing/handshake, streamed input and disconnect/reconnect during play.
-No Moonlight receiver was installed. ST2 is the first end-to-end stream gate.
+No Moonlight receiver was installed by ST1. ST2 is the first end-to-end stream gate.
 
 Verification: the full `scripts/check.sh` pass includes source-patch regression,
 Rust workspace/CLI tests, Clippy, desktop compile and Svelte tests/build. Final
@@ -162,6 +162,59 @@ probe. Local documentation links and whitespace checks passed.
 | ST5 | Second-device/LAN acceptance, then additional hosts | Separate Fedora or other supported receiver; real network latency/bandwidth/input/reconnect checks; Sunshine/Apollo adapters and wake-on-LAN follow capability-specific gates |
 
 ## ST2 — Fedora-to-itself streaming (next)
+
+### ST2a progress — 2026-10-24
+
+The optional native `streaming receiver-install` command now downloads the pinned
+official Moonlight Qt **6.2.0 Linux x86_64 AppImage**, verifies its published SHA-256
+and exact size before executing extraction, checks executable containment, and
+promotes a versioned program directory with a bounded validated receipt. A failed
+download/extraction does not publish an installation. Re-running reuses the
+validated receipt; it does not overwrite preferences or pair/start a receiver.
+`receiver-status` reads this state independently of the library database.
+
+```sh
+cargo run -p marquee-cli -- --data-dir /absolute/path/streaming-pilot streaming receiver-install
+cargo run -p marquee-cli -- --data-dir /absolute/path/streaming-pilot streaming receiver-status
+```
+
+The manifest is `catalog/streaming/moonlight/reference.json`. It retains official
+binary and matching source URLs/checksums and GPL-3.0 identification. This is an
+optional downloaded reference program, not an embedded player or a completed
+redistribution/license audit. It extracts without requiring a FUSE mount.
+
+Live observations on the owner's Fedora 9950X3D/5090 machine:
+
+- Official receiver download/checksum/extraction and managed installation passed.
+- This AppImage contains the Qt `xcb` plugin, not the Wayland plugin. The UI runs
+  under XWayland with `QT_QPA_PLATFORM=xcb`; do not force Qt's `wayland` platform.
+- Separate XDG config/data/cache directories keep pilot pairing/preferences apart
+  from any existing Moonlight setup. The host identity and private state remain
+  under the dedicated pilot data directory.
+- PIN pairing through Marquee completed and Wolf registered the client. Rootless
+  networking reported the client's host address rather than `127.0.0.1`; select
+  the actual pending request instead of hardcoding the pairing address.
+- At 720p/60 H.264, Moonlight received/decoded/rendered **59.99 FPS**, reported
+  0% network/jitter drops and roughly 1 ms network latency. It used NVIDIA VDPAU
+  after VAAPI initialization failed. These are same-machine diagnostic readings.
+- The first run displayed video but the owner heard no audio before termination.
+  After the readiness fix, the owner explicitly confirmed **sustained moving
+  video and audible ticking audio**. Moonlight used PipeWire and its stream was
+  routed to the existing desktop output; desktop audio settings were not changed.
+- The first stream terminated after five seconds because the pinned Wolf source
+  waited for an empty Wayland socket despite `start_virtual_compositor=false`.
+  The strict source patch now guards display creation/readiness for compositor
+  apps only. The rebuilt host passed the sustained playback retest using the
+  managed receiver and preserved client pairing across the host restart.
+  The retest ran for approximately 42 seconds until the requested stop, with
+  60.00 FPS received/decoded/rendered and 0% reported network/jitter drops.
+
+**ST2a passed.** Marquee requested the synthetic session stop after acceptance and
+the owned pilot host was stopped cleanly. Full repository checks, source-patch
+regression and receiver checksum/containment tests passed. Evidence remains in
+ignored pilot directories; no receiver binary, pairing identity or game data is
+committed. This evidence does not establish a virtual game desktop,
+streamed keyboard/controller support, game audio, saves or reconnect acceptance.
 
 The first end-to-end test uses the same Fedora machine as both host and receiver:
 Ryzen 9 9950X3D and RTX 5090. Connect Moonlight manually to `127.0.0.1`, using the
@@ -184,10 +237,10 @@ Complete these increments in order and retain separate evidence:
 | ST2b | Sonic virtual-desktop launch contract | Run the known-working BlastEm source build against a read-only game input and fresh dedicated saves in Wolf's compositor/audio environment; show the game through Moonlight without capturing the host desktop |
 | ST2c | Streamed gameplay and lifecycle acceptance | Demonstrate forwarded keyboard and controller input separately, save/restore, audio, viewer disconnect/reconnect and normal game exit; reconcile backend/runner lifetime and return to Marquee without disturbing the host desktop |
 
-- [ ] Install the receiver; it is not installed by ST1's host build.
+- [x] Install the receiver; it is not installed by ST1's host build.
 - [ ] Start the reviewed host with explicit ownership and bounded shutdown;
   preserve identity/configuration. Keep game data and test saves isolated.
-- [ ] Complete PIN/certificate pairing; an accepted PIN POST alone is insufficient.
+- [x] Complete PIN/certificate pairing; confirmed by the live stream, beyond the PIN POST.
 - [ ] Observe synthetic video/audio, then real Sonic video/audio through the client.
 - [ ] Verify input reaches the game through the stream: direct host keyboard
   access must not be mistaken for forwarded input. Track controller acceptance

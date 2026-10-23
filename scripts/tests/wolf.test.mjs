@@ -21,6 +21,7 @@ test('Wolf source adaptations pin floating dependencies and strip sensitive log 
     put('src/moonlight-server/rest/helpers.hpp', 'logs::log(logs::trace, "Header {}", request->parse_query_string());\nlogs::log(logs::trace, "Response {}", xml_to_str(xml));');
     put('src/moonlight-server/rest/servers.cpp', 'logs::log(logs::debug, "Received POST /pin/ pin:{} secret:{}", pin, secret);\nlogs::log(logs::info, "Insert pin at http://{}:{}/pin/#{}", pair_sig->host_ip, http_port, secret);');
     put('src/moonlight-server/wolf.cpp', '  // PulseAudio sink-input router (hostname -> session_id -> virtual_sink_<session>)');
+    put('src/moonlight-server/sessions/moonlight.cpp', '          auto wl_state = virtual_display::create_wayland_display(ready.wayland_plugin, ready.wayland_socket_name);\n          logs::log(logs::debug, "[STREAM_SESSION] Start runner");');
     const args = [join(recipe, 'patch-source.py'), root, join(recipe, 'source-lock.json')];
     const first = spawnSync('python3', args, { encoding: 'utf8' });
     assert.equal(first.status, 0, first.stderr);
@@ -33,6 +34,9 @@ test('Wolf source adaptations pin floating dependencies and strip sensitive log 
       assert.doesNotMatch(text, /req\.body|event\.error|pair_sig->host_ip|parse_query_string|xml_to_str/);
     }
     assert.match(readFileSync(join(root, 'src/moonlight-server/wolf.cpp'), 'utf8'), /if \(!audio_server\)/);
+    const sessions = readFileSync(join(root, 'src/moonlight-server/sessions/moonlight.cpp'), 'utf8');
+    assert.match(sessions, /if \(session->app->start_virtual_compositor\)/);
+    assert.ok(sessions.indexOf('} // Virtual display readiness') < sessions.indexOf('Start runner'));
     const repeated = spawnSync('python3', args, { encoding: 'utf8' });
     assert.notEqual(repeated.status, 0, 'Reapplying to unexpected/already-modified source must fail');
   } finally {
