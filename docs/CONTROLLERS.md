@@ -1,16 +1,18 @@
 # Emulation box: controls and organization
 
-Reviewed 2026-10-21 against the owner's proposed equipment list. This is a
-planning inventory, not hardware detection or evidence that these peripherals
-have passed emulator acceptance on this Linux host.
+Updated 2026-10-24. The owner confirmed that no controller is currently available;
+it has not been purchased. The earlier equipment list is a proposal, not confirmed
+ownership or hardware detection. Physical controller acceptance is deferred until
+hardware is available. Continue keyboard/mouse testing and native streaming UX
+without requiring a purchase or claiming controller support has passed.
 
-## Use the equipment already owned first
+## Planned equipment roles
 
-Xbox Series pads cover ordinary gamepad mappings. The Switch pad is a spare;
-the Hori Fighting Stick Alpha, G920 and HOTAS/pedals are candidates for arcade,
-racing and flight profiles respectively. Choose one existing mouse for desktop
-navigation and supported pointer/touch emulation. No additional controller is
-required before testing those paths.
+The proposed Xbox Series pads would cover ordinary gamepad mappings; a Switch
+pad could be a spare. The proposed Hori Fighting Stick Alpha, G920 and HOTAS/pedals
+are candidates for arcade, racing and flight profiles respectively. Their current
+availability is unverified. Use keyboard/mouse for current acceptance; evaluate
+each physical input path only when the relevant device is available.
 
 This does not establish complete gameplay coverage. Pressure-sensitive buttons,
 motion/gyro, pointer tracking, unusual accessories, wheel force feedback and

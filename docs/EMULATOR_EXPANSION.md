@@ -35,6 +35,8 @@ without inspection. Files in `other` need explicit platform review.
    game exit in Wolf's virtual desktop passed. Complete physical controller,
    focus isolation and ordinary viewer-window semantics. Local Sonic acceptance
    alone does not satisfy this gate.
+   Physical controller acceptance is deferred because the owner has no controller
+   yet; it does not block keyboard/mouse cohorts or native hosting UX.
 2. **E1 — Existing lightweight adapters.** Mesen NES → SNES → GB/GBC → PCE,
    followed by melonDS and FinalBurn Neo with valid data. Reuse installed runners
    and shared profiles; fix observed launch/save/input problems before adding

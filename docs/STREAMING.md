@@ -236,6 +236,12 @@ isolation and ordinary receiver-window disconnect semantics remain pending;
 the earlier close also ended the game. The pilot remains operator-driven, not
 ST3 lifecycle/UI. See the [evidence and limitations](STREAMING_GAME_PILOT.md#live-evidence).
 
+Owner clarification, 2026-10-24: no physical controller is available yet; it has
+not been purchased. Defer that acceptance gate until hardware is available.
+Proceed with keyboard/mouse focus, viewer-disconnect behavior and ST3 native UX;
+controller testing is not a prerequisite for those increments. Keep physical
+controller support explicitly unverified. See [controls planning](CONTROLLERS.md).
+
 The first end-to-end test uses the same Fedora machine as both host and receiver:
 Ryzen 9 9950X3D and RTX 5090. Connect Moonlight manually to `127.0.0.1`, using the
 existing loopback-only pilot ports. Keep the receiver on the physical desktop;
@@ -265,7 +271,8 @@ Complete these increments in order and retain separate evidence:
 - [x] Verify keyboard input reaches the game through the stream: direct host keyboard
   access must not be mistaken for forwarded input. Track controller acceptance
   separately; working keyboard input does not establish controller support.
-- [ ] Verify physical controller forwarding and focus/input isolation separately.
+- [ ] Verify keyboard/mouse focus and input isolation.
+- [ ] Deferred for hardware: verify physical controller forwarding separately.
 - [x] Save a state, change the game position, restore it and observe the result
   in the receiver. Keep this separate from battery-save persistence.
 - [ ] Define and verify viewer disconnect versus game stop behavior; reconnect to

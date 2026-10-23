@@ -43,8 +43,10 @@ incorrect five-second compositor wait for synthetic apps. ST2b now also passed:
 Sonic runs inside Wolf's virtual desktop with user-confirmed video/audio/keyboard
 play. Save restoration with both binding sets, controlled receiver-loss/reconnect
 to the same process/session, and normal game exit also passed. **Next is remaining
-ST2c controller/focus and ordinary viewer-disconnect semantics**, then native
+ST2c keyboard/mouse focus and ordinary viewer-disconnect semantics**, then native
 hosting integration; see the [pilot contract](STREAMING_GAME_PILOT.md).
+The owner has no controller yet (2026-10-24). Physical controller acceptance is
+deferred until hardware is available and does not block keyboard/mouse UX or ST3.
 
 The owner's follow-on tracks are [collection-driven emulator expansion](EMULATOR_EXPANSION.md)
 and [soundtracks/player](SOUNDTRACKS.md). Validate the already installed lightweight
@@ -63,7 +65,7 @@ capabilities or reasons to delay the active streaming audio/input gates.
 | 6 | C1 + E1 — Compatibility and Epic | One tested managed Windows runtime/prefix path plus direct account/library/install/play through Legendary |
 | 7 | G1 — Direct GOG | Direct account/library, supported gogdl operations and native/Windows install/play |
 | 8 | U1 and M6 continuation | Unified identities/defaults, remaining setup-worker migration, save/controller polish and packaging |
-| Active streaming track | ST2 — Same-machine Fedora pilot | Synthetic/Sonic video/audio/keyboard, save restore, controlled receiver-loss/reconnect and normal game exit passed; controller/focus and ordinary viewer-disconnect semantics remain; [ST2 acceptance](STREAMING.md#st2--fedora-to-itself-streaming-next) |
+| Active streaming track | ST2 — Same-machine Fedora pilot | Synthetic/Sonic video/audio/keyboard, save restore, controlled receiver-loss/reconnect and normal game exit passed; focus and ordinary viewer-disconnect semantics next; controller acceptance deferred for hardware; [ST2 acceptance](STREAMING.md#st2--fedora-to-itself-streaming-next) |
 
 [Manager M0–M6](MARQUEE_MANAGER.md#implementation-sequence-and-gates) supplies
 concrete deliverables and recovery acceptance. M3/M4 are independent after M2;

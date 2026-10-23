@@ -96,6 +96,10 @@ the native hosting UI and second-device/LAN acceptance remain separate. The
 earlier close action ended the game and is not relabelled as a retained session.
 Do not mark full ST2 complete from the successful ST2b launch.
 
+The owner confirmed on 2026-10-24 that no controller has been purchased yet.
+Defer physical controller acceptance; it does not block keyboard/mouse focus,
+viewer-disconnect work or native hosting UI. Keep that capability unverified.
+
 Evidence stays in ignored pilot directories. No game, executable image, pairing
 identity or private save is committed. Full repository checks and catalogue/config
 preservation tests cover the implementation, not the remaining human acceptance.
