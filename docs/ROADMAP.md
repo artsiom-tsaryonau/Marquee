@@ -28,8 +28,12 @@ umu/Proton recipes. Lutris/Heroic remain optional, never required onboarding.
 
 The owner has also scheduled [native streaming](STREAMING.md). ST0 implements a
 source-pinned Wolf control adapter and CLI; ST1 now adds a managed local source
-build, software/NVIDIA probes and real host lifecycle acceptance. ST2 (isolated
-Sonic streaming acceptance) is next on that track. Hosting UI and an
+build, software/NVIDIA probes and real host lifecycle acceptance. **Next is ST2:
+Fedora-to-itself streaming over `127.0.0.1`**, first the synthetic stream, then
+Sonic/BlastEm in a separate virtual Wayland desktop, received by Moonlight on the
+same physical desktop. Pairing, video/audio, streamed input, save restoration and
+disconnect/reconnect must pass. A second-device/LAN test is a separate later gate;
+local loopback success does not prove network performance. Hosting UI and an
 embedded receiver remain open. This does not mark the existing manager/store
 gates complete or restart the deferred Quiver work.
 
@@ -43,6 +47,7 @@ gates complete or restart the deferred Quiver work.
 | 6 | C1 + E1 — Compatibility and Epic | One tested managed Windows runtime/prefix path plus direct account/library/install/play through Legendary |
 | 7 | G1 — Direct GOG | Direct account/library, supported gogdl operations and native/Windows install/play |
 | 8 | U1 and M6 continuation | Unified identities/defaults, remaining setup-worker migration, save/controller polish and packaging |
+| Active streaming track | ST2 — Same-machine Fedora pilot | Reference receiver installation/pairing → synthetic stream → isolated Sonic; [ST2 acceptance](STREAMING.md#st2--fedora-to-itself-streaming-next) |
 
 [Manager M0–M6](MARQUEE_MANAGER.md#implementation-sequence-and-gates) supplies
 concrete deliverables and recovery acceptance. M3/M4 are independent after M2;

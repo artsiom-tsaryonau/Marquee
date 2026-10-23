@@ -156,10 +156,61 @@ probe. Local documentation links and whitespace checks passed.
 | Step | Work | Gate |
 | --- | --- | --- |
 | ST1 | Local source build and host probe implemented | Source/image pins, software/NVIDIA encoding, real API, restart/stop and receipt rollback passed; OS snapshots, distribution review and packaged lifecycle remain open |
-| ST2 | Isolated Sonic/BlastEm streaming pilot | Reference Moonlight receiver on this machine; virtual Wayland display/audio; video, streamed keyboard/controller, audio, save-state restoration, disconnect/reconnect and clean exit observed |
+| ST2 | Fedora-to-itself streaming pilot — next | Moonlight on this machine connects to `127.0.0.1`; synthetic stream first, then isolated Sonic; video/audio, streamed input, save restoration, disconnect/reconnect and exit observed |
 | ST3 | Native Marquee hosting interface | Pair/revoke clients, show stream quality/state and reconnect/stop actions; map Wolf sessions to library editions and actual runner lifetime; desktop/browser parity without exposing the raw privileged API |
 | ST4 | Marquee receiver | Choose native decoding/rendering design, audit licensing and prove latency/input/focus/audio behavior; playback within Marquee needs a receiver implementation, not just a web video element |
-| ST5 | Additional hosts and devices | Sunshine/Apollo adapters with capability-specific controls, second-device/LAN acceptance, wake-on-LAN and remote trust/recovery |
+| ST5 | Second-device/LAN acceptance, then additional hosts | Separate Fedora or other supported receiver; real network latency/bandwidth/input/reconnect checks; Sunshine/Apollo adapters and wake-on-LAN follow capability-specific gates |
+
+## ST2 — Fedora-to-itself streaming (next)
+
+The first end-to-end test uses the same Fedora machine as both host and receiver:
+Ryzen 9 9950X3D and RTX 5090. Connect Moonlight manually to `127.0.0.1`, using the
+existing loopback-only pilot ports. Keep the receiver on the physical desktop;
+the game belongs in Wolf's independent virtual desktop. This avoids capturing
+the receiver window recursively and makes an extra monitor unnecessary for the
+intended test. Native playback inside Marquee remains ST4.
+
+```text
+Sonic / BlastEm in Wolf's virtual Wayland desktop
+    → NVIDIA H.264 encoding → local connection → Moonlight on Fedora's desktop
+    ← keyboard/controller input forwarded through the receiver ←
+```
+
+Complete these increments in order and retain separate evidence:
+
+| Increment | Work | Acceptance |
+| --- | --- | --- |
+| ST2a | Reference Moonlight setup and synthetic loopback stream | Install a reviewed receiver build; pair through Marquee; stream the existing test pattern and tick audio at an initial 720p/60 H.264 baseline; confirm real decoding/display/audio and paired-client persistence |
+| ST2b | Sonic virtual-desktop launch contract | Run the known-working BlastEm source build against a read-only game input and fresh dedicated saves in Wolf's compositor/audio environment; show the game through Moonlight without capturing the host desktop |
+| ST2c | Streamed gameplay and lifecycle acceptance | Demonstrate forwarded keyboard and controller input separately, save/restore, audio, viewer disconnect/reconnect and normal game exit; reconcile backend/runner lifetime and return to Marquee without disturbing the host desktop |
+
+- [ ] Install the receiver; it is not installed by ST1's host build.
+- [ ] Start the reviewed host with explicit ownership and bounded shutdown;
+  preserve identity/configuration. Keep game data and test saves isolated.
+- [ ] Complete PIN/certificate pairing; an accepted PIN POST alone is insufficient.
+- [ ] Observe synthetic video/audio, then real Sonic video/audio through the client.
+- [ ] Verify input reaches the game through the stream: direct host keyboard
+  access must not be mistaken for forwarded input. Track controller acceptance
+  separately; working keyboard input does not establish controller support.
+- [ ] Save a state, change the game position, restore it and observe the result
+  in the receiver. Keep this separate from battery-save persistence.
+- [ ] Define and verify viewer disconnect versus game stop behavior; reconnect to
+  the intended session without a duplicate game or competing save writer.
+- [ ] Close the game normally, verify the runner/session ends and return to
+  Marquee. Stop the owned pilot cleanly when testing finishes.
+- [ ] Record exact host/receiver/emulator revisions, codec, resolution/FPS,
+  encoder/decoder, observed audio/input results and available frame/latency stats.
+
+The existing host API, software/NVIDIA encoding probes and local Sonic gameplay
+tests do not complete these items. Keep ST2 open until the receiver has actually
+displayed the stream and each claimed capability has been observed.
+
+After local acceptance, ST3 can build on the proven contract. ST5 must separately
+exercise another device over a real LAN, including bandwidth/latency, packet loss,
+input and reconnect behavior. Same-machine testing shares CPU/GPU resources and
+does not establish network or second-device decoder performance. Internet access
+and wake-on-LAN are additional explicit capabilities; do not widen the pilot's
+loopback bindings as part of ST2.
 
 The existing managed BlastEm runner is not automatically a Wolf app. Its Podman
 wrapper currently targets the user's native Wayland session. ST2 must provide a
