@@ -77,7 +77,7 @@ capabilities or reasons to delay the active streaming audio/input gates.
 | --- | --- | --- |
 | Done: local slice | M0/M1 — Contract/storage slice and archive preparation | Reviewed ZIP/7z/RAR plan → receipt → transactional library registration; recovery tests and real Genesis browser registration passed; see [intake](INTAKE.md) |
 | Done: local worker | M2 — Hidden `marquee-manager` process | Worker/socket/ownership tests and real browser close/reconnect passed; immutable outputs, safe receipt publication and M1 cutover; see [manager](MARQUEE_MANAGER.md) |
-| 3 | M3/M4 — Existing torrent and browser workers | Adopt state safely; downloaded bytes reach supported preparation without a manual second importer; transport-specific capabilities remain truthful |
+| Done: torrent/browser slice | M3/M4 — Existing torrent and browser workers | Manager hosts torrents and browser jobs with linked archive reviews/receipts; live-provider, unsupported-package and packaged delivery remain open |
 | 4 | M5 — Added console collection | Read-only inventory can start now; platform recipes follow the common preparation contract and pass their own gates |
 | 5 | S1 — Direct Steam | Persistent installed library and real launch first; owned sync and explicit installation handoff complete the milestone |
 | 6 | C1 + E1 — Compatibility and Epic | One tested managed Windows runtime/prefix path plus direct account/library/install/play through Legendary |

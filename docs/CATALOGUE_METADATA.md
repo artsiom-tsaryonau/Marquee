@@ -16,7 +16,7 @@ Import any conforming export file (from your own tooling or a saved snapshot):
 cargo run -p marquee-cli -- catalogue import /path/to/catalog.json
 ```
 
-Or open Library → **Catalogue metadata** → pick the same JSON file in the UI.
+Or open Games → **Catalogue metadata** → pick the same JSON file in the UI.
 Re-importing updates provider records by
 `vimm:<game_id>` without duplicating them. Each request is limited to 900 KB;
 larger catalogues need multiple exports/batches. Imports accumulate records;

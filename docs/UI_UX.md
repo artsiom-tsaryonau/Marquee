@@ -12,10 +12,10 @@ Games-library panel, not a top-level destination.
   identities in shelves/counts, limits platform shortcuts to four, and keeps
   the desktop hero stable. Big Screen focus can still preview a game. Mouse
   hover no longer changes the main Play target.
-- Library separates Your library from Catalogue discovery. Catalogue imports
+- Games separates Your library from Catalogue discovery. Catalogue imports
   stay available in discovery. Filters, search, grouping and return position
   remain shared, with distinct catalogue/ownership language.
-- Global Add games opens the Library system picker instead of assuming PS2.
+- Global Add games opens the Games system picker instead of assuming PS2.
   Existing folder imports remain the supported flow; this pass does not add
   store connections. A subsequent roadmap step adds the [archive importer](INTAKE.md).
 - Cards show readable titles underneath, with quiet platform-mark/title fallbacks, including failed cover loads. Offline

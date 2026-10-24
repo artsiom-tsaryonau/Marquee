@@ -21,9 +21,11 @@ The owner has also added **Switch, PS3, PS4, original Xbox and Xbox 360 games**.
 **Native streaming:** Wolf API controls are available through `marquee streaming
 --socket /absolute/path/wolf.sock` (inspect, pending, pair, unpair, stop). Native
 `streaming build`, `runtime-status`, `probe` and `rollback` manage a pinned local
-source build with software/NVIDIA checks and image receipts. Host lifecycle
-passed locally; an end-to-end game stream, automatic hosting lifecycle, UI and
-integrated player remain upcoming. See [source reuse, commands and gates](docs/STREAMING.md).
+source build with software/NVIDIA checks and image receipts. ST2 Fedora-to-itself
+passed 2026-10-24 (synthetic stream and Sonic/BlastEm in Wolf's virtual desktop,
+keyboard/mouse, saves, disconnect/reconnect). Hosting UI, an embedded receiver,
+OS window-close/automatic focus return and a second-device gate remain open.
+See [source reuse, commands and gates](docs/STREAMING.md).
 
 Needs Node 22+, pnpm (`corepack enable pnpm`), and Rust for the desktop/CLI. On Fedora, install WebKit and the other Tauri devel packages first:
 
@@ -59,7 +61,7 @@ cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev ports install zelda64rec
 
 **Demo (`pnpm dev`, no token, or `?demo=1`)** still uses invented titles and simulated playtime. Controller input in the browser is not evidence for the Tauri window.
 
-**Desktop** uses the real library and the same Home/Games/Music/Tools/Streaming/Settings chrome as the demo. With no imported media or enabled source it is empty; the optional legacy Lutris bridge stays disconnected until explicitly enabled. Install PCSX2 from Home, Library, or Settings: Marquee downloads the official AppImage and unpacks it into its own data dir (no Flatpak wizard). Point library roots at your disc folders (automated acquisition jobs are the target); covers are looked up by disc serial and cached. **Native ports** appear as tagged games, with engine installation/configuration in Tools; retail data should eventually flow from store/detection jobs, with **Open folder** as fallback today. **Tools → Purple for Aion 2** provides managed setup and opening with progress, stop/retry and private diagnostics; Purple performs account sign-in, game downloads and patching. This is an unverified Linux compatibility recipe. A persistent Downloads screen is not implemented; Purple progress is on its Tools card. Other Windows-app recipes remain demo-only.
+**Desktop** uses the real library and the same Home/Games/Music/Media/Tools/Streaming/Settings chrome as the demo. With no imported media or enabled source it is empty; the optional legacy Lutris bridge stays disconnected until explicitly enabled. Install PCSX2 from Home, Games, or Settings: Marquee downloads the official AppImage and unpacks it into its own data dir (no Flatpak wizard). Point library roots at your disc folders (automated acquisition jobs are the target); covers are looked up by disc serial and cached. **Native ports** appear as tagged games, with engine installation/configuration in Tools; retail data should eventually flow from store/detection jobs, with **Open folder** as fallback today. **Tools → Purple for Aion 2** provides managed setup and opening with progress, stop/retry and private diagnostics; Purple performs account sign-in, game downloads and patching. This is an unverified Linux compatibility recipe. A persistent Downloads screen is not implemented; Purple progress is on its Tools card. Other Windows-app recipes remain demo-only.
 
 Dev URL params: `?route=library`, `?mode=big`, `?theme=light`, `?game=<id suffix>`, `?add=1`, `?splash=0`, `?motion=0`, `?empty=1` (demo with no sample games, for the empty desktop look).
 

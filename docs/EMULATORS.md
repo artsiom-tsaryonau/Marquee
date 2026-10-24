@@ -337,7 +337,7 @@ The program runs in its local OCI image, so Podman stays a runtime prerequisite;
 
 ## Nintendo DS and Neo Geo library adapters
 
-Use **Library → Add Nintendo DS folder** or **Add Neo Geo folder**. DS archives
+Use **Games → Add Nintendo DS folder** or **Add Neo Geo folder**. DS archives
 must first be extracted to `.nds` files. Neo Geo arcade sets stay zipped, with
 `neogeo.zip` and required parent sets beside the selected game. The BIOS ZIP is
 excluded from playable entries. Readiness is rechecked when taking a snapshot;

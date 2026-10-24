@@ -7,7 +7,7 @@ library registration. See the [manager lifecycle/delivery contract](MARQUEE_MANA
 
 ## Saved preparation workflow (implemented)
 
-Library → Downloads and archives → add paths → choose a supported platform →
+Games → Downloads and archives → add paths → choose a supported platform →
 **Inspect selected archives** → review files/destination/space → **Approve and
 prepare**. Inspection saves a review only; dropping/selecting files never extracts.
 Preparation history reloads from the backend when the panel is reopened.
@@ -98,7 +98,7 @@ marquee intake x.zip --no-scan             # skip the rescan
 
 ### Legacy desktop and browser UI
 
-Library → Add games → Import ZIP/7z/RAR archives opens the importer. A separate
+Games → Add games → Import ZIP/7z/RAR archives opens the importer. A separate
 Library button reopens progress and results. Desktop can select multiple
 archives or drop them onto Library; dropping only queues them for review.
 Browser users enter absolute paths on the Marquee computer, with no browser

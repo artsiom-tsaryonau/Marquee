@@ -189,7 +189,7 @@ cookie export or shell-command interface is introduced.
   acknowledgements never cause another automatic site click. Cancellation from
   Marquee remains pending until the browser applies/acknowledges it; open/refresh
   the companion. Progress is last reported, not an unattended polling promise.
-- Library → **Downloads and archives** shows these jobs. Completed ZIP/7z/RAR
+- Games → **Downloads and archives** shows these jobs. Completed ZIP/7z/RAR
   files enter a linked explicit-platform review: the archive is rechecked against
   download-time SHA-256, and review plus link commit atomically. Repeated inspection
   reuses one job; changing its platform does not silently replace that review.

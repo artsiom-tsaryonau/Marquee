@@ -27,8 +27,8 @@ Payload folders, `.marquee-transfer-*` markers and cached `torrents/<hash>.torre
 files stay in their original locations; no source is moved or downloaded by migration.
 
 After cutover, manager settings are authoritative; legacy SQLite values are not
-reimported. IPC v4 requires a compatible companion; a requested manager start
-can drain an older v1/v2/v3 worker before replacing it. Rollback is manual: stop all
+reimported. IPC v5 requires a compatible companion; a requested manager start
+can drain an older v1–v4 worker before replacing it. Rollback is manual: stop all
 manager/library owners, preserve the current manager state, then reconcile later
 changes against the backup before restoring legacy history/settings. Restoring
 only the old entry list loses later changes. Never restore it beside a live manager.

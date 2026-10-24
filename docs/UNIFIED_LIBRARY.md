@@ -44,7 +44,7 @@ Never merge by filename or display title. Equal names can be unrelated games; id
 
 ## Games without files
 
-Library → **Add games → Add a game without files…**: type a title, pick the system and a status (**Wishlist**, or **I own it** when the files are elsewhere). The game appears in the Library with a "Wishlist" or "No files" badge and a disabled **Play · no files yet** button. Code: `crates/core/src/wanted.rs`, table `wanted`.
+Games → **Add games → Add a game without files…**: type a title, pick the system and a status (**Wishlist**, or **I own it** when the files are elsewhere). The game appears in Games with a "Wishlist" or "No files" badge and a disabled **Play · no files yet** button. Code: `crates/core/src/wanted.rs`, table `wanted`.
 
 ### Wanted-entry behavior
 
