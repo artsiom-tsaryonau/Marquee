@@ -129,13 +129,19 @@ fn serve_file(req: Request, mut file: fs::File, mime: &str) {
             &format!("bytes {start}-{end}/{size}"),
         ));
     }
-    let _ = req.respond(Response::new(
-        StatusCode(if partial { 206 } else { 200 }),
-        headers,
-        file.take(length),
-        Some(length as usize),
-        None,
-    ));
+    // tiny_http otherwise switches files >=32 KiB to chunked transfer and
+    // drops Content-Length. WebKit/GStreamer can then identify an ordinary
+    // MP4 as a live broadcast rather than a finite, seekable file.
+    let _ = req.respond(
+        Response::new(
+            StatusCode(if partial { 206 } else { 200 }),
+            headers,
+            file.take(length),
+            Some(length as usize),
+            None,
+        )
+        .with_chunked_threshold(usize::MAX),
+    );
 }
 
 pub fn load_or_create_token(path: &Path) -> Result<String> {
@@ -484,6 +490,50 @@ mod tests {
         let core = Arc::new(Core::open_isolated(Some(dir.to_path_buf()), false).unwrap());
         let handle = start(Arc::clone(&core), None, Some(48900)).unwrap();
         (core, handle)
+    }
+
+    #[test]
+    fn large_media_has_fixed_lengths_for_full_head_and_range_responses() {
+        let dir = tempfile::tempdir().unwrap();
+        let (core, h) = start_test_server(dir.path());
+        let mut payload = vec![b'x'; 96 * 1024];
+        payload[..12].copy_from_slice(b"0000ftypabcd");
+        let source = dir.path().join("large.mp4");
+        fs::write(&source, &payload).unwrap();
+        let collection = core.media_create("Extras", None).unwrap();
+        core.media_import(&collection, vec![source]).unwrap();
+        let asset = core.media_collections(None).unwrap()[0].assets[0]
+            .id
+            .clone();
+        let url = h.media_url(&asset);
+        let path = url.strip_prefix(&format!("http://{}", h.addr)).unwrap();
+        for (method, range, length, status) in [
+            ("GET", "", 98304, 200),
+            ("HEAD", "", 98304, 200),
+            ("GET", "Range: bytes=32768-73727\r\n", 40960, 206),
+            ("HEAD", "Range: bytes=32768-73727\r\n", 40960, 206),
+        ] {
+            let response = request(
+                h.addr,
+                &format!(
+                    "{method} {path} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n{range}\r\n",
+                    h.addr
+                ),
+            );
+            let (headers, body) = response.split_once("\r\n\r\n").unwrap();
+            let headers = headers.to_ascii_lowercase();
+            assert!(headers.starts_with(&format!("http/1.1 {status}")));
+            assert!(
+                headers.contains(&format!("content-length: {length}\r\n"))
+                    || headers.ends_with(&format!("content-length: {length}"))
+            );
+            assert!(!headers.contains("transfer-encoding"));
+            assert!(headers.contains("accept-ranges: bytes"));
+            assert_eq!(body.len(), if method == "HEAD" { 0 } else { length });
+            if status == 206 {
+                assert!(headers.contains("content-range: bytes 32768-73727/98304"));
+            }
+        }
     }
 
     #[test]

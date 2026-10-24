@@ -1,16 +1,40 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { app } from '../state.svelte';
-  import { music } from '../music.svelte';
+  import { music, musicTime } from '../music.svelte';
   import type { MediaAsset } from '../api/contracts';
+  import Icon from './Icon.svelte';
   let { asset, url, onerror, onposition }:{asset:MediaAsset;url:string;onerror:()=>void;onposition:(id:string,position:number)=>void}=$props();
-  let video=$state<HTMLVideoElement>();let saved=0;let ready=false;
-  function remember(){if(ready&&video&&Number.isFinite(video.currentTime)){const position=video.ended?0:video.currentTime;onposition(asset.id,position);void app.api.mediaPosition(asset.id,position).catch(()=>{});}}
-  function loaded(){ready=true;if(video&&asset.position>0&&asset.position<video.duration-2){video.currentTime=asset.position;saved=asset.position;}}
-  function progress(){if(video&&Math.abs(video.currentTime-saved)>=10){saved=video.currentTime;remember();}}
+  let video=$state<HTMLVideoElement>();let player=$state<HTMLDivElement>();
+  let ready=$state(false);let paused=$state(true);let position=$state(0);let duration=$state(0);let volume=$state(.8);let muted=$state(false);let waiting=$state(false);let seeking=$state(false);let failure=$state('');let fullscreen=$state(false);let saved=0;
+  const fill=$derived(duration>0?Math.min(100,position/duration*100):0);
+  function remember(){if(ready&&video&&Number.isFinite(video.currentTime)){const value=video.ended?0:video.currentTime;onposition(asset.id,value);void app.api.mediaPosition(asset.id,value).catch(()=>{});}}
+  function sync(){if(!video)return;paused=video.paused;duration=Number.isFinite(video.duration)?video.duration:0;if(!seeking)position=video.currentTime||0;}
+  function loaded(){ready=true;sync();if(video&&asset.position>0&&asset.position<duration-2){video.currentTime=asset.position;position=asset.position;saved=asset.position;}}
+  function progress(){sync();if(video&&!seeking&&Math.abs(video.currentTime-saved)>=10){saved=video.currentTime;remember();}}
+  async function toggle(){if(!video)return;failure='';if(!video.paused){video.pause();return;}try{await video.play();}catch{failure='Playback could not start. Try again or choose another video.';}}
+  function seek(value:number){if(!video||!duration)return;const target=Math.max(0,Math.min(duration,value));seeking=true;position=target;video.currentTime=target;}
+  function updateVolume(value:number){if(!video)return;video.volume=value;video.muted=value===0;try{localStorage.setItem('marquee.media.volume',String(value));}catch{/* optional preference */}}
+  function volumeChanged(){if(video){volume=video.volume;muted=video.muted;}}
+  async function toggleFullscreen(){if(!player)return;try{if(document.fullscreenElement)await document.exitFullscreen();else await player.requestFullscreen();}catch{failure='Fullscreen is unavailable in this window.';}}
+  onMount(()=>{try{const stored=Number(localStorage.getItem('marquee.media.volume')??'.8');if(Number.isFinite(stored))volume=Math.max(0,Math.min(1,stored));}catch{/* default volume */}if(video)video.volume=volume;const changed=()=>fullscreen=document.fullscreenElement===player;document.addEventListener('fullscreenchange',changed);return()=>document.removeEventListener('fullscreenchange',changed);});
   onDestroy(()=>{remember();video?.pause();});
 </script>
-<!-- Disc extras may have no subtitle tracks; native controls remain available. -->
-<!-- svelte-ignore a11y_media_has_caption -->
-<video bind:this={video} src={url} controls playsinline preload="metadata" onloadedmetadata={loaded} ontimeupdate={progress} onpause={remember} onended={remember} onplay={()=>music.pause()} {onerror}></video>
-<style>video{display:block;width:100%;max-height:65vh;aspect-ratio:16/9;object-fit:contain;background:#06080c;border-radius:6px}:global(.viewer:fullscreen) video{flex:1;min-height:0;max-height:none}</style>
+
+<div class="video-player" bind:this={player}>
+  <!-- Controls are rendered by Marquee: native WebKit controls may classify a
+       finite HTTP file as live or disappear while video is fullscreen. -->
+  <!-- svelte-ignore a11y_media_has_caption -->
+  <video bind:this={video} src={url} playsinline preload="metadata" onloadedmetadata={loaded} ondurationchange={sync} ontimeupdate={progress} onpause={()=>{sync();remember();}} onended={()=>{sync();remember();}} onplay={()=>{music.pause();sync();}} onwaiting={()=>waiting=true} onplaying={()=>waiting=false} onseeked={()=>{seeking=false;sync();remember();}} onvolumechange={volumeChanged} onerror={()=>{failure='This video could not be decoded.';onerror();}}></video>
+  <div class="video-controls" role="group" aria-label="Video playback controls">
+    <div class="timeline"><span>{musicTime(position)}</span><input data-nav type="range" class="seek" aria-label="Seek video" aria-valuetext={`${musicTime(position)} of ${duration?musicTime(duration):'unknown duration'}`} min="0" max={duration||0} step=".1" value={position} disabled={!duration} style={`--filled:${fill}%`} oninput={e=>seek(Number(e.currentTarget.value))}/><span>{duration?musicTime(duration):'--:--'}</span></div>
+    <div class="toolbar"><div class="transport"><button data-nav class="control play" aria-label={paused?'Play video':'Pause video'} title={paused?'Play':'Pause'} onclick={toggle}><Icon name={paused?'play':'pause'} filled size={20}/></button><button data-nav class="control" aria-label="Rewind video 10 seconds" title="Back 10 seconds" disabled={!duration} onclick={()=>seek(position-10)}><Icon name="previous" size={17}/><span class="skip-number">10</span></button><button data-nav class="control" aria-label="Forward video 10 seconds" title="Forward 10 seconds" disabled={!duration} onclick={()=>seek(position+10)}><Icon name="next" size={17}/><span class="skip-number">10</span></button><span class="state" role="status">{!ready?'Loading video…':seeking?'Seeking…':waiting&&!paused?'Buffering…':!duration?'Duration unavailable':''}</span></div>
+      <div class="utilities"><button data-nav class="control" aria-label={muted||volume===0?'Unmute video':'Mute video'} title={muted||volume===0?'Unmute':'Mute'} onclick={()=>{if(video)video.muted=!video.muted;}}><Icon name={muted||volume===0?'muted':'volume'} size={18}/></button><input data-nav class="volume" type="range" aria-label="Video volume" min="0" max="1" step=".01" value={muted?0:volume} aria-valuetext={muted?'Muted':`${Math.round(volume*100)} percent`} style={`--filled:${(muted?0:volume)*100}%`} oninput={e=>updateVolume(Number(e.currentTarget.value))}/><button data-nav class="control" aria-label={fullscreen?'Exit video fullscreen':'Fullscreen video'} title={fullscreen?'Exit fullscreen':'Fullscreen'} onclick={toggleFullscreen}><Icon name="fullscreen" size={19}/></button></div>
+    </div>
+    {#if failure}<p class="failure" role="alert">{failure}</p>{/if}
+  </div>
+</div>
+
+<style>
+  .video-player{display:flex;flex-direction:column;min-height:0;background:#080b12;border:1px solid var(--line);border-radius:8px;overflow:hidden}video{display:block;width:100%;max-height:60vh;aspect-ratio:16/9;object-fit:contain;background:#06080c;min-height:0}.video-controls{background:var(--surface-strong);padding:12px 16px;flex-shrink:0}.timeline{display:flex;align-items:center;gap:12px}.timeline>span{font-size:11px;color:var(--text-soft);min-width:36px;text-align:center;font-variant-numeric:tabular-nums}.toolbar,.transport,.utilities{display:flex;align-items:center;gap:10px}.toolbar{justify-content:space-between;margin-top:6px}.control{display:flex;align-items:center;justify-content:center;gap:2px;width:36px;height:36px;padding:0;border:0;background:transparent;color:var(--text-soft);border-radius:6px;cursor:pointer;flex-shrink:0}.control:hover:not(:disabled){background:var(--field);color:var(--text)}.control:disabled{opacity:.35;cursor:default}.control.play{border-radius:50%;background:var(--accent);color:var(--bg);margin-right:4px}.control.play:hover{filter:brightness(1.12);background:var(--accent);color:var(--bg)}.skip-number{font-size:9px}.state{font-size:11px;color:var(--text-dim)}input[type=range]{appearance:none;-webkit-appearance:none;min-width:0;height:24px;padding:0;margin:0;background:transparent;cursor:pointer}input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:4px;background:linear-gradient(to right,var(--text-soft) 0 var(--filled),var(--field-strong) var(--filled) 100%)}input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:10px;margin-top:-3px;border-radius:50%;background:var(--text)}input[type=range]::-moz-range-track{height:4px;border-radius:4px;background:var(--field-strong)}input[type=range]::-moz-range-progress{height:4px;background:var(--text-soft)}input[type=range]::-moz-range-thumb{width:10px;height:10px;border:0;border-radius:50%;background:var(--text)}input:disabled{opacity:.35;cursor:default}.seek{width:100%}.volume{width:80px}.control:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:3px}.failure{font-size:12px;color:var(--danger);margin:8px 0 0}.video-player:fullscreen{box-sizing:border-box;border:0;border-radius:0}.video-player:fullscreen video,:global(.viewer:fullscreen) .video-player video{flex:1;max-height:none}.video-player:fullscreen,:global(.viewer:fullscreen) .video-player{flex:1;min-height:0}@media(max-width:520px){.video-controls{padding:10px}.toolbar{gap:8px;flex-wrap:wrap}.transport,.utilities{gap:5px}.utilities{margin-left:auto}.volume{width:60px}.state{display:none}}
+</style>

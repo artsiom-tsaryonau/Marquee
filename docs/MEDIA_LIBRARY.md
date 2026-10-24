@@ -57,7 +57,9 @@ the collection in Media; it never creates or removes a game installation.
   Limits: depth 8, 512 directories, 20,000 directory records, 16 MiB total
   directory data and 2,000 media candidates. Unsupported layouts fail explicitly.
 - Images open in a contained gallery with previous/next and fullscreen controls.
-  Videos use native controls for seeking, volume and fullscreen. Position is
+  Videos use always-visible Marquee controls for play/pause, seeking, 10-second
+  skips, mute/volume and fullscreen. They stay with the video in fullscreen
+  rather than relying on platform-native overlays. Position is
   persisted periodically and on pause/close. Immediate reopen uses the latest
   position; closing before metadata loads cannot replace an existing resume point
   with zero. Starting video pauses Marquee's OST playback.
@@ -158,3 +160,20 @@ Original imports, playable media and retained download/torrent payloads remain
 separate. Acquisition follows the durable manager roadmap; playback should not
 depend on retaining an archive or keeping a torrent active. This plan creates
 no network listener, account or background download.
+
+### Finite video framing and visible controls
+
+The owner's desktop test found that the MAG promo showed a native “live
+broadcast” label and no usable controls. Its large byte-range responses were
+chunked without Content-Length: tiny_http changes transfer framing at 32 KiB
+by default. Media serving now keeps the known lengths for full, HEAD and range
+responses while streaming bounded file readers. Regression tests use payloads
+and ranges above that threshold. This also applies to local OST streaming.
+
+Fedora GStreamer acceptance now reports the MAG promo duration as 76.777 seconds,
+seekable, and successfully seeks to 30 seconds. Marquee renders its own visible
+control bar, with native video overlays disabled, so desktop WebKit does not
+determine which controls are available. Browser acceptance passed play/pause, a 45-second seek, 10-second rewind,
+volume changes, visible fullscreen controls and a 390-pixel layout without
+overflow or script errors. The rebuilt native desktop is awaiting the owner’s
+recheck. Evidence is recorded in the ignored pilot artifacts.
