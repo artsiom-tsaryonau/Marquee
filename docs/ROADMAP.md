@@ -204,3 +204,9 @@ HTTP seek access. Live WebKit/browser decoding and visual acceptance remain open
 The [soundtrack guide](SOUNDTRACKS.md) owns usage, limits and MU0–MU5 gates.
 yt-dlp acquisition, Jellyfin and automatic matching remain later work; the source
 search link is not a downloader.
+
+The [YouTube OST pilot](YOUTUBE_OST.md) now tests the owner's selected Sonic 2
+playlist without browser cookies. Reuse the companion's paired bridge for a
+typed music URL handoff, then add reviewed durable manager download/audio jobs.
+Keep cookies an explicit optional fallback, separate from the existing
+Vimm/Axekin game-provider protocol and music playback.

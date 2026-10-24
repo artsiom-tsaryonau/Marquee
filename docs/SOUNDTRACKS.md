@@ -78,6 +78,11 @@ require live acceptance. No codec is claimed as successfully decoded on those
 surfaces based on header/import tests. Physical controller focus awaits hardware.
 MU0/MU1 are initial implementations, with acceptance gates still open.
 
+The owner's [YouTube playlist experiment](YOUTUBE_OST.md) tests a selected Sonic 2
+soundtrack with a checksum-verified yt-dlp helper, without cookies. That guide
+owns the acquisition evidence and URL-first browser-companion integration plan.
+It does not turn the current OST source link into a downloader or complete MU4.
+
 ## Product experience
 
 Add a **Music** section to game details with album artwork, release title,
