@@ -17,12 +17,14 @@
   import Ports from './lib/screens/Ports.svelte';
   import Tools from './lib/screens/Tools.svelte';
   import Settings from './lib/screens/Settings.svelte';
+  import Streaming from './lib/screens/Streaming.svelte';
 
   const nav: { route: Route; label: string; icon: IconName }[] = [
     { route: 'home', label: 'Home', icon: 'home' },
     { route: 'library', label: 'Library', icon: 'grid' },
     { route: 'tools', label: 'Tools', icon: 'controller' },
     { route: 'ports', label: 'Ports', icon: 'puzzle' },
+    { route: 'streaming', label: 'Streaming', icon: 'monitor' },
     { route: 'settings', label: 'Settings', icon: 'settings' },
   ];
 
@@ -155,6 +157,7 @@
         {:else if app.route === 'game'}<GamePage />
         {:else if app.route === 'tools'}<Tools />
         {:else if app.route === 'ports'}<Ports />
+        {:else if app.route === 'streaming'}<Streaming />
         {:else}<Settings />{/if}
       </div>
     {/key}

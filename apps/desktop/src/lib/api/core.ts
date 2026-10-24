@@ -41,6 +41,15 @@ export function asError(err: unknown): AppError {
 /** The commands are identical on every surface; only the transport (`call`) differs. */
 export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable' | 'pickArchives' | 'pickTorrent' | 'onArchiveDrop'> {
   return {
+    streamingState: () => call('streaming_state'),
+    streamingSaveConnection: (c) => call('streaming_save_connection', { data_dir: c.data_dir, socket: c.socket }),
+    streamingOpenViewer: (appId) => call('streaming_open_viewer', { app_id: appId }),
+    streamingPairViewer: () => call('streaming_pair_viewer'),
+    streamingInstallViewer: () => call('streaming_install_viewer'),
+    streamingDisconnectViewer: () => call('streaming_disconnect_viewer'),
+    streamingPair: (clientIp, pin) => call('streaming_pair', { client_ip: clientIp, pin }),
+    streamingRevoke: (clientId) => call('streaming_revoke', { client_id: clientId, confirmed: true }),
+    streamingEndGame: (sessionId) => call('streaming_end_game', { session_id: sessionId, confirmed: true }),
     managerStatus: () => call('manager_status'),
     torrentDownloads: () => call('torrent_downloads'),
     inspectTorrentPreparation: (infoHash, path, system) => call('inspect_torrent_preparation', { info_hash: infoHash, path, system }),

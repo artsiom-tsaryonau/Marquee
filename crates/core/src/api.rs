@@ -29,6 +29,35 @@ fn out<T: Serialize>(value: T) -> Result<Value> {
 pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
     let sink: Arc<dyn EventSink> = core.hub();
     match cmd {
+        "streaming_state" => core.streaming_state(),
+        "streaming_save_connection" => {
+            out(core.streaming_save_connection(serde_json::from_value(args)?)?)
+        }
+        "streaming_open_viewer" => out(core.streaming_open_viewer(text(&args, "app_id")?)?),
+        "streaming_pair_viewer" => out(core.streaming_pair_viewer()?),
+        "streaming_install_viewer" => out(core.streaming_install_viewer()?),
+        "streaming_disconnect_viewer" => core.streaming_disconnect_viewer(),
+        "streaming_pair" => {
+            out(core.streaming_pair(&text(&args, "client_ip")?, &text(&args, "pin")?)?)
+        }
+        "streaming_revoke" => {
+            if args.get("confirmed").and_then(Value::as_bool) != Some(true) {
+                return Err(AppError::new(
+                    "STREAMING_CONFIRM",
+                    "Confirm revoking this client's access",
+                ));
+            }
+            out(core.streaming_revoke(&text(&args, "client_id")?)?)
+        }
+        "streaming_end_game" => {
+            if args.get("confirmed").and_then(Value::as_bool) != Some(true) {
+                return Err(AppError::new(
+                    "STREAMING_CONFIRM",
+                    "Confirm ending this game; unsaved progress can be lost",
+                ));
+            }
+            out(core.streaming_end_game(&text(&args, "session_id")?)?)
+        }
         "health" => out(core.health()?),
         "library_snapshot" => out(core.snapshot()?),
         "import_catalogue" => {

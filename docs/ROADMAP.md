@@ -33,8 +33,11 @@ Fedora-to-itself streaming over `127.0.0.1`**, first the synthetic stream, then
 Sonic/BlastEm in a separate virtual Wayland desktop, received by Moonlight on the
 same physical desktop. Pairing, video/audio, streamed input, save restoration and
 disconnect/reconnect must pass. A second-device/LAN test is a separate later gate;
-local loopback success does not prove network performance. Hosting UI and an
-embedded receiver remain open. This does not mark the existing manager/store
+local loopback success does not prove network performance. The initial
+[Streaming screen](STREAMING_VIEWER.md#streaming-screen) now exposes an existing
+local host, pairing, viewer controls and confirmed session stop/revoke on both
+surfaces. Host startup automation, edition mapping and an embedded receiver
+remain open. This does not mark the existing manager/store
 gates complete or restart the deferred Quiver work.
 
 ST2a passed on 2026-10-24: pinned reference receiver installation, pairing and

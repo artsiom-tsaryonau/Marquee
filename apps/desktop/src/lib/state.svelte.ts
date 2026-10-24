@@ -10,7 +10,7 @@ import { describeScan } from './format';
 import { installOption } from './install';
 import type { GameEntry, PortEntry } from './types';
 
-export type Route = 'home' | 'library' | 'game' | 'ports' | 'settings' | 'ps2' | 'tools';
+export type Route = 'home' | 'library' | 'game' | 'ports' | 'settings' | 'ps2' | 'tools' | 'streaming';
 export type LibraryStatus = 'loading' | 'empty' | 'loaded' | 'failed';
 
 function load<T>(key: string, fallback: T): T {

@@ -32,15 +32,14 @@ fn private_dir(path: &Path) -> Result<()> {
     Ok(())
 }
 
+pub(crate) fn configuration_lease(data: &Path) -> Result<InstanceLock> {
+    private_dir(&root(data))?;
+    InstanceLock::acquire(&root(data).join("owner.lock"))
+}
+
 /// Foreground owner. The caller can disconnect it from another CLI/app process.
 /// A live child is not proof of an authenticated stream or successful decoding.
 pub fn view(data: &Path, socket: &Path, app_id: &str) -> Result<Value> {
-    let installed = super::receiver::status(data)?.ok_or_else(|| {
-        AppError::new(
-            "VIEWER_NOT_INSTALLED",
-            "Install the reference receiver first",
-        )
-    })?;
     let snapshot = super::wolf::WolfClient::new(socket)?.inspect()?;
     let apps: Vec<_> = snapshot.apps.iter().filter(|a| a.id == app_id).collect();
     if apps.len() != 1 {
@@ -67,6 +66,40 @@ pub fn view(data: &Path, socket: &Path, app_id: &str) -> Result<Value> {
             "The reference receiver needs a unique, unambiguous app name",
         ));
     }
+    let mut command = reference_command(data)?;
+    command.args([
+        "stream",
+        "127.0.0.1",
+        title,
+        "--720",
+        "--fps",
+        "60",
+        "--bitrate",
+        "10000",
+        "--display-mode",
+        "windowed",
+        "--audio-config",
+        "stereo",
+        "--video-codec",
+        "H.264",
+        "--video-decoder",
+        "auto",
+        "--capture-system-keys",
+        "never",
+        "--no-quit-after",
+        "--no-audio-on-host",
+        "--no-background-gamepad",
+    ]);
+    supervise(&root(data), &mut command, app_id)
+}
+
+fn reference_command(data: &Path) -> Result<Command> {
+    let installed = super::receiver::status(data)?.ok_or_else(|| {
+        AppError::new(
+            "VIEWER_NOT_INSTALLED",
+            "Install the reference receiver first",
+        )
+    })?;
     let preferences = data.join("streaming/moonlight/preferences");
     private_dir(&preferences)?;
     let mut command = Command::new(installed.executable);
@@ -79,32 +112,15 @@ pub fn view(data: &Path, socket: &Path, app_id: &str) -> Result<Value> {
         private_dir(&path)?;
         command.env(name, path);
     }
-    command
-        .env("QT_QPA_PLATFORM", &installed.reference.qt_platform)
-        .args([
-            "stream",
-            "127.0.0.1",
-            title,
-            "--720",
-            "--fps",
-            "60",
-            "--bitrate",
-            "10000",
-            "--display-mode",
-            "windowed",
-            "--audio-config",
-            "stereo",
-            "--video-codec",
-            "H.264",
-            "--video-decoder",
-            "auto",
-            "--capture-system-keys",
-            "never",
-            "--no-quit-after",
-            "--no-audio-on-host",
-            "--no-background-gamepad",
-        ]);
-    supervise(&root(data), &mut command, app_id)
+    command.env("QT_QPA_PLATFORM", &installed.reference.qt_platform);
+    Ok(command)
+}
+
+/// Pair using the same isolated preferences and ownership as the viewer.
+pub fn pair(data: &Path) -> Result<Value> {
+    let mut command = reference_command(data)?;
+    command.args(["pair", "127.0.0.1"]);
+    supervise(&root(data), &mut command, "pairing")
 }
 
 struct OwnedChild(Child);

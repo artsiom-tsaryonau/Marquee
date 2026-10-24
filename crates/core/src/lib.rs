@@ -57,6 +57,7 @@ pub struct Core {
     keys: keys::KeyStore,
     pub purple: Arc<purple::Manager>,
     pub source_builds: source_builds::Manager,
+    pub streaming_controls: Arc<streaming::controls::Manager>,
     pub(crate) transfers: transfer::Transfers,
     pub(crate) preparation: marquee_manager::Client,
 }
@@ -79,6 +80,7 @@ impl Core {
         let db = Db::open(&paths)?;
         let core = Self {
             source_builds: source_builds::Manager::default(),
+            streaming_controls: Arc::new(streaming::controls::Manager::default()),
             preparation: marquee_manager::Client::for_library_owner(&paths.data_dir),
             transfers: transfer::Transfers::new(&paths.data_dir),
             purple: Arc::new(purple::Manager::new(&paths)),

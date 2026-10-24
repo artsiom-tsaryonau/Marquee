@@ -1,8 +1,47 @@
 # Owned reference viewer and focus
 
-Updated 2026-10-24. Native CLI groundwork for ST3; the viewer is still the optional
-Moonlight reference program in its own window. No embedded decoder or desktop
-streaming panel is implemented by this increment.
+Updated 2026-10-24. ST3 now has a Streaming screen in desktop and browser navigation.
+Playback still uses the optional Moonlight reference program in its own window;
+there is no embedded decoder.
+
+## Streaming screen
+
+Open **Streaming** in the left navigation. It uses the same authenticated core
+commands on Tauri and the browser surface. A browser action opens the native
+viewer on the computer running Marquee, not on a remote browser device.
+
+- Connect to an already running local Wolf host. **Advanced connection** selects
+  the absolute streaming data folder and Unix API socket; the default is the
+  current library data folder. For the existing pilot select
+  `<checkout>/data/streaming-pilot` and its
+  `streaming/wolf/state/runtime/wolf.sock`. Settings persist per library.
+- Install the checksum-pinned reference viewer if absent. **Pair this viewer**
+  opens its pairing dialog with the same private preferences used for playback.
+  Select the pending device, submit its four-digit PIN, then close the pairing
+  window. PIN values are cleared immediately on submission and are not stored.
+- **Games offered by host** comes from the live host catalogue. **Open viewer**
+  opens or resumes that advertised app. **Close viewer** only disconnects the
+  owned receiver; **End game** separately requests session termination and needs
+  a second click. Revoking a paired device also requires a second click.
+- Status distinguishes an offline host, installed receiver, active operation and
+  open viewer. Requested session resolution/FPS is not measured stream quality;
+  an open receiver is never represented as verified video/audio playback.
+- Navigation away stops screen polling without stopping games or the viewer.
+  Overlapping commands/polls are suppressed. Background viewer errors remain
+  visible; connection changes are blocked while its ownership lease is active.
+
+Host build/start/stop automation, library-edition mapping, automatic focus return,
+measured quality/latency and the embedded receiver remain later work. The current
+screen deliberately exposes no nonfunctional host Start button. The existing
+operator pilot launcher remains necessary. Physical controller acceptance awaits
+hardware. Native and UI tests cover connection validation, ownership conflicts,
+background errors, confirmation, command parity and non-overlapping polling.
+Live authenticated HTTP acceptance also passed against the existing pilot: offline
+default, saved connection, advertised catalogue, viewer open, disconnect retaining
+the host session, and explicit end-game clearing it. The isolated host was stopped
+afterward. Visual screen verification is pending: no browser surface was available
+in the agent session. This does not repeat or replace the earlier human gameplay
+acceptance.
 
 ## Commands and semantics
 
@@ -70,7 +109,8 @@ For first-time manual reference pairing, launch the installed `AppRun pair
 127.0.0.1` with `QT_QPA_PLATFORM=xcb` and the three XDG variables pointing to the
 private preferences directories above. Do not override HOME. Finish host PIN
 acceptance through Marquee and close the pairing window before opening a viewer.
-The native hosting UI will own this flow later; no unattended pairing is implied.
+The Streaming screen now owns this pairing launch and PIN submission flow;
+no unattended pairing is implied.
 
 ## Focus behavior and acceptance
 

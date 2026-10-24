@@ -348,7 +348,32 @@ export interface BiosImport { added: BiosFile[]; ignored: number }
 
 export interface ManagerStatus { running: boolean; pid: number | null; stopping: boolean; protocol_version: number; snapshot_polling: boolean; event_replay: boolean; active_cancel: boolean }
 
+export interface StreamingConnection { data_dir: string; socket: string }
+export interface StreamingApp { id: string; title: string; support_hdr: boolean; start_virtual_compositor: boolean; start_audio_server: boolean }
+export interface StreamingSession { session_id: string; app_id: string | null; client_ip: string; video_width: number; video_height: number; video_refresh_rate: number; audio_channel_count: number }
+export interface StreamingState {
+  connection: StreamingConnection;
+  host: { apps: StreamingApp[]; clients: { client_id: string }[]; sessions: StreamingSession[] } | null;
+  host_error: AppError | null;
+  pending: { client_ip: string }[];
+  viewer: { running: boolean; app_id?: string; connection_verified?: boolean };
+  viewer_error: AppError | null;
+  receiver_installed: boolean;
+  receiver_error: AppError | null;
+  operation: 'viewer' | 'install' | 'pair' | null;
+  last_error: AppError | null;
+}
+
 export interface LibraryApi {
+  streamingState(): Promise<StreamingState>;
+  streamingSaveConnection(connection: StreamingConnection): Promise<void>;
+  streamingOpenViewer(appId: string): Promise<void>;
+  streamingPairViewer(): Promise<void>;
+  streamingInstallViewer(): Promise<void>;
+  streamingDisconnectViewer(): Promise<unknown>;
+  streamingPair(clientIp: string, pin: string): Promise<void>;
+  streamingRevoke(clientId: string): Promise<void>;
+  streamingEndGame(sessionId: string): Promise<void>;
   torrentDownloads(): Promise<TorrentDownload[]>;
   inspectTorrentPreparation(infoHash: string, path: string, system: string): Promise<PreparationJob>;
   browserJobs(): Promise<BrowserJob[]>;

@@ -157,7 +157,7 @@ probe. Local documentation links and whitespace checks passed.
 | --- | --- | --- |
 | ST1 | Local source build and host probe implemented | Source/image pins, software/NVIDIA encoding, real API, restart/stop and receipt rollback passed; OS snapshots, distribution review and packaged lifecycle remain open |
 | ST2 | Fedora-to-itself streaming pilot — keyboard/mouse path tested | Synthetic/Sonic video/audio, keyboard/focus, save restoration, receiver-loss/reconnect, explicit viewer disconnect and game exit passed; controller deferred for hardware, window-close button and automatic focus return remain open |
-| ST3 | Native Marquee hosting interface | Pair/revoke clients, show stream quality/state and reconnect/stop actions; map Wolf sessions to library editions and actual runner lifetime; desktop/browser parity without exposing the raw privileged API |
+| ST3 | Streaming screen implemented for an existing local host | Desktop/browser status, viewer install/open/close, pairing, revoke and confirmed host-session stop share one core API. Host startup, edition mapping, measured quality and automatic focus return remain open |
 | ST4 | Marquee receiver | Choose native decoding/rendering design, audit licensing and prove latency/input/focus/audio behavior; playback within Marquee needs a receiver implementation, not just a web video element |
 | ST5 | Second-device/LAN acceptance, then additional hosts | Separate Fedora or other supported receiver; real network latency/bandwidth/input/reconnect checks; Sunshine/Apollo adapters and wake-on-LAN follow capability-specific gates |
 
@@ -254,9 +254,9 @@ Alt+Tab/key release without stuck input, Ctrl+Alt+Shift+Z mouse release and
 Ctrl+Alt+Shift+Q normal receiver disconnect. The shortcut returned 0 while the
 same Sonic process stayed alive. Native `disconnect-viewer` and owner-crash/
 stale-socket recovery also retained the same game. Full checks and five viewer
-ownership/protocol tests passed. No hosting UI or embedded decoder ships with
-this groundwork; automatic focus return and the OS window-close button remain
-separate checks.
+ownership/protocol tests passed. This groundwork now backs the [Streaming screen](STREAMING_VIEWER.md#streaming-screen).
+No embedded decoder ships; automatic focus return and the OS window-close button
+remain separate checks.
 
 The first end-to-end test uses the same Fedora machine as both host and receiver:
 Ryzen 9 9950X3D and RTX 5090. Connect Moonlight manually to `127.0.0.1`, using the
