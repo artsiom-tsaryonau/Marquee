@@ -50,14 +50,16 @@
       <span aria-hidden="true">{music.duration ? musicTime(music.duration) : '--:--'}</span>
     </div>
   </div>
-  <div class="right">
-    <div class="output" title="Music plays on this device. It is not automatically included in a Wolf game stream."><Icon name="monitor" size={14} /><span>This device</span></div>
-    <div class="utilities">
-      <button class="control" class:active={music.queueOpen} data-nav aria-label="Show playback queue" aria-pressed={music.queueOpen} onclick={() => music.queueOpen = !music.queueOpen}><Icon name="queue" size={19} /></button>
-      <button class="control volume-button" data-nav aria-label={music.muted || music.volume === 0 ? 'Unmute soundtrack' : 'Mute soundtrack'} title={music.muted || music.volume === 0 ? 'Unmute' : 'Mute'} aria-pressed={music.muted || music.volume === 0} onclick={() => music.toggleMute()}><Icon name={music.muted || music.volume === 0 ? 'muted' : 'volume'} size={18} /></button>
-      <input class="volume" data-nav type="range" aria-label="Soundtrack volume" aria-valuetext={music.muted ? 'Muted' : `${Math.round(music.volume * 100)} percent`} min="0" max="1" step="0.01" value={music.muted ? 0 : music.volume} style={`--filled:${music.muted ? 0 : music.volume * 100}%`} oninput={(event) => music.setVolume(Number(event.currentTarget.value))} />
-      <MusicMenu label="Playback options"><label><input data-nav type="checkbox" bind:checked={music.pauseOnGame} onchange={savePreference} /> Pause when a game starts</label><button data-nav onclick={() => { music.pause(); music.queue = []; audio.removeAttribute('src'); audio.load(); }}>Close player</button></MusicMenu>
-    </div>
+  <div class="right" aria-label="Playback utilities">
+    <button class="control" class:active={music.queueOpen} data-nav data-queue-toggle aria-label="Show playback queue" title="Queue" aria-pressed={music.queueOpen} onclick={() => music.queueOpen = !music.queueOpen}><Icon name="queue" size={19} /></button>
+    <MusicMenu label="Soundtrack volume" icon={music.muted || music.volume === 0 ? 'muted' : 'volume'} closeOnAction={false}>
+      <div class="volume-popup"><strong>Volume <span>{music.muted ? 'Muted' : `${Math.round(music.volume * 100)}%`}</span></strong>
+        <input class="volume" data-nav type="range" aria-label="Soundtrack volume" aria-valuetext={music.muted ? 'Muted' : `${Math.round(music.volume * 100)} percent`} min="0" max="1" step="0.01" value={music.muted ? 0 : music.volume} style={`--filled:${music.muted ? 0 : music.volume * 100}%`} oninput={(event) => music.setVolume(Number(event.currentTarget.value))} />
+      </div>
+      <button data-nav onclick={() => music.toggleMute()}><Icon name={music.muted || music.volume === 0 ? 'volume' : 'muted'} size={17} />{music.muted || music.volume === 0 ? 'Unmute' : 'Mute'}</button>
+    </MusicMenu>
+    <MusicMenu label="Playback device" icon="monitor" text="This device"><div class="device-popup"><strong>This device</strong><p>Music plays on this computer. No remote music device is connected.</p></div></MusicMenu>
+    <MusicMenu label="Playback options"><label><input data-nav type="checkbox" bind:checked={music.pauseOnGame} onchange={savePreference} /> Pause when a game starts</label><button data-nav onclick={() => { music.pause(); music.queue = []; audio.removeAttribute('src'); audio.load(); }}>Close player</button></MusicMenu>
   </div>
   {#if music.loading || music.error || music.note}<p class="message" class:error={!!music.error} role="status">{music.error || music.note || 'Loading audio…'}</p>{/if}
 </section>
@@ -66,13 +68,13 @@
 
 <style>
   .record img { width: 100%; height: 100%; object-fit: contain; border-radius: inherit; }
-  .music-player { position: fixed; bottom: 0; left: 0; right: 0; z-index: 35; display: grid; grid-template-columns: minmax(150px, 1fr) minmax(250px, 1.4fr) minmax(260px, 1fr); gap: 18px; align-items: center; padding: 12px 24px; border-top: 1px solid var(--line); background: var(--surface-strong); }
+  .music-player { position: fixed; bottom: 0; left: 0; right: 0; z-index: 35; display: grid; grid-template-columns: minmax(150px, 1fr) minmax(250px, 1.4fr) max-content; gap: 16px; align-items: center; padding: 8px 16px; border-top: 1px solid var(--line); background: var(--surface-strong); }
   .control.active { color: var(--music-text); }
   .playing { display: flex; align-items: center; gap: 12px; min-width: 0; } .metadata { min-width: 0; }
   strong, .metadata span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } strong { font-size: 13px; font-weight: 650; }
   .metadata span { font-size: 12px; color: var(--text-dim); margin-top: 5px; }
   .record { flex: 0 0 auto; display: grid; place-items: center; width: 48px; height: 48px; border: 1px solid var(--line); border-radius: 10px; color: var(--text-soft); background: radial-gradient(circle at 35% 25%, color-mix(in srgb, var(--music-accent) 35%, transparent), var(--surface)); }
-  .center { display: grid; gap: 8px; min-width: 0; } .transport { display: flex; align-items: center; justify-content: center; gap: 18px; }
+  .center { display: grid; gap: 2px; min-width: 0; } .transport { display: flex; align-items: center; justify-content: center; gap: 18px; }
   .control { flex: 0 0 auto; display: grid; place-items: center; width: var(--music-control-size); height: var(--music-control-size); padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--text-dim); cursor: pointer; }
   .control:hover:not(:disabled) { color: var(--text); background: var(--field); } .control:disabled { opacity: .3; cursor: default; }
   .control:focus-visible { outline: 2px solid var(--music-text); outline-offset: 3px; } .primary-play { width: 32px; height: 32px; color: var(--music-ink); background: var(--music-accent); }
@@ -86,10 +88,12 @@
   input[type='range']::-moz-range-track { height: 4px; border-radius: 4px; background: var(--field-strong); } input[type='range']::-moz-range-progress { height: 4px; background: var(--text-soft); }
   input[type='range']::-moz-range-thumb { width: 10px; height: 10px; border: 0; border-radius: 50%; background: var(--text); }
   input[type='range']:focus-visible { outline: 2px solid var(--music-text); outline-offset: 3px; border-radius: 4px; } input:disabled { opacity: .35; cursor: default; }
-  .seek { width: 100%; } .right { display: grid; gap: 2px; justify-items: end; } .output { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--text-dim); }
-  .utilities { display: flex; align-items: center; gap: 5px; } .volume { width: 80px; } .message { grid-column: 1 / -1; margin: 0; font-size: 12px; color: var(--text-dim); } .error { color: var(--bad); }
-  @media(max-width:900px) { .music-player { grid-template-columns: minmax(110px, 1fr) minmax(210px, 1.4fr); } .right { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; width: 100%; } }
-  @media(max-width:560px) { .music-player { padding: 12px; gap: 12px; grid-template-columns: 1fr; } .record { width: var(--music-control-size); height: var(--music-control-size); } }
+  .seek { width: 100%; } .right { display: flex; align-items: center; justify-content: end; gap: 4px; }
+  .volume-popup, .device-popup { padding: 10px 12px; } .volume-popup strong { display: flex; justify-content: space-between; gap: 20px; } .volume-popup span { color: var(--text-dim); }
+  .volume-popup .volume { width: 100%; margin-top: 8px; } .device-popup p { font-size: 12px; color: var(--text-dim); line-height: 1.6; margin: 8px 0 0; max-width: 230px; }
+  .message { grid-column: 1 / -1; margin: 0; font-size: 12px; color: var(--text-dim); } .error { color: var(--bad); }
+  @media(max-width:900px) { .music-player { grid-template-columns: minmax(110px,1fr) minmax(190px,1.4fr) max-content; gap: 10px; } }
+  @media(max-width:640px) { .music-player { grid-template-columns: minmax(0,1fr) max-content; gap: 8px 12px; padding: 8px 12px; } .center { grid-row: 2; grid-column: 1 / -1; } .right { grid-column: 2; grid-row: 1; } .record { width: 36px; height: 36px; } .playing { gap: 8px; } }
   @media(pointer:coarse) { .control { width: 44px; height: 44px; } input[type='range'] { height: 36px; } }
   @media(prefers-reduced-motion:reduce) { .primary-play:hover:not(:disabled) { transform: none; } }
   :global(:root[data-motion='reduce']) .primary-play:hover:not(:disabled) { transform: none; }

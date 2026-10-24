@@ -196,6 +196,11 @@ no additional engine download is needed for these systems.
 
 ## Soundtrack foundation — 2026-10-24
 
+The player now centers its utility popovers on one row, OST removes the redundant
+footer note/padding, and the navigation rail is flush to the window edge. Ports
+are tagged game entries/filter results, with setup kept in Tools and no separate
+Ports screen. Metadata IDs no longer appear conditionally in installation facts.
+
 Game details now split Overview / OST / Metadata, with installation and identity
 information on the right, Edit at the top right, direct emulator settings and
 no duplicate Overview shortcut panel. The desktop rail reaches the bottom behind

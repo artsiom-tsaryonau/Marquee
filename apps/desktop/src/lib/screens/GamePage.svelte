@@ -80,7 +80,7 @@
     </div>
   </article>
 {:else}
-<article class="page" style="--accent-h:{g.art.hue2}">
+<article class="page" class:music-view={tab === 'ost'} style="--accent-h:{g.art.hue2}">
   <div class="head" in:fly={{ y: 20, duration: dur }}>
     <button class="back" data-nav onclick={() => app.back()}><Icon name="back" size={18} /> Back</button>
     {#if offline && !editing}<button class="edit-game btn glass small" data-nav onclick={beginEdit}><Icon name="edit" size={16} />Edit</button>{/if}
@@ -146,9 +146,9 @@
       </button>
     </div>
   <div class="play-strip" aria-label="Game activity">
-    <div><Icon name="clock" size={19} /><span><small>PLAYTIME</small><strong>{g.source === 'catalogue' || port ? 'Not tracked' : g.playtimeMin ? hours(g.playtimeMin) : 'Not played yet'}</strong></span></div>
-    <div><span><small>LAST PLAYED</small><strong>{g.lastPlayed ? ago(g.lastPlayed) : '—'}</strong></span></div>
-    <div><Icon name="controller" size={19} /><span><small>PLAY WITH</small><strong>{launchVia}</strong></span></div>
+    <div><span><small><Icon name="clock" size={14} />PLAYTIME</small><strong>{g.source === 'catalogue' || port ? 'Not tracked' : g.playtimeMin ? hours(g.playtimeMin) : 'Not played yet'}</strong></span></div>
+    <div><span><small><Icon name="clock" size={14} />LAST PLAYED</small><strong>{g.lastPlayed ? ago(g.lastPlayed) : '—'}</strong></span></div>
+    <div><span><small><Icon name="controller" size={14} />PLAY WITH</small><strong>{launchVia}</strong></span></div>
   </div>
 
   </div>
@@ -171,6 +171,7 @@
         </section>
         {#if g.metadata || offline && app.catalogue.records.length}<CatalogueDetails game={g} />{:else}<p class="about">No catalogue metadata is linked to this entry.</p><button class="btn glass small" data-nav onclick={browseCatalogue}>Browse catalogue</button>{/if}
         {#if g.descriptionSource}<p class="media-credit">Description source: {g.descriptionSource}</p>{/if}
+        <details class="library-identifiers"><summary data-nav>Library identifiers</summary><dl><dt>Installation ID</dt><dd class="identifier">{g.id}</dd>{#if canonicalId(g) !== g.id}<dt>Game identity</dt><dd class="identifier">{canonicalId(g)}</dd>{/if}</dl></details>
       {:else}
         <section class="overview-about"><h3>About this game</h3>
           {#if g.description}<p class="about">{g.description}</p>{:else}<p class="about muted">A release description has not been added yet.</p>{/if}
@@ -236,7 +237,7 @@
       <section class="identity"><h4>Identification</h4><dl>
         {#if g.serial}<dt>Serial</dt><dd>{g.serial}</dd>{/if}
         <dt>Metadata</dt><dd>{g.source === 'catalogue' ? 'Catalogue entry' : g.metadata ? g.metadataMatch === 'sha1' ? 'Exact SHA-1 link' : 'Manually linked' : 'No catalogue link'}</dd>
-        {#if tab === 'metadata'}<dt>Library ID</dt><dd class="identifier">{g.id}</dd>{#if canonicalId(g) !== g.id}<dt>Game identity</dt><dd class="identifier">{canonicalId(g)}</dd>{/if}{/if}
+
       </dl></section>
     </aside>
   </div>
@@ -246,6 +247,9 @@
 {/if}
 
 <style>
+  .page.music-view { padding-bottom: 0; } .music-view .body { padding-bottom: 0; }
+  .library-identifiers { margin-top: 24px; color: var(--text-dim); } .library-identifiers summary { cursor: pointer; padding: 10px 0; }
+
   .edit-game { position: absolute; top: 18px; right: var(--gutter); }
   .title-editor { display: grid; gap: 12px; } .rename-actions { display: flex; gap: 8px; }
   .side-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
@@ -268,7 +272,7 @@
 
   .play-strip { display: flex; align-items: center; flex-wrap: wrap; gap: 20px 40px; padding: 20px var(--gutter); background: var(--surface); border-block: 1px solid var(--line); }
   .play-strip > div { display: flex; align-items: center; gap: 10px; min-width: 110px; color: var(--text-dim); }
-  .play-strip span { display: grid; gap: 6px; } .play-strip small { font-size: 10px; letter-spacing: .09em; } .play-strip strong { font-size: 13px; font-weight: 600; color: var(--text-soft); }
+  .play-strip span { display: grid; gap: 6px; } .play-strip small { display: flex; align-items: center; gap: 6px; min-height: 18px; font-size: 10px; letter-spacing: .09em; } .play-strip strong { padding-left: 20px; font-size: 13px; font-weight: 600; color: var(--text-soft); }
   .game-tabs { display: flex; gap: 24px; padding: 0 var(--gutter); margin: 12px 0 0; border-bottom: 1px solid var(--line); }
   .game-tabs button { border: 0; border-bottom: 2px solid transparent; padding: 14px 4px; background: none; color: var(--text-dim); cursor: pointer; font: inherit; }
   .game-tabs button[aria-selected='true'] { border-color: var(--accent); color: var(--text); }

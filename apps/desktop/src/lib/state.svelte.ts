@@ -254,6 +254,10 @@ class AppState {
   }
 
   go(route: Route, gameId: string | null = route === 'game' ? this.gameId : null) {
+    if (route === 'ports') {
+      Object.assign(libraryView('all'), { discovery: false, sourceFilter: 'port', platform: '', query: '', region: '', language: '', revision: '', playerMode: '', installedOnly: false, noFiles: false, favOnly: false });
+      route = 'library'; gameId = null;
+    }
     if (route === this.route && gameId === this.gameId) return;
     this.history.push({ route: this.route, gameId: this.gameId, heroId: this.heroId });
     this.route = route;

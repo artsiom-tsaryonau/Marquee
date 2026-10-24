@@ -88,12 +88,13 @@
     <div class="actions"><button class="btn primary" data-nav disabled={busy}>Save soundtrack</button><button type="button" class="btn glass" data-nav disabled={busy} onclick={() => editing = false}>Cancel</button></div>
   </form>{/if}
   {#if !albums.length && !busy}<div class="glass-panel empty"><span class="disc" aria-hidden="true">♫</span><h3>{library ? 'Build your music library' : 'Give this game a soundtrack'}</h3><p>Add an album, then choose its local audio files. Music keeps playing while you browse Marquee.</p><p class="hint">MP3, FLAC, OGG and WAV are accepted for import; playback depends on the decoder available in your browser or desktop runtime.</p></div>{/if}
+  {#if !library && unlinked.length}<form class="reuse" onsubmit={(e) => { e.preventDefault(); if (existing) void run(async () => { await app.api.musicLink(gameKey, existing, true); existing = ''; }); }}><label>Link an existing soundtrack<select data-nav bind:value={existing} disabled={busy}><option value="">Choose album</option>{#each unlinked as album}<option value={album.id}>{album.title}{album.artist ? ` · ${album.artist}` : ''}</option>{/each}</select></label><button class="btn glass" data-nav disabled={busy || !existing}>Link album</button></form>{/if}
   {#each displayed as album (album.id)}<article class="glass-panel album">
     <div class="album-head"><div class="album-art" aria-hidden="true">{#if albumArtwork(album, app.games)}<img src={albumArtwork(album, app.games)!.url} alt="" />{:else}♫{/if}</div><div class="album-info"><span class="eyebrow">SOUNDTRACK · {album.tracks.length} TRACKS</span><h3>{album.title}</h3>{#if albumArtwork(album, app.games)}<span class="art-credit">{albumArtwork(album, app.games)!.label}</span>{/if}{#if album.artist}<p>{album.artist}</p>{/if}{#if album.source_url}<a data-nav href={album.source_url} onclick={(event) => openSource(event, album)} target="_blank" rel="noreferrer">View source ↗</a>{/if}</div></div>
     <div class="album-actions">
       <button class="album-play" data-nav aria-label={music.current?.albumId === album.id && (!music.paused || music.loading) ? 'Pause album' : 'Play album'} title={music.current?.albumId === album.id && (!music.paused || music.loading) ? 'Pause album' : 'Play album'} disabled={!album.tracks.some(t => t.available)} onclick={() => toggleAlbum(album)}><Icon name={music.current?.albumId === album.id && (!music.paused || music.loading) ? 'pause' : 'play'} size={25} filled /></button>
       <button class="add-tracks" data-nav disabled={busy} title="Choose local audio files" onclick={() => addFiles(album)}><Icon name="plus" size={18} />Add tracks</button>
-      <MusicMenu label={`Album options for ${album.title}`}><button data-nav disabled={busy} onclick={() => chooseArtwork(album)}><Icon name="image" size={16} />Choose album artwork</button>{#if album.cover_data_url}<button data-nav disabled={busy} onclick={() => run(() => app.api.musicSetCover(album.id, null))}>Remove album artwork</button>{/if}<button data-nav disabled={busy} onclick={() => edit(album)}><Icon name="settings" size={16} />Edit album details</button>{#if !library}<button data-nav disabled={busy} onclick={() => run(() => app.api.musicLink(gameKey, album.id, false))}>Unlink from this game</button>{/if}</MusicMenu>
+      <MusicMenu label={`Album options for ${album.title}`}><button data-nav disabled={busy} onclick={() => chooseArtwork(album)}><Icon name="image" size={16} />Choose album artwork</button>{#if album.cover_data_url}<button data-nav disabled={busy} onclick={() => run(() => app.api.musicSetCover(album.id, null))}>Remove album artwork</button>{/if}<button data-nav disabled={busy} onclick={() => edit(album)}><Icon name="settings" size={16} />Edit album details</button>{#if !library}<button data-nav disabled={busy} title="The album stays in Music; audio files are kept." onclick={() => run(() => app.api.musicLink(gameKey, album.id, false))}>Unlink from this game</button>{/if}</MusicMenu>
     </div>
     {#if album.tracks.length}
       <div class="list-heading" aria-hidden="true"><span>#</span><span>Title</span><span class="album-column">Album</span><span class="duration-column"><Icon name="clock" size={14} /></span></div>
@@ -113,12 +114,12 @@
       {/each}</ol>
     {:else}<p class="hint">No audio attached. Add tracks to build this album’s track list.</p>{/if}
   </article>{/each}
-  {#if !library && unlinked.length}<form class="reuse" onsubmit={(e) => { e.preventDefault(); if (existing) void run(async () => { await app.api.musicLink(gameKey, existing, true); existing = ''; }); }}><label>Link an existing soundtrack<select data-nav bind:value={existing} disabled={busy}><option value="">Choose album</option>{#each unlinked as album}<option value={album.id}>{album.title}{album.artist ? ` · ${album.artist}` : ''}</option>{/each}</select></label><button class="btn glass" data-nav disabled={busy || !existing}>Link album</button></form>{/if}
-  <p class="hint">Albums stay in Music when you unlink them from a game. Original audio files are kept intact.</p>
+
 </section>
 
 <style>
-  .album-art img, .library-art img { width: 100%; height: 100%; object-fit: contain; display: block; border-radius: inherit; }
+  .album-art, .library-art { position: relative; overflow: hidden; flex-shrink: 0; }
+  .album-art img, .library-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; border-radius: inherit; }
   .art-credit { display: block; color: var(--text-dim); font-size: 11px; margin: 6px 0; }
   .back-albums { display: flex; align-items: center; gap: 6px; justify-self: start; border: 0; background: transparent; color: var(--text-soft); font: inherit; cursor: pointer; padding: 8px 0; }
   .music-search { display: flex; align-items: center; gap: 10px; background: var(--field); padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; }
@@ -128,7 +129,7 @@
   .album-card:hover { background: var(--field); } .album-card > span:last-child { color: var(--text-dim); font-size: 12px; }
   .library-art { width: 100%; aspect-ratio: 1; display: grid; place-items: center; border-radius: 10px; color: var(--music-text); background: radial-gradient(circle, color-mix(in srgb,var(--music-accent) 30%,var(--surface)),var(--bg)); }
 
-  .soundtrack { display: grid; gap: 22px; max-width: 1100px; margin: 0 auto; padding: 24px var(--gutter) 40px; }
+  .soundtrack { display: grid; gap: 22px; max-width: 1100px; margin: 0 auto; padding: 24px var(--gutter) 0; }
   header, .album-head { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; } header { justify-content: space-between; }
   h2 { margin: 8px 0; font-size: 28px; } h3 { margin: 6px 0 12px; } p { line-height: 1.65; margin: 8px 0; color: var(--text-soft); }
   .eyebrow { color: var(--text-dim); font-size: 11px; letter-spacing: .1em; } .actions { display: flex; gap: 10px; flex-wrap: wrap; }
@@ -141,7 +142,7 @@
   .album-play { width: var(--music-play-size); height: var(--music-play-size); display: grid; place-items: center; flex: 0 0 auto; border: 0; border-radius: 50%; color: var(--music-ink); background: var(--music-accent); cursor: pointer; }
   .album-play:hover:not(:disabled) { filter: brightness(1.12); transform: scale(1.04); } .album-play:disabled { opacity: .35; cursor: default; }
   .album-play:focus-visible, .add-tracks:focus-visible, .track:focus-visible { outline: 2px solid var(--music-text); outline-offset: 3px; }
-  .add-tracks { display: flex; align-items: center; gap: 8px; height: var(--music-control-size); box-sizing: border-box; padding: 0 16px; border-radius: 24px; border: 1px solid var(--line); background: transparent; color: var(--text-soft); font: inherit; font-size: 13px; cursor: pointer; }
+  .add-tracks { display: flex; align-items: center; gap: 8px; height: var(--music-control-size); box-sizing: border-box; padding: 0 16px; border-radius: 8px; border: 1px solid var(--line); background: var(--field-strong); color: var(--text); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
   .add-tracks:hover { color: var(--text); border-color: var(--text-dim); } .add-tracks:disabled { opacity: .4; cursor: default; }
   .list-heading { display: grid; grid-template-columns: 36px minmax(0,1fr) minmax(0,.7fr) 56px; gap: 12px; padding: 22px 58px 10px 10px; color: var(--text-dim); font-size: 12px; border-bottom: 1px solid var(--line); }
   .list-heading span:first-child { text-align: center; } .tracks { padding: 6px 0 0; margin: 0; list-style: none; }

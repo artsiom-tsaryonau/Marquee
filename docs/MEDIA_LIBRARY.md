@@ -24,9 +24,10 @@ queued track plays it; selecting the current one toggles pause. Starting another
 album replaces the queue. The queue survives page navigation within this app
 session but is not saved across app restarts or shared with another device.
 
-The player occupies a full-width bottom footer. Its measured height reserves
+The player occupies a full-width bottom footer with a centered utility row and
+volume/device/queue popovers. Its measured height reserves
 page space and internal sidebar padding, including narrow layouts. The desktop
-rail extends to the bottom behind the player overlay. **Add games** belongs
+rail is flush with the window edges and extends behind the player overlay. **Add games** belongs
 to the Games library header; **Big Screen** is in the desktop toolbar at the top
 right. Narrow desktop navigation sits above the player, and Big Screen hints
 also reserve its height. Rendered desktop/responsive/controller acceptance is

@@ -41,7 +41,7 @@ compatibility/Epic, then GOG remain the store milestones.
   availability and attention filters plus a compact view. Emulator installation
   is labeled Installed, not Ready. Required firmware gaps are explained.
   Firmware filenames expand on demand instead of setting every card's height.
-- Ports shows setup requirements, supported actions and installation details
+- Native port setup in Tools shows requirements, supported actions and installation details
   instead of a decorative feature banner. Missing-ROM/data actions open the
   existing folder fallback rather than reinstalling the engine. Requirement
   copy describes current behavior rather than future development jobs.
@@ -153,6 +153,28 @@ behavior. This dated checklist does not close rendered/native/controller gates.
 
 ## Presentation goals still to validate or extend
 
+The player utility row now centers Queue, Volume, Device and Options on one
+baseline. Volume and device details use anchored disclosures; Queue is a bounded
+popover with outside-click/Escape dismissal and focus return. The device panel
+reports local output only and does not imply remote music-device support. The
+desktop player uses tighter vertical spacing, with a two-row narrow layout.
+The sidebar is flush to the window's left/top/bottom edges, and the page meets
+its right edge; persistent expansion reserves content space.
+
+OST content ends after its album list without the persistent unlink/storage
+footnote or added bottom padding. The relevant unlink action has a tooltip.
+Album images are contained in their frames, and Add tracks is a filled secondary
+control. Installation information remains stable across tabs; raw library IDs
+live in a Library identifiers disclosure inside Metadata. Activity labels place
+their icons on the same label baseline, with aligned values underneath.
+
+Ports no longer have a separate main navigation destination. Installed native
+ports remain game entries with a **Native port** tag and a Games filter; Tools
+keeps engine installation/configuration and uninstalled port discovery. Legacy
+`ports` navigation resolves to the filtered Games library and clears conflicting
+discovery filters. Game identity, setup requirements and installed status are
+preserved; removing the screen does not install engines or add ownership.
+
 Platform identity uses original, bundled vector hardware miniatures beside names
 in library chips/shelf headings, Home shortcuts, game facts and Tools filters.
 Common systems have distinct silhouettes/colors; less common platforms use a
@@ -169,7 +191,8 @@ Game details now have **Overview**, **OST** and **Metadata** tabs with wrapping
 Left/Right and Home/End keyboard navigation. Metadata owns catalogue matching and
 artwork refresh; the duplicate Your copy / Review metadata / Soundtracks shortcut
 panel is removed. Installation and compact identification occupy the right rail
-across tabs, with full library/canonical IDs shown when Metadata is selected.
+across tabs. Full library/canonical IDs are now in the Library identifiers
+disclosure within Metadata, keeping the right rail stable.
 Overview shows the real description and related playable games, falling back to
 the same platform when genre data is absent. Missing descriptions remain explicit.
 **Edit** sits at the top right for locally editable ROM entries and focuses the

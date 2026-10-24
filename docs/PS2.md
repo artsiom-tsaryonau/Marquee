@@ -261,7 +261,7 @@ After import, Marquee fetches 2D covers from [xlenore/ps2-covers](https://github
 | Event stream | `crates/core/src/hub.rs` |
 | API keys (registry, precedence, masking) | `crates/core/src/keys.rs`; Settings → API keys in `Settings.svelte` |
 | Local web server (token, loopback) | `crates/core/src/server.rs`, `marquee run web` |
-| Native ports | `crates/core/src/ports.rs`, `catalog/ports/*.json`, `apps/desktop/src/lib/screens/Ports.svelte` |
+| Native ports | `crates/core/src/ports.rs`, `catalog/ports/*.json`, Games library and `apps/desktop/src/lib/screens/Tools.svelte` |
 | Native vs web | `apps/desktop/src/lib/api/` (`desktop.ts`, `http.ts`, shared `core.ts`) |
 | Play / empty library | `apps/desktop/src/lib/state.svelte.ts` |
 | Install UI | `apps/desktop/src/lib/install.ts`, `InstallMenu.svelte`, `InstallDialog.svelte` |

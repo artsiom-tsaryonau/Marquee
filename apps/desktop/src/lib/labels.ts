@@ -5,7 +5,7 @@ export const sourceLabel: Record<Source, string> = {
   gog: 'GOG',
   epic: 'Epic',
   lutris: 'Lutris',
-  port: 'Port',
+  port: 'Native port',
   rom: 'Emulated',
   catalogue: 'Catalogue',
 };

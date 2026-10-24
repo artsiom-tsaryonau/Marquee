@@ -584,3 +584,11 @@ test('manager controls share the desktop/browser transport and do not launch gam
   await api.managerStatus(); await api.startManager(); await api.stopManager();
   assert.deepEqual(calls,[['manager_status',undefined],['start_manager',undefined],['stop_manager',undefined]]);
 });
+
+test('legacy Ports navigation opens tagged Games and clears incompatible discovery filters', async () => {
+  const {libraryView}=await import('../src/lib/libraryView.svelte');
+  const view=libraryView('all');Object.assign(view,{discovery:true,query:'old',platform:'ps2',sourceFilter:'rom',region:'USA',favOnly:true,installedOnly:true});
+  app.go('ports');
+  assert.equal(app.route,'library');assert.equal(view.sourceFilter,'port');assert.equal(view.discovery,false);
+  assert.equal(view.platform,'');assert.equal(view.query,'');assert.equal(view.region,'');assert.equal(view.favOnly,false);assert.equal(view.installedOnly,false);
+});

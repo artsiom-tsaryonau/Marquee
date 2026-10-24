@@ -14,7 +14,6 @@
   import Home from './lib/screens/Home.svelte';
   import Library from './lib/screens/Library.svelte';
   import GamePage from './lib/screens/GamePage.svelte';
-  import Ports from './lib/screens/Ports.svelte';
   import Tools from './lib/screens/Tools.svelte';
   import Settings from './lib/screens/Settings.svelte';
   import Streaming from './lib/screens/Streaming.svelte';
@@ -28,7 +27,6 @@
     { route: 'library', label: 'Games', icon: 'grid' },
     { route: 'music', label: 'Music', icon: 'music' },
     { route: 'tools', label: 'Tools', icon: 'controller' },
-    { route: 'ports', label: 'Ports', icon: 'puzzle' },
     { route: 'streaming', label: 'Streaming', icon: 'monitor' },
     { route: 'settings', label: 'Settings', icon: 'settings' },
   ];
@@ -86,7 +84,8 @@
     // Dev shortcuts: ?route=library&mode=big&theme=light&splash=0&empty=1
     const q = new URLSearchParams(location.search);
     const r = q.get('route') as Route | null;
-    if (r) app.route = r;
+    if (r === 'ports') app.go('ports');
+    else if (r) app.route = r;
     if (q.get('mode') === 'big' || q.get('mode') === 'desktop') app.mode = q.get('mode') as 'big' | 'desktop';
     if (q.get('theme') === 'light' || q.get('theme') === 'dark') app.theme = q.get('theme') as 'light' | 'dark';
     if (q.get('motion') === '0') app.reduceMotion = true;
@@ -162,7 +161,7 @@
         {:else if app.route === 'ps2'}<Library collection="ps2" />
         {:else if app.route === 'game'}<GamePage />
         {:else if app.route === 'tools'}<Tools />
-        {:else if app.route === 'ports'}<Ports />
+        {:else if app.route === 'ports'}<Library />
         {:else if app.route === 'streaming'}<Streaming />
         {:else}<Settings />{/if}
       </div>
@@ -233,9 +232,10 @@
     flex: 1;
     min-width: 0;
     display: block;
-    margin-left: 88px;
+    margin-left: 76px;
   }
   :global([data-mode='big']) main { margin-left: 0; }
+  .shell:has(.side.expanded) main { margin-left: 220px; }
   .desktop-toolbar { position: sticky; top: 0; z-index: 19; display: flex; justify-content: space-between; align-items: center; min-height: 52px; padding: 0 var(--gutter); background: var(--bg); border-bottom: 1px solid var(--line); color: var(--text-dim); font-size: 12px; }
   .screen-mode { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 0; border-radius: 8px; color: var(--text-soft); background: transparent; font: inherit; cursor: pointer; }
   .screen-mode:hover { background: var(--field); }
@@ -246,14 +246,15 @@
   /* Desktop sidebar: icons, labels slide out on hover. */
   .side {
     position: fixed;
-    top: 12px;
+    top: 0;
     bottom: 0;
-    left: 12px;
+    left: 0;
     overflow-y: auto;
     box-sizing: border-box;
-    width: 64px;
-    padding: 14px 8px calc(var(--player-height, 0px) + 14px);
-    border-radius: 12px 12px 0 0;
+    width: 76px;
+    padding: 14px 14px calc(var(--player-height, 0px) + 14px);
+    border-radius: 0;
+    border-width: 0 1px 0 0;
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -616,9 +617,9 @@
     .side:focus-within {
       position: fixed;
       top: auto;
-      left: 8px;
-      right: 8px;
-      bottom: calc(var(--player-height, 0px) + 8px);
+      left: 0;
+      right: 0;
+      bottom: var(--player-height, 0px);
       width: auto;
       height: 60px;
       margin: 0;
@@ -637,6 +638,7 @@
       margin-left: 0;
       padding-bottom: 76px;
     }
+    .shell:has(.side.expanded) main { margin-left: 0; }
     .side { overflow-x: auto; }
     .nav { padding: 0 10px; }
     .tab {

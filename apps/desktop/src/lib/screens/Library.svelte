@@ -164,6 +164,7 @@
           <span class="add-hint">Pick the system, then the folder that holds its games.</span>
           {#each addTargets as t (t.id)}<button class="add-item" role="menuitem" data-nav onclick={() => addFolder(t.id)}>{t.label}</button>{/each}
           <button class="add-item" role="menuitem" data-nav onclick={() => { addMenu.open = false; app.intakeOpen = true; }}>Import ZIP/7z/RAR archives…</button>
+          <button class="add-item" role="menuitem" data-nav onclick={() => app.go('tools')}>Set up a native port…</button>
           <hr />
           <span class="add-hint">Don't have the files yet?</span>
           <button class="add-item" role="menuitem" data-nav onclick={startAddGame}>Add a game without files…</button>
@@ -199,6 +200,7 @@
       {#if view.query}<button class="clear" onclick={() => (view.query = '')} aria-label="Clear search"><Icon name="x" size={16} /></button>{/if}
     </label>
     <div class="chips" data-nav-row>
+      <button class="chip" class:on={view.sourceFilter === 'port'} data-nav aria-pressed={view.sourceFilter === 'port'} onclick={() => { view.discovery = false; view.sourceFilter = view.sourceFilter === 'port' ? '' : 'port'; }}><Icon name="puzzle" size={14} />Native ports</button>
       <button class="chip" class:on={view.installedOnly} data-nav aria-pressed={view.installedOnly} onclick={() => (view.installedOnly = !view.installedOnly)}>Installed</button>
       <button class="chip" class:on={view.noFiles} data-nav aria-pressed={view.noFiles} onclick={() => (view.noFiles = !view.noFiles)} title="Wishlist and games whose files are not here">Without files{#if noFilesCount} <span>{noFilesCount}</span>{/if}</button>
       <button class="chip" class:on={view.favOnly} data-nav aria-pressed={view.favOnly} onclick={() => (view.favOnly = !view.favOnly)}><Icon name="star" size={14} filled={view.favOnly} /> Favourites</button>

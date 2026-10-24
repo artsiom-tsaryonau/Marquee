@@ -63,9 +63,17 @@ time. Unknown durations show **—** and never prevent playback; the loaded medi
 element supplies the current track's playback duration. This does not establish
 that a codec can be decoded by the desktop/browser runtime.
 
-The output indicator **This device** describes current routing. It does not
+The **Playback device** popover reports **This device** as current routing. It does not
 select an output device or automatically mix music into a game stream. See the
 [streamed launcher/audio plan](STREAMING.md#launcher-music-and-media-streaming).
+
+The compact player's Queue, Volume, Device and Options controls share one row.
+Volume uses a popup slider/mute control; Queue opens a bounded popover with
+outside-click/Escape dismissal. Add tracks is a filled secondary action. Album
+images stay within their frames; unlink/storage information appears at the
+relevant action rather than as a persistent note after the track list. Extra
+OST end padding is removed, while the app still reserves the player's real
+height so the final track remains reachable.
 
 Use **Link an existing soundtrack** to reuse an album for another game. Existing
 explicit canonical game identities are reused; similar titles are not merged.
