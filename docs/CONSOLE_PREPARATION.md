@@ -1,6 +1,6 @@
 # Console collection: inventory and preparation plan
 
-Updated 2026-10-22. The owner reports adding **Switch, PS3, PS4, original Xbox and
+Updated 2026-10-24. The owner reports adding **Switch, PS3, PS4, original Xbox and
 Xbox 360 games**. The source tree has now been inventoried read-only using filesystem metadata and
 ZIP headers. Inner formats not inspected remain unknown; no console game, firmware
 or key material was installed or changed.
@@ -38,7 +38,7 @@ platforms. Full paths/sizes and ZIP-header summaries are in ignored
 
 | Platform | Observed source shape | Preparation status |
 | --- | --- | --- |
-| PS3 | God of War III `.7z`, about 35.8 GB compressed | Inner layout not inspected; no PS3 adapter |
+| PS3 | God of War III `.7z`, 35,786,199,527 bytes; headers contain a 38,169,870,336-byte `.dec.iso` plus text | Read-only header inspection implemented; title ID/encryption unverified, no extraction or PS3 game adapter |
 | PS4 | The Last of Us Remastered `.pkg.rar`, about 47.2 GB; separate Shadow of the Colossus `.torrent` metadata | Filename is only a format hint; RAR payload/torrent files not installed or fetched |
 | Switch | Firmware ZIP containing `.nca`; Nightshade ZIP containing `.nsp`; Zelda base ZIP containing `.xci` plus `.url`; separate DLC ZIP containing `.nsp`; two `.keys` files | Containers recorded separately; no base/update/DLC identity or key validity inferred |
 | Xbox | Splinter Cell `.iso.rar`, about 6.3 GB | Inner layout not inspected; requires xemu-specific format/configuration work |
@@ -49,6 +49,12 @@ database. Its source hash was unchanged, and no other collection files were
 extracted. The existing user library remained at schema 5 with 856 editions and
 29 sessions during inspection; it was not reset. The new build migrates libraries
 additively to schema 6 on opening.
+
+PS3-specific progress: [PS3 discovery](PS3.md) now provides native/browser/CLI
+read-only archive and folder inspection. It does not close the broader inventory,
+firmware, preparation or launch gates below. The supplied archive contains an ISO,
+so its next recipe needs image/filesystem inspection rather than assuming a loose
+PS3_GAME folder. No source payload was extracted.
 
 ## P0 — Read-only inventory (in progress)
 

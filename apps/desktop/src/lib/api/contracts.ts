@@ -370,6 +370,23 @@ export interface MusicTrack { id: string; title: string; available: boolean; dur
 export interface MusicAlbum { id: string; title: string; artist: string; source_url: string; cover_data_url?: string | null; cover_source?: string | null; game_keys?: string[]; tracks: MusicTrack[] }
 export interface MusicDraft { game_key: string; album_id: string | null; title: string; artist: string; source_url: string }
 
+export interface Ps3Inspection {
+  source: string;
+  source_kind: string;
+  source_bytes: number | null;
+  archive_unpacked_bytes: number | null;
+  inspected_entries: number;
+  truncated: boolean;
+  playable: false;
+  items: {
+    path: string; kind: string; bytes: number | null;
+    metadata: {title: string; title_id: string; category: string; app_version: string | null; system_version: string | null} | null;
+    boot_file_present: boolean; artwork_present: boolean;
+    status: string; next_action: string;
+  }[];
+  diagnostics: string[];
+}
+
 export interface LibraryApi {
   musicAlbums(gameKey?: string): Promise<MusicAlbum[]>;
   musicFind(title: string): Promise<void>;
@@ -406,6 +423,8 @@ export interface LibraryApi {
   cancelPreparation(id: string): Promise<PreparationJob>;
   intakeArchive(path: string, deleteSource?: boolean): Promise<IntakeReport>;
   pickArchives(): Promise<string[]>;
+  pickPs3Content(): Promise<string | null>;
+  inspectPs3(path: string): Promise<Ps3Inspection>;
   pickTorrent(): Promise<string | null>;
   onArchiveDrop(handler: (paths: string[]) => void): Promise<() => void>;
   emulatorProfile(id: string): Promise<EmulatorProfileStatus>;

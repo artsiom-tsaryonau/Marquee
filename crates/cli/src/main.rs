@@ -89,6 +89,10 @@ enum Command {
     Run(RunCmd),
     /// Read-only native/Flatpak Steam clients, library folders and installed manifests
     SteamInspect,
+    /// Read-only PS3 archive/folder discovery; never installs or registers games
+    Ps3Inspect {
+        path: PathBuf,
+    },
     Health,
 }
 
@@ -556,6 +560,13 @@ fn streaming(
 
 fn run() -> marquee_core::error::Result<()> {
     let args = Args::parse();
+    if let Command::Ps3Inspect { path } = &args.command {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&marquee_core::ps3::inspect(path)?)?
+        );
+        return Ok(());
+    }
     // Streaming must remain usable while the desktop holds the library lease.
     // No data-directory resolution, manager start or transfer recovery here.
     if let Command::Streaming { socket, command } = &args.command {
@@ -794,6 +805,7 @@ fn run() -> marquee_core::error::Result<()> {
                 }
             }
         }
+        Command::Ps3Inspect { .. } => unreachable!("handled without Core"),
         Command::Runners(RunnersCmd::List { json }) => {
             let runners = core.refresh_runners()?;
             if json {

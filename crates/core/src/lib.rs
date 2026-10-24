@@ -25,6 +25,7 @@ pub mod paths;
 pub mod ports;
 pub mod preparation;
 pub mod profiles;
+pub mod ps3;
 pub mod purple;
 pub mod romart;
 pub mod romfacts;

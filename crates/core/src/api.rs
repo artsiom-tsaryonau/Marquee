@@ -29,6 +29,9 @@ fn out<T: Serialize>(value: T) -> Result<Value> {
 pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
     let sink: Arc<dyn EventSink> = core.hub();
     match cmd {
+        "inspect_ps3" => out(crate::ps3::inspect(
+            PathBuf::from(text(&args, "path")?).as_path(),
+        )?),
         "music_find" => out(core.music_find(&text(&args, "title")?)?),
         "music_open_source" => out(core.music_open_source(&text(&args, "album_id")?)?),
         "music_albums" => out(core.music_albums(maybe(&args, "game_key").as_deref())?),

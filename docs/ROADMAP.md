@@ -93,6 +93,13 @@ validated format/title path at a time, not as a prerequisite to every store flow
 The store sequence remains Steam → compatibility/Epic → GOG; Quiver, optional
 enrichment and a separate manager UI remain deferred.
 
+PS3 step P3-0 now adds [read-only content discovery](PS3.md) through RPCS3’s
+Tools dialog and a library-independent CLI. The supplied God of War III archive
+contains a 38.17 GB ISO candidate; title identity and encryption remain unverified.
+Next PS3 steps are firmware readiness and reviewed disc-image preparation, then
+library Play and title-specific local/streamed acceptance. No source extraction
+or playable PS3 library entry is implied by discovery.
+
 ## Current implementation versus target
 
 | Area | Current evidence and remaining boundary |
@@ -104,7 +111,7 @@ enrichment and a separate manager UI remain deferred.
 | Archive preparation | M1 persistent explicit-platform reviews/jobs/receipts, isolated directory promotion, transactional registration and restart recovery; legacy immediate batches remain available. Independent worker is implemented; universal transport registry and unsupported package recipes remain open |
 | Torrents | Durable history, reviewed files/magnets, private/public separation, retained sources, pause/resume and scan recovery; hosted by the detached manager with backed-up single-owner adoption and no-UI checkpoints; linked archive/platform reviews and immutable source-bearing receipts implemented; real 13.58 GB receive-only PS4 transport passed, package installation remains unsupported |
 | Browser/provider work | Opt-in companion → manager job authority, stable replay, attribution, progress/hash history and acknowledged cancellation; Atomic linked platform review and provenance-bearing preparation/library receipts verified with synthetic UI and recovery tests. Legacy completion adoption, live provider-to-install/launch acceptance, reference hashes and packaged delivery remain open |
-| Added console games | Owner reports Switch, PS3, PS4, Xbox and Xbox 360 additions; RPCS3/shadPS4/xemu tools exist, no library descriptors/adapters for the five systems. [Console plan](CONSOLE_PREPARATION.md) owns gaps |
+| Added console games | Owner reports Switch, PS3, PS4, Xbox and Xbox 360 additions; RPCS3/shadPS4/xemu tools exist; PS3 read-only archive/folder discovery implemented, no library Play adapters for the five systems. [Console plan](CONSOLE_PREPARATION.md) owns gaps |
 | Stores | Read-only installed Steam detection/manifests implemented; persistent library/launch and complete Steam/Epic/GOG workflows remain open |
 | Streaming | Native Wolf API/build/probes and owned reference viewer open/status/disconnect; Sonic video/audio/keyboard, saves, focus/key release, mouse release and disconnect/reconnect passed. Hosting lifecycle/UI, embedded player, OS window-close/automatic focus return, deferred controller and second-device gates remain open; [streaming gates](STREAMING.md) |
 | Compatibility | Narrow Purple/Aion 2 setup/open recipe with checkpoints/cancellation; live game compatibility and general runtime lifecycle remain open |

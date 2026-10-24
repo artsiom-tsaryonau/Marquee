@@ -6,6 +6,7 @@
   import { coverSrc } from '../api/map';
   import { systemLabel } from '../labels';
   import Artwork from './Artwork.svelte';
+  import Ps3Discovery from './Ps3Discovery.svelte';
   import EmulatorProfile from './EmulatorProfile.svelte';
   import Icon from './Icon.svelte';
   import type { EmulatorBuildStatus } from '../api/contracts';
@@ -172,6 +173,7 @@
       {#if e.launch_presentation}<p class="hint">{e.launch_presentation}</p>{/if}
       {#if error}<p class="error" role="alert">{error}</p>{/if}
 
+      {#if e.id === 'rpcs3'}<Ps3Discovery />{/if}
       {#if (e.firmware ?? []).length}
         <section>
           <h3>Firmware</h3>
