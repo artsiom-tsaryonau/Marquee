@@ -1,8 +1,6 @@
 # YouTube OST experiment and companion integration
 
-Updated 2026-10-24. This is an operator-run acquisition experiment, separate from
-the implemented [local OST tab/player](SOUNDTRACKS.md). It is not a new durable
-manager transport or a YouTube downloader button in the browser companion.
+Updated 2026-10-25. In-app cookie-free soundtrack discovery is implemented alongside the operator-run acquisition experiment and [local soundtrack player](SOUNDTRACKS.md). Durable audio acquisition and a browser companion music handoff remain future work.
 
 ## Source and tooling
 
@@ -116,3 +114,49 @@ Primary references: [official release](https://github.com/yt-dlp/yt-dlp/releases
 [EJS/runtime setup](https://github.com/yt-dlp/yt-dlp/wiki/EJS),
 [cookie handling FAQ](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp),
 [Chrome cookie API permissions](https://developer.chrome.com/docs/extensions/reference/api/cookies).
+
+
+## In-app source discovery (implemented 2026-10-25)
+
+Game → Media → Soundtrack → **Find soundtrack** offers playlist and video
+search, an ordered playlist preview and **Link source**. A browser YouTube search
+link remains available. Opening a result is explicit; it never launches a browser
+automatically to solve sign-in or verification challenges. No Quiver code is used:
+Quiver remains the deferred app/recomp catalogue track, not a soundtrack provider.
+
+The first search installs the same pinned official Linux x86-64 yt-dlp release and
+SHA-256 recorded above under `<data>/music-tools/yt-dlp/2026.10.21/yt-dlp`.
+Downloads have a 64 MiB limit and are published only after checksum verification;
+the executable is rechecked before each operation. Other host platforms use the
+browser fallback for now. This foreground metadata helper is not a durable media
+transport. Installation can take up to 180 seconds; extraction is bounded to 45
+seconds, 2 MiB JSON and 64 KiB discarded diagnostics. One discovery operation may
+run at a time. Ephemeral metadata/diagnostics use temporary files that are closed
+and removed afterward; raw extractor output is not persisted or sent to the UI.
+
+Search uses flat, skip-download extraction with no user configuration, cookies,
+cache, JS runtimes, plugins or remote components. It returns at most eight sources;
+playlist inspection reads at most 51 entries and displays 50 with an explicit
+truncation label. Requests accept canonical YouTube source IDs, never arbitrary
+helper flags/commands or extractor URLs. Output exposes only bounded title,
+uploader, canonical source URL and optional duration. Uploader is labelled as an
+account, not treated as a composer. Results do not prove availability, completeness
+or a matching game release.
+
+**Link source** reuses an album with that canonical URL, adds the explicit game
+link and preserves existing album title/composer/tracks. A new source album has
+no playable tracks; use local audio import today. Linking cannot start an audio
+download or make a remote video appear as local media. Repeat linking does not
+create duplicate albums. Existing browser companion permissions are unchanged.
+
+Validation: full checks pass, including canonical URL/ID constraints, helper
+checksum/symlink rejection, bounded output/process cleanup, and duplicate-safe
+source linking that preserves manually edited album metadata. A fresh helper
+installation, real God of War III playlist/video searches, SonySoundtracksVEVO's
+22-entry playlist preview and source link all passed in an isolated library.
+Browser interaction passed search/preview/link at desktop and 390 px with no
+horizontal overflow or JS errors. No audio or main-library album was downloaded
+or changed by these tests.
+
+Primary references: [yt-dlp search extractors](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md),
+[playlist-filtered search](https://github.com/yt-dlp/yt-dlp/issues/1213).

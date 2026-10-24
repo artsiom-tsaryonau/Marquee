@@ -199,6 +199,7 @@
         <p>Starting via {g.source === 'steam' ? 'Steam' : g.source === 'port' ? 'native port' : g.source === 'rom' ? emulatorName(g) : 'Lutris'}…</p>
       {:else}
         <p class="running"><span class="live"></span> Playing now</p>
+        {#if g.platform === 'ps3'}<p>To exit RPCS3, close the game window with Alt+F4 and confirm “Exit Game?”.</p>{/if}
         <button class="btn glass" data-nav onclick={() => (app.dismissOverlay())}>Return to Marquee <kbd>Esc</kbd></button>
       {/if}
     </div>

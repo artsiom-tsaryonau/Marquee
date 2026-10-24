@@ -244,3 +244,13 @@ Primary references: [MusicBrainz API](https://musicbrainz.org/doc/MusicBrainz_AP
 [Jellyfin music libraries](https://jellyfin.org/docs/general/server/media/music/),
 [Steam soundtrack applications](https://partner.steamgames.com/doc/store/application/soundtrackapp),
 and [yt-dlp](https://github.com/yt-dlp/yt-dlp).
+
+
+### Find soundtrack sources
+
+Game → Media → Soundtrack → **Find soundtrack** searches YouTube playlists and
+videos. **Preview tracks** shows playlist metadata; **Link source** adds or reuses
+a source album for the game. Existing album metadata and tracks are preserved.
+Source-only albums need local tracks before they can play in Marquee. This does
+not start an audio download; durable yt-dlp acquisition remains planned.
+See [YouTube discovery](YOUTUBE_OST.md) for helper and validation details.

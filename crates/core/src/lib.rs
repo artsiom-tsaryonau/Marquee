@@ -21,6 +21,7 @@ pub mod metadata;
 mod metadata_search;
 pub mod model;
 pub mod music;
+mod music_discovery;
 mod music_metadata;
 pub mod neogeo;
 pub mod paths;

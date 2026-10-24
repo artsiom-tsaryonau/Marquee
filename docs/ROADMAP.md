@@ -97,8 +97,7 @@ enrichment and a separate manager UI remain deferred.
 firmware installation, verified ISO registration, linked Media and direct RPCS3
 ISO launch with session tracking. The supplied God of War III archive was
 explicitly unpacked and its BCUS98111 ISO registered; the first managed launch
-selected Vulkan on the RTX 5090. Live video/audio, keyboard play, native saves and
-relaunch acceptance are still in progress. General archive preparation, PKG and
+selected Vulkan on the RTX 5090. Live menu/video/audio/keyboard-navigation and clean exit/return passed. In-game play, native saves, relaunch persistence and streaming acceptance remain open. General archive preparation, PKG and
 license import remain future work. Discovery never extracts or launches content.
 
 ## Current implementation versus target
@@ -298,3 +297,14 @@ SteamGridDB artwork search. Release previews and explicit apply fill missing
 facts without replacing existing values or changing game identity/files.
 The real PS3 search/apply and responsive UI were verified in an isolated library.
 Richer developer/publisher mapping and region/serial exact matching remain open.
+
+
+### YouTube soundtrack discovery — implemented 2026-10-25
+
+Game → Media → Soundtrack → Find soundtrack searches playlists or videos through
+a pinned, verified, cookie-free yt-dlp helper. Playlist previews show up to 50
+track entries. Linking creates or reuses a source album and preserves its existing
+metadata; it does not download audio or create remote-playable tracks. The owner’s
+existing locally attached Sonic 2 album is unaffected. Durable acquisition,
+per-track progress/cancel/retry and verified importer handoff remain the next
+music-manager step. See [YouTube integration](YOUTUBE_OST.md).

@@ -100,6 +100,21 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
             flag(&args, "spoiler")?,
         )?),
         "media_remove" => out(core.media_remove(&text(&args, "id")?)?),
+        "music_search_youtube" => out(core.music_search_youtube(
+            &text(&args, "query")?,
+            serde_json::from_value(
+                args.get("kind")
+                    .cloned()
+                    .unwrap_or(Value::String("playlist".into())),
+            )?,
+        )?),
+        "music_inspect_youtube" => out(core.music_inspect_youtube(&text(&args, "url")?)?),
+        "music_open_youtube" => out(core.music_open_youtube(&text(&args, "url")?)?),
+        "music_link_youtube" => out(core.music_link_youtube(
+            &text(&args, "game_key")?,
+            &text(&args, "url")?,
+            &text(&args, "title")?,
+        )?),
         "music_find" => out(core.music_find(&text(&args, "title")?)?),
         "music_open_source" => out(core.music_open_source(&text(&args, "album_id")?)?),
         "music_albums" => out(core.music_albums(maybe(&args, "game_key").as_deref())?),

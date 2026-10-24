@@ -96,7 +96,7 @@ fn search_url(title: &str) -> Result<String> {
         .to_string())
 }
 
-fn open_browser(url: &str) -> Result<()> {
+pub(crate) fn open_browser(url: &str) -> Result<()> {
     validate_url(url)?;
     let binary = crate::runners::which("xdg-open")
         .ok_or_else(|| AppError::new("MUSIC_BROWSER", "No browser opener found"))?;

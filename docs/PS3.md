@@ -1,6 +1,6 @@
 # PS3 integration
 
-Updated 2026-10-25. **Discovery, reviewed firmware setup, verified ISO registration and direct RPCS3 Library Play are implemented. Live game acceptance is in progress.**
+Updated 2026-10-25. **Discovery, reviewed firmware setup, verified ISO registration and direct RPCS3 Library Play are implemented. Live menu/video/audio/keyboard-navigation and clean-exit acceptance passed; gameplay/save acceptance remains open.**
 RPCS3 uses a managed profile for Library Play and separate standalone configuration. This page records the staged PS3 work
 under [console preparation](CONSOLE_PREPARATION.md).
 
@@ -102,7 +102,7 @@ modal startup/install dialogs. Firmware confirmation remains interactive. After
 RPCS3 exits, its saved welcome opt-out is carried into the regular managed profile
 without copying other GUI preferences, filesystem settings, saves or caches.
 A later rejected welcome preference is not copied as an opt-out. Standalone Tools
-opening still opens the emulator; future Library Play should use `--no-gui` with
+opening still opens the emulator; Library Play now uses `--no-gui` with
 a validated boot target, optionally `--fullscreen`. Hiding the main window is not
 headless rendering. `--no-gui` does not support firmware installation.
 
@@ -246,5 +246,4 @@ Validation: the full check script and production build passed; tests cover the
 catalogue capability, argument boundaries, firmware-version comparison, refusal
 without installed firmware and frontend runner readiness. The owner's BCUS98111
 ISO started through the actual main-library API, selected Vulkan on the RTX 5090
-and began PPU compilation. Video/audio, keyboard play and native save/relaunch
-acceptance remain pending the live test. RPCS3 process start is not proof of gameplay.
+and began PPU compilation. The owner confirmed the game reached its menu, video and audio worked, and keyboard menu navigation worked. Alt+F4 eventually showed RPCS3’s Exit Game confirmation; after confirmation the process exited 0 and Marquee recorded an ended session (508 seconds, no error). The playing overlay now explains this exit flow. This validates boot/menu/return, not in-game combat, native saves, relaunch persistence or streaming; those remain open.

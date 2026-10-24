@@ -403,6 +403,8 @@ export interface Ps3Inspection {
 export interface MediaAsset { id:string; title:string; kind:'image'|'video'; bytes:number; source:string; spoiler:boolean; position:number; available:boolean; }
 export interface MediaCollection { id:string; title:string; game_keys:string[]; assets:MediaAsset[]; }
 export interface MediaDisc { path:string; source_bytes:number; signature:string; items:{path:string; bytes:number; kind:'image'|'video'; supported:boolean}[]; }
+export interface YoutubeSource { id:string; title:string; uploader:string; url:string; kind:'playlist'|'video'; duration:number|null; }
+export interface YoutubePlaylist { title:string; uploader:string; url:string; tracks:YoutubeSource[]; truncated:boolean; }
 export interface MetadataReview {token:string;provider:string;candidates:{id:number;title:string;system?:string;facts?:{year?:number;genre?:string;players?:number;description?:string}}[];}
 export interface LibraryApi {
   importPs3Disc(path:string):Promise<string>;
@@ -424,6 +426,10 @@ export interface LibraryApi {
   pickMedia(kind?:'image'|'video'):Promise<string[]>;
   pickMediaDisc():Promise<string|null>;
 
+  musicSearchYoutube(query:string,kind:'playlist'|'video'):Promise<YoutubeSource[]>;
+  musicInspectYoutube(url:string):Promise<YoutubePlaylist>;
+  musicOpenYoutube(url:string):Promise<void>;
+  musicLinkYoutube(gameKey:string,url:string,title:string):Promise<string>;
   musicAlbums(gameKey?: string): Promise<MusicAlbum[]>;
   musicFind(title: string): Promise<void>;
   musicOpenSource(albumId: string): Promise<void>;

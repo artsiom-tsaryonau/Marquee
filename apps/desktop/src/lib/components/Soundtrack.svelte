@@ -4,6 +4,7 @@
   import { music, trackTitle, musicTime } from '../music.svelte';
   import Icon from './Icon.svelte';
   import MusicMenu from './MusicMenu.svelte';
+  import YoutubeSearch from './YoutubeSearch.svelte';
   import { asError } from '../api/core';
   import type { MusicAlbum } from '../api/contracts';
   import { albumArtwork } from '../musicArtwork';
@@ -16,6 +17,7 @@
   let error = $state('');
   let note = $state('');
   let editing = $state(false);
+  let discovering = $state(false);
   let albumId = $state<string | null>(null);
   let title = $state('');
   let artist = $state('');
@@ -68,7 +70,8 @@
 </script>
 
 <section class="soundtrack" aria-label={library ? 'Music library' : 'Game original soundtracks'}>
-  <header><div><span class="eyebrow">{library ? 'YOUR MEDIA LIBRARY' : 'MUSIC FOR THIS GAME'}</span><h2>{library ? 'Music' : 'Soundtracks'}</h2><p>{library ? 'Your albums and soundtracks, together. Keep listening while you browse.' : 'Original, remastered or arranged albums, linked to this game.'}</p></div><div class="actions">{#if !library}<a class="btn glass" data-nav href={findUrl} onclick={openSearch} target="_blank" rel="noreferrer">Find OST on YouTube ↗</a>{/if}<button class="btn primary" data-nav disabled={busy} onclick={() => edit()}>{library ? 'Add album' : 'Add soundtrack'}</button></div></header>
+  <header><div><span class="eyebrow">{library ? 'YOUR MEDIA LIBRARY' : 'MUSIC FOR THIS GAME'}</span><h2>{library ? 'Music' : 'Soundtracks'}</h2><p>{library ? 'Your albums and soundtracks, together. Keep listening while you browse.' : 'Original, remastered or arranged albums, linked to this game.'}</p></div><div class="actions">{#if !library}<button class="btn glass" data-nav aria-expanded={discovering} onclick={() => discovering = !discovering}><Icon name="search" size={16} />Find soundtrack</button><a class="btn glass" data-nav href={findUrl} onclick={openSearch} target="_blank" rel="noreferrer">YouTube ↗</a>{/if}<button class="btn primary" data-nav disabled={busy} onclick={() => edit()}>{library ? 'Add album' : 'Add soundtrack'}</button></div></header>
+  {#if discovering}<YoutubeSearch {gameKey} {gameTitle} onlinked={refresh} />{/if}
   {#if library && selected}<button class="back-albums" data-nav onclick={() => selected = null}><Icon name="back" size={16} />All albums</button>{/if}
   {#if library && !selected}
     <label class="music-search"><Icon name="search" size={18} /><input data-nav type="search" bind:value={query} placeholder="Search albums, artists or tracks" aria-label="Search music" /></label>
