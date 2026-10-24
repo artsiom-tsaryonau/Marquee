@@ -123,7 +123,7 @@
 
 <Backdrop blur={app.route !== 'game'} />
 
-<div class="shell" inert={!!(app.launching || app.running || app.installToolId)}>
+<div class="shell" class:sidebar-expanded={app.sidebarExpanded} inert={!!(app.launching || app.running || app.installToolId)}>
   {#if app.mode === 'desktop'}
     <nav id="desktop-navigation" class="side glass-panel" class:expanded={app.sidebarExpanded} aria-label="Main">
       <div class="brand"><span class="mark">M</span><span class="word">Marquee</span></div>
@@ -226,11 +226,13 @@
 
 <style>
   .shell {
+    --sidebar-width: 76px;
     display: flex;
     min-height: 100vh;
     padding-bottom: var(--player-height, 0px);
     box-sizing: border-box;
   }
+  .shell.sidebar-expanded { --sidebar-width: 220px; }
   :global([data-mode='big']) .shell {
     flex-direction: column;
     padding-bottom: calc(var(--player-height, 0px) + 64px);
@@ -239,12 +241,11 @@
     flex: 1;
     min-width: 0;
     display: block;
-    margin-left: 76px;
+    margin-left: var(--sidebar-width);
     transition: margin-left 220ms var(--ease);
   }
   :global([data-mode='big']) main { margin-left: 0; }
-  .shell:has(.side.expanded) main { margin-left: 220px; }
-  .desktop-toolbar { position: sticky; top: 0; z-index: 19; display: flex; justify-content: space-between; align-items: center; min-height: 52px; padding: 0 var(--gutter); background: var(--bg); border-bottom: 1px solid var(--line); color: var(--text-dim); font-size: 12px; }
+  .desktop-toolbar { position: sticky; top: 0; z-index: 19; display: flex; justify-content: space-between; align-items: center; min-height: 52px; width: 100%; box-sizing: border-box; padding: 0 var(--gutter); background: var(--bg); border-bottom: 1px solid var(--line); color: var(--text-dim); font-size: 12px; }
   .screen-mode { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 0; border-radius: 8px; color: var(--text-soft); background: transparent; font: inherit; cursor: pointer; }
   .screen-mode:hover { background: var(--field); }
   .screen {
@@ -259,7 +260,7 @@
     left: 0;
     overflow-y: auto;
     box-sizing: border-box;
-    width: 76px;
+    width: var(--sidebar-width);
     padding: 14px 14px calc(var(--player-height, 0px) + 14px);
     border-radius: 0;
     border-width: 0 1px 0 0;
@@ -270,7 +271,9 @@
     overflow-x: hidden;
     transition: width 220ms var(--ease);
   }
-  .side.expanded { width: 220px; }
+  .side:not(.expanded) .brand { justify-content: center; padding-inline: 0; }
+  .side:not(.expanded) .nav { justify-content: center; padding-inline: 0; gap: 0; }
+  .side:not(.expanded) :is(.nav span, .word) { display: none; }
   .brand {
     display: flex;
     align-items: center;
@@ -626,7 +629,6 @@
       margin-left: 0;
       padding-bottom: 76px;
     }
-    .shell:has(.side.expanded) main { margin-left: 0; }
     .side { overflow-x: auto; }
     .nav { padding: 0 10px; }
     .tab {

@@ -314,3 +314,10 @@ provider picker correctly at desktop and 390 px, without overflow or JS errors.
 No main-library metadata was changed by this validation.
 
 Provider reference: [TheGamesDB API](https://api.thegamesdb.net/).
+
+
+Collapsed-sidebar sizing now uses one explicit shell width variable for the rail
+and content offset, rather than a relational `:has()` selector. Hidden labels
+leave layout completely, icon buttons center in the collapsed rail, and the
+sticky toolbar explicitly fills the content column. Expansion still moves the
+content; mobile navigation and Big Screen retain their independent layout.
