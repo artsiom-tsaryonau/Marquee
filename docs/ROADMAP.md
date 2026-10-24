@@ -215,7 +215,7 @@ footer note/padding, and the navigation rail is flush to the window edge. Ports
 are tagged game entries/filter results, with setup kept in Tools and no separate
 Ports screen. Metadata IDs no longer appear conditionally in installation facts.
 
-Game details now split Overview / OST / Metadata, with installation and identity
+Game details now split Overview / OST / Media / Metadata, with installation and identity
 information on the right, Edit at the top right, direct emulator settings and
 no duplicate Overview shortcut panel. The desktop rail reaches the bottom behind
 the player overlay. These changes remain subject to native visual acceptance.

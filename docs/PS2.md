@@ -4,7 +4,7 @@ Current correction notes: [PS1/PS2 correction pass](CORRECTIONS.md). Platform ma
 
 Slice notes from 2026-10-20; work-order clarification updated 2026-10-21.
 
-This document records the PS2 slice: **what exists**, **how to run it**, **what was verified**, and **what is next**. Long-term phases: [ROADMAP.md](ROADMAP.md). Other systems: [EXPANSION_CATALOGUE.md](EXPANSION_CATALOGUE.md). Next ticket (not started): [PS2_METADATA_FOLLOWUP.md](ENRICHMENT.md#ps2-metadata-matching-and-cached-artwork).
+This document records the PS2 slice: **what exists**, **how to run it**, **what was verified**, and **what is next**. Long-term phases: [ROADMAP.md](ROADMAP.md). Other systems: [EXPANSION_CATALOGUE.md](EXPANSION_CATALOGUE.md). Metadata matching follow-up: [ENRICHMENT.md](ENRICHMENT.md#ps2-metadata-matching-and-cached-artwork).
 
 Release boundary:
 
@@ -23,13 +23,14 @@ Marquee does not download BIOS files or commercial games.
 | Web (`marquee run web`) | **Works.** Same dispatch layer as the desktop shell, token-authenticated, no sample data. |
 | CLI (`marquee`) | **Works** without GTK. Same core as desktop. Use `--data-dir` for isolation. |
 | Desktop (`./scripts/run.sh desktop`) | Optimized standalone window with embedded UI. NVIDIA/Wayland now defaults to accelerated shared-memory transport; see [live rendering correction](DESKTOP_RENDERING.md). Software mode is an explicit fallback. Native folder-picker / Play clicks are **not live-tested**. |
-| Persistent library | SQLite schema **v4** after the shared PS1 root-system work (artwork v2, session recovery v3) at `$XDG_DATA_HOME/marquee/library.db` (or `--data-dir` / `MARQUEE_DATA_DIR`). `artwork` table + migrate v1→2. Newer `user_version` is rejected. |
+| Persistent library | SQLite schema **v6** at `$XDG_DATA_HOME/marquee/library.db` (or `--data-dir` / `MARQUEE_DATA_DIR`). Artwork v2, session recovery v3, root-system v4 and `preparation_receipts` v6 are in that sequence. Newer `user_version` is rejected. |
 | In-app PCSX2 install | **Built, via the emulator catalogue.** Downloads the official AppImage, verifies it, unpacks it into `$XDG_DATA_HOME/marquee/runners/pcsx2/current`. Flatpak, keep-as-AppImage and the dedicated installer were removed 2026-10-21; host copies are never discovered. First launch seeds `PCSX2.ini` so no setup wizard appears (see [EMULATORS](EMULATORS.md)). |
 | Serial covers | **Built.** xlenore/ps2-covers JPEG cache, `convertFileSrc` + asset protocol. ScreenScraper/SteamGridDB still [follow-up](ENRICHMENT.md#ps2-metadata-matching-and-cached-artwork). |
 | Real PCSX2 Play → quit → duration | **Pending.** Fake runner `/bin/sleep` records duration in tests. That is not the gate. |
 | Controller in Tauri WebView | **Pending.** Browser Gamepad API + focus engine exist; `gilrs` not added. Browser gamepad is not evidence. |
 
-`origin/main` as of this sweep: `e902f4e` (WebKit/DBus Fedora script). ISO library + Tauri shell: `1b20257`. **Unpack install, covers, icons, schema v2, isolated tests, desktop look, `run.sh`, `check.sh` compile-fail, and the 2026-10-20 roadmap/catalogue sweep are in the working tree, not pushed.** Commit when you say so.
+Git history for this slice is on `main`. Do not treat this page as a commit log;
+see `git log` for the current HEAD.
 
 ### In scope for this slice
 
@@ -159,11 +160,11 @@ Host while building: Fedora Wayland, rustc 1.96.1, Node 24.18.0, pnpm 12.14.0. W
 | One PCSX2 variant launched end-to-end | **Partly done:** managed PCSX2, Vice City (USA), exit 0, 254 s recorded (2026-10-21). Relaunch and restart-persistence still to confirm. |
 | BIOS missing / unverified / launch-tested | **Done** in core. Open-setup not live-tested. |
 | Supervised duration persisted once | Fake runner **yes**. Real PCSX2 **no**. |
-| Reload / duplicate launch / interrupted sessions | **Done** in core: duplicate launch blocked; matching live processes are recovered; already-dead interrupted sessions retain checkpointed time. See [CORRECTION_PASS.md](CORRECTIONS.md). Desktop UI reload still live-pending. |
+| Reload / duplicate launch / interrupted sessions | **Done** in core: duplicate launch blocked; matching live processes are recovered; already-dead interrupted sessions retain checkpointed time. See [CORRECTIONS.md](CORRECTIONS.md). Desktop UI reload still live-pending. |
 | PS2 collection + keyboard; controller in Tauri | Library filter + keyboard in demo/desktop. **Controller (`gilrs`) pending.** |
 | Offline, no provider credentials | **Done.** Covers are optional; Play does not need them. |
 | CLI same core, session ownership | **Done.** |
-| Tests pass; desktop compile or blockers named | **Pass** on this host. 27 core tests; 16 UI tests; desktop `cargo check`. Live PCSX2 still pending. |
+| Tests pass; desktop compile or blockers named | **Pass** on this host (dated 2026-10-20 counts). Re-run `scripts/check.sh` for current numbers. Live PCSX2 still pending. |
 
 The slice is **implemented in tree**, **not release-complete**.
 
@@ -185,8 +186,8 @@ Isolated data directories only. No commercial ISOs or BIOS in the repo.
 
 | Check | Result |
 | --- | --- |
-| fmt, clippy core+CLI, core tests, CLI smoke | Pass (27 core tests: unpack AppImage, managed runner without network, cover skip, stale-session reclaim, isolated runners) |
-| `pnpm check`, 16 UI tests, `pnpm build` | Pass |
+| fmt, clippy core+CLI, core tests, CLI smoke | Pass on 2026-10-20 (unpack AppImage, managed runner without network, cover skip, stale-session reclaim, isolated runners). Current workspace tests are larger; re-run `scripts/check.sh`. |
+| `pnpm check`, UI tests, `pnpm build` | Pass |
 | `cargo check -p marquee-desktop` | **Pass** (`protocol-asset` for cached covers) |
 | `pnpm tauri dev` | **Process up** with `WEBKIT_DISABLE_DMABUF_RENDERER=1` |
 
@@ -245,10 +246,10 @@ After import, Marquee fetches 2D covers from [xlenore/ps2-covers](https://github
 
 | Claim | Where |
 | --- | --- |
-| Schema v2 | `crates/core/src/db.rs` (`SCHEMA_VERSION`, `artwork`, abandon running sessions) |
+| Schema v6 | `crates/core/src/db.rs` / `crates/core/src/model.rs` (`SCHEMA_VERSION`) |
 | ISO scan + serial | `crates/core/src/library.rs`, `crates/core/src/iso.rs` (`cover_serial`) |
 | PCSX2 argv + BIOS | `crates/core/src/runners.rs` |
-| PCSX2 install | `crates/core/src/tools.rs` |
+| PCSX2 install | `crates/core/src/lib.rs` (`install_pcsx2`) via the emulator catalogue |
 | HTTP (covers vs AppImage caps) | `crates/core/src/http.rs` |
 | Covers | `crates/core/src/artwork.rs` |
 | Sessions | `crates/core/src/sessions.rs` |
@@ -266,6 +267,6 @@ After import, Marquee fetches 2D covers from [xlenore/ps2-covers](https://github
 | Play / empty library | `apps/desktop/src/lib/state.svelte.ts` |
 | Install UI | `apps/desktop/src/lib/install.ts`, `InstallMenu.svelte`, `InstallDialog.svelte` |
 | Empty shelves | `apps/desktop/src/lib/components/GhostCover.svelte` |
-| Nav | `apps/desktop/src/App.svelte` (Home / Library / Ports / Downloads / Settings; `ps2` route still works) |
+| Nav | `apps/desktop/src/App.svelte` (Home / Games / Music / Media / Tools / Streaming / Settings). Downloads and archives is a Games-library panel, not top-level nav. `ports` rewrites to Games with a port filter. |
 | Registry | `catalog/systems/ps2.json` |
 | NVIDIA Wayland | `scripts/run.sh desktop` |

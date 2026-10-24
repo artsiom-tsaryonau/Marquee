@@ -89,6 +89,7 @@ sample_images/
 
 # Private PS3 licenses and disc keys
 exdata/
+*[Dd]isc*[Kk]eys*
 *.[rR][aA][pP]
 *.[rR][iI][fF]
 *.[dD][kK][eE][yY]

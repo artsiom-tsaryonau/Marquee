@@ -74,8 +74,10 @@ cargo run -p marquee-cli -- streaming --socket /absolute/path/wolf.sock stop SES
 ST0 verification uses synthetic, source-derived Unix HTTP fixtures, the retained
 upstream OpenAPI schema, timeout/truncation cases and a real CLI with an occupied
 library lease. It is **not live Wolf streaming acceptance**. No backend, receiver,
-virtual display or game launch has been installed or enabled by ST0. These
-controls are not yet exposed through the desktop/browser API.
+virtual display or game launch has been installed or enabled by ST0. The same
+inspect/pair/revoke/stop controls are now on the desktop and browser Streaming
+screen against an existing local host. Host startup automation and an embedded
+receiver remain later gates.
 
 Verification on 2026-10-23: all eight new streaming tests passed, followed by the
 complete `scripts/check.sh` pass (Rust formatting, workspace Clippy/build/tests,

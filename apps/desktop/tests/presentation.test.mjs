@@ -60,12 +60,12 @@ test('platform shelves preserve filtered order inside each system and keep every
   assert.equal(caseRatio('ps1'),1);assert.equal(caseRatio('ps2'),2/3);assert.ok(caseRatio('snes')>1);
 });
 
-test('game detail tabs include Metadata and keyboard navigation wraps across all three', async () => {
+test('game detail tabs include Media and Metadata; keyboard navigation wraps across all four', async () => {
   const {gameDetailTabs,nextGameDetailTab}=await import('../src/lib/gameDetails');
-  assert.deepEqual(gameDetailTabs,['overview','ost','metadata']);
+  assert.deepEqual(gameDetailTabs,['overview','ost','media','metadata']);
   assert.equal(nextGameDetailTab('overview','ArrowLeft'),'metadata');
   assert.equal(nextGameDetailTab('metadata','ArrowRight'),'overview');
-  assert.equal(nextGameDetailTab('ost','ArrowRight'),'metadata');
+  assert.equal(nextGameDetailTab('ost','ArrowRight'),'media');
   assert.equal(nextGameDetailTab('ost','Home'),'overview');
   assert.equal(nextGameDetailTab('overview','End'),'metadata');
   assert.equal(nextGameDetailTab('ost','Enter'),'ost');

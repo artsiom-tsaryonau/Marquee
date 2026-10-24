@@ -14,7 +14,8 @@ and authoritative job queue directly inside the launcher process.
 
 ## Product boundary
 
-Marquee presents Library, Get/Install/Play and a concise Downloads view. Detailed
+Marquee presents Library, Get/Install/Play and a **Downloads and archives**
+panel from the Games library (not a top-level nav destination). Detailed
 preparation, diagnostics and source cleanup are secondary management actions.
 A manager failure must not prevent launching an existing ready installation.
 Closing Marquee leaves accepted jobs running; stopping the manager is explicit.

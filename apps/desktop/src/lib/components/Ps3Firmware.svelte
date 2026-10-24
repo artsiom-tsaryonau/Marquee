@@ -43,7 +43,7 @@
 <section class="firmware-setup">
   <h3>PS3 firmware setup</h3>
   <p class="readiness">{status?.installed_version ? `Installed firmware files: ${status.installed_version}` : 'Firmware is not installed'}</p>
-  {#if status?.installed_version}<p>{status.managed_receipt ? 'Marquee installation receipt recorded.' : 'Existing files detected; no Marquee installation receipt.'} Game compatibility is tested separately.</p>
+  {#if status?.installed_version}<p>{status.managed_receipt ? 'Marquee installation receipt recorded.' : 'Existing files detected; no Marquee installation receipt.'} Existing firmware is kept; automatic replacement is not supported yet. Game compatibility is tested separately.</p>
   {:else}<p>Choose your PS3UPDAT.PUP, review its version, then finish the installer in RPCS3. Installation uses a temporary profile and continues if Marquee closes.</p>{/if}
   {#if !installed}<p>Install RPCS3 first using the button above.</p>{/if}
   <div class="actions">

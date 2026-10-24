@@ -7,18 +7,7 @@ use std::path::Path;
 
 impl Core {
     pub fn ps3_firmware_status(&self) -> Result<Status> {
-        let mut status = marquee_manager::ps3_firmware::read_status(&self.paths.data_dir)?;
-        if let Some(job) = status.job.as_mut() {
-            if matches!(job.state.as_str(), "running" | "promoting") {
-                if self.preparation.status().is_ok_and(|s| s.running) {
-                    return self.preparation.ps3_firmware(Request::Status);
-                }
-                job.state = "interrupted".into();
-                job.message =
-                    "Reconnect to the manager to recover the interrupted firmware setup".into();
-            }
-        }
-        Ok(status)
+        self.reconcile_ps3_firmware(false)
     }
     pub fn review_ps3_firmware(&self, source: &Path) -> Result<Status> {
         let installed = self
@@ -72,12 +61,27 @@ impl Core {
         result
     }
     pub(crate) fn require_ps3_setup_idle(&self, id: &str) -> Result<()> {
-        if id == "rpcs3" && marquee_manager::ps3_firmware::active(&self.paths.data_dir)? {
-            return Err(AppError::new(
-                "INSTALL_BUSY",
-                "Finish RPCS3 firmware setup before opening, updating or removing RPCS3",
-            ));
+        if id == "rpcs3" {
+            self.reconcile_ps3_firmware(true)?;
+            if marquee_manager::ps3_firmware::active(&self.paths.data_dir)? {
+                return Err(AppError::new(
+                    "INSTALL_BUSY",
+                    "Finish RPCS3 firmware setup before opening, updating or removing RPCS3",
+                ));
+            }
         }
         Ok(())
+    }
+
+    fn reconcile_ps3_firmware(&self, idle_only: bool) -> Result<Status> {
+        if self.preparation.status().is_ok_and(|s| s.running) {
+            return if idle_only {
+                marquee_manager::ps3_firmware::read_status(&self.paths.data_dir)
+            } else {
+                self.preparation.ps3_firmware(Request::Status)
+            };
+        }
+        marquee_manager::ps3_firmware::recover(&self.paths.data_dir)?;
+        marquee_manager::ps3_firmware::read_status(&self.paths.data_dir)
     }
 }

@@ -23,10 +23,11 @@ Preparation history reloads from the backend when the panel is reopened.
   staging directory. Validate sizes, regular-file paths, CUE dependencies and output
   hashes, sync staged files/directories, persist the receipt, then promote the
   whole directory. Existing installations are never overwritten by this recipe.
-- `manager/jobs.db` schema 3 persists jobs, reviews, attempts and receipts/outbox;
-  M1 schema 1 is backed up and adopted under exclusive ownership; schema 2 is
-  backed up before the provenance-aware schema-3 upgrade. Manager IPC v2 prevents
-  older receipt clients from dropping provenance.
+- `manager/jobs.db` schema 4 persists jobs, reviews, attempts, receipts/outbox
+  and `browser_jobs`; M1 schema 1 is backed up and adopted under exclusive
+  ownership; schemas 2–3 are backed up before the provenance and browser-job
+  upgrades. Manager IPC v5 is required for provenance-aware receipts, torrent
+  authority and isolated PS3 firmware setup.
   `library.db` schema 6 adds only `preparation_receipts`. Root registration, scan
   and the library receipt record commit in one transaction, then the worker is acknowledged; failed publication
   rolls back and stays retryable. No existing library reset is required.

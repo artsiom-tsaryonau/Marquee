@@ -1,8 +1,10 @@
 # UI and UX implementation pass
 
-Updated 2026-10-21 after the screenshot/source audit. This is an implementation
+Updated 2026-10-24. This is an implementation
 record, not a replacement for [the roadmap](ROADMAP.md). Direct Steam, then
-compatibility/Epic, then GOG remain the store milestones.
+compatibility/Epic, then GOG remain the store milestones. Navigation is Home,
+Games, Music, Media, Tools, Streaming and Settings. Downloads and archives is a
+Games-library panel, not a top-level destination.
 
 ## Implemented
 

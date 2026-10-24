@@ -18,6 +18,15 @@ let listenReady: Promise<void> = Promise.resolve();
 export const desktopApi: LibraryApi = {
   kind: 'desktop',
   ...commands(call),
+  mediaUrl:(id)=>invoke<string>('media_url',{id}),
+  async pickMedia() {
+    const selected=await open({directory:false,multiple:true,title:'Add game videos and images',filters:[{name:'Game media',extensions:['png','jpg','jpeg','mp4','webm']}]});
+    return typeof selected==='string'?[selected]:selected??[];
+  },
+  async pickMediaDisc() {
+    const selected=await open({directory:false,multiple:false,title:'Browse disc media',filters:[{name:'ISO disc image',extensions:['iso']}]});
+    return typeof selected==='string'?selected:null;
+  },
   musicUrl: (trackId) => invoke<string>('music_url', { trackId }),
   async pickMusicCover() {
     const selected = await open({ directory: false, multiple: false, title: 'Choose album artwork', filters: [{ name: 'Album artwork', extensions: ['jpg', 'jpeg', 'png'] }] });

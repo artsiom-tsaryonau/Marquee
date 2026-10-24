@@ -22,6 +22,12 @@ fn maybe(args: &Value, key: &str) -> Option<String> {
     args.get(key).and_then(Value::as_str).map(str::to_string)
 }
 
+fn flag(args: &Value, key: &str) -> Result<bool> {
+    args.get(key)
+        .and_then(Value::as_bool)
+        .ok_or_else(|| AppError::new("BAD_REQUEST", format!("missing argument: {key}")))
+}
+
 fn out<T: Serialize>(value: T) -> Result<Value> {
     Ok(serde_json::to_value(value)?)
 }
@@ -37,6 +43,40 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
         "inspect_ps3" => out(crate::ps3::inspect(
             PathBuf::from(text(&args, "path")?).as_path(),
         )?),
+        "media_collections" => out(core.media_collections(maybe(&args, "game_key").as_deref())?),
+        "media_create" => {
+            out(core.media_create(&text(&args, "title")?, maybe(&args, "game_key").as_deref())?)
+        }
+        "media_link" => out(core.media_link(
+            &text(&args, "id")?,
+            &text(&args, "game_key")?,
+            args.get("linked").and_then(Value::as_bool).unwrap_or(true),
+        )?),
+        "media_inspect_disc" => out(crate::game_media::inspect(
+            PathBuf::from(text(&args, "path")?).as_path(),
+        )?),
+        "media_import" => out(core.media_import(
+            &text(&args, "id")?,
+            serde_json::from_value(args.get("paths").cloned().unwrap_or_default())?,
+        )?),
+        "media_import_disc" => out(core.media_import_disc(
+            &text(&args, "id")?,
+            PathBuf::from(text(&args, "path")?).as_path(),
+            &text(&args, "signature")?,
+            &text(&args, "member")?,
+        )?),
+        "media_position" => out(core.media_position(
+            &text(&args, "id")?,
+            args.get("position")
+                .and_then(Value::as_f64)
+                .ok_or_else(|| AppError::new("BAD_REQUEST", "Missing playback position"))?,
+        )?),
+        "media_update" => out(core.media_update(
+            &text(&args, "id")?,
+            &text(&args, "title")?,
+            flag(&args, "spoiler")?,
+        )?),
+        "media_remove" => out(core.media_remove(&text(&args, "id")?)?),
         "music_find" => out(core.music_find(&text(&args, "title")?)?),
         "music_open_source" => out(core.music_open_source(&text(&args, "album_id")?)?),
         "music_albums" => out(core.music_albums(maybe(&args, "game_key").as_deref())?),

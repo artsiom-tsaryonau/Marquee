@@ -39,10 +39,19 @@ export function asError(err: unknown): AppError {
 }
 
 /** The commands are identical on every surface; only the transport (`call`) differs. */
-export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable' | 'pickArchives' | 'pickPs3Content' | 'pickPs3Firmware' | 'pickTorrent' | 'onArchiveDrop' | 'pickMusic' | 'pickMusicCover' | 'musicUrl'> {
+export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable' | 'pickArchives' | 'pickPs3Content' | 'pickPs3Firmware' | 'pickTorrent' | 'onArchiveDrop' | 'pickMusic' | 'pickMusicCover' | 'musicUrl' | 'mediaUrl' | 'pickMedia' | 'pickMediaDisc'> {
   return {
     musicSetCover: (albumId, path) => call('music_set_cover', { album_id: albumId, path }),
     musicAlbums: (gameKey) => call('music_albums', gameKey === undefined ? {} : { game_key: gameKey }),
+    mediaCollections:(gameKey)=>call('media_collections',{game_key:gameKey??null}),
+    mediaCreate:(title,gameKey)=>call('media_create',{title,game_key:gameKey??null}),
+    mediaLink:(id,gameKey,linked)=>call('media_link',{id,game_key:gameKey,linked}),
+    mediaImport:(id,paths)=>call('media_import',{id,paths}),
+    mediaInspectDisc:(path)=>call('media_inspect_disc',{path}),
+    mediaImportDisc:(id,path,signature,member)=>call('media_import_disc',{id,path,signature,member}),
+    mediaPosition:(id,position)=>call('media_position',{id,position}),
+    mediaUpdate:(id,title,spoiler)=>call('media_update',{id,title,spoiler}),
+    mediaRemove:(id)=>call('media_remove',{id}),
     musicFind: (title) => call('music_find', { title }),
     musicOpenSource: (albumId) => call('music_open_source', { album_id: albumId }),
     musicSaveAlbum: (draft) => call('music_save_album', { ...draft }),

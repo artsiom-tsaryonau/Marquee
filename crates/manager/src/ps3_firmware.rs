@@ -580,6 +580,30 @@ pub fn active(data: &Path) -> Result<bool> {
         .job
         .is_some_and(|j| matches!(j.state.as_str(), "running" | "promoting")))
 }
+
+/// Persist leftover running/promoting jobs after the manager process is gone.
+/// Live installs keep the host gate, so Status recovery only runs when idle.
+pub fn recover(data: &Path) -> Result<()> {
+    if let Some(mut job) = read_status(data)?.job {
+        if matches!(job.state.as_str(), "running" | "promoting") {
+            if job.state == "promoting"
+                && job
+                    .output
+                    .as_ref()
+                    .is_some_and(|m| manifest(&flash_path(data)).is_ok_and(|actual| &actual == m))
+            {
+                job.state = "installed".into();
+                job.message = "Recovered verified firmware promotion".into();
+                save(data, &base(data).join("receipt.json"), &job)?;
+            } else {
+                job.state = "interrupted".into();
+                job.message = "Setup was interrupted. Existing firmware was not replaced; inspect and review before retrying".into();
+            }
+            save_job(data, &job)?;
+        }
+    }
+    Ok(())
+}
 pub struct Host {
     data: PathBuf,
     gate: Mutex<()>,
@@ -590,35 +614,15 @@ impl Host {
             data: data.to_path_buf(),
             gate: Mutex::new(()),
         };
-        if let Err(e) = host.recover() {
+        if let Err(e) = recover(&host.data) {
             eprintln!("PS3 firmware recovery: {}", e.message);
         }
         Ok(host)
     }
-    fn recover(&self) -> Result<()> {
-        if let Some(mut job) = read_status(&self.data)?.job {
-            if matches!(job.state.as_str(), "running" | "promoting") {
-                if job.state == "promoting"
-                    && job.output.as_ref().is_some_and(|m| {
-                        manifest(&flash_path(&self.data)).is_ok_and(|actual| &actual == m)
-                    })
-                {
-                    job.state = "installed".into();
-                    job.message = "Recovered verified firmware promotion".into();
-                    save(&self.data, &base(&self.data).join("receipt.json"), &job)?;
-                } else {
-                    job.state = "interrupted".into();
-                    job.message = "Setup was interrupted. Existing firmware was not replaced; inspect and review before retrying".into();
-                }
-                save_job(&self.data, &job)?;
-            }
-        }
-        Ok(())
-    }
     pub fn dispatch(&self, request: Request) -> Result<Status> {
         if matches!(request, Request::Status) {
             if let Ok(_guard) = self.gate.try_lock() {
-                self.recover()?;
+                recover(&self.data)?;
             }
             return read_status(&self.data);
         }
@@ -1108,5 +1112,37 @@ exit {}
         fs::write(record(&data), "broken checkpoint").unwrap();
         assert!(Host::new(&data).is_ok());
         assert!(read_status(&data).is_err());
+    }
+    #[test]
+    fn orphaned_running_job_is_interrupted_and_releases_the_runner_lock() {
+        let t = tempfile::tempdir().unwrap();
+        let data = t.path().join("data");
+        fs::create_dir(&data).unwrap();
+        let job = Job {
+            recipe: String::new(),
+            id: uuid::Uuid::new_v4().to_string(),
+            state: "running".into(),
+            message: "Installing".into(),
+            review_token: "token".into(),
+            package: Package {
+                source: data.join("PS3UPDAT.PUP"),
+                version: "4.93".into(),
+                bytes: 1,
+                sha256: "abc".into(),
+            },
+            runner_version: "fixture".into(),
+            program_sha256: "def".into(),
+            output: None,
+            exit_code: None,
+            log_path: None,
+        };
+        save_job(&data, &job).unwrap();
+        assert!(active(&data).unwrap());
+        recover(&data).unwrap();
+        assert_eq!(
+            read_status(&data).unwrap().job.unwrap().state,
+            "interrupted"
+        );
+        assert!(!active(&data).unwrap());
     }
 }

@@ -7,6 +7,12 @@ or a production LAN media service.
 
 ## Implemented foundation
 
+The **Media** destination and game-page Media tab hold explicit local extras
+(PNG/JPEG stills and MP4/WebM clips). Disc inspection reads ISO9660 directories
+only and copies a selected member; originals stay put. Videos default to spoiler
+until revealed. Raw M2V cinematics need conversion; audio pairing is not
+implemented. This is not films/series identity or a remote media service.
+
 The **Music** navigation destination browses every saved album, including albums
 unlinked from games. Search matches album titles, artists and track names. Open
 an album for its existing track list, file import and details controls. **Add

@@ -140,7 +140,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::core_call,
             commands::web_url,
-            commands::music_url
+            commands::music_url,
+            commands::media_url
         ])
         .run(tauri::generate_context!())
         .expect("error while running Marquee");

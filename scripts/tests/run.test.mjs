@@ -87,7 +87,7 @@ test('a missing manager companion rebuilds the standalone production pair', (t) 
 test('manager source changes invalidate the production pair', (t) => {
   const f = fixture(t);
   assert.equal(f.run('desktop').status, 0);
-  const source = join(f.root, 'crates/manager/worker.rs');
+  const source = join(f.root, 'crates/manager/service.rs');
   writeFileSync(source, 'changed worker');
   const future = new Date(Date.now() + 1000);
   utimesSync(source, future, future);

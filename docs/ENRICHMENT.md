@@ -57,7 +57,9 @@ The library is mostly public-domain and homebrew Game Boy Color and NES ROMs, so
 ### Artwork limits
 
 - Disc images are not hashed (too large); PS1/PS2 use the serial, Dreamcast and others only the title.
-- Genesis now has a launch adapter; Genesis and Neo Geo remain absent from the current artwork source list. Emulator support and enrichment support are separate.
+- Genesis now has a launch adapter and a libretro artwork source. Neo Geo remains
+  absent from the current artwork source list. Emulator support and enrichment
+  support are separate.
 - IGDB is not used by this path. TheGamesDB is used for optional facts as described below.
 
 

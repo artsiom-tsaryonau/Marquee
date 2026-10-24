@@ -71,10 +71,22 @@ pub fn all() -> Result<Vec<SystemDescriptor>> {
 
 /// Look up a descriptor by system id (`ps2`, `ps1`). Unknown ids are a caller error.
 pub fn by_id(system: &str) -> Result<SystemDescriptor> {
-    all()?
-        .into_iter()
+    let systems = all()?;
+    systems
+        .iter()
         .find(|d| d.id == system)
-        .ok_or_else(|| AppError::new("ROOT_OFFLINE", format!("unknown system: {system}")))
+        .cloned()
+        .ok_or_else(|| {
+            let known = systems
+                .iter()
+                .map(|d| d.id.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            AppError::new(
+                "ROOT_OFFLINE",
+                format!("unknown system: {system} (known: {known})"),
+            )
+        })
 }
 
 pub fn load(json: &str) -> Result<SystemDescriptor> {
@@ -120,7 +132,11 @@ mod tests {
 
     #[test]
     fn by_id_unknown_is_error() {
-        assert_eq!(by_id("atari-jaguar").unwrap_err().code, "ROOT_OFFLINE");
+        let err = by_id("atari-jaguar").unwrap_err();
+        assert_eq!(err.code, "ROOT_OFFLINE");
+        assert!(err.message.contains("known:"));
+        assert!(err.message.contains("ps1"));
+        assert!(err.message.contains("genesis"));
         assert_eq!(by_id("ps2").unwrap().display_name, "PlayStation 2");
     }
 }

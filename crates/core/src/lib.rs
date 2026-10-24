@@ -7,6 +7,7 @@ pub mod db;
 pub mod desktop_rendering;
 pub mod emulators;
 pub mod error;
+pub mod game_media;
 pub mod http;
 pub mod hub;
 pub mod instance;

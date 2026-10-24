@@ -68,6 +68,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export const httpApi: LibraryApi = {
   kind: 'web',
   ...commands(call),
+  mediaUrl:(id)=>call('media_url',{id}),
+  async pickMedia() {return window.prompt('Absolute PNG, JPEG, MP4 or WebM paths on the Marquee host, one per line. Selected files are copied.')?.split('\n').map(p=>p.trim()).filter(Boolean)??[];},
+  async pickMediaDisc() {return window.prompt('Absolute ISO image path on the Marquee host')?.trim()||null;},
   musicUrl: (trackId) => call('music_url', { track_id: trackId }),
   async pickMusicCover() {
     return window.prompt('Absolute JPEG or PNG image path on the Marquee computer (not a browser upload)')?.trim() || null;

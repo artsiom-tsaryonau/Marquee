@@ -10,7 +10,8 @@ Release boundary:
 
 > A persistent PS1 library that imports `.iso` and `.chd`, matches serials for art, and launches through an installed DuckStation, recording real session duration.
 
-That gate is **not closed**. Everything below is verified on this host except the live DuckStation Play → quit → duration, because DuckStation is not installed here.
+That gate is **not closed**. Managed DuckStation is installed and can be launched
+from Marquee; live Play → quit → duration (picture, input and exit) is still pending.
 
 Marquee does not download BIOS files or commercial games.
 
@@ -21,7 +22,7 @@ Marquee does not download BIOS files or commercial games.
 | Concern | Before | Now |
 | --- | --- | --- |
 | System descriptors | one hardcoded `ps2.json` | `catalog/systems/*.json` behind `catalog::by_id` / `catalog::all` |
-| Library roots | a root had no system | `library_roots.system` (schema **v4**), set at `add-root` |
+| Library roots | a root had no system | `library_roots.system` (added in schema **v4**; current library schema is **v6**), set at `add-root` |
 | Disc formats | `.iso` only, by extension | per-system supported/skipped sets; PS1 also imports `.chd` and `.cue` |
 | Disc layout | 2048-byte sectors assumed | the ISO9660 reader probes 2048 / 2352 (Mode 1) / 2352 (Mode 2) / 2336 strides |
 | Runner | PCSX2 only | `RunnerKind::Duckstation` beside `RunnerKind::Pcsx2` |
@@ -88,7 +89,9 @@ cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev list --system ps1
 cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev launch <edition-id>
 ```
 
-Unknown systems are rejected at `add-root` with `ROOT_OFFLINE` (`known: ps2, ps1`).
+Unknown systems are rejected at `add-root` with `ROOT_OFFLINE` and a `known:`
+list of every `catalog/systems/*.json` id (PS1/PS2 plus the cartridge/disc
+systems in that folder). Switch/PS3/PS4/Xbox are not library-root systems yet.
 
 ### Launch argv
 
@@ -137,8 +140,8 @@ Real library (`~/.local/share/marquee/library.db`), PS1 root `./roms/ps1`:
 | Raw 2352 reading | **Pass** — Mode 2 Form 1 stride (`2352*16+24`) validates on both real MGS discs, whose `.cue` declares `MODE2/2352` |
 | PS1 launch with a PCSX2 pin present | **Pass** — reports `RUNNER_MISSING: no emulator is installed for ps1`, not PCSX2 |
 | PS2 launch with the same pin | **Pass** — unchanged, still selects PCSX2 |
-| `scripts/check.sh` Rust half | **Pass** — fmt, clippy `-D warnings`, **79 core tests** |
-| `pnpm check` / `pnpm test` / `pnpm build` | **Pass** — 0 type errors, 31 UI tests, build |
+| `scripts/check.sh` Rust half | **Pass** — fmt, clippy `-D warnings` (dated 79 core tests on 2026-10-21; re-run for the current count) |
+| `pnpm check` / `pnpm test` / `pnpm build` | **Pass** — 0 type errors (dated 31 UI tests on 2026-10-21) |
 
 ### Not verified
 

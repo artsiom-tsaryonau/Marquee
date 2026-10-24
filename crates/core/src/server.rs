@@ -34,6 +34,14 @@ impl ServerHandle {
         format!("http://{}/#token={}", self.addr, self.token)
     }
 
+    pub fn media_url(&self, id: &str) -> String {
+        format!(
+            "http://{}/media/{id}?key={}",
+            self.addr,
+            media_key(&self.token, id)
+        )
+    }
+
     /// Read-only track capability, never the general API bearer token.
     pub fn music_url(&self, id: &str) -> String {
         format!(
@@ -50,6 +58,14 @@ fn music_key(token: &str, id: &str) -> String {
     format!(
         "{:x}",
         Sha256::digest(format!("marquee-music:{token}:{id}"))
+    )
+}
+
+fn media_key(token: &str, id: &str) -> String {
+    use sha2::{Digest, Sha256};
+    format!(
+        "{:x}",
+        Sha256::digest(format!("marquee-game-media:{token}:{id}"))
     )
 }
 
@@ -75,9 +91,13 @@ fn audio_range(value: Option<&str>, size: u64) -> Option<(u64, u64, bool)> {
 }
 
 fn serve_music(core: &Core, req: Request, id: &str) {
-    let Ok((mut file, mime)) = core.music_open(id) else {
+    let Ok((file, mime)) = core.music_open(id) else {
         return respond(req, 404, "text/plain", b"Track unavailable".to_vec(), true);
     };
+    serve_file(req, file, mime);
+}
+
+fn serve_file(req: Request, mut file: fs::File, mime: &str) {
     let Ok(size) = file.metadata().map(|m| m.len()) else {
         return respond(req, 404, "text/plain", b"Track unavailable".to_vec(), true);
     };
@@ -281,6 +301,20 @@ fn handle(core: &Arc<Core>, token: &str, port: u16, assets: Option<&Assets>, mut
         return respond(req, 403, "text/plain", b"forbidden".to_vec(), true);
     }
 
+    if let Some(id) = path.strip_prefix("/media/") {
+        if !matches!(method, Method::Get | Method::Head) {
+            return respond(req, 405, "text/plain", b"use GET or HEAD".to_vec(), true);
+        }
+        let supplied = query_value(&query, "key").unwrap_or_default();
+        if uuid::Uuid::parse_str(id).is_err() || !same(supplied, &media_key(token, id)) {
+            return respond(req, 403, "text/plain", b"forbidden".to_vec(), true);
+        }
+        return match core.media_open(id) {
+            Ok((file, mime)) => serve_file(req, file, &mime),
+            Err(_) => respond(req, 404, "text/plain", b"Media unavailable".to_vec(), true),
+        };
+    }
+
     if let Some(id) = path.strip_prefix("/music/") {
         if !matches!(method, Method::Get | Method::Head) {
             return respond(req, 405, "text/plain", b"use GET or HEAD".to_vec(), true);
@@ -336,6 +370,20 @@ fn handle(core: &Arc<Core>, token: &str, port: u16, assets: Option<&Assets>, mut
                 }
             }
         };
+        if cmd == "media_url" {
+            let id = args
+                .get("id")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default();
+            return match core.media_open(id) {
+                Ok(_) => respond_json(
+                    req,
+                    200,
+                    &format!("/media/{id}?key={}", media_key(token, id)),
+                ),
+                Err(e) => respond_error(req, 404, e),
+            };
+        }
         if cmd == "music_url" {
             let id = args
                 .get("track_id")
@@ -436,6 +484,46 @@ mod tests {
         let core = Arc::new(Core::open_isolated(Some(dir.to_path_buf()), false).unwrap());
         let handle = start(Arc::clone(&core), None, Some(48900)).unwrap();
         (core, handle)
+    }
+
+    #[test]
+    fn game_media_capabilities_are_item_scoped_seekable_and_revoked_by_removal() {
+        let dir = tempfile::tempdir().unwrap();
+        let (core, h) = start_test_server(dir.path());
+        let source = dir.path().join("clip.mp4");
+        fs::write(&source, b"0000ftyp0123456789abcdef").unwrap();
+        let collection = core.media_create("Extras", Some("game")).unwrap();
+        core.media_import(&collection, vec![source]).unwrap();
+        let asset = core.media_collections(None).unwrap()[0].assets[0]
+            .id
+            .clone();
+        let url = h.media_url(&asset);
+        let path = url.strip_prefix(&format!("http://{}", h.addr)).unwrap();
+        let get = |path: &str, method: &str, range: &str| {
+            request(
+                h.addr,
+                &format!(
+                    "{method} {path} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n{range}\r\n",
+                    h.addr
+                ),
+            )
+        };
+        assert!(get(path, "GET", "Range: bytes=8-11\r\n").starts_with("HTTP/1.1 206"));
+        assert!(get(path, "GET", "Range: bytes=8-11\r\n").ends_with("0123"));
+        let head = get(path, "HEAD", "");
+        assert!(head.starts_with("HTTP/1.1 200"));
+        assert!(!head.ends_with("abcdef"));
+        assert!(get(
+            &format!("/media/{asset}?key={}", music_key(&h.token, &asset)),
+            "GET",
+            ""
+        )
+        .starts_with("HTTP/1.1 403"));
+        let other = Uuid::new_v4().to_string();
+        assert!(get(&path.replace(&asset, &other), "GET", "").starts_with("HTTP/1.1 403"));
+        assert!(get(path, "GET", "Range: bytes=999-\r\n").starts_with("HTTP/1.1 416"));
+        core.media_remove(&asset).unwrap();
+        assert!(get(path, "GET", "").starts_with("HTTP/1.1 404"));
     }
 
     #[test]

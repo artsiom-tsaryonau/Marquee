@@ -92,7 +92,10 @@ runner version and program fingerprint. It does not claim publisher authenticity
 RPCS3 verifies the package contents. Start rechecks the program and an isolated
 source snapshot, requires 2.5 GiB free, and runs the pinned RPCS3 `--installfw`
 recipe in a fresh HOME/XDG profile. Existing nonempty firmware and custom `vfs.yml`
-are refused rather than replaced. The supplied original is retained.
+are refused rather than replaced; there is no upgrade/replace path yet. The
+supplied original is retained. If the manager is down with a leftover
+running/promoting job, status and RPCS3 open/update/removal persist that job as
+interrupted (or recover a verified promotion) before treating the runner as idle.
 
 RPCS3's informational welcome is hidden in this setup profile to avoid competing
 modal startup/install dialogs. Firmware confirmation remains interactive. After

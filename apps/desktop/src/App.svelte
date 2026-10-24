@@ -18,6 +18,7 @@
   import Settings from './lib/screens/Settings.svelte';
   import Streaming from './lib/screens/Streaming.svelte';
   import MusicPlayer from './lib/components/MusicPlayer.svelte';
+  import MediaLibrary from './lib/components/MediaLibrary.svelte';
   import Soundtrack from './lib/components/Soundtrack.svelte';
   import { music } from './lib/music.svelte';
   import { musicPalette } from './lib/musicAppearance';
@@ -26,6 +27,7 @@
     { route: 'home', label: 'Home', icon: 'home' },
     { route: 'library', label: 'Games', icon: 'grid' },
     { route: 'music', label: 'Music', icon: 'music' },
+    { route: 'media', label: 'Media', icon: 'image' },
     { route: 'tools', label: 'Tools', icon: 'controller' },
     { route: 'streaming', label: 'Streaming', icon: 'monitor' },
     { route: 'settings', label: 'Settings', icon: 'settings' },
@@ -161,6 +163,7 @@
         {#if app.route === 'home'}<Home />
         {:else if app.route === 'library'}<Library />
         {:else if app.route === 'music'}<Soundtrack library />
+        {:else if app.route === 'media'}<MediaLibrary library />
         {:else if app.route === 'ps2'}<Library collection="ps2" />
         {:else if app.route === 'game'}<GamePage />
         {:else if app.route === 'tools'}<Tools />

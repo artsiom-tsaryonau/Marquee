@@ -14,6 +14,7 @@
   import Row from '../components/Row.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
   import CatalogueDetails from '../components/CatalogueDetails.svelte';
+  import MediaLibrary from '../components/MediaLibrary.svelte';
   import Soundtrack from '../components/Soundtrack.svelte';
   let tab = $state<GameDetailTab>('overview');
 
@@ -160,12 +161,14 @@
       (event.currentTarget.querySelector(`[data-tab="${tab}"]`) as HTMLButtonElement)?.focus();
     }
   }}>
-    {#each gameDetailTabs as item}<button id={`${item}-tab`} data-tab={item} role="tab" aria-selected={tab === item} aria-controls={`${item}-panel`} tabindex={tab === item ? 0 : -1} data-nav onclick={() => tab = item}>{item === 'overview' ? 'Overview' : item === 'ost' ? 'OST' : 'Metadata'}</button>{/each}
+    {#each gameDetailTabs as item}<button id={`${item}-tab`} data-tab={item} role="tab" aria-selected={tab === item} aria-controls={`${item}-panel`} tabindex={tab === item ? 0 : -1} data-nav onclick={() => tab = item}>{item === 'overview' ? 'Overview' : item === 'ost' ? 'OST' : item === 'media' ? 'Media' : 'Metadata'}</button>{/each}
   </div>
   <div class="body">
     <div class="main" id={`${tab}-panel`} role="tabpanel" aria-labelledby={`${tab}-tab`} tabindex="0">
       {#if tab === 'ost'}
         {#key canonicalId(g)}<Soundtrack gameKey={canonicalId(g)} gameTitle={cleanTitle(g.title)} />{/key}
+      {:else if tab === 'media'}
+        {#key canonicalId(g)}<MediaLibrary gameKey={canonicalId(g)} gameTitle={cleanTitle(g.title)} />{/key}
       {:else if tab === 'metadata'}
         <section class="metadata-intro"><h3>Metadata and artwork</h3><p class="about">Release information and source links for this installation. Matching updates metadata; it does not change your game files, saves or launch method.</p>
           {#if offline}<button class="btn glass small" data-nav disabled={app.fetchingArt} onclick={() => app.refreshArtwork(g.id)}><Icon name="refresh" size={16} />{app.fetchingArt ? 'Refreshing…' : 'Refresh artwork and details'}</button>{/if}

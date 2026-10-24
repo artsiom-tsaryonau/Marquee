@@ -43,3 +43,17 @@ pub fn music_url(state: State<'_, AppState>, track_id: String) -> Result<String>
         .expect("server initialized")
         .music_url(&track_id))
 }
+
+#[tauri::command]
+pub fn media_url(state: State<'_, AppState>, id: String) -> Result<String> {
+    state.core.media_open(&id)?;
+    let mut server = state.music_server.lock().unwrap_or_else(|e| e.into_inner());
+    if server.is_none() {
+        *server = Some(marquee_core::server::start(
+            Arc::clone(&state.core),
+            None,
+            None,
+        )?);
+    }
+    Ok(server.as_ref().expect("server initialized").media_url(&id))
+}
