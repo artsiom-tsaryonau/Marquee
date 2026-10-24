@@ -19,8 +19,8 @@ export const desktopApi: LibraryApi = {
   kind: 'desktop',
   ...commands(call),
   mediaUrl:(id)=>invoke<string>('media_url',{id}),
-  async pickMedia() {
-    const selected=await open({directory:false,multiple:true,title:'Add game videos and images',filters:[{name:'Game media',extensions:['png','jpg','jpeg','mp4','webm']}]});
+  async pickMedia(kind) {
+    const selected=await open({directory:false,multiple:true,title:kind==='image'?'Add images':kind==='video'?'Add videos':'Add game media',filters:[{name:'Game media',extensions:kind==='image'?['png','jpg','jpeg']:kind==='video'?['mp4','webm']:['png','jpg','jpeg','mp4','webm']}]});
     return typeof selected==='string'?[selected]:selected??[];
   },
   async pickMediaDisc() {

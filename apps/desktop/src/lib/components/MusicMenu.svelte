@@ -27,7 +27,7 @@
   .music-menu { position: relative; flex: 0 0 auto; }
   summary { display: grid; place-items: center; width: var(--music-control-size); height: var(--music-control-size); border-radius: 50%; color: var(--text-dim); cursor: pointer; list-style: none; }
   summary::-webkit-details-marker { display: none; }
-  summary.with-label { display: flex; gap: 7px; width: auto; padding: 0 10px; font-size: 12px; white-space: nowrap; }
+  summary.with-label { border-radius:6px; display: flex; gap: 7px; width: auto; padding: 0 10px; font-size: 12px; white-space: nowrap; }
   @media(max-width:900px) { :global(.music-player) summary.with-label { width: var(--music-control-size); padding: 0; justify-content: center; } :global(.music-player) .visible-label { display: none; } }
   summary:hover, .music-menu[open] summary { color: var(--text); background: var(--field); }
   summary:focus-visible { outline: 2px solid var(--music-text); outline-offset: 2px; }

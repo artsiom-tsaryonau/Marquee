@@ -182,6 +182,7 @@ impl Db {
         crate::wanted::ensure_table(&self.conn)?;
         crate::music::ensure_tables(&self.conn)?;
         crate::game_media::ensure_tables(&self.conn)?;
+        crate::metadata_search::ensure_tables(&self.conn)?;
         if version > SCHEMA_VERSION {
             return Err(crate::error::AppError::new(
                 "DB",

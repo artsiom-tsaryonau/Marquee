@@ -1,6 +1,6 @@
 # Game soundtracks and music player
 
-Updated 2026-10-24. The initial local OST tab and compact player are implemented.
+Updated 2026-10-25. Local soundtracks under Media and the compact player are implemented.
 Jellyfin, yt-dlp/torrent audio acquisition and automatic release matching remain
 planned. This stays independent of [streaming acceptance](STREAMING.md).
 
@@ -12,7 +12,7 @@ queue supports play-next, append, selecting queued tracks and reordering/removin
 upcoming tracks; it remains local to the current app session. See the
 [media library foundation](MEDIA_LIBRARY.md#implemented-foundation).
 
-Open a game → **OST** → **Add soundtrack**. Save an album title, optional
+Open a game → **Media** → **Soundtrack** → **Add soundtrack**. Save an album title, optional
 composer/artist and HTTPS source page, then **Add tracks**. The native
 app opens a multi-file picker. Browser mode asks for absolute paths on the
 computer running Marquee; it does not upload browser files. Tracks are added in

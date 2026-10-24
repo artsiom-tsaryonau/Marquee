@@ -357,6 +357,9 @@ fn steamgriddb(key: &str, title: &str) -> Option<(Vec<u8>, &'static str)> {
         .iter()
         .find(|g| g["name"].as_str().is_some_and(|n| names_agree(&term, n)))?;
     let id = game["id"].as_u64()?;
+    steamgriddb_id(key, id)
+}
+pub(crate) fn steamgriddb_id(key: &str, id: u64) -> Option<(Vec<u8>, &'static str)> {
     let grids = http::get_json_bearer(
         &format!("https://www.steamgriddb.com/api/v2/grids/game/{id}?dimensions=600x900&types=static&limit=3"),
         key,
@@ -375,7 +378,13 @@ fn steamgriddb(key: &str, title: &str) -> Option<(Vec<u8>, &'static str)> {
     None
 }
 
-fn store(core: &Core, art_dir: &Path, e: &Edition, bytes: &[u8], source: &str) -> Result<()> {
+pub(crate) fn store(
+    core: &Core,
+    art_dir: &Path,
+    e: &Edition,
+    bytes: &[u8],
+    source: &str,
+) -> Result<()> {
     let ext = image_kind(bytes).ok_or_else(|| AppError::new("NETWORK", "Not a usable image"))?;
     let dest = art_dir.join(format!("{}.{ext}", e.id));
     let mut tmp = tempfile::NamedTempFile::new_in(art_dir)?;

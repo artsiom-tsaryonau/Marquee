@@ -1,5 +1,6 @@
 //! Read-only PS3 discovery. Never extracts, installs, decrypts or registers games.
 use crate::error::{AppError, Result};
+use crate::sessions::EventSink;
 use marquee_media::archive::{ext_of, kind_of, list_entries};
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -411,6 +412,52 @@ pub fn inspect(path: &Path) -> Result<Inspection> {
     Ok(report)
 }
 
+/// Resolve a disc title through bounded ISO directory reads; no key access.
+pub fn inspect_disc_metadata(path: &Path) -> Result<Metadata> {
+    let (mut reader, size) = crate::game_media::disc_member(path, "/PS3_GAME/PARAM.SFO")?;
+    if size > MAX_SFO as u64 {
+        return Err(invalid("Disc metadata exceeds its limit"));
+    }
+    let mut bytes = vec![];
+    reader.read_to_end(&mut bytes)?;
+    let metadata = parse_sfo(&bytes)?;
+    if metadata.category != "DG" {
+        return Err(invalid("Only a base disc title can be registered"));
+    }
+    let (mut boot, _) = crate::game_media::disc_member(path, "/PS3_GAME/USRDIR/EBOOT.BIN")?;
+    let mut magic = [0; 4];
+    boot.read_exact(&mut magic)?;
+    if magic != *b"SCE\0" {
+        return Err(invalid(
+            "Disc executable header is not readable; preparation is required",
+        ));
+    }
+    let (mut sfb, _) = crate::game_media::disc_member(path, "/PS3_DISC.SFB")?;
+    sfb.read_exact(&mut magic)?;
+    if magic != *b".SFB" {
+        return Err(invalid("Disc manifest header is not valid"));
+    }
+    Ok(metadata)
+}
+impl crate::Core {
+    pub fn import_ps3_disc(&self, path: &Path) -> Result<String> {
+        let metadata = inspect_disc_metadata(path)?;
+        let path = std::fs::canonicalize(path)?;
+        let id = self.with_db(|db| {
+            let mut report = crate::model::ScanReport::default();
+            let descriptor = crate::catalog::by_id("ps3")?;
+            crate::library::ingest_ps3_disc(db, &path, &descriptor, &mut report)?;
+            let media = db
+                .media_by_path(&path)?
+                .ok_or_else(|| invalid("Disc registration failed"))?;
+            db.set_display_title(&media.edition_id, Some(&metadata.title))?;
+            Ok(media.edition_id)
+        })?;
+        self.events.emit(crate::CoreEvent::LibraryChanged);
+        Ok(id)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -467,6 +514,101 @@ mod tests {
         }
     }
 
+    fn disc_iso(path: &Path, category: &str) {
+        fn dual(n: u32) -> Vec<u8> {
+            [n.to_le_bytes(), n.to_be_bytes()].concat()
+        }
+        fn record(name: &[u8], sector: u32, size: u32, flags: u8) -> Vec<u8> {
+            let len = 33 + name.len() + usize::from(name.len().is_multiple_of(2));
+            let mut b = vec![0; len];
+            b[0] = len as u8;
+            b[2..10].copy_from_slice(&dual(sector));
+            b[10..18].copy_from_slice(&dual(size));
+            b[25] = flags;
+            b[32] = name.len() as u8;
+            b[33..33 + name.len()].copy_from_slice(name);
+            b
+        }
+        let sfo = metadata(category);
+        let mut bytes = vec![0; 64 * 2048];
+        let p = &mut bytes[16 * 2048..17 * 2048];
+        p[..7].copy_from_slice(b"\x01CD001\x01");
+        p[80..88].copy_from_slice(&dual(64));
+        p[128..132].copy_from_slice(&[0, 8, 8, 0]);
+        p[156..190].copy_from_slice(&record(&[0], 20, 2048, 2));
+        for (sector, entries) in [
+            (
+                20,
+                vec![
+                    record(&[0], 20, 2048, 2),
+                    record(&[1], 20, 2048, 2),
+                    record(b"PS3_GAME", 21, 2048, 2),
+                    record(b"PS3_DISC.SFB;1", 33, 4, 0),
+                ],
+            ),
+            (
+                21,
+                vec![
+                    record(&[0], 21, 2048, 2),
+                    record(&[1], 20, 2048, 2),
+                    record(b"PARAM.SFO;1", 30, sfo.len() as u32, 0),
+                    record(b"USRDIR", 22, 2048, 2),
+                ],
+            ),
+            (
+                22,
+                vec![
+                    record(&[0], 22, 2048, 2),
+                    record(&[1], 21, 2048, 2),
+                    record(b"EBOOT.BIN;1", 32, 4, 0),
+                ],
+            ),
+        ] {
+            let data = entries.concat();
+            bytes[sector * 2048..sector * 2048 + data.len()].copy_from_slice(&data);
+        }
+        bytes[30 * 2048..30 * 2048 + sfo.len()].copy_from_slice(&sfo);
+        bytes[32 * 2048..32 * 2048 + 4].copy_from_slice(b"SCE\0");
+        bytes[33 * 2048..33 * 2048 + 4].copy_from_slice(b".SFB");
+        fs::write(path, bytes).unwrap();
+    }
+    #[test]
+    fn ps3_disc_registration_is_idempotent_and_linkable_but_cannot_launch_yet() {
+        let t = tempfile::tempdir().unwrap();
+        let p = t.path().join("disc.iso");
+        disc_iso(&p, "DG");
+        let core = crate::Core::open_isolated(Some(t.path().join("data")), true).unwrap();
+        let id = core.import_ps3_disc(&p).unwrap();
+        assert_eq!(core.import_ps3_disc(&p).unwrap(), id);
+        let snap = core.snapshot().unwrap();
+        assert_eq!(snap.editions.len(), 1);
+        assert!(snap
+            .runners
+            .iter()
+            .all(|r| !r.systems.contains(&"ps3".to_string())));
+        assert_eq!(snap.editions[0].system, "ps3");
+        assert_eq!(snap.editions[0].title, "Example PS3 title");
+        assert!(!snap.editions[0].missing);
+        assert_eq!(snap.editions[0].serial.as_deref(), Some("BCUS98111"));
+        assert_eq!(snap.media[0].kind, crate::model::MediaKind::Ps3Iso);
+        assert_eq!(
+            core.launch(&id, &[], core.hub()).unwrap_err().code,
+            "PS3_LAUNCH_PENDING"
+        );
+        let collection = core.media_create("Extras", None).unwrap();
+        core.media_link(&collection, &id, true).unwrap();
+        assert_eq!(core.media_collections(Some(&id)).unwrap().len(), 1);
+        let mut f = fs::OpenOptions::new().write(true).open(&p).unwrap();
+        use std::io::{Seek, SeekFrom};
+        f.seek(SeekFrom::Start(32 * 2048)).unwrap();
+        f.write_all(b"bad!").unwrap();
+        assert!(core.import_ps3_disc(&p).is_err());
+        assert_eq!(core.snapshot().unwrap().editions.len(), 1);
+        let update = t.path().join("update.iso");
+        disc_iso(&update, "GD");
+        assert!(core.import_ps3_disc(&update).is_err());
+        assert_eq!(core.snapshot().unwrap().editions.len(), 1);
+    }
     #[test]
     fn bounded_psf_identity_parser_rejects_bad_offsets_duplicates_and_unicode_ids() {
         let bytes = metadata("DG");

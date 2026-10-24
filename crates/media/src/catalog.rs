@@ -62,7 +62,11 @@ pub fn ps1() -> Result<SystemDescriptor> {
 
 /// Every system Marquee ships a descriptor for.
 pub fn all() -> Result<Vec<SystemDescriptor>> {
-    let mut all = vec![ps1()?, ps2()?];
+    let mut all = vec![
+        ps1()?,
+        ps2()?,
+        load(include_str!("../../../catalog/systems/ps3.json"))?,
+    ];
     for json in GENERIC_JSON {
         all.push(load(json)?);
     }

@@ -40,8 +40,21 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
             out(core.review_ps3_firmware(PathBuf::from(text(&args, "path")?).as_path())?)
         }
         "install_ps3_firmware" => out(core.install_ps3_firmware(&text(&args, "review_token")?)?),
+        "import_ps3_disc" => {
+            out(core.import_ps3_disc(PathBuf::from(text(&args, "path")?).as_path())?)
+        }
         "inspect_ps3" => out(crate::ps3::inspect(
             PathBuf::from(text(&args, "path")?).as_path(),
+        )?),
+        "search_game_metadata" => {
+            out(core.search_game_metadata(&text(&args, "edition_id")?, &text(&args, "query")?)?)
+        }
+        "apply_metadata_match" => out(core.apply_metadata_match(
+            &text(&args, "edition_id")?,
+            &text(&args, "token")?,
+            args.get("candidate_id")
+                .and_then(Value::as_u64)
+                .ok_or_else(|| AppError::new("BAD_REQUEST", "Missing candidate ID"))?,
         )?),
         "media_collections" => out(core.media_collections(maybe(&args, "game_key").as_deref())?),
         "media_create" => {
@@ -212,6 +225,7 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
         "stop_manager" => out(core.preparation.stop()?),
         "preparation_systems" => out(catalog::all()?
             .into_iter()
+            .filter(|d| d.id != "ps3")
             .map(|d| serde_json::json!({"id":d.id,"name":d.display_name}))
             .collect::<Vec<_>>()),
         "preparation_jobs" => out(core.preparation_jobs()?),

@@ -78,7 +78,7 @@ streamed/controller acceptance.
 | BlastEm | Genesis / Mega Drive | Pinned source build and direct cartridge launch; no BIOS |
 | DuckStation | PS1 | Managed lifecycle plus library-disc launch adapter |
 | PPSSPP | PSP | Managed lifecycle and standalone opening |
-| RPCS3 | PS3 | Managed lifecycle/standalone opening, [PS3 discovery and reviewed firmware setup](PS3.md); library Play remains open |
+| RPCS3 | PS3 | Managed lifecycle/standalone opening, [PS3 discovery, reviewed firmware setup and verified ISO registration](PS3.md); library Play remains open |
 | Flycast | Dreamcast | Managed lifecycle and generic disc adapter; live game acceptance separate |
 | Azahar | Nintendo 3DS | Managed lifecycle and standalone opening |
 | Cemu | Wii U | Managed lifecycle and standalone opening |

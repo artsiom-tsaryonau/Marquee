@@ -18,6 +18,7 @@ pub mod launchers;
 pub mod library;
 pub mod lutris;
 pub mod metadata;
+mod metadata_search;
 pub mod model;
 pub mod music;
 mod music_metadata;

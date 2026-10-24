@@ -194,7 +194,20 @@ fn ingest_disc(
     }
     // `.chd` is compressed and not ISO9660 on disk, so it carries no serial.
     // `.cue` is a sheet; its data track holds the filesystem.
+    let ps3 = if kind == MediaKind::Ps3Iso {
+        Some(crate::ps3::inspect_disc_metadata(path)?)
+    } else {
+        None
+    };
     let identity = match kind {
+        MediaKind::Ps3Iso => {
+            let m = ps3.as_ref().unwrap();
+            crate::iso::DiscIdentity {
+                serial: Some(m.title_id.clone()),
+                serial_raw: Some(m.title_id.clone()),
+                region: None,
+            }
+        }
         MediaKind::Ps1Cue => match crate::cue::identify_cue(path) {
             Ok(identity) => identity,
             Err(err) => {
@@ -222,7 +235,10 @@ fn ingest_disc(
         Some(row) => row.id.clone(),
         None => Uuid::new_v4().to_string(),
     };
-    let title = title_from_filename(path);
+    let title = ps3
+        .as_ref()
+        .map(|m| m.title.clone())
+        .unwrap_or_else(|| title_from_filename(path));
     db.upsert_edition(
         &edition_id,
         &descriptor.id,
@@ -393,4 +409,20 @@ pub fn find_media_for_edition(db: &Db, edition_id: &str) -> Result<Option<MediaF
     Ok(snapshot_media(db)?
         .into_iter()
         .find(|m| m.edition_id == edition_id))
+}
+
+pub(crate) fn ingest_ps3_disc(
+    db: &Db,
+    path: &Path,
+    descriptor: &catalog::SystemDescriptor,
+    report: &mut ScanReport,
+) -> Result<()> {
+    ingest_disc(
+        db,
+        path,
+        &fs::metadata(path)?,
+        descriptor,
+        MediaKind::Ps3Iso,
+        report,
+    )
 }

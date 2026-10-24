@@ -60,15 +60,15 @@ test('platform shelves preserve filtered order inside each system and keep every
   assert.equal(caseRatio('ps1'),1);assert.equal(caseRatio('ps2'),2/3);assert.ok(caseRatio('snes')>1);
 });
 
-test('game detail tabs include Media and Metadata; keyboard navigation wraps across all four', async () => {
+test('game detail tabs include Media and Metadata; keyboard navigation wraps across all three', async () => {
   const {gameDetailTabs,nextGameDetailTab}=await import('../src/lib/gameDetails');
-  assert.deepEqual(gameDetailTabs,['overview','ost','media','metadata']);
+  assert.deepEqual(gameDetailTabs,['overview','media','metadata']);
   assert.equal(nextGameDetailTab('overview','ArrowLeft'),'metadata');
   assert.equal(nextGameDetailTab('metadata','ArrowRight'),'overview');
-  assert.equal(nextGameDetailTab('ost','ArrowRight'),'media');
-  assert.equal(nextGameDetailTab('ost','Home'),'overview');
+  assert.equal(nextGameDetailTab('overview','ArrowRight'),'media');
+  assert.equal(nextGameDetailTab('media','Home'),'overview');
   assert.equal(nextGameDetailTab('overview','End'),'metadata');
-  assert.equal(nextGameDetailTab('ost','Enter'),'ost');
+  assert.equal(nextGameDetailTab('media','Enter'),'media');
 });
 
 test('console icon profiles distinguish common systems and missing artwork initials stay decorative', async () => {
@@ -103,3 +103,10 @@ test('GB defaults and per-game overrides use compatible engines without hiding a
   assert.equal(pickRunner(snap,'gb'),null);
   assert.equal(pickRunner(snap,'gb',mesen.id).id,mesen.id);
 });
+
+ test('registered PS3 discs are visible but never claim PCSX2 or playable readiness',async()=>{
+ const {editionToGame}=await import('../src/lib/api/map');
+ const snap={runners:[],settings:{},roots:[],media:[{id:'disc',kind:'ps3_iso',path:'/game.iso',available:true}]};
+ const entry=editionToGame({id:'gow3',system:'ps3',title:'God of War III',media_id:'disc',missing:false,playtime_seconds:0},snap);
+ assert.equal(entry.platform,'ps3');assert.equal(entry.installed,true);assert.equal(canPlay(entry),false);assert.match(gameStatus(entry).label,/launch integration pending/i);assert.equal(emulatorName(entry),'RPCS3');
+ });

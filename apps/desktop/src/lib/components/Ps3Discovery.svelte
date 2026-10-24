@@ -3,6 +3,8 @@
   import { bytes } from '../format';
   import type { Ps3Inspection } from '../api/contracts';
   import Icon from './Icon.svelte';
+  let added=$state('');
+  async function add(path:string){busy=true;error='';try{const id=await app.api.importPs3Disc(path);app.applySnapshot(await app.api.snapshot());added=id;}catch(e){error=(e as Error).message;}finally{busy=false;}}
   let busy = $state(false);
   let error = $state('');
   let report = $state<Ps3Inspection | null>(null);
@@ -22,6 +24,7 @@
   <h3>PS3 content discovery</h3>
   <p>Review archives or game folders before preparation. This check reads metadata and archive headers; it does not extract, install or add games.</p>
   <div class="actions"><button class="btn glass small" data-nav disabled={busy} onclick={() => inspect(false)}><Icon name="search" size={16} />Inspect a file</button><button class="btn glass small" data-nav disabled={busy} onclick={() => inspect(true)}><Icon name="folder" size={16} />Inspect a folder</button></div>
+  {#if added}<p role="status">Added to Games. Open its Media tab to link an extras collection.</p>{/if}
   {#if busy}<p role="status">Inspecting content…</p>{/if}
   {#if error}<p class="error" role="alert">{error}</p>{/if}
   {#if report}
@@ -35,6 +38,7 @@
           <p class="path">{item.path}</p>
           {#if item.metadata}<dl><dt>Title ID</dt><dd>{item.metadata.title_id}</dd><dt>Content category</dt><dd>{item.metadata.category} · {names[item.kind]}</dd>{#if item.metadata.app_version}<dt>Version</dt><dd>{item.metadata.app_version}</dd>{/if}<dt>Boot file</dt><dd>{item.boot_file_present ? 'Present; not launched' : 'Not found in this layout'}</dd><dt>Artwork</dt><dd>{item.artwork_present ? 'ICON0.PNG present; not decoded' : 'Not found'}</dd></dl>{/if}
           {#if item.bytes !== null}<p>{bytes(item.bytes)}</p>{/if}
+          {#if item.kind==='disc_image'&&report.source_kind!=='archive'}<button class="btn glass small" data-nav disabled={busy} onclick={()=>add(item.path)}>Add disc to Games</button><p>Registers a verified disc. RPCS3 launch remains pending validation.</p>{/if}
           <p class="status">{item.status}</p><p>{item.next_action}</p>
         </article>
       {/each}

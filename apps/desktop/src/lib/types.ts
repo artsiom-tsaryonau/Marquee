@@ -32,6 +32,7 @@ export interface Art {
 export type SetupState = 'runner_missing' | 'missing' | 'unverified' | 'launch_tested';
 
 export interface GameEntry {
+  launchPending?: string;
   runnerOverride?: string;
   metadata?: import('./api/contracts').CatalogueRecord;
   metadataMediaId?: string;

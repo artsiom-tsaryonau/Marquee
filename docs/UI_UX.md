@@ -192,8 +192,10 @@ an explicit No cover label. Platform shelves avoid repeating their heading on
 every placeholder, while mixed rows retain the platform name. Real covers are
 unchanged. Icons supplement text and remain hidden from assistive technology.
 
-Game details now have **Overview**, **OST** and **Metadata** tabs with wrapping
-Left/Right and Home/End keyboard navigation. Metadata owns catalogue matching and
+Game details now have **Overview**, **Media** and **Metadata** tabs with wrapping
+Left/Right and Home/End keyboard navigation. Media groups Soundtrack, Images and
+Videos; videos carry an advisory top-right spoiler badge instead of a reveal
+switch. Metadata owns reviewed provider search, catalogue matching and
 artwork refresh; the duplicate Your copy / Review metadata / Soundtracks shortcut
 panel is removed. Installation and compact identification occupy the right rail
 across tabs. Full library/canonical IDs are now in the Library identifiers
@@ -283,3 +285,8 @@ targets, controller glyphs and reliable Back/context behavior. Native Tauri inpu
 must be verified independently of browser Gamepad API tests. Capture supported
 sizes/themes/input modes; a build is not visual acceptance. Optional collections,
 notes, save backup, Gamescope and streaming remain [expansion work](EXPANSION_CATALOGUE.md).
+
+The expanded sidebar toggle is icon-only, retaining its accessible label and
+tooltip. Music/video control bars use less height; the labelled This device
+control has a rectangular hover surface. The video viewer omits the remembered
+playback-position explanatory footer.

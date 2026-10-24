@@ -97,7 +97,8 @@ PS3 step P3-0 now adds [read-only content discovery](PS3.md) through RPCS3’s
 Tools dialog and a library-independent CLI. The supplied God of War III archive
 contains a 38.17 GB ISO candidate; title identity and encryption remain unverified.
 P3-1 now adds pinned, reviewed manager-owned firmware installation with isolated
-staging, output verification and receipts. Next is reviewed disc-image preparation, then
+staging, output verification and receipts. Verified unpacked ISO registration and Media links are now implemented; PS3
+archive preparation and validated RPCS3 library launch remain next, then
 library Play and title-specific local/streamed acceptance. No source extraction
 or playable PS3 library entry is implied by discovery.
 
@@ -227,7 +228,7 @@ Marquee accents, with Classic available in Appearance. These presentation
 choices preserve canonical game IDs and independent music preferences.
 
 The game-page layout now uses a Steam-inspired media stage/thumbnail strip,
-adjacent release summary and a Play/activity toolbar, followed by Overview/OST.
+adjacent release summary and a Play/activity toolbar, followed by Overview / Media / Metadata. Media groups Soundtrack, Images and Videos.
 Only available assets are shown, with contained box art when that is the only
 image. Prices, purchase panels and review sections are outside this launcher UI.
 
@@ -246,7 +247,7 @@ the top-right desktop toolbar. Native/responsive acceptance remains open.
 
 Local game extras now have a **Media** navigation destination and a game-page
 **Media** tab: independent collections, explicit game links, selected-file/disc
-imports, image gallery, native video controls, spoiler reveal and persisted resume.
+imports, image gallery, visible Marquee video controls, advisory spoiler badges and persisted resume.
 [Media usage and GoW3 acceptance](MEDIA_LIBRARY.md#local-game-extras--current-use-and-limits)
 record the actual pilot and limits. Raw M2V conversion/audio pairing, generated
 video posters and remote hosting remain separate steps.
@@ -283,3 +284,10 @@ playlist without browser cookies. Reuse the companion's paired bridge for a
 typed music URL handoff, then add reviewed durable manager download/audio jobs.
 Keep cookies an explicit optional fallback, separate from the existing
 Vimm/Axekin game-provider protocol and music playback.
+
+Metadata search now starts with an explicit SteamGridDB artwork-identity review
+on the game Metadata tab. Search results are capped and kept in edition-bound,
+30-minute server reviews. Applying one stores provider attribution and artwork
+without renaming, changing platform or merging games. Live GoW3 original versus
+Remastered candidates were checked. Text descriptions, richer release matching,
+provider/platform disambiguation and additional providers remain open.

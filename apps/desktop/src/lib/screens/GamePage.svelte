@@ -14,8 +14,8 @@
   import Row from '../components/Row.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
   import CatalogueDetails from '../components/CatalogueDetails.svelte';
-  import MediaLibrary from '../components/MediaLibrary.svelte';
-  import Soundtrack from '../components/Soundtrack.svelte';
+  import MetadataSearch from '../components/MetadataSearch.svelte';
+  import GameMediaHub from '../components/GameMediaHub.svelte';
   let tab = $state<GameDetailTab>('overview');
 
   const g = $derived(app.current ?? app.hero);
@@ -82,7 +82,7 @@
     </div>
   </article>
 {:else}
-<article class="page" class:music-view={tab === 'ost'} style="--accent-h:{g.art.hue2}">
+<article class="page" class:music-view={tab === 'media'} style="--accent-h:{g.art.hue2}">
   <div class="head" in:fly={{ y: 20, duration: dur }}>
     <button class="back" data-nav onclick={() => app.back()}><Icon name="back" size={18} /> Back</button>
     {#if offline && !editing}<button class="edit-game btn glass small" data-nav onclick={beginEdit}><Icon name="edit" size={16} />Edit</button>{/if}
@@ -132,6 +132,7 @@
         <button class="btn glass" data-nav onclick={() => app.removeWantedGame(g)}><Icon name="x" /> Remove</button>
       {:else if g.source === 'catalogue'}
         <p class="catalogue-note" role="status">Not in your library — catalogue discovery only. Open the source page from the facts panel when you want to browse Vimm’s Lair.</p>
+      {:else if g.launchPending}<button class="btn glass" data-nav disabled title={g.launchPending}><Icon name="play"/>Launch pending</button>
       {:else if offline && g.setupState === 'runner_missing'}
         {#if g.platform === 'ps2'}<InstallMenu tone="primary" />
         {:else}<button class="btn primary" data-nav onclick={() => app.go('tools')}><Icon name="settings" /> Set up {g.platform === 'ps1' ? 'DuckStation' : g.platform === 'genesis' ? 'BlastEm' : g.platform === 'ds' ? 'melonDS' : g.platform === 'neogeo' ? 'FinalBurn Neo' : 'emulator'}</button>{/if}
@@ -161,15 +162,14 @@
       (event.currentTarget.querySelector(`[data-tab="${tab}"]`) as HTMLButtonElement)?.focus();
     }
   }}>
-    {#each gameDetailTabs as item}<button id={`${item}-tab`} data-tab={item} role="tab" aria-selected={tab === item} aria-controls={`${item}-panel`} tabindex={tab === item ? 0 : -1} data-nav onclick={() => tab = item}>{item === 'overview' ? 'Overview' : item === 'ost' ? 'OST' : item === 'media' ? 'Media' : 'Metadata'}</button>{/each}
+    {#each gameDetailTabs as item}<button id={`${item}-tab`} data-tab={item} role="tab" aria-selected={tab === item} aria-controls={`${item}-panel`} tabindex={tab === item ? 0 : -1} data-nav onclick={() => tab = item}>{item === 'overview' ? 'Overview' : item === 'media' ? 'Media' : 'Metadata'}</button>{/each}
   </div>
   <div class="body">
     <div class="main" id={`${tab}-panel`} role="tabpanel" aria-labelledby={`${tab}-tab`} tabindex="0">
-      {#if tab === 'ost'}
-        {#key canonicalId(g)}<Soundtrack gameKey={canonicalId(g)} gameTitle={cleanTitle(g.title)} />{/key}
-      {:else if tab === 'media'}
-        {#key canonicalId(g)}<MediaLibrary gameKey={canonicalId(g)} gameTitle={cleanTitle(g.title)} />{/key}
+      {#if tab === 'media'}
+        {#key canonicalId(g)}<GameMediaHub gameKey={canonicalId(g)} gameTitle={cleanTitle(g.title)} />{/key}
       {:else if tab === 'metadata'}
+        {#if g.source==='rom'}{#key g.id}<MetadataSearch editionId={g.id} title={cleanTitle(g.title)}/>{/key}{/if}
         <section class="metadata-intro"><h3>Metadata and artwork</h3><p class="about">Release information and source links for this installation. Matching updates metadata; it does not change your game files, saves or launch method.</p>
           {#if offline}<button class="btn glass small" data-nav disabled={app.fetchingArt} onclick={() => app.refreshArtwork(g.id)}><Icon name="refresh" size={16} />{app.fetchingArt ? 'Refreshing…' : 'Refresh artwork and details'}</button>{/if}
         </section>
@@ -273,7 +273,7 @@
   .identity h4 { font-size: 13px; margin: 0 0 14px; } .identifier { overflow-wrap: anywhere; font-family: ui-monospace,monospace; font-size: 11px; }
   .metadata-intro { margin-bottom: 20px; } .overview-about { margin: 12px 0 28px; }
   .muted { color: var(--text-dim); }
-  .main { min-width: 0; } .main :global(.soundtrack) { padding: 0; max-width: none; }
+  .main { min-width: 0; } .main :global(.soundtrack), .main :global(.media-library) { padding: 0; max-width: none; } .main :global(.media-sections) { padding: 0 0 18px; max-width: none; }
 
   .feature-layout { display: grid; grid-template-columns: minmax(0,2.3fr) minmax(250px,1fr); gap: 24px; padding: 0 var(--gutter) 24px; max-width: 1500px; margin: 0 auto; }
   .feature-summary { min-width: 0; padding: 4px 0; }

@@ -57,6 +57,12 @@ pub fn launch(
             .edition_by_id(edition_id)?
             .ok_or_else(|| AppError::new("MEDIA_MISSING", "title is not in the library"))?;
         let system = edition.system.clone();
+        if system == "ps3" {
+            return Err(AppError::new(
+                "PS3_LAUNCH_PENDING",
+                "PS3 disc is registered. RPCS3 library launch still needs validation.",
+            ));
+        }
         let media = library::find_media_for_edition(&db, edition_id)?
             .ok_or_else(|| AppError::new("MEDIA_MISSING", "no disc is attached to this title"))?;
         if !media.available {

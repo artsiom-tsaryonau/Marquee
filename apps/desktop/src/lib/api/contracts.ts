@@ -403,7 +403,12 @@ export interface Ps3Inspection {
 export interface MediaAsset { id:string; title:string; kind:'image'|'video'; bytes:number; source:string; spoiler:boolean; position:number; available:boolean; }
 export interface MediaCollection { id:string; title:string; game_keys:string[]; assets:MediaAsset[]; }
 export interface MediaDisc { path:string; source_bytes:number; signature:string; items:{path:string; bytes:number; kind:'image'|'video'; supported:boolean}[]; }
+export interface MetadataReview {token:string;provider:string;candidates:{id:number;title:string}[];}
 export interface LibraryApi {
+  importPs3Disc(path:string):Promise<string>;
+  searchGameMetadata(editionId:string,query:string):Promise<MetadataReview>;
+  applyMetadataMatch(editionId:string,token:string,candidateId:number):Promise<void>;
+
   mediaCollections(gameKey?:string):Promise<MediaCollection[]>;
   mediaCreate(title:string,gameKey?:string):Promise<string>;
   mediaLink(id:string,gameKey:string,linked:boolean):Promise<void>;
@@ -414,7 +419,7 @@ export interface LibraryApi {
   mediaUpdate(id:string,title:string,spoiler:boolean):Promise<void>;
   mediaRemove(id:string):Promise<void>;
   mediaUrl(id:string):Promise<string>;
-  pickMedia():Promise<string[]>;
+  pickMedia(kind?:'image'|'video'):Promise<string[]>;
   pickMediaDisc():Promise<string|null>;
 
   musicAlbums(gameKey?: string): Promise<MusicAlbum[]>;

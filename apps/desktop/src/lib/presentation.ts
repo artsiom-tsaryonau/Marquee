@@ -4,6 +4,7 @@ import { systemLabel } from './labels';
 /** Availability is installation-specific; installed files alone do not imply readiness. */
 export function gameStatus(game: GameEntry): { label: string; tone: 'ok' | 'warn' | 'dim' | 'note' } | null {
   if (game.source === 'catalogue') return { label: 'Catalogue only', tone: 'dim' };
+  if (game.launchPending) return {label:game.launchPending,tone:'note'};
   if (game.wanted) return { label: game.wanted === 'wishlist' ? 'Wishlist' : 'Game files required', tone: 'note' };
   if (game.rootOffline) return { label: 'Drive unavailable', tone: 'warn' };
   if (game.mediaMissing) return { label: 'Files unavailable', tone: 'warn' };
@@ -17,13 +18,13 @@ export function gameStatus(game: GameEntry): { label: string; tone: 'ok' | 'warn
 }
 
 export function canPlay(game: GameEntry): boolean {
-  return game.source !== 'catalogue' && !game.wanted && game.installed && !game.rootOffline && !game.mediaMissing &&
+  return !game.launchPending && game.source !== 'catalogue' && !game.wanted && game.installed && !game.rootOffline && !game.mediaMissing &&
     game.setupState !== 'runner_missing' && game.setupState !== 'missing' &&
     (!game.portStatus || game.portStatus === 'ready');
 }
 
 export function emulatorName(game: GameEntry): string {
-  return game.runnerName?.replace(' (Marquee)', '') ?? ({ ps1: 'DuckStation', ps2: 'PCSX2', genesis: 'BlastEm', ds: 'melonDS', neogeo: 'FinalBurn Neo' } as Record<string, string>)[game.platform] ?? `${systemLabel(game.platform)} emulator`;
+  return game.runnerName?.replace(' (Marquee)', '') ?? ({ ps1: 'DuckStation', ps2: 'PCSX2', ps3:'RPCS3', genesis: 'BlastEm', ds: 'melonDS', neogeo: 'FinalBurn Neo' } as Record<string, string>)[game.platform] ?? `${systemLabel(game.platform)} emulator`;
 }
 
 /** Missing data opens the supported folder fallback, never reinstalls the engine. */

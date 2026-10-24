@@ -386,6 +386,9 @@ pub struct PlannedFile {
 
 impl ArchivePlan {
     pub fn inspect(source: &Path, system: &str) -> Result<Self> {
+        if system == "ps3" {
+            return Err(AppError::new("PREPARATION_PLATFORM","PS3 archive preparation is not implemented. Import a verified unpacked ISO through RPCS3 content discovery."));
+        }
         let descriptor = catalog::by_id(system)?;
         let kind = kind_of(source)?;
         let entries = list_entries(source, kind)?;

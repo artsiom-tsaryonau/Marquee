@@ -1,6 +1,6 @@
 # Marquee media library and remote playback
 
-Updated 2026-10-24. Owner-selected direction: Marquee hosts its own remote media
+Updated 2026-10-25. Owner-selected direction: Marquee hosts its own remote media
 library with a Jellyfin-like experience alongside games. This is a roadmap;
 the implemented OST player serves local desktop/browser use, not remote accounts
 or a production LAN media service.
@@ -9,8 +9,8 @@ or a production LAN media service.
 
 The **Media** destination and game-page Media tab hold explicit local extras
 (PNG/JPEG stills and MP4/WebM clips). Disc inspection reads ISO9660 directories
-only and copies a selected member; originals stay put. Videos default to spoiler
-until revealed. Raw M2V cinematics need conversion; audio pairing is not
+only and copies a selected member; originals stay put. Videos retain a spoiler flag and show a **Contains spoilers** badge at the
+top-right; the badge is advisory and does not block playback. Raw M2V cinematics need conversion; audio pairing is not
 implemented. This is not films/series identity or a remote media service.
 
 The **Music** navigation destination browses every saved album, including albums
@@ -42,8 +42,9 @@ still required; these implementation details do not close ML0 or remote gates.
 ## Local game extras — current use and limits
 
 Open **Media** in the navigation rail to browse collections independently of
-playable games. On a game's details page, its **Media** tab shows linked
-collections. Create a collection there, or link an existing one. Unlinking keeps
+playable games. On a game's details page, its **Media** tab contains **Soundtrack**, **Images**
+and **Videos** sections. Soundtrack uses the existing album/queue player; Images
+and Videos show linked collections filtered by media type. Create a collection there, or link an existing one. Unlinking keeps
 the collection in Media; it never creates or removes a game installation.
 
 - **Add files** copies explicitly chosen PNG/JPEG images and MP4/WebM videos.
@@ -63,8 +64,9 @@ the collection in Media; it never creates or removes a game installation.
   persisted periodically and on pause/close. Immediate reopen uses the latest
   position; closing before metadata loads cannot replace an existing resume point
   with zero. Starting video pauses Marquee's OST playback.
-- Imported videos default to spoilers. Both titles and playback stay hidden until
-  **Reveal videos** is selected. Media details allow editing titles and spoiler
+- Imported videos default to a **Contains spoilers** badge. The owner requested
+  an advisory label instead of the initial reveal switch; titles and playback are
+  accessible without an extra gate. Media details allow editing titles and spoiler
   labels. The MP4/WebM container check is not a codec guarantee: unsupported
   playback produces an explicit conversion message.
 - Raw M2V cinematics are indexed but **Needs conversion** prevents importing them
@@ -104,9 +106,9 @@ codec probes and screenshots are kept under ignored
 
 The main library now contains **God of War III — Disc extras** with two artwork
 images, the correctly labelled MAG promo and the GoW3 video-only preview:
-121,452,900 managed bytes in total. It has no fabricated PS3 installation/game
-link. Open it through Media; a future GoW3 game entry can link this same
-collection. This does not make the PS3 title playable.
+121,452,900 managed bytes in total. It is now linked to the verified GoW3 ISO game entry. Open Games → God of War III
+→ Media, or use the independent Media destination. This does not make the PS3
+title playable; its launch adapter remains pending.
 
 
 ## Product shape
@@ -177,3 +179,19 @@ determine which controls are available. Browser acceptance passed play/pause, a 
 volume changes, visible fullscreen controls and a 390-pixel layout without
 overflow or script errors. The rebuilt native desktop is awaiting the owner’s
 recheck. Evidence is recorded in the ignored pilot artifacts.
+
+### Compact layout and advisory spoilers — 2026-10-25
+
+Game details now use Overview / Media / Metadata, with Soundtrack / Images /
+Videos inside Media. Global Media offers the same sections; Music remains a
+direct shortcut to the album library. Pickers and disc candidates follow the
+selected media type. Video captions no longer explain remembered position. Both
+music and video controls are thinner; labelled device popovers use rectangular
+hover surfaces. The sidebar toggle keeps its accessible name and tooltip without
+a visible text label.
+
+Owner acceptance on 2026-10-25: the updated GoW3 Media layout was confirmed
+working in the rebuilt desktop. Automated game-page acceptance covered the
+Soundtrack / Images / Videos sections, advisory badges without a reveal switch,
+no playback-position footer, an icon-only sidebar toggle, reviewed search results
+and a 390-pixel layout without overflow or script errors.

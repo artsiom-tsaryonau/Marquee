@@ -118,6 +118,9 @@ fn both(b: &[u8]) -> Result<u64> {
 /// Bounded ISO9660 primary directory reader, including level-3 multi-extents.
 /// No mounting, shell execution, license access or game payload parsing.
 pub fn inspect(path: &Path) -> Result<Disc> {
+    index(path, false)
+}
+fn index(path: &Path, include_all: bool) -> Result<Disc> {
     let mut f = regular(path)?;
     let meta = f.metadata()?;
     let size = meta.len();
@@ -197,8 +200,10 @@ pub fn inspect(path: &Path) -> Result<Disc> {
                 queue.push((path, start, count, depth + 1));
                 continue;
             }
-            let Some((kind, _, supported)) = format(&path) else {
-                continue;
+            let (kind, _, supported) = match format(&path) {
+                Some(v) => v,
+                None if include_all => ("file", "application/octet-stream", false),
+                None => continue,
             };
             if files.len() >= 2000 && !files.contains_key(&path) {
                 return Err(err("Disc media candidate limit reached"));
@@ -261,6 +266,24 @@ fn storage(root: &Path) -> Result<PathBuf> {
     fs::set_permissions(&p, fs::Permissions::from_mode(0o700))?;
     Ok(p)
 }
+pub(crate) fn disc_member(path: &Path, member: &str) -> Result<(Box<dyn Read>, u64)> {
+    let disc = index(path, true)?;
+    let item = disc
+        .items
+        .into_iter()
+        .find(|i| i.path == member)
+        .ok_or_else(|| err("Required disc member is missing"))?;
+    Ok((
+        Box::new(DiscReader {
+            file: regular(path)?,
+            extents: item.extents,
+            index: 0,
+            remaining: 0,
+        }),
+        item.bytes,
+    ))
+}
+
 struct DiscReader {
     file: File,
     extents: Vec<(u64, u64)>,

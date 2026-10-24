@@ -18,7 +18,7 @@
   import Settings from './lib/screens/Settings.svelte';
   import Streaming from './lib/screens/Streaming.svelte';
   import MusicPlayer from './lib/components/MusicPlayer.svelte';
-  import MediaLibrary from './lib/components/MediaLibrary.svelte';
+  import GameMediaHub from './lib/components/GameMediaHub.svelte';
   import Soundtrack from './lib/components/Soundtrack.svelte';
   import { music } from './lib/music.svelte';
   import { musicPalette } from './lib/musicAppearance';
@@ -128,7 +128,7 @@
     <nav id="desktop-navigation" class="side glass-panel" class:expanded={app.sidebarExpanded} aria-label="Main">
       <div class="brand"><span class="mark">M</span><span class="word">Marquee</span></div>
       <button class="nav sidebar-toggle" data-nav aria-expanded={app.sidebarExpanded} aria-controls="desktop-navigation" aria-label={app.sidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'} title={app.sidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'} onclick={() => app.sidebarExpanded = !app.sidebarExpanded}>
-        <Icon name="sidebar" size={22} /><span>Collapse sidebar</span>
+        <Icon name="sidebar" size={22} />
       </button>
       {#each nav as n (n.route)}
         <button class="nav" class:on={app.route === n.route} aria-current={app.route === n.route ? 'page' : undefined} title={n.label} data-nav onclick={() => app.go(n.route)}>
@@ -163,7 +163,7 @@
         {#if app.route === 'home'}<Home />
         {:else if app.route === 'library'}<Library />
         {:else if app.route === 'music'}<Soundtrack library />
-        {:else if app.route === 'media'}<MediaLibrary library />
+        {:else if app.route === 'media'}<GameMediaHub library />
         {:else if app.route === 'ps2'}<Library collection="ps2" />
         {:else if app.route === 'game'}<GamePage />
         {:else if app.route === 'tools'}<Tools />

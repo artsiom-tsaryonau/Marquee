@@ -1,4 +1,4 @@
-export const gameDetailTabs = ['overview', 'ost', 'media', 'metadata'] as const;
+export const gameDetailTabs = ['overview', 'media', 'metadata'] as const;
 export type GameDetailTab = typeof gameDetailTabs[number];
 
 export function nextGameDetailTab(current: GameDetailTab, key: string): GameDetailTab {

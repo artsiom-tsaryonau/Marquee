@@ -13,7 +13,7 @@ const SYSTEM_EMULATOR: Record<string, string> = {
 };
 /** Backend system id -> UI platform id. */
 const PLATFORM: Record<string, GameEntry['platform']> = {
-  ps1: 'ps1', ps2: 'ps2', genesis: 'genesis', ds: 'ds', neogeo: 'neogeo', dreamcast: 'dreamcast', nes: 'nes', snes: 'snes', gb: 'gb', gbc: 'gbc', pce: 'tg16', n64: 'n64',
+  ps1: 'ps1', ps2: 'ps2', ps3:'ps3', genesis: 'genesis', ds: 'ds', neogeo: 'neogeo', dreamcast: 'dreamcast', nes: 'nes', snes: 'snes', gb: 'gb', gbc: 'gbc', pce: 'tg16', n64: 'n64',
 };
 
 export function runnerSupports(runner: Runner, system: string): boolean {
@@ -68,6 +68,7 @@ export function editionToGame(edition: Edition, snap: LibrarySnapshot): GameEntr
     wanted: edition.wanted ?? undefined,
     rootOffline,
     setupState,
+    launchPending: edition.system==='ps3'?'RPCS3 launch integration pending':undefined,
     runnerId: runner?.id,
     runnerName: runner?.display_name,
     mediaIssue: media?.skip_reason ?? undefined,
