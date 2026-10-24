@@ -514,3 +514,82 @@ fn background_seed_metadata_and_listener_policy_survive_restart_without_touching
         .unwrap();
     assert_eq!(fs::read(source).unwrap(), b"synthetic source to retain");
 }
+
+#[test]
+fn accepted_firmware_setup_survives_client_disconnect_and_manager_stop_drains_it() {
+    use marquee_manager::ps3_firmware::{self, Request as FirmwareRequest};
+    let fixture = Fixture::new();
+    let data = fixture.client.data_dir();
+    let source = fixture.temp.path().join("PS3UPDAT.PUP");
+    let header_length = 48_u64 + 2 * 64;
+    let mut pup = b"SCEUF\0\0\0".to_vec();
+    for n in [1, 68500, 2, header_length, 6] {
+        pup.extend(n.to_be_bytes());
+    }
+    for (id, offset, len) in [(0x100, header_length, 5), (0x300, header_length + 5, 1)] {
+        for n in [id, offset, len, 0] {
+            pup.extend(n.to_be_bytes());
+        }
+    }
+    pup.resize(header_length as usize, 0);
+    pup.extend(b"4.93\nx");
+    fs::write(&source, pup).unwrap();
+    let program = data.join("runners/rpcs3/current");
+    fs::create_dir_all(program.join("usr/bin")).unwrap();
+    fs::write(program.join("usr/bin/rpcs3"), "fixture identity").unwrap();
+    let script = r#"#!/bin/sh
+set -eu
+mkdir -p "$XDG_CACHE_HOME/rpcs3"
+touch "$XDG_CACHE_HOME/waiting"
+while [ ! -e "$XDG_CACHE_HOME/continue" ]; do sleep .05; done
+f="$XDG_CONFIG_HOME/rpcs3/dev_flash"
+mkdir -p "$f/vsh/etc" "$f/vsh/module" "$f/sys/external"
+printf 'release:04.9300:\n' > "$f/vsh/etc/version.txt"
+printf 'SCE\000fixture' > "$f/vsh/module/vsh.self"
+printf 'SCE\000fixture' > "$f/sys/external/liblv2.sprx"
+printf 'Successfully installed PS3 firmware version 4.93.\n' > "$XDG_CACHE_HOME/rpcs3/RPCS3.log"
+"#;
+    fs::write(program.join("AppRun"), script).unwrap();
+    fs::set_permissions(program.join("AppRun"), fs::Permissions::from_mode(0o755)).unwrap();
+    let job = fixture
+        .client
+        .ps3_firmware(FirmwareRequest::Review {
+            source,
+            runner_version: "fixture".into(),
+        })
+        .unwrap()
+        .job
+        .unwrap();
+    let cache = data
+        .join("manager/ps3-firmware/work")
+        .join(&job.id)
+        .join("cache");
+    let mut stream = UnixStream::connect(fixture.client.socket_path().unwrap()).unwrap();
+    protocol::write_frame(
+        &mut stream,
+        &Request {
+            protocol_version: protocol::VERSION,
+            request_id: "firmware-disconnect".into(),
+            operation: Operation::Ps3Firmware {
+                request: FirmwareRequest::Start {
+                    review_token: job.review_token,
+                },
+            },
+        },
+    )
+    .unwrap();
+    drop(stream);
+    fixture.wait(|| cache.join("waiting").exists());
+    assert!(ps3_firmware::active(data).unwrap());
+    assert!(fixture.client.stop().unwrap().stopping);
+    assert!(
+        fixture.client.status().unwrap().running,
+        "accepted setup must drain before stop"
+    );
+    fs::write(cache.join("continue"), "continue").unwrap();
+    fixture.wait(|| !fixture.client.status().unwrap().running);
+    let result = ps3_firmware::read_status(data).unwrap();
+    assert!(result.managed_receipt);
+    assert_eq!(result.installed_version.as_deref(), Some("4.93"));
+    assert_eq!(result.job.unwrap().state, "installed");
+}

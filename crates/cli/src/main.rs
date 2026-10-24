@@ -89,6 +89,9 @@ enum Command {
     Run(RunCmd),
     /// Read-only native/Flatpak Steam clients, library folders and installed manifests
     SteamInspect,
+    /// Manager-owned reviewed PS3 firmware setup
+    #[command(subcommand)]
+    Ps3Firmware(Ps3FirmwareCmd),
     /// Read-only PS3 archive/folder discovery; never installs or registers games
     Ps3Inspect {
         path: PathBuf,
@@ -387,6 +390,18 @@ enum LibraryCmd {
 }
 
 #[derive(Subcommand)]
+enum Ps3FirmwareCmd {
+    Status,
+    Review {
+        path: PathBuf,
+    },
+    /// Opens RPCS3's isolated installer; finish its prompts, then close it
+    Start {
+        review_token: String,
+    },
+}
+
+#[derive(Subcommand)]
 enum RunnersCmd {
     List {
         #[arg(long)]
@@ -565,6 +580,12 @@ fn run() -> marquee_core::error::Result<()> {
             "{}",
             serde_json::to_string_pretty(&marquee_core::ps3::inspect(path)?)?
         );
+        return Ok(());
+    }
+    if matches!(&args.command, Command::Ps3Firmware(Ps3FirmwareCmd::Status)) {
+        let paths = marquee_core::paths::Paths::resolve(args.data_dir)?;
+        let status = marquee_manager::ps3_firmware::read_status(&paths.data_dir)?;
+        println!("{}", serde_json::to_string_pretty(&status)?);
         return Ok(());
     }
     // Streaming must remain usable while the desktop holds the library lease.
@@ -804,6 +825,16 @@ fn run() -> marquee_core::error::Result<()> {
                     );
                 }
             }
+        }
+        Command::Ps3Firmware(command) => {
+            let status = match command {
+                Ps3FirmwareCmd::Status => core.ps3_firmware_status()?,
+                Ps3FirmwareCmd::Review { path } => core.review_ps3_firmware(&path)?,
+                Ps3FirmwareCmd::Start { review_token } => {
+                    core.install_ps3_firmware(&review_token)?
+                }
+            };
+            println!("{}", serde_json::to_string_pretty(&status)?);
         }
         Command::Ps3Inspect { .. } => unreachable!("handled without Core"),
         Command::Runners(RunnersCmd::List { json }) => {

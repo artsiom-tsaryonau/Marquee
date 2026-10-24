@@ -76,6 +76,9 @@ export const httpApi: LibraryApi = {
     const paths = window.prompt('Audio paths on the computer running Marquee, one absolute path per line (MP3, FLAC, OGG or WAV). This copies files; it is not a browser upload.');
     return paths?.split('\n').map(p => p.trim()).filter(Boolean) ?? [];
   },
+  async pickPs3Firmware() {
+    return window.prompt('Absolute PS3UPDAT.PUP path on the Marquee computer (not a browser upload)')?.trim() || null;
+  },
   async pickPs3Content() {
     return window.prompt('Absolute PS3 content path on the Marquee computer (not a browser upload)')?.trim() || null;
   },

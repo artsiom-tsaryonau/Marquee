@@ -19,6 +19,7 @@ fn json(value: impl Serialize) -> Result<Value> {
 struct Server {
     manager: Arc<Manager>,
     data: std::path::PathBuf,
+    ps3_firmware: crate::ps3_firmware::Host,
     torrents: std::sync::Mutex<Option<Arc<crate::torrent::Host>>>,
     stopping: AtomicBool,
     connections: AtomicUsize,
@@ -69,6 +70,7 @@ impl Server {
         }
         match operation {
             Operation::Hello => json(self.status()),
+            Operation::Ps3Firmware { request } => json(self.ps3_firmware.dispatch(request)?),
             Operation::Torrent { request } => self.torrents()?.dispatch(request),
             Operation::Browser { client_id, request } => {
                 self.manager.browser_request(&client_id, request)
@@ -195,6 +197,7 @@ pub fn run(data: &Path) -> Result<()> {
     listener.set_nonblocking(true)?;
     let server = Arc::new(Server {
         manager: Arc::new(Manager::new(&data)),
+        ps3_firmware: crate::ps3_firmware::Host::new(&data)?,
         data: data.clone(),
         torrents: std::sync::Mutex::new(None),
         stopping: AtomicBool::new(false),

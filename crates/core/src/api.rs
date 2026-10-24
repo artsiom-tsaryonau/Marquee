@@ -29,6 +29,11 @@ fn out<T: Serialize>(value: T) -> Result<Value> {
 pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
     let sink: Arc<dyn EventSink> = core.hub();
     match cmd {
+        "ps3_firmware_status" => out(core.ps3_firmware_status()?),
+        "review_ps3_firmware" => {
+            out(core.review_ps3_firmware(PathBuf::from(text(&args, "path")?).as_path())?)
+        }
+        "install_ps3_firmware" => out(core.install_ps3_firmware(&text(&args, "review_token")?)?),
         "inspect_ps3" => out(crate::ps3::inspect(
             PathBuf::from(text(&args, "path")?).as_path(),
         )?),

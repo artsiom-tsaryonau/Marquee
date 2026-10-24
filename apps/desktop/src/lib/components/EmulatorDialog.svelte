@@ -6,6 +6,7 @@
   import { coverSrc } from '../api/map';
   import { systemLabel } from '../labels';
   import Artwork from './Artwork.svelte';
+  import Ps3Firmware from './Ps3Firmware.svelte';
   import Ps3Discovery from './Ps3Discovery.svelte';
   import EmulatorProfile from './EmulatorProfile.svelte';
   import Icon from './Icon.svelte';
@@ -173,8 +174,8 @@
       {#if e.launch_presentation}<p class="hint">{e.launch_presentation}</p>{/if}
       {#if error}<p class="error" role="alert">{error}</p>{/if}
 
-      {#if e.id === 'rpcs3'}<Ps3Discovery />{/if}
-      {#if (e.firmware ?? []).length}
+      {#if e.id === 'rpcs3'}<Ps3Firmware installed={e.status !== 'not_installed'} /><Ps3Discovery />{/if}
+      {#if e.id !== 'rpcs3' && (e.firmware ?? []).length}
         <section>
           <h3>Firmware</h3>
           <p class="hint">Put the files in Marquee’s bios-inbox folder; they are copied into place on the next launch.</p>

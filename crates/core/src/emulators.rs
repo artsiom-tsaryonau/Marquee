@@ -840,6 +840,15 @@ fn name_matches(fw: &FirmwareDef, file: &str) -> bool {
 
 /// Which of an emulator's firmware files are in its folder.
 pub fn firmware_status(paths: &Paths, def: &EmulatorDef) -> Vec<FirmwareStatus> {
+    if def.id == "rpcs3" {
+        let version = marquee_manager::ps3_firmware::installed_version(&paths.data_dir)
+            .ok()
+            .flatten();
+        return vec![FirmwareStatus { name: "PS3 firmware".into(), required: true, present: version.is_some(),
+            path: version.as_ref().map(|_| marquee_manager::ps3_firmware::flash_path(&paths.data_dir).to_string_lossy().into_owned()),
+            note: version.map_or_else(|| "A stored PUP is not an installed firmware. Use RPCS3 firmware setup.".into(), |v| format!("Installed firmware files detected: {v}. Game compatibility is not yet tested.")) }];
+    }
+
     def.firmware
         .iter()
         .map(|fw| {

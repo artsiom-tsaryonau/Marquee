@@ -94,17 +94,18 @@ bridge; legacy JSON remains until explicit cutover.
   `marquee-manager-<uid>/<data-directory-hash>/ipc.sock` (mode 600). Both peers
   check Linux `SO_PEERCRED`. Long isolated data paths do not exceed socket limits.
   No manager TCP port or direct browser endpoint is opened.
-- Protocol v4 uses bounded length-prefixed JSON, typed operations, matching request
+- Protocol v5 uses bounded length-prefixed JSON, typed operations, matching request
   IDs and a version check before mutation. Maximum frame is 32 MiB. The worker
   advertises snapshot polling; event replay and active preparation cancellation are
-  unsupported. Browser cancellation is a request/acknowledgement flow. The existing browser/native-host protocol is still a separate bridge.
+  unsupported. v5 adds isolated PS3 firmware review/start/status operations;
+  v4 torrent provenance remains intact. Browser cancellation is a request/acknowledgement flow. The existing browser/native-host protocol is still a separate bridge.
 - Job state/receipts use private `manager/jobs.db` schema 4; the worker never opens
   `library.db` or holds the library's instance lease. The launcher transactionally
   imports receipts into library schema 6 and sends a fingerprint-bound acknowledgement.
   Failed/lost acknowledgements remain replayable. The active frontend reconciles
   receipts even when its archive panel is closed, including after reconnect.
 - **Stop manager** checkpoints/stops torrents and drains accepted archive
-  preparation, then exits. It records `manager/stopped`; polling respects that
+  preparation and accepted PS3 firmware setup, then exits. It records `manager/stopped`; polling respects that
   stop. Explicit Start, Inspect, Prepare or an active torrent command
   re-enables the worker. Unexpected termination leaves an interrupted checkpoint;
   the next start reconciles state without automatically rerunning the job.
@@ -431,3 +432,12 @@ remote API, universal installer and arbitrary recipe execution are deferred.
   companion build and real browser close/reconnect were exercised. Installer
   distribution and additional transports retain their own acceptance. Later work
   must recheck the live schema; v6 is now allocated to preparation receipts.
+
+## PS3 firmware setup worker
+
+Protocol v5 adds typed PS3 firmware Status, Review and Start operations. The
+manager owns the installer subprocess, private job checkpoints and verified
+firmware publication without opening `library.db`. Core is the UI/CLI bridge,
+records no false library game readiness and blocks conflicting RPCS3 setup.
+See [PS3 firmware setup](PS3.md#p3-1--firmware-and-runner-readiness-implemented-live-acceptance-recorded-below)
+for review binding, limits, staging, promotion/recovery and live evidence.

@@ -78,7 +78,7 @@ streamed/controller acceptance.
 | BlastEm | Genesis / Mega Drive | Pinned source build and direct cartridge launch; no BIOS |
 | DuckStation | PS1 | Managed lifecycle plus library-disc launch adapter |
 | PPSSPP | PSP | Managed lifecycle and standalone opening |
-| RPCS3 | PS3 | Managed lifecycle/standalone opening plus [read-only PS3 discovery](PS3.md); firmware install and library Play remain open |
+| RPCS3 | PS3 | Managed lifecycle/standalone opening, [PS3 discovery and reviewed firmware setup](PS3.md); library Play remains open |
 | Flycast | Dreamcast | Managed lifecycle and generic disc adapter; live game acceptance separate |
 | Azahar | Nintendo 3DS | Managed lifecycle and standalone opening |
 | Cemu | Wii U | Managed lifecycle and standalone opening |
@@ -223,10 +223,10 @@ A catalogue entry may list `firmware` files taken from the emulator's own source
 | Emulator | File | Required | Where it goes | Still manual |
 | --- | --- | --- | --- | --- |
 | Flycast | `dc_boot.bin` (2 MB; alias `dc_bios.bin`) | optional, HLE fallback | `xdg-data/flycast/` | nothing |
-| RPCS3 | `PS3UPDAT.PUP` | required | `xdg-config/rpcs3/firmware/` | installing it into RPCS3 (File > Install Firmware or `--installfw`) is not automated |
+| RPCS3 | `PS3UPDAT.PUP` | required | installed output: `xdg-config/rpcs3/dev_flash/` | reviewed manager setup in Configure; storing a PUP alone is not readiness |
 | xemu | `mcpx_1.0.bin` (512 B), flash ROM (`Complex_4627.bin`, `cerbios.bin`…), `xbox_hdd.qcow2` | required | `xdg-data/xemu/xemu/` | xemu reads the paths from `xemu.toml`; Marquee does not write that file yet |
 
-Verified on this host: the status reports all five as missing (none supplied), and unit tests cover import and the size check. PS1/PS2 BIOS keep their own region-aware import above.
+The generic inbox imports have unit coverage for size checks. RPCS3 uses its separate reviewed setup and installed-output checks; its PUP inbox is no longer presented as installation. PS1/PS2 BIOS keep their own region-aware import above.
 
 ## Package managers: not used
 

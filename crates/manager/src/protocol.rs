@@ -10,7 +10,8 @@ use std::path::PathBuf;
 // unknown receipt fields before publication/fingerprinting.
 // v3 adds detached torrent authority and requires upgraded companion binaries.
 // v4 preserves torrent artifact provenance in preparation reviews/receipts.
-pub const VERSION: u32 = 4;
+// v5 adds manager-owned isolated PS3 firmware setup.
+pub const VERSION: u32 = 5;
 pub const MAX_FRAME: usize = 32 * 1024 * 1024;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -25,6 +26,9 @@ pub struct Request {
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Operation {
     Hello,
+    Ps3Firmware {
+        request: crate::ps3_firmware::Request,
+    },
     Torrent {
         request: crate::torrent::Request,
     },

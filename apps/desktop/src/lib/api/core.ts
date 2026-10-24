@@ -39,7 +39,7 @@ export function asError(err: unknown): AppError {
 }
 
 /** The commands are identical on every surface; only the transport (`call`) differs. */
-export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable' | 'pickArchives' | 'pickPs3Content' | 'pickTorrent' | 'onArchiveDrop' | 'pickMusic' | 'pickMusicCover' | 'musicUrl'> {
+export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable' | 'pickArchives' | 'pickPs3Content' | 'pickPs3Firmware' | 'pickTorrent' | 'onArchiveDrop' | 'pickMusic' | 'pickMusicCover' | 'musicUrl'> {
   return {
     musicSetCover: (albumId, path) => call('music_set_cover', { album_id: albumId, path }),
     musicAlbums: (gameKey) => call('music_albums', gameKey === undefined ? {} : { game_key: gameKey }),
@@ -84,6 +84,9 @@ export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'su
     addRoot: (path, system) => call<LibraryRoot>('add_library_root', { path, system }),
     scan: (rootId) => call<ScanReport>('scan_library_root', { root_id: rootId ?? null }),
     listRunners: () => call<Runner[]>('list_runners'),
+    ps3FirmwareStatus: () => call('ps3_firmware_status'),
+    reviewPs3Firmware: (path) => call('review_ps3_firmware', { path }),
+    installPs3Firmware: (reviewToken) => call('install_ps3_firmware', { review_token: reviewToken }),
     inspectPs3: (path) => call('inspect_ps3', { path }),
     selectSystemRunner: (system, runnerId) => call<void>('select_system_runner', { system, runner_id: runnerId }),
     setGameRunner: (editionId, runnerId) => call<void>('set_game_runner', { edition_id: editionId, runner_id: runnerId }),

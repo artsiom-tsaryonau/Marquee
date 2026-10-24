@@ -86,3 +86,11 @@ coverage/
 
 # Local acceptance collection, including console key material; never commit.
 sample_images/
+
+# Private PS3 licenses and disc keys
+exdata/
+*.[rR][aA][pP]
+*.[rR][iI][fF]
+*.[dD][kK][eE][yY]
+*.[iI][rR][dD]
+*.[eE][dD][aA][tT]

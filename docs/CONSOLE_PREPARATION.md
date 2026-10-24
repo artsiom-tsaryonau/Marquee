@@ -19,7 +19,7 @@ platform identifiers without providing import or launch support.
 | Platform / proposed ID | Existing tool entry | Missing before library Play |
 | --- | --- | --- |
 | Nintendo Switch / `switch` | No managed emulator entry found | Select and validate a runner; content inventory, prerequisites, installation/launch adapter and live evidence |
-| PlayStation 3 / `ps3` | RPCS3 managed install/open; firmware requirement recorded | Firmware installation recipe, content/installed-title inventory, package or folder preparation, launch/profile/save mapping |
+| PlayStation 3 / `ps3` | RPCS3 managed install/open, read-only discovery, reviewed manager-owned firmware setup | Content/installed-title inventory, package or image/folder preparation, launch/profile/save mapping |
 | PlayStation 4 / `ps4` | shadPS4 managed install/open, experimental | Package or prepared-folder inspection, title/version relationships, explicit supported install method and per-game launch/validation |
 | Original Xbox / `xbox` | xemu managed install/open; BIOS/MCPX/HDD requirements recorded | Firmware/HDD configuration, input format inspection, tested conversion only when needed, library/launch/save adapter |
 | Xbox 360 / `xbox360` | No managed emulator entry found | Select and validate a runner on the target Linux host; content inventory, setup, launch and compatibility evidence |
@@ -52,7 +52,8 @@ additively to schema 6 on opening.
 
 PS3-specific progress: [PS3 discovery](PS3.md) now provides native/browser/CLI
 read-only archive and folder inspection. It does not close the broader inventory,
-firmware, preparation or launch gates below. The supplied archive contains an ISO,
+preparation or launch gates below. Reviewed firmware setup is implemented with
+isolated staging and output receipts; see the same PS3 page for live evidence. The supplied archive contains an ISO,
 so its next recipe needs image/filesystem inspection rather than assuming a loose
 PS3_GAME folder. No source payload was extracted.
 

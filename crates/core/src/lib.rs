@@ -26,6 +26,7 @@ pub mod ports;
 pub mod preparation;
 pub mod profiles;
 pub mod ps3;
+mod ps3_firmware;
 pub mod purple;
 pub mod romart;
 pub mod romfacts;
@@ -641,6 +642,7 @@ impl Core {
         id: &str,
         sink: Arc<dyn EventSink>,
     ) -> Result<Vec<emulators::EmulatorInfo>> {
+        self.require_ps3_setup_idle(id)?;
         let def = emulators::find(id)?;
         if self.with_db(|db| db.running_session())?.is_some() {
             return Err(AppError::new("LAUNCH_BUSY", "close the running game first"));
@@ -859,6 +861,7 @@ impl Core {
 
     /// Open an installed emulator's own window (not a game).
     pub fn open_emulator(&self, id: &str) -> Result<()> {
+        self.require_ps3_setup_idle(id)?;
         let busy = self
             .installing_ports
             .lock()
@@ -923,6 +926,7 @@ impl Core {
         id: &str,
         purge_data: bool,
     ) -> Result<Vec<emulators::EmulatorInfo>> {
+        self.require_ps3_setup_idle(id)?;
         let def = emulators::find(id)?;
         let busy = self
             .installing_ports

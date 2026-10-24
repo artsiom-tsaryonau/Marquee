@@ -356,6 +356,12 @@ impl Client {
             false,
         )
     }
+    pub fn ps3_firmware(
+        &self,
+        request: crate::ps3_firmware::Request,
+    ) -> Result<crate::ps3_firmware::Status> {
+        self.call(Operation::Ps3Firmware { request }, true)
+    }
     pub fn torrent<T: DeserializeOwned>(&self, request: crate::torrent::Request) -> Result<T> {
         crate::migration::adopt_torrents(&self.data, self.library_owned)?;
         // Also upgrades an older daemon through a drain-only stop before sending
@@ -372,7 +378,7 @@ impl Client {
         self.call(Operation::Torrent { request }, false)
     }
     pub fn stop(&self) -> Result<Status> {
-        for version in [protocol::VERSION, 3, 2, 1] {
+        for version in [protocol::VERSION, 4, 3, 2, 1] {
             match self.exchange_version(self.connect()?, Operation::Stop, version) {
                 Err(e) if e.code == "MANAGER_VERSION" => continue,
                 result => return result,
@@ -396,7 +402,7 @@ mod tests {
         let socket = client.socket_path().unwrap();
         let listener = UnixListener::bind(&socket).unwrap();
         let server = std::thread::spawn(move || {
-            for version in [protocol::VERSION, 3, 2, 1] {
+            for version in [protocol::VERSION, 4, 3, 2, 1] {
                 let (mut stream, _) = listener.accept().unwrap();
                 let request: Request = protocol::read_frame(&mut stream).unwrap();
                 assert_eq!(request.protocol_version, version);

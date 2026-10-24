@@ -1,6 +1,6 @@
 # PS3 integration
 
-Updated 2026-10-24. **Discovery only; PS3 Library Play is not implemented.**
+Updated 2026-10-24. **Discovery and reviewed firmware setup; PS3 Library Play is not implemented.**
 RPCS3 remains a managed standalone tool. This page records the staged PS3 work
 under [console preparation](CONSOLE_PREPARATION.md).
 
@@ -75,21 +75,113 @@ facts and layout behavior, not copied into Marquee:
 - [PSF field formats](https://github.com/RPCS3/rpcs3/blob/46b7fb670b280d08036c7670270b713daef912c2/rpcs3/Loader/PSF.h)
 - [Disc/title boot and inventory behavior](https://github.com/RPCS3/rpcs3/blob/46b7fb670b280d08036c7670270b713daef912c2/rpcs3/Emu/System.cpp)
 
+## P3-1 — Firmware and runner readiness (implemented; live acceptance recorded below)
+
+Tools → RPCS3 → Configure → **PS3 firmware setup** selects and reviews a supplied
+PUP, then starts a manager-owned installation. A stored PUP alone never counts as
+installed firmware. CLI equivalents:
+
+```sh
+marquee ps3-firmware status
+marquee ps3-firmware review /absolute/path/to/PS3UPDAT.PUP
+marquee ps3-firmware start <review_token>
+```
+
+The review records structural PUP validation, version, size, SHA-256, installed
+runner version and program fingerprint. It does not claim publisher authenticity;
+RPCS3 verifies the package contents. Start rechecks the program and an isolated
+source snapshot, requires 2.5 GiB free, and runs the pinned RPCS3 `--installfw`
+recipe in a fresh HOME/XDG profile. Existing nonempty firmware and custom `vfs.yml`
+are refused rather than replaced. The supplied original is retained.
+
+RPCS3's informational welcome is hidden in this setup profile to avoid competing
+modal startup/install dialogs. Firmware confirmation remains interactive. After
+RPCS3 exits, its saved welcome opt-out is carried into the regular managed profile
+without copying other GUI preferences, filesystem settings, saves or caches.
+A later rejected welcome preference is not copied as an opt-out. Standalone Tools
+opening still opens the emulator; future Library Play should use `--no-gui` with
+a validated boot target, optionally `--fullscreen`. Hiding the main window is not
+headless rendering. `--no-gui` does not support firmware installation.
+
+The manager requires all of: clean exit, the exact version-specific successful
+installation log, valid installed version/SELF markers and a bounded regular-file
+output manifest. Only `dev_flash` is published with a no-replace rename; no user
+saves/settings are replaced. Output hashes and a private receipt are recorded.
+Interrupted jobs are not automatically rerun. A crash after verified promotion
+can recover its receipt from a matching full manifest. Accepted setup survives a
+launcher/client disconnect; manager Stop drains it. RPCS3 open/update/removal is
+blocked while its firmware job is active. The current cross-process mutation
+limits of the manager still apply; do not run external RPCS3 writers concurrently.
+
+Private state: `<data>/manager/ps3-firmware/{job.json,jobs/,receipt.json,work/}`.
+Installed firmware: `<data>/rpcs3/xdg-config/rpcs3/dev_flash/`. Work profiles retain
+logs and snapshots for diagnosis; no automatic source cleanup is performed.
+
+### Pinned build and actual input evidence
+
+- RPCS3 `v0.0.43-20395-46b7fb67`, release
+  `build-46b7fb670b280d08036c7670270b713daef912c2`.
+- Linux AppImage SHA-256:
+  `9df18bd0af25e94c5a03936b04b3e5a332a5c22e6fa61e6ab93376b027817a5c`.
+- Supplied PUP: version **4.93**, 206,197,916 bytes, SHA-256
+  `158471fd834f8ea8036136b6aab43cd86c7ba73d79ca30e0af3c0fe0001cf365`.
+- The isolated interactive pilot exited 0, logged successful 4.93 installation and
+  produced valid version, `vsh.self` and `liblv2.sprx` markers.
+- Two `--headless --installfw` probes extracted firmware but aborted during
+  RPCS3 teardown (exit 134). That path is deliberately not accepted as success.
+- An initial main-profile job exited 0 after canceling installation. It correctly
+  failed verification and published nothing. A second attempt installed into
+  staging but had an unresponsive welcome; it was stopped without publication.
+  The revised recipe hides that informational welcome before starting RPCS3.
+- Revised main-profile job completed: clean exit 0, verified firmware 4.93 and
+  no-replace publication with a managed receipt. The original PUP hash was
+  unchanged. The regular managed profile retains `infoBoxEnabledWelcome=false`.
+  Output: 1,075 files, 195,078,808 bytes; manifest SHA-256
+  `8d4551ecda94894db68c12f7551d62dbed2fb35e4cc97a9c7a280ce55688347e`.
+  Firmware PPU compilation completed; this was not a game boot test.
+
+Validation includes malformed/linked PUPs, changed source/program reviews,
+existing-destination protection, false-success/nonzero installer output, saved GUI
+preference preservation, interrupted promotion recovery and an actual detached
+manager/client-disconnect/draining-Stop test. Live game compatibility is separate.
+
+Upstream behavior checked at the pinned revision:
+[CLI modes](https://github.com/RPCS3/rpcs3/blob/46b7fb670b280d08036c7670270b713daef912c2/rpcs3/rpcs3.cpp),
+[firmware installer](https://github.com/RPCS3/rpcs3/blob/46b7fb670b280d08036c7670270b713daef912c2/rpcs3/rpcs3qt/main_window.cpp),
+[welcome behavior](https://github.com/RPCS3/rpcs3/blob/46b7fb670b280d08036c7670270b713daef912c2/rpcs3/rpcs3qt/welcome_dialog.cpp),
+[Linux XDG paths](https://github.com/RPCS3/rpcs3/blob/46b7fb670b280d08036c7670270b713daef912c2/Utilities/File.cpp).
+
+## License and disc-key inputs (assessed; import/decryption not implemented)
+
+Archive headers only were inspected: `exdata.zip` contains 28,798 RAP, 662 EDAT,
+4 BIN and 2 RIF entries; the disc-key ZIP contains 4,366 DKEY entries. Key payloads
+were not opened, extracted or committed. Local license/key formats are ignored
+by Git, in addition to the existing archive/PUP exclusions.
+
+RAP/RIF relate to digital-content licenses; disc keys relate to encrypted disc
+images. Their presence does not prove a matching title, license readiness or that
+an image needs decryption. The `.dec.iso` filename remains unverified. Check the
+pinned RPCS3 build's native key/image support before adding a decryptor.
+
+[PS3 Quick Disc Decryptor](https://github.com/ElektroStudios/PS3-Quick-Disc-Decryptor)
+was reviewed as a reference: it is an Apache-2.0 Windows .NET desktop wrapper for
+PS3Dec, with ISO/ZIP and DKEY inputs. Its bundled engine needs separate licensing
+review. No code or keys were copied. A native Linux manager recipe is preferred
+if the selected input needs preparation.
+
 ## Remaining steps
 
-1. **P3-1 — Firmware and runner readiness.** Pin/record the installed RPCS3 build;
-   validate firmware acquisition/import and installation in its managed profile.
-   Storing a PUP is not successful installation. Preserve existing RPCS3 data.
-2. **P3-2 — One real preparation path.** This collection needs a reviewed archive
+1. **P3-2 — One real preparation path.** This collection needs a reviewed archive
    → disc-image path. Verify the pinned RPCS3 build's accepted filesystem/image
    formats and encryption requirements before choosing direct ISO or a prepared
    folder. Inspect title identity after preparation; reject unsupported content.
    Use manager jobs, space checks, recovery and receipts. No automatic 38 GB
-   extraction was started by discovery.
-3. **P3-3 — Library launch and ownership.** Add PS3 media/system descriptors,
+   extraction was started by discovery or firmware setup.
+2. **P3-3 — Library launch and ownership.** Add PS3 media/system descriptors,
    validated boot targets, edition/version relationships and isolated user saves.
+   Launch directly with `--no-gui`; keep setup/configuration a separate action.
    Track the game process and exit; never mark an update/extra as a base title.
-4. **P3-4 — Live game acceptance.** Observe boot/video/audio, keyboard mappings,
+3. **P3-4 — Live game acceptance.** Observe boot/video/audio, keyboard mappings,
    native saves across relaunch and clean exit/return. Report the exact game/build.
    Streaming follows local acceptance; physical-controller testing waits for
    hardware. A heavy title may require a smaller pilot to distinguish adapter

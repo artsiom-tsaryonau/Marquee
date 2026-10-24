@@ -370,6 +370,19 @@ export interface MusicTrack { id: string; title: string; available: boolean; dur
 export interface MusicAlbum { id: string; title: string; artist: string; source_url: string; cover_data_url?: string | null; cover_source?: string | null; game_keys?: string[]; tracks: MusicTrack[] }
 export interface MusicDraft { game_key: string; album_id: string | null; title: string; artist: string; source_url: string }
 
+export interface Ps3FirmwareStatus {
+  job: {
+    id: string; state: 'reviewed' | 'running' | 'promoting' | 'installed' | 'failed' | 'interrupted';
+    message: string; review_token: string;
+    package: {source: string; version: string; bytes: number; sha256: string};
+    runner_version: string; program_sha256: string;
+    output: {version: string; files: number; bytes: number; sha256: string} | null;
+    exit_code: number | null; log_path: string | null;
+  } | null;
+  installed_version: string | null;
+  managed_receipt: boolean;
+}
+
 export interface Ps3Inspection {
   source: string;
   source_kind: string;
@@ -424,6 +437,10 @@ export interface LibraryApi {
   intakeArchive(path: string, deleteSource?: boolean): Promise<IntakeReport>;
   pickArchives(): Promise<string[]>;
   pickPs3Content(): Promise<string | null>;
+  pickPs3Firmware(): Promise<string | null>;
+  ps3FirmwareStatus(): Promise<Ps3FirmwareStatus>;
+  reviewPs3Firmware(path: string): Promise<Ps3FirmwareStatus>;
+  installPs3Firmware(reviewToken: string): Promise<Ps3FirmwareStatus>;
   inspectPs3(path: string): Promise<Ps3Inspection>;
   pickTorrent(): Promise<string | null>;
   onArchiveDrop(handler: (paths: string[]) => void): Promise<() => void>;
