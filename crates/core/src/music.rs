@@ -17,6 +17,7 @@ pub fn ensure_tables(db: &Connection) -> Result<()> {
     db.execute_batch("CREATE TABLE IF NOT EXISTS music_albums (id TEXT PRIMARY KEY, title TEXT NOT NULL, artist TEXT NOT NULL, source_url TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS music_links (game_key TEXT NOT NULL, album_id TEXT NOT NULL REFERENCES music_albums(id), PRIMARY KEY(game_key,album_id));
         CREATE TABLE IF NOT EXISTS music_tracks (id TEXT PRIMARY KEY, album_id TEXT NOT NULL REFERENCES music_albums(id), title TEXT NOT NULL, media TEXT NOT NULL, position INTEGER NOT NULL, UNIQUE(album_id,media));")?;
+    db.execute_batch("CREATE TABLE IF NOT EXISTS music_media_metadata (media TEXT PRIMARY KEY, size INTEGER NOT NULL, modified TEXT NOT NULL, duration_seconds REAL);")?;
     Ok(())
 }
 
@@ -25,6 +26,7 @@ pub struct Track {
     pub id: String,
     pub title: String,
     pub available: bool,
+    pub duration_seconds: Option<f64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -269,8 +271,32 @@ impl Core {
         }
         open_browser(&url)
     }
+    fn music_media_info(&self, media: &str) -> (bool, Option<f64>) {
+        let Ok((file, _)) = self.music_open_name(media) else {
+            return (false, None);
+        };
+        let Ok(metadata) = file.metadata() else {
+            return (false, None);
+        };
+        let size = metadata.len();
+        let modified = metadata
+            .modified()
+            .ok()
+            .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|time| time.as_nanos().to_string())
+            .unwrap_or_default();
+        let cached = self.with_db(|db| Ok(db.conn.query_row("SELECT duration_seconds FROM music_media_metadata WHERE media=?1 AND size=?2 AND modified=?3",params![media,size,modified],|row|row.get::<_,Option<f64>>(0)).optional()?));
+        if let Ok(Some(duration)) = cached {
+            return (true, duration);
+        }
+        let extension = media.rsplit('.').next().unwrap_or("");
+        let duration = crate::music_metadata::duration(file, extension);
+        let _ = self.with_db(|db| { db.conn.execute("INSERT INTO music_media_metadata(media,size,modified,duration_seconds) VALUES(?1,?2,?3,?4) ON CONFLICT(media) DO UPDATE SET size=excluded.size,modified=excluded.modified,duration_seconds=excluded.duration_seconds",params![media,size,modified,duration])?; Ok(()) });
+        (true, duration)
+    }
+
     pub fn music_albums(&self, game_key: Option<&str>) -> Result<Vec<Album>> {
-        self.with_db(|db| {
+        let records = self.with_db(|db| {
             let mut stmt = db.conn.prepare("SELECT id,title,artist,source_url FROM music_albums WHERE ?1 IS NULL OR id IN (SELECT album_id FROM music_links WHERE game_key=?1) ORDER BY title,id")?;
             let rows = stmt.query_map([game_key], |r| Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,r.get::<_,String>(3)?)))?;
             let mut albums = vec![];
@@ -278,10 +304,31 @@ impl Core {
                 let (id,title,artist,source_url) = row?;
                 let mut tracks = db.conn.prepare("SELECT id,title,media FROM music_tracks WHERE album_id=?1 ORDER BY position,id")?;
                 let tracks = tracks.query_map([&id], |r| Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?)))?.collect::<std::result::Result<Vec<_>,_>>()?;
-                albums.push(Album { id,title,artist,source_url,tracks:tracks.into_iter().map(|(id,title,media)| Track { id,title,available:self.music_open_name(&media).is_ok() }).collect() });
+                albums.push((id,title,artist,source_url,tracks));
             }
             Ok(albums)
-        })
+        })?;
+        Ok(records
+            .into_iter()
+            .map(|(id, title, artist, source_url, tracks)| Album {
+                id,
+                title,
+                artist,
+                source_url,
+                tracks: tracks
+                    .into_iter()
+                    .map(|(id, title, media)| {
+                        let (available, duration_seconds) = self.music_media_info(&media);
+                        Track {
+                            id,
+                            title,
+                            available,
+                            duration_seconds,
+                        }
+                    })
+                    .collect(),
+            })
+            .collect())
     }
 
     pub fn music_save_album(&self, draft: AlbumDraft) -> Result<String> {
@@ -440,6 +487,52 @@ mod tests {
                 .count(),
             1
         );
+    }
+    #[test]
+    fn duration_cache_survives_restart_and_unknown_duration_does_not_block_media() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("library");
+        let core = Core::open_isolated(Some(root.clone()), true).unwrap();
+        let id = album(&core);
+        let valid = dir.path().join("valid.wav");
+        let mut bytes = b"RIFF".to_vec();
+        bytes.extend(16036u32.to_le_bytes());
+        bytes.extend(b"WAVEfmt ");
+        bytes.extend(16u32.to_le_bytes());
+        bytes.extend(1u16.to_le_bytes());
+        bytes.extend(1u16.to_le_bytes());
+        bytes.extend(8000u32.to_le_bytes());
+        bytes.extend(16000u32.to_le_bytes());
+        bytes.extend(2u16.to_le_bytes());
+        bytes.extend(16u16.to_le_bytes());
+        bytes.extend(b"data");
+        bytes.extend(16000u32.to_le_bytes());
+        bytes.resize(16044, 0);
+        fs::write(&valid, bytes).unwrap();
+        let unknown = dir.path().join("unknown.wav");
+        wav(&unknown);
+        core.music_import(&id, vec![valid, unknown]).unwrap();
+        let tracks = &core.music_albums(None).unwrap()[0].tracks;
+        assert_eq!(tracks[0].duration_seconds, Some(1.0));
+        assert_eq!(tracks[1].duration_seconds, None);
+        assert!(tracks.iter().all(|track| track.available));
+        assert!(core.music_open(&tracks[1].id).is_ok());
+        let cached: i64 = core
+            .with_db(|db| {
+                Ok(db
+                    .conn
+                    .query_row("SELECT COUNT(*) FROM music_media_metadata", [], |r| {
+                        r.get(0)
+                    })?)
+            })
+            .unwrap();
+        assert_eq!(cached, 2);
+        drop(core);
+        let core = Core::open_isolated(Some(root), true).unwrap();
+        let tracks = &core.music_albums(None).unwrap()[0].tracks;
+        assert_eq!(tracks[0].duration_seconds, Some(1.0));
+        assert_eq!(tracks[1].duration_seconds, None);
+        assert!(tracks.iter().all(|track| track.available));
     }
     #[test]
     fn invalid_batches_do_not_publish_partial_tracks_and_symlinks_are_refused() {

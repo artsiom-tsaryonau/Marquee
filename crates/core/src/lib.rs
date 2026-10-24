@@ -19,6 +19,7 @@ pub mod lutris;
 pub mod metadata;
 pub mod model;
 pub mod music;
+mod music_metadata;
 pub mod neogeo;
 pub mod paths;
 pub mod ports;

@@ -364,7 +364,7 @@ export interface StreamingState {
   last_error: AppError | null;
 }
 
-export interface MusicTrack { id: string; title: string; available: boolean }
+export interface MusicTrack { id: string; title: string; available: boolean; duration_seconds?: number | null }
 export interface MusicAlbum { id: string; title: string; artist: string; source_url: string; tracks: MusicTrack[] }
 export interface MusicDraft { game_key: string; album_id: string | null; title: string; artist: string; source_url: string }
 

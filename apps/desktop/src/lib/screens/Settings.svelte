@@ -5,6 +5,7 @@
   import type { KeyInfo, TorrentReview } from '../api/contracts';
   import Icon from '../components/Icon.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
+  import { musicAccents } from '../musicAppearance';
 
   const categories = [['appearance', 'Appearance'], ['games', 'Games and controls'], ['library', 'Library locations'], ['providers', 'Artwork and API keys'], ['devices', 'Torrents and devices']] as const;
   let category = $state<string>('appearance');
@@ -236,6 +237,13 @@
         <button data-nav aria-pressed={app.theme === 'light'} class:on={app.theme === 'light'} onclick={() => (app.theme = 'light')}><Icon name="sun" size={16} /> Light</button>
       </div>
     </div>
+    <div class="item music-appearance">
+      <div><strong>Music accent</strong><span>Music uses round play buttons and its own color, separate from game Play.</span></div>
+      <div class="music-colors" role="group" aria-label="Music accent color">
+        {#each musicAccents as accent}<button class="music-swatch" data-nav style={`--swatch:${accent.value}`} aria-label={`${accent.name} music accent`} aria-pressed={app.musicAccent === accent.value} title={accent.name} onclick={() => app.musicAccent = accent.value}>{#if app.musicAccent === accent.value}<Icon name="check" size={17} />{/if}</button>{/each}
+        <label class="custom-music-color">Custom<input type="color" data-nav aria-label="Custom music accent color" bind:value={app.musicAccent} /></label>
+      </div>
+    </div>
     <div class="item">
       <div><strong>Visual effects</strong><span>Balanced reduces GPU work. Full enables backdrop blur, grain and pointer tilt.</span></div>
       <div class="seg" data-nav-row>
@@ -266,6 +274,11 @@
 </div>
 
 <style>
+  .music-colors { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .music-swatch { width: 36px; height: 36px; border: 3px solid transparent; border-radius: 50%; background: var(--swatch); color: #08120f; cursor: pointer; display: grid; place-items: center; }
+  .music-swatch[aria-pressed='true'] { outline: 2px solid var(--text); outline-offset: 2px; }
+  .custom-music-color { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-soft); }
+  .custom-music-color input { width: 38px; height: 36px; padding: 3px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); cursor: pointer; }
   .settings {
     padding: 36px var(--gutter);
     max-width: 1400px;

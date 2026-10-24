@@ -19,6 +19,7 @@
   import Settings from './lib/screens/Settings.svelte';
   import Streaming from './lib/screens/Streaming.svelte';
   import MusicPlayer from './lib/components/MusicPlayer.svelte';
+  import { musicPalette } from './lib/musicAppearance';
 
   const nav: { route: Route; label: string; icon: IconName }[] = [
     { route: 'home', label: 'Home', icon: 'home' },
@@ -55,6 +56,10 @@
   $effect(() => {
     const root = document.documentElement;
     root.dataset.theme = app.theme;
+    const palette = musicPalette(app.musicAccent, app.theme);
+    root.style.setProperty('--music-accent', palette.fill);
+    root.style.setProperty('--music-ink', palette.ink);
+    root.style.setProperty('--music-text', palette.text);
     root.dataset.mode = app.mode;
     root.dataset.motion = app.motionReduced ? 'reduce' : 'full';
     root.dataset.effects = app.visualEffects;

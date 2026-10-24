@@ -25,10 +25,10 @@
 
 <style>
   .music-menu { position: relative; flex: 0 0 auto; }
-  summary { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; color: var(--text-dim); cursor: pointer; list-style: none; }
+  summary { display: grid; place-items: center; width: var(--music-control-size); height: var(--music-control-size); border-radius: 50%; color: var(--text-dim); cursor: pointer; list-style: none; }
   summary::-webkit-details-marker { display: none; }
   summary:hover, .music-menu[open] summary { color: var(--text); background: var(--field); }
-  summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  summary:focus-visible { outline: 2px solid var(--music-text); outline-offset: 2px; }
   .menu-content { position: absolute; z-index: 45; right: 0; top: calc(100% + 6px); min-width: 210px; max-width: min(320px, 75vw); padding: 6px; border-radius: 12px; background: var(--surface-strong); border: 1px solid var(--line); box-shadow: 0 8px 30px #0004; }
   .menu-content :global(button), .menu-content :global(a), .menu-content :global(label) { width: 100%; box-sizing: border-box; display: flex; align-items: center; gap: 9px; min-height: 40px; padding: 10px 12px; border: 0; border-radius: 7px; background: transparent; color: var(--text); text-align: left; font: inherit; font-size: 13px; text-decoration: none; }
   .menu-content :global(button:hover), .menu-content :global(a:hover) { background: var(--field); }

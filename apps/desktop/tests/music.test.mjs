@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { MusicPlayer, trackTitle, musicTime } from '../src/lib/music.svelte';
 import { commands } from '../src/lib/api/core';
+import { musicAccent, musicAccents, musicPalette, contrastRatio } from '../src/lib/musicAppearance';
 
 const album = {id:'album',title:'OST',artist:'Composer',source_url:'',tracks:[{id:'one',title:'Opening',available:true},{id:'missing',title:'Missing',available:false},{id:'two',title:'Stage',available:true}]};
 function setup() {
@@ -80,4 +81,17 @@ test('resuming after cancelling another track load cannot play the previous trac
   assert.equal(output.src,'/music/one');
   await player.toggle({musicUrl:async()=>'/music/two'});
   assert.equal(output.src,'/music/two');assert.equal(player.current.id,'two');assert.equal(output.plays,2);
+});
+
+test('music colors validate saved values and keep icons and selected text readable in both themes', () => {
+  assert.equal(musicAccent('not a color'),'#63e6be');assert.equal(musicAccent({color:'red'}),'#63e6be');
+  assert.equal(musicAccent('#AABBCC'),'#aabbcc');
+  for (const fill of [...musicAccents.map(p=>p.value),'#ffffff','#000000','#777777','#ff0000','#ffff00','#0000ff']) {
+    for (const theme of ['light','dark']) {
+      const palette=musicPalette(fill,theme);
+      assert.equal(palette.fill,fill);
+      assert.ok(contrastRatio(palette.fill,palette.ink)>=4.5,fill);
+      assert.ok(contrastRatio(palette.text,theme==='light'?'#eef0f7':'#181826')>=4.5,`${fill}/${theme}`);
+    }
+  }
 });

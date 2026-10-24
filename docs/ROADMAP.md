@@ -196,6 +196,17 @@ no additional engine download is needed for these systems.
 
 ## Soundtrack foundation — 2026-10-24
 
+The selected product direction is a **Marquee-hosted remote media library**,
+starting with music. The [media library roadmap](MEDIA_LIBRARY.md) sequences
+global browsing/queue, metadata/artwork, authenticated hosting, direct remote
+playback and explicit session/output control. Optional Jellyfin connection is
+a provider path. Streaming the whole launcher remains a separate delivery path.
+The current music endpoint is local-only and is not a remote-account service.
+
+Music now has a saved accent separate from game Play, round 48 px play controls,
+consistent secondary controls and title/album/duration song columns. Bounded
+header probes cache real track durations; unknown duration never blocks playback.
+
 The player controls now use a central play/pause transport, track-row controls,
 seek/volume sliders and quieter options menus. Current-track pause/resume keeps
 position. **This device** identifies the current local output; streamed launcher

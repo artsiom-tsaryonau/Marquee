@@ -6,6 +6,7 @@ import { lutrisToGame } from './lutris';
 import { artFromSeed } from './art';
 import { libraryView } from './libraryView.svelte';
 import { music } from './music.svelte';
+import { musicAccent } from './musicAppearance';
 import { portAction } from './presentation';
 import { describeScan } from './format';
 import { installOption } from './install';
@@ -45,6 +46,7 @@ class AppState {
   showLegacyIntegrations = $state(load('showLegacyIntegrations', false));
   sidebarExpanded = $state(load('sidebarExpanded', false));
   theme = $state<'dark' | 'light'>(load('theme', 'dark'));
+  musicAccent = $state(musicAccent(load<unknown>('musicAccent', '#63e6be')));
   reduceMotion = $state<boolean>(load('reduceMotion', false));
   visualEffects = $state<'balanced' | 'full'>(load<string>('visualEffects', 'balanced') === 'full' ? 'full' : 'balanced');
   systemReduceMotion = $state(typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches);
@@ -121,6 +123,7 @@ class AppState {
     $effect.root(() => {
       $effect(() => save('mode', this.mode));
       $effect(() => save('theme', this.theme));
+      $effect(() => save('musicAccent', musicAccent(this.musicAccent)));
       $effect(() => save('sidebarExpanded', this.sidebarExpanded));
       $effect(() => save('showLegacyIntegrations', this.showLegacyIntegrations));
       $effect(() => save('reduceMotion', this.reduceMotion));

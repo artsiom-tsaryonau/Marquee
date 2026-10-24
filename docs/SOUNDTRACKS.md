@@ -37,6 +37,23 @@ outside clicks or focus departure. All transport controls have accessible labels
 and keyboard focus, while native range inputs preserve keyboard seeking/volume.
 Only actual media duration/time events drive progress; there is no fake waveform.
 
+Music has its own accent under **Settings → Appearance → Music accent**. Mint is
+the default; presets and a custom color are saved on this surface independently
+of the game Play accent. Music play/pause controls are circular and 48 px in both
+the album and compact player; secondary transport controls are 40 px (44 px on
+coarse pointers). Contrast-adjusted icons and selected-track text keep custom colors
+readable. The song list separates title/artist, album and duration; small screens
+hide the repeated album column. The playing indicator respects reduced motion.
+
+List durations come from bounded local header/container inspection using
+[Symphonia 0.5.5](https://docs.rs/symphonia/0.5.5/symphonia/) (MPL-2.0), without
+FFmpeg or audio decoding. Probes are limited to 2 MiB of reads, 256 seeks and
+64 KiB of metadata, with embedded visuals disabled. Results, including unknown
+durations, are cached in `music_media_metadata` against file size/modification
+time. Unknown durations show **—** and never prevent playback; the loaded media
+element supplies the current track's playback duration. This does not establish
+that a codec can be decoded by the desktop/browser runtime.
+
 The output indicator **This device** describes current routing. It does not
 select an output device or automatically mix music into a game stream. See the
 [streamed launcher/audio plan](STREAMING.md#launcher-music-and-media-streaming).
@@ -95,12 +112,23 @@ require live acceptance. No codec is claimed as successfully decoded on those
 surfaces based on header/import tests. Physical controller focus awaits hardware.
 MU0/MU1 are initial implementations, with acceptance gates still open.
 
+The 2026-10-24 duration pass imported the existing 24 Sonic 2 MP3 files into an
+isolated library and compared every parsed duration against the earlier FFmpeg
+receipt. All were available, maximum difference was below one microsecond, and
+repeat reads returned identical cached results. This tests real MP3 metadata,
+not native audible playback. The main library was not modified by that test.
+
 The owner's [YouTube playlist experiment](YOUTUBE_OST.md) tests a selected Sonic 2
 soundtrack with a checksum-verified yt-dlp helper, without cookies. That guide
 owns the acquisition evidence and URL-first browser-companion integration plan.
 It does not turn the current OST source link into a downloader or complete MU4.
 
 ## Product experience
+
+The owner-selected direction is **Marquee hosting its own remote media library**,
+with a Jellyfin-like browsing experience inside the launcher. The delivery and
+security gates are in [the media library roadmap](MEDIA_LIBRARY.md). An optional
+Jellyfin connector remains useful later, but is not the primary hosting model.
 
 Add a **Music** section to game details with album artwork, release title,
 composer/artist, source and track list. Empty state: “Add a soundtrack” with
