@@ -19,11 +19,14 @@
   import Settings from './lib/screens/Settings.svelte';
   import Streaming from './lib/screens/Streaming.svelte';
   import MusicPlayer from './lib/components/MusicPlayer.svelte';
+  import Soundtrack from './lib/components/Soundtrack.svelte';
+  import { music } from './lib/music.svelte';
   import { musicPalette } from './lib/musicAppearance';
 
   const nav: { route: Route; label: string; icon: IconName }[] = [
     { route: 'home', label: 'Home', icon: 'home' },
-    { route: 'library', label: 'Library', icon: 'grid' },
+    { route: 'library', label: 'Games', icon: 'grid' },
+    { route: 'music', label: 'Music', icon: 'music' },
     { route: 'tools', label: 'Tools', icon: 'controller' },
     { route: 'ports', label: 'Ports', icon: 'puzzle' },
     { route: 'streaming', label: 'Streaming', icon: 'monitor' },
@@ -88,7 +91,8 @@
     if (q.get('motion') === '0') app.reduceMotion = true;
     const stop = startFocusEngine({
       back: () => {
-        if (app.installToolId) app.closeInstall();
+        if (music.queueOpen) music.queueOpen = false;
+        else if (app.installToolId) app.closeInstall();
         else app.back();
       },
       onInput: (l) => (app.lastInput = l),
@@ -122,18 +126,11 @@
     <nav class="side glass-panel" class:expanded={app.sidebarExpanded} aria-label="Main">
       <div class="brand"><span class="mark">M</span><span class="word">Marquee</span></div>
       {#each nav as n (n.route)}
-        <button class="nav" class:on={app.route === n.route} aria-current={app.route === n.route ? 'page' : undefined} data-nav onclick={() => app.go(n.route)}>
+        <button class="nav" class:on={app.route === n.route} aria-current={app.route === n.route ? 'page' : undefined} title={n.label} data-nav onclick={() => app.go(n.route)}>
           <Icon name={n.icon} size={22} />
           <span>{n.label}</span>
         </button>
       {/each}
-      <div class="spacer"></div>
-      <button class="nav add" data-nav onclick={() => app.addGames()}>
-        <Icon name="plus" size={22} /><span>Add games</span>
-      </button>
-      <button class="nav" data-nav onclick={() => (app.mode = 'big')}>
-        <Icon name="tv" size={22} /><span>Big Screen</span>
-      </button>
     </nav>
   {:else}
     <nav class="top" aria-label="Main">
@@ -152,6 +149,7 @@
   {/if}
 
   <main>
+    {#if app.mode === 'desktop'}<div class="desktop-toolbar"><span>{nav.find(n => n.route === app.route)?.label ?? 'Game details'}</span><button class="screen-mode" data-nav title="Switch to Big Screen" onclick={() => app.mode = 'big'}><Icon name="tv" size={18} /><span>Big Screen</span></button></div>{/if}
     {#key app.route + (app.route === 'game' ? app.gameId : '')}
       <!-- Keep navigation opaque and replace the page immediately. A delayed
            whole-page fade exposes the backdrop and composites two large pages
@@ -159,6 +157,7 @@
       <div class="screen">
         {#if app.route === 'home'}<Home />
         {:else if app.route === 'library'}<Library />
+        {:else if app.route === 'music'}<Soundtrack library />
         {:else if app.route === 'ps2'}<Library collection="ps2" />
         {:else if app.route === 'game'}<GamePage />
         {:else if app.route === 'tools'}<Tools />
@@ -222,26 +221,35 @@
   .shell {
     display: flex;
     min-height: 100vh;
+    padding-bottom: var(--player-height, 0px);
+    box-sizing: border-box;
   }
   :global([data-mode='big']) .shell {
     flex-direction: column;
+    padding-bottom: calc(var(--player-height, 0px) + 64px);
   }
   main {
     flex: 1;
     min-width: 0;
-    display: grid;
+    display: block;
+    margin-left: 88px;
   }
+  :global([data-mode='big']) main { margin-left: 0; }
+  .desktop-toolbar { position: sticky; top: 0; z-index: 19; display: flex; justify-content: space-between; align-items: center; min-height: 52px; padding: 0 var(--gutter); background: var(--bg); border-bottom: 1px solid var(--line); color: var(--text-dim); font-size: 12px; }
+  .screen-mode { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 0; border-radius: 8px; color: var(--text-soft); background: transparent; font: inherit; cursor: pointer; }
+  .screen-mode:hover { background: var(--field); }
   .screen {
-    grid-area: 1 / 1;
     min-width: 0;
   }
 
   /* Desktop sidebar: icons, labels slide out on hover. */
   .side {
-    position: sticky;
+    position: fixed;
     top: 12px;
-    height: calc(100vh - 24px);
-    margin: 12px 0 12px 12px;
+    bottom: calc(var(--player-height, 0px) + 12px);
+    left: 12px;
+    overflow-y: auto;
+    box-sizing: border-box;
     width: 64px;
     padding: 14px 8px;
     border-radius: 22px;
@@ -249,7 +257,7 @@
     flex-direction: column;
     gap: 4px;
     z-index: 20;
-    overflow: hidden;
+    overflow-x: hidden;
     transition: width var(--side-close-duration) var(--ease);
   }
   .side.expanded,
@@ -291,6 +299,7 @@
     align-items: center;
     gap: 14px;
     height: 46px;
+    flex-shrink: 0;
     padding: 0 13px;
     border: 0;
     border-radius: 14px;
@@ -337,12 +346,7 @@
     background: var(--accent);
     box-shadow: 0 0 12px var(--accent);
   }
-  .nav.add {
-    color: var(--accent);
-  }
-  .spacer {
-    flex: 1;
-  }
+
 
   /* Big Screen top bar. */
   .top {
@@ -358,6 +362,7 @@
   .tabs {
     display: flex;
     gap: 6px;
+    overflow-x: auto;
     padding: 5px;
     border-radius: 999px;
     background: var(--field);
@@ -400,7 +405,7 @@
   }
   .hints {
     position: fixed;
-    bottom: 0;
+    bottom: var(--player-height, 0px);
     left: 0;
     right: 0;
     display: flex;
@@ -605,13 +610,14 @@
 
   @media (max-width: 640px) {
     .side,
+    .side.expanded,
     .side:hover,
     .side:focus-within {
       position: fixed;
       top: auto;
       left: 8px;
       right: 8px;
-      bottom: 8px;
+      bottom: calc(var(--player-height, 0px) + 8px);
       width: auto;
       height: 60px;
       margin: 0;
@@ -620,15 +626,18 @@
       justify-content: space-around;
       transition: none;
     }
-    .side :is(.brand, .spacer, .add, .nav span) {
+    .side :is(.brand, .nav span) {
       display: none;
     }
     .nav.on::before {
       display: none;
     }
     main {
+      margin-left: 0;
       padding-bottom: 76px;
     }
+    .side { overflow-x: auto; }
+    .nav { padding: 0 10px; }
     .tab {
       font-size: 14px;
       padding: 8px 12px;

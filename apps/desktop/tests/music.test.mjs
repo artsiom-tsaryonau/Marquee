@@ -95,3 +95,24 @@ test('music colors validate saved values and keep icons and selected text readab
     }
   }
 });
+
+test('queue inserts next, reorders only upcoming tracks and preserves the active media', async () => {
+  const {player,output}=setup();const api={musicUrl:async id=>'/music/'+id};
+  await player.play(api,album,'one');
+  player.enqueue(album,'one',true);
+  assert.deepEqual(player.queue.map(t=>t.id),['one','one','two']);
+  player.moveQueued(2,-1);assert.deepEqual(player.queue.map(t=>t.id),['one','two','one']);
+  player.moveQueued(1,-1);player.removeQueued(0);
+  assert.equal(player.current.id,'one');assert.equal(output.loads,1);assert.equal(output.currentTime,0);
+  player.removeQueued(2);assert.equal(player.queue.length,2);
+  await player.selectQueued(api,1);assert.equal(player.current.id,'two');assert.equal(output.src,'/music/two');
+  await player.selectQueued(api,1);assert.equal(player.paused,true);
+  await player.selectQueued(api,-1);assert.equal(player.current.id,'two');
+});
+test('queueing after a cleared queue selects its first track without starting playback', async () => {
+  const {player,output}=setup();player.index=5;
+  player.enqueue(album,'missing');assert.equal(player.queue.length,0);
+  player.enqueue(album,'two',true);assert.equal(player.index,0);assert.equal(player.current.id,'two');
+  assert.equal(output.plays,0);assert.equal(player.paused,true);
+  await player.toggle({musicUrl:async id=>'/music/'+id});assert.equal(output.src,'/music/two');assert.equal(output.plays,1);
+});

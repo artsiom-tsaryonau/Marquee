@@ -153,6 +153,13 @@ behavior. This dated checklist does not close rendered/native/controller gates.
 
 ## Presentation goals still to validate or extend
 
+The 2026-10-24 music shell pass aligns the sidebar/content above a full-width
+player footer, using its measured height rather than unrelated fixed offsets.
+Desktop navigation includes Music; Add games stays in the Games library header,
+and Big Screen moves to the top-right toolbar. Narrow navigation sits above the
+player. Music albums and the session queue share the OST playback state. Visual
+checks at narrow/wide sizes and desktop input acceptance remain open.
+
 Home shelves must use real library/play/readiness metadata. Canonical pages retain
 edition/run selection, separate saves and provenance-labeled screenshots. Keep
 source/platform/runtime/install filters distinct and paginate or virtualize large

@@ -4,7 +4,14 @@
   import { music, musicTime } from '../music.svelte';
   import Icon from './Icon.svelte';
   import MusicMenu from './MusicMenu.svelte';
+  import MusicQueue from './MusicQueue.svelte';
   let audio: HTMLAudioElement;
+  function measurePlayer(node: HTMLElement) {
+    const update = () => document.documentElement.style.setProperty('--player-height', `${node.getBoundingClientRect().height}px`);
+    update();
+    const observer = new ResizeObserver(update); observer.observe(node);
+    return { destroy() { observer.disconnect(); document.documentElement.style.setProperty('--player-height', '0px'); } };
+  }
   const progress = $derived(music.duration > 0 ? Math.min(100, music.position / music.duration * 100) : 0);
   onMount(() => {
     try {
@@ -26,7 +33,7 @@
 <audio bind:this={audio} hidden preload="metadata" onended={() => music.next(app.api)} ontimeupdate={() => music.syncTime()} ondurationchange={() => music.syncTime()} onloadedmetadata={() => music.syncTime()} onplay={() => { music.paused = false; music.error = ''; music.note = ''; }} onpause={() => music.paused = true} onvolumechange={saveVolume} onerror={() => { music.paused = true; music.error = 'This audio could not be decoded or is no longer available. Try another format or re-add the file.'; }}></audio>
 
 {#if music.current}
-<section class="music-player" aria-label="Soundtrack player">
+<section class="music-player" use:measurePlayer aria-label="Soundtrack player">
   <div class="playing">
     <span class="record" aria-hidden="true"><Icon name="music" size={24} /></span>
     <div class="metadata"><strong title={music.current.title}>{music.current.title}</strong><span title={music.current.album}>{music.current.artist || music.current.album}</span></div>
@@ -46,6 +53,7 @@
   <div class="right">
     <div class="output" title="Music plays on this device. It is not automatically included in a Wolf game stream."><Icon name="monitor" size={14} /><span>This device</span></div>
     <div class="utilities">
+      <button class="control" class:active={music.queueOpen} data-nav aria-label="Show playback queue" aria-pressed={music.queueOpen} onclick={() => music.queueOpen = !music.queueOpen}><Icon name="queue" size={19} /></button>
       <button class="control volume-button" data-nav aria-label={music.muted || music.volume === 0 ? 'Unmute soundtrack' : 'Mute soundtrack'} title={music.muted || music.volume === 0 ? 'Unmute' : 'Mute'} aria-pressed={music.muted || music.volume === 0} onclick={() => music.toggleMute()}><Icon name={music.muted || music.volume === 0 ? 'muted' : 'volume'} size={18} /></button>
       <input class="volume" data-nav type="range" aria-label="Soundtrack volume" aria-valuetext={music.muted ? 'Muted' : `${Math.round(music.volume * 100)} percent`} min="0" max="1" step="0.01" value={music.muted ? 0 : music.volume} style={`--filled:${music.muted ? 0 : music.volume * 100}%`} oninput={(event) => music.setVolume(Number(event.currentTarget.value))} />
       <MusicMenu label="Playback options"><label><input data-nav type="checkbox" bind:checked={music.pauseOnGame} onchange={savePreference} /> Pause when a game starts</label><button data-nav onclick={() => { music.pause(); music.queue = []; audio.removeAttribute('src'); audio.load(); }}>Close player</button></MusicMenu>
@@ -53,10 +61,12 @@
   </div>
   {#if music.loading || music.error || music.note}<p class="message" class:error={!!music.error} role="status">{music.error || music.note || 'Loading audio…'}</p>{/if}
 </section>
+{#if music.queueOpen}<MusicQueue />{/if}
 {/if}
 
 <style>
-  .music-player { position: fixed; bottom: 14px; left: 68px; right: 18px; z-index: 35; display: grid; grid-template-columns: minmax(150px, 1fr) minmax(250px, 1.4fr) minmax(170px, 1fr); gap: 18px; align-items: center; padding: 14px 20px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface-strong); box-shadow: 0 8px 40px #0004; }
+  .music-player { position: fixed; bottom: 0; left: 0; right: 0; z-index: 35; display: grid; grid-template-columns: minmax(150px, 1fr) minmax(250px, 1.4fr) minmax(260px, 1fr); gap: 18px; align-items: center; padding: 12px 24px; border-top: 1px solid var(--line); background: var(--surface-strong); }
+  .control.active { color: var(--music-text); }
   .playing { display: flex; align-items: center; gap: 12px; min-width: 0; } .metadata { min-width: 0; }
   strong, .metadata span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } strong { font-size: 13px; font-weight: 650; }
   .metadata span { font-size: 12px; color: var(--text-dim); margin-top: 5px; }
@@ -76,9 +86,7 @@
   .seek { width: 100%; } .right { display: grid; gap: 2px; justify-items: end; } .output { display: flex; gap: 6px; align-items: center; font-size: 12px; color: var(--text-dim); }
   .utilities { display: flex; align-items: center; gap: 5px; } .volume { width: 80px; } .message { grid-column: 1 / -1; margin: 0; font-size: 12px; color: var(--text-dim); } .error { color: var(--bad); }
   @media(max-width:900px) { .music-player { grid-template-columns: minmax(110px, 1fr) minmax(210px, 1.4fr); } .right { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; width: 100%; } }
-  @media(max-width:560px) { .music-player { left: 58px; right: 8px; padding: 12px; gap: 12px; grid-template-columns: 1fr; } .record { width: var(--music-control-size); height: var(--music-control-size); } }
-  :global(body:has(.music-player) .screen) { padding-bottom: 170px; }
-  :global(:root[data-mode='big']) .music-player { bottom: 52px; left: 24px; right: 24px; }
+  @media(max-width:560px) { .music-player { padding: 12px; gap: 12px; grid-template-columns: 1fr; } .record { width: var(--music-control-size); height: var(--music-control-size); } }
   @media(pointer:coarse) { .control:not(.primary-play) { width: 44px; height: 44px; } input[type='range'] { height: 36px; } }
   @media(prefers-reduced-motion:reduce) { .primary-play:hover:not(:disabled) { transform: none; } }
   :global(:root[data-motion='reduce']) .primary-play:hover:not(:disabled) { transform: none; }

@@ -27,6 +27,7 @@ export class MusicPlayer {
   duration = $state(0);
   volume = $state(0.65);
   muted = $state(false);
+  queueOpen = $state(false);
   private output: AudioOutput | null = null;
   private generation = 0;
   private loadedTrackId: string | null = null;
@@ -46,6 +47,28 @@ export class MusicPlayer {
     const next = this.index + direction;
     if (next < 0 || next >= this.queue.length) { this.pause(); return; }
     this.index = next; await this.load(api);
+  }
+  enqueue(album: MusicAlbum, trackId: string, next = false) {
+    const track = album.tracks.find(t => t.id === trackId && t.available);
+    if (!track) return;
+    if (!this.queue.length) this.index = 0;
+    const entry = { ...track, title: trackTitle(track.title, album.tracks.indexOf(track) + 1), albumId: album.id, album: album.title, artist: album.artist };
+    const position = next && this.queue.length ? this.index + 1 : this.queue.length;
+    this.queue.splice(position, 0, entry);
+    this.note = next ? 'Added to play next.' : 'Added to queue.';
+  }
+  async selectQueued(api: LibraryApi, index: number) {
+    if (!Number.isInteger(index) || index < 0 || index >= this.queue.length) return;
+    if (index === this.index) await this.toggle(api);
+    else { this.index = index; await this.load(api); }
+  }
+  moveQueued(index: number, direction: -1 | 1) {
+    const target = index + direction;
+    if (!Number.isInteger(index) || index <= this.index || target <= this.index || target >= this.queue.length) return;
+    const [track] = this.queue.splice(index, 1); this.queue.splice(target, 0, track);
+  }
+  removeQueued(index: number) {
+    if (Number.isInteger(index) && index > this.index && index < this.queue.length) this.queue.splice(index, 1);
   }
   async select(api: LibraryApi, album: MusicAlbum, trackId: string) {
     if (this.current?.id === trackId && this.current.albumId === album.id) await this.toggle(api);

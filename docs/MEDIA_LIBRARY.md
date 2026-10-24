@@ -5,6 +5,29 @@ library with a Jellyfin-like experience alongside games. This is a roadmap;
 the implemented OST player serves local desktop/browser use, not remote accounts
 or a production LAN media service.
 
+## Implemented foundation
+
+The **Music** navigation destination browses every saved album, including albums
+unlinked from games. Search matches album titles, artists and track names. Open
+an album for its existing track list, file import and details controls. **Add
+album** creates an independent album without a fabricated game link; game OST
+tabs can link it later. Album artwork remains a labelled music placeholder;
+embedded tags/artwork and folder rescans are still ML2 work.
+
+The player's **Queue** control opens the current selection and upcoming tracks.
+Track options offer **Play next** and **Add to queue**. Upcoming tracks can move
+earlier/later or be removed without restarting the current audio. Selecting a
+queued track plays it; selecting the current one toggles pause. Starting another
+album replaces the queue. The queue survives page navigation within this app
+session but is not saved across app restarts or shared with another device.
+
+The player occupies a full-width bottom footer. Its measured height reserves
+space in the page and sidebar, including narrow layouts. **Add games** belongs
+to the Games library header; **Big Screen** is in the desktop toolbar at the top
+right. Narrow desktop navigation sits above the player, and Big Screen hints
+also reserve its height. Rendered desktop/responsive/controller acceptance is
+still required; these implementation details do not close ML0 or remote gates.
+
 ## Product shape
 
 Add a top-level **Music** destination with albums, artists, soundtracks and a

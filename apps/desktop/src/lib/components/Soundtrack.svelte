@@ -6,7 +6,9 @@
   import MusicMenu from './MusicMenu.svelte';
   import { asError } from '../api/core';
   import type { MusicAlbum } from '../api/contracts';
-  let { gameKey, gameTitle }: { gameKey: string; gameTitle: string } = $props();
+  let { gameKey = '', gameTitle = '', library = false }: { gameKey?: string; gameTitle?: string; library?: boolean } = $props();
+  let query = $state('');
+  let selected = $state<string | null>(null);
   let albums = $state<MusicAlbum[]>([]);
   let all = $state<MusicAlbum[]>([]);
   let busy = $state(false);
@@ -20,14 +22,19 @@
   let existing = $state('');
   const unlinked = $derived(all.filter(a => !albums.some(link => link.id === a.id)));
   const findUrl = $derived(`https://www.youtube.com/results?search_query=${encodeURIComponent(`${gameTitle} official soundtrack OST`)}`);
-  async function refresh() { [albums, all] = await Promise.all([app.api.musicAlbums(gameKey), app.api.musicAlbums()]); }
+  const matches = $derived(albums.filter(a => `${a.title} ${a.artist} ${a.tracks.map(t => t.title).join(' ')}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())));
+  const displayed = $derived(library ? albums.filter(a => a.id === selected) : albums);
+  async function refresh() {
+    if (library) { albums = await app.api.musicAlbums(); all = albums; }
+    else [albums, all] = await Promise.all([app.api.musicAlbums(gameKey), app.api.musicAlbums()]);
+  }
   async function run(action: () => Promise<unknown>) {
     if (busy) return;
     busy = true; error = ''; note = '';
     try { await action(); await refresh(); } catch (err) { error = asError(err).message; } finally { busy = false; }
   }
   onMount(() => { void run(async () => {}); });
-  function edit(album?: MusicAlbum) { albumId = album?.id ?? null; title = album?.title ?? `${gameTitle} — Original soundtrack`; artist = album?.artist ?? ''; source = album?.source_url ?? ''; editing = true; }
+  function edit(album?: MusicAlbum) { albumId = album?.id ?? null; title = album?.title ?? (library ? '' : `${gameTitle} — Original soundtrack`); artist = album?.artist ?? ''; source = album?.source_url ?? ''; editing = true; }
   function openSearch(event: MouseEvent) {
     if (app.api.kind === 'desktop') { event.preventDefault(); void run(() => app.api.musicFind(gameTitle)); }
   }
@@ -40,7 +47,7 @@
   }
   async function save(event: SubmitEvent) {
     event.preventDefault();
-    await run(async () => { await app.api.musicSaveAlbum({ game_key: gameKey, album_id: albumId, title, artist, source_url: source.trim() }); editing = false; });
+    await run(async () => { const id = await app.api.musicSaveAlbum({ game_key: gameKey, album_id: albumId, title, artist, source_url: source.trim() }); if (library) selected = id; editing = false; });
   }
   async function addFiles(album: MusicAlbum) {
     await run(async () => {
@@ -52,8 +59,15 @@
   }
 </script>
 
-<section class="soundtrack" aria-label="Game original soundtracks">
-  <header><div><span class="eyebrow">MUSIC FOR THIS GAME</span><h2>Soundtracks</h2><p>Original, remastered or arranged albums, linked to this game.</p></div><div class="actions"><a class="btn glass" data-nav href={findUrl} onclick={openSearch} target="_blank" rel="noreferrer">Find OST on YouTube ↗</a><button class="btn primary" data-nav disabled={busy} onclick={() => edit()}>Add soundtrack</button></div></header>
+<section class="soundtrack" aria-label={library ? 'Music library' : 'Game original soundtracks'}>
+  <header><div><span class="eyebrow">{library ? 'YOUR MEDIA LIBRARY' : 'MUSIC FOR THIS GAME'}</span><h2>{library ? 'Music' : 'Soundtracks'}</h2><p>{library ? 'Your albums and soundtracks, together. Keep listening while you browse.' : 'Original, remastered or arranged albums, linked to this game.'}</p></div><div class="actions">{#if !library}<a class="btn glass" data-nav href={findUrl} onclick={openSearch} target="_blank" rel="noreferrer">Find OST on YouTube ↗</a>{/if}<button class="btn primary" data-nav disabled={busy} onclick={() => edit()}>{library ? 'Add album' : 'Add soundtrack'}</button></div></header>
+  {#if library && selected}<button class="back-albums" data-nav onclick={() => selected = null}><Icon name="back" size={16} />All albums</button>{/if}
+  {#if library && !selected}
+    <label class="music-search"><Icon name="search" size={18} /><input data-nav type="search" bind:value={query} placeholder="Search albums, artists or tracks" aria-label="Search music" /></label>
+    <p class="hint">{matches.length} {matches.length === 1 ? 'album' : 'albums'}</p>
+    <div class="album-grid">{#each matches as album (album.id)}<button class="album-card" data-nav onclick={() => selected = album.id}><span class="library-art" aria-hidden="true"><Icon name="music" size={44} /></span><strong>{album.title}</strong><span>{album.artist || 'Soundtrack'} · {album.tracks.length} tracks</span></button>{/each}</div>
+    {#if albums.length && !matches.length}<p>No music matches “{query}”. Try an album, artist or track name.</p>{/if}
+  {/if}
   {#if error}<p class="error" role="alert">{error}</p><button class="btn glass small" data-nav disabled={busy} onclick={() => run(async () => {})}>Retry</button>{/if}
   {#if note}<p role="status">{note}</p>{/if}
   {#if busy}<p class="hint" role="status">Updating soundtracks…</p>{/if}
@@ -65,13 +79,13 @@
     <p class="hint">A source link records attribution; it does not download or play that page. Shared albums keep the same details across linked games.</p>
     <div class="actions"><button class="btn primary" data-nav disabled={busy}>Save soundtrack</button><button type="button" class="btn glass" data-nav disabled={busy} onclick={() => editing = false}>Cancel</button></div>
   </form>{/if}
-  {#if !albums.length && !busy}<div class="glass-panel empty"><span class="disc" aria-hidden="true">♫</span><h3>Give this game a soundtrack</h3><p>Add an album, then choose its local audio files. Music keeps playing while you browse Marquee.</p><p class="hint">MP3, FLAC, OGG and WAV are accepted for import; playback depends on the decoder available in your browser or desktop runtime.</p></div>{/if}
-  {#each albums as album (album.id)}<article class="glass-panel album">
+  {#if !albums.length && !busy}<div class="glass-panel empty"><span class="disc" aria-hidden="true">♫</span><h3>{library ? 'Build your music library' : 'Give this game a soundtrack'}</h3><p>Add an album, then choose its local audio files. Music keeps playing while you browse Marquee.</p><p class="hint">MP3, FLAC, OGG and WAV are accepted for import; playback depends on the decoder available in your browser or desktop runtime.</p></div>{/if}
+  {#each displayed as album (album.id)}<article class="glass-panel album">
     <div class="album-head"><div class="album-art" aria-hidden="true">♫</div><div class="album-info"><span class="eyebrow">SOUNDTRACK · {album.tracks.length} TRACKS</span><h3>{album.title}</h3>{#if album.artist}<p>{album.artist}</p>{/if}{#if album.source_url}<a data-nav href={album.source_url} onclick={(event) => openSource(event, album)} target="_blank" rel="noreferrer">View source ↗</a>{/if}</div></div>
     <div class="album-actions">
       <button class="album-play" data-nav aria-label={music.current?.albumId === album.id && (!music.paused || music.loading) ? 'Pause album' : 'Play album'} title={music.current?.albumId === album.id && (!music.paused || music.loading) ? 'Pause album' : 'Play album'} disabled={!album.tracks.some(t => t.available)} onclick={() => toggleAlbum(album)}><Icon name={music.current?.albumId === album.id && (!music.paused || music.loading) ? 'pause' : 'play'} size={25} filled /></button>
       <button class="add-tracks" data-nav disabled={busy} title="Choose local audio files" onclick={() => addFiles(album)}><Icon name="plus" size={18} />Add tracks</button>
-      <MusicMenu label={`Album options for ${album.title}`}><button data-nav disabled={busy} onclick={() => edit(album)}><Icon name="settings" size={16} />Edit album details</button><button data-nav disabled={busy} onclick={() => run(() => app.api.musicLink(gameKey, album.id, false))}>Unlink from this game</button></MusicMenu>
+      <MusicMenu label={`Album options for ${album.title}`}><button data-nav disabled={busy} onclick={() => edit(album)}><Icon name="settings" size={16} />Edit album details</button>{#if !library}<button data-nav disabled={busy} onclick={() => run(() => app.api.musicLink(gameKey, album.id, false))}>Unlink from this game</button>{/if}</MusicMenu>
     </div>
     {#if album.tracks.length}
       <div class="list-heading" aria-hidden="true"><span>#</span><span>Title</span><span class="album-column">Album</span><span class="duration-column"><Icon name="clock" size={14} /></span></div>
@@ -86,16 +100,24 @@
             <span class="album-column" title={album.title}>{album.title}</span>
             <span class="duration-column">{duration && duration > 0 ? musicTime(duration) : '—'}</span>
           </button>
-          <MusicMenu label={`Options for ${title}`}><button class="danger" data-nav disabled={busy} onclick={() => run(async () => { await app.api.musicRemoveTrack(album.id, track.id); music.removed(track.id); })}>Remove from album</button></MusicMenu>
+          <MusicMenu label={`Options for ${title}`}><button data-nav disabled={!track.available} onclick={() => music.enqueue(album, track.id, true)}>Play next</button><button data-nav disabled={!track.available} onclick={() => music.enqueue(album, track.id)}>Add to queue</button><button class="danger" data-nav disabled={busy} onclick={() => run(async () => { await app.api.musicRemoveTrack(album.id, track.id); music.removed(track.id); })}>Remove from album</button></MusicMenu>
         </li>
       {/each}</ol>
     {:else}<p class="hint">No audio attached. Add tracks to build this album’s track list.</p>{/if}
   </article>{/each}
-  {#if unlinked.length}<form class="reuse" onsubmit={(e) => { e.preventDefault(); if (existing) void run(async () => { await app.api.musicLink(gameKey, existing, true); existing = ''; }); }}><label>Link an existing soundtrack<select data-nav bind:value={existing} disabled={busy}><option value="">Choose album</option>{#each unlinked as album}<option value={album.id}>{album.title}{album.artist ? ` · ${album.artist}` : ''}</option>{/each}</select></label><button class="btn glass" data-nav disabled={busy || !existing}>Link album</button></form>{/if}
-  <p class="hint">Original files are kept intact. Removing a track or unlinking an album leaves the copied audio on disk. yt-dlp downloads, Jellyfin and automatic release matching are planned separately; source links open in your browser.</p>
+  {#if !library && unlinked.length}<form class="reuse" onsubmit={(e) => { e.preventDefault(); if (existing) void run(async () => { await app.api.musicLink(gameKey, existing, true); existing = ''; }); }}><label>Link an existing soundtrack<select data-nav bind:value={existing} disabled={busy}><option value="">Choose album</option>{#each unlinked as album}<option value={album.id}>{album.title}{album.artist ? ` · ${album.artist}` : ''}</option>{/each}</select></label><button class="btn glass" data-nav disabled={busy || !existing}>Link album</button></form>{/if}
+  <p class="hint">Albums stay in Music when you unlink them from a game. Original audio files are kept intact.</p>
 </section>
 
 <style>
+  .back-albums { display: flex; align-items: center; gap: 6px; justify-self: start; border: 0; background: transparent; color: var(--text-soft); font: inherit; cursor: pointer; padding: 8px 0; }
+  .music-search { display: flex; align-items: center; gap: 10px; background: var(--field); padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; }
+  .music-search input { flex: 1; border: 0; background: transparent; }
+  .album-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(170px,1fr)); gap: 20px; }
+  .album-card { display: flex; flex-direction: column; text-align: left; gap: 8px; color: var(--text); background: transparent; border: 0; padding: 10px; border-radius: 12px; cursor: pointer; min-width: 0; font: inherit; }
+  .album-card:hover { background: var(--field); } .album-card > span:last-child { color: var(--text-dim); font-size: 12px; }
+  .library-art { width: 100%; aspect-ratio: 1; display: grid; place-items: center; border-radius: 10px; color: var(--music-text); background: radial-gradient(circle, color-mix(in srgb,var(--music-accent) 30%,var(--surface)),var(--bg)); }
+
   .soundtrack { display: grid; gap: 22px; max-width: 1100px; margin: 0 auto; padding: 24px var(--gutter) 40px; }
   header, .album-head { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; } header { justify-content: space-between; }
   h2 { margin: 8px 0; font-size: 28px; } h3 { margin: 6px 0 12px; } p { line-height: 1.65; margin: 8px 0; color: var(--text-soft); }

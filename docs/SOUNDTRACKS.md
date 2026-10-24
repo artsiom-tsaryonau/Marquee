@@ -6,6 +6,12 @@ planned. This stays independent of [streaming acceptance](STREAMING.md).
 
 ## Current implementation
 
+Use **Music** in the main navigation to browse/search all albums or create an
+album independently of a game. Open its card to add tracks or play. The player
+queue supports play-next, append, selecting queued tracks and reordering/removing
+upcoming tracks; it remains local to the current app session. See the
+[media library foundation](MEDIA_LIBRARY.md#implemented-foundation).
+
 Open a game → **OST** → **Add soundtrack**. Save an album title, optional
 composer/artist and HTTPS source page, then **Add tracks**. The native
 app opens a multi-file picker. Browser mode asks for absolute paths on the

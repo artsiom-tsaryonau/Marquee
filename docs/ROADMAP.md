@@ -196,6 +196,12 @@ no additional engine download is needed for these systems.
 
 ## Soundtrack foundation — 2026-10-24
 
+The first global Music destination now browses/searches saved albums independently
+of games. Queue inspection, play-next/append and upcoming-track reorder/removal
+are implemented, with session-only state. The shared shell now uses a measured,
+full-width player footer; Add games lives in the Games header and Big Screen in
+the top-right desktop toolbar. Native/responsive acceptance remains open.
+
 The selected product direction is a **Marquee-hosted remote media library**,
 starting with music. The [media library roadmap](MEDIA_LIBRARY.md) sequences
 global browsing/queue, metadata/artwork, authenticated hosting, direct remote

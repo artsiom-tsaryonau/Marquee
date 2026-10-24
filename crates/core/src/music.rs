@@ -332,7 +332,7 @@ impl Core {
     }
 
     pub fn music_save_album(&self, draft: AlbumDraft) -> Result<String> {
-        text(&draft.game_key, 512, true)?;
+        text(&draft.game_key, 512, false)?;
         text(&draft.title, 300, true)?;
         text(&draft.artist, 300, false)?;
         text(&draft.source_url, 2048, false)?;
@@ -342,7 +342,9 @@ impl Core {
         self.with_db(|db| {
             let tx = db.conn.unchecked_transaction()?;
             tx.execute("INSERT INTO music_albums(id,title,artist,source_url) VALUES(?1,?2,?3,?4) ON CONFLICT(id) DO UPDATE SET title=excluded.title,artist=excluded.artist,source_url=excluded.source_url",params![id,draft.title.trim(),draft.artist.trim(),draft.source_url])?;
-            tx.execute("INSERT OR IGNORE INTO music_links(game_key,album_id) VALUES(?1,?2)",params![draft.game_key,id])?;
+            if !draft.game_key.is_empty() {
+                tx.execute("INSERT OR IGNORE INTO music_links(game_key,album_id) VALUES(?1,?2)",params![draft.game_key,id])?;
+            }
             tx.commit()?; Ok(id)
         })
     }
@@ -487,6 +489,30 @@ mod tests {
                 .count(),
             1
         );
+    }
+    #[test]
+    fn standalone_albums_remain_browsable_after_game_unlink_and_restart() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("library");
+        let core = Core::open_isolated(Some(root.clone()), true).unwrap();
+        let id = core
+            .music_save_album(AlbumDraft {
+                game_key: String::new(),
+                album_id: None,
+                title: "Independent album".into(),
+                artist: String::new(),
+                source_url: String::new(),
+            })
+            .unwrap();
+        assert_eq!(core.music_albums(None).unwrap()[0].id, id);
+        assert!(core.music_albums(Some("")).unwrap().is_empty());
+        core.music_link("game-one", &id, true).unwrap();
+        assert_eq!(core.music_albums(Some("game-one")).unwrap().len(), 1);
+        core.music_link("game-one", &id, false).unwrap();
+        drop(core);
+        let core = Core::open_isolated(Some(root), true).unwrap();
+        assert_eq!(core.music_albums(None).unwrap()[0].id, id);
+        assert!(core.music_albums(Some("game-one")).unwrap().is_empty());
     }
     #[test]
     fn duration_cache_survives_restart_and_unknown_duration_does_not_block_media() {
