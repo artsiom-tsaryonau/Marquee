@@ -290,3 +290,27 @@ The expanded sidebar toggle is icon-only, retaining its accessible label and
 tooltip. Music/video control bars use less height; the labelled This device
 control has a rectangular hover surface. The video viewer omits the remembered
 playback-position explanatory footer.
+
+### Reviewed game-details search (2026-10-25)
+
+Games → Metadata → Search metadata and artwork now separates **Game details**
+(TheGamesDB) from **Artwork** (SteamGridDB). Details are scoped to the game's
+platform, including PS3, and show release year, genres, player count and an
+expandable description preview. The owner chooses a specific release; results
+are never applied automatically. The existing Settings keys are reused.
+
+**Fill missing details** retains existing facts, game title, platform, artwork,
+files and installations. The saved facts include provider/title-ID provenance.
+Search reviews expire after 30 minutes, bind candidates to the game and platform,
+and cannot be used across the artwork/details apply endpoints. Provider errors
+never expose TheGamesDB's query-string key. This is not a region/serial exact
+match, and developer/publisher enrichment is still future work.
+
+Validation: full checks and real isolated-library search/apply passed. The PS3
+God of War III search returned 19 platform-scoped candidates; selecting ID 843
+filled year 2010, genres, player count and an 818-character description while
+preserving title/platform/artwork. Browser interaction showed the preview and
+provider picker correctly at desktop and 390 px, without overflow or JS errors.
+No main-library metadata was changed by this validation.
+
+Provider reference: [TheGamesDB API](https://api.thegamesdb.net/).

@@ -403,10 +403,12 @@ export interface Ps3Inspection {
 export interface MediaAsset { id:string; title:string; kind:'image'|'video'; bytes:number; source:string; spoiler:boolean; position:number; available:boolean; }
 export interface MediaCollection { id:string; title:string; game_keys:string[]; assets:MediaAsset[]; }
 export interface MediaDisc { path:string; source_bytes:number; signature:string; items:{path:string; bytes:number; kind:'image'|'video'; supported:boolean}[]; }
-export interface MetadataReview {token:string;provider:string;candidates:{id:number;title:string}[];}
+export interface MetadataReview {token:string;provider:string;candidates:{id:number;title:string;system?:string;facts?:{year?:number;genre?:string;players?:number;description?:string}}[];}
 export interface LibraryApi {
   importPs3Disc(path:string):Promise<string>;
   searchGameMetadata(editionId:string,query:string):Promise<MetadataReview>;
+  searchGameFacts(editionId:string,query:string):Promise<MetadataReview>;
+  applyGameFacts(editionId:string,token:string,id:number):Promise<void>;
   applyMetadataMatch(editionId:string,token:string,candidateId:number):Promise<void>;
 
   mediaCollections(gameKey?:string):Promise<MediaCollection[]>;

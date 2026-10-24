@@ -290,3 +290,11 @@ on the game Metadata tab. Search results are capped and kept in edition-bound,
 without renaming, changing platform or merging games. Live GoW3 original versus
 Remastered candidates were checked. Text descriptions, richer release matching,
 provider/platform disambiguation and additional providers remain open.
+
+### Reviewed game details search — implemented 2026-10-25
+
+Metadata now offers platform-scoped TheGamesDB search alongside the existing
+SteamGridDB artwork search. Release previews and explicit apply fill missing
+facts without replacing existing values or changing game identity/files.
+The real PS3 search/apply and responsive UI were verified in an isolated library.
+Richer developer/publisher mapping and region/serial exact matching remain open.

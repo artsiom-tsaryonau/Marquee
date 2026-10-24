@@ -46,6 +46,16 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
         "inspect_ps3" => out(crate::ps3::inspect(
             PathBuf::from(text(&args, "path")?).as_path(),
         )?),
+        "search_game_facts" => {
+            out(core.search_game_facts(&text(&args, "edition_id")?, &text(&args, "query")?)?)
+        }
+        "apply_game_facts" => out(core.apply_game_facts(
+            &text(&args, "edition_id")?,
+            &text(&args, "token")?,
+            args.get("candidate_id")
+                .and_then(Value::as_u64)
+                .ok_or_else(|| AppError::new("BAD_REQUEST", "Missing candidate ID"))?,
+        )?),
         "search_game_metadata" => {
             out(core.search_game_metadata(&text(&args, "edition_id")?, &text(&args, "query")?)?)
         }

@@ -97,6 +97,8 @@ export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'su
     reviewPs3Firmware: (path) => call('review_ps3_firmware', { path }),
     installPs3Firmware: (reviewToken) => call('install_ps3_firmware', { review_token: reviewToken }),
     importPs3Disc:(path)=>call('import_ps3_disc',{path}),
+    searchGameFacts:(editionId,query)=>call('search_game_facts',{edition_id:editionId,query}),
+    applyGameFacts:(editionId,token,id)=>call('apply_game_facts',{edition_id:editionId,token,candidate_id:id}),
     searchGameMetadata:(editionId,query)=>call('search_game_metadata',{edition_id:editionId,query}),
     applyMetadataMatch:(editionId,token,candidateId)=>call('apply_metadata_match',{edition_id:editionId,token,candidate_id:candidateId}),
     inspectPs3: (path) => call('inspect_ps3', { path }),

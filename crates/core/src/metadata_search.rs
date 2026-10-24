@@ -16,6 +16,10 @@ fn err(message: &str) -> AppError {
 pub struct Candidate {
     pub id: u64,
     pub title: String,
+    #[serde(default)]
+    pub facts: Option<crate::model::GameInfo>,
+    #[serde(default)]
+    pub system: Option<String>,
 }
 #[derive(Serialize)]
 pub struct Review {
@@ -49,6 +53,8 @@ fn candidates(json: &Value) -> Vec<Candidate> {
             Some(Candidate {
                 id,
                 title: title.into(),
+                facts: None,
+                system: None,
             })
         })
         .collect()
@@ -95,8 +101,83 @@ impl Core {
             candidates: items,
         })
     }
+    pub fn search_game_facts(&self, edition_id: &str, query: &str) -> Result<Review> {
+        let query = query.trim();
+        if query.len() < 2 || query.len() > 200 || query.chars().any(char::is_control) {
+            return Err(err("Enter a game title between 2 and 200 characters"));
+        }
+        let system = self.with_db(|db| {
+            db.edition_by_id(edition_id)?
+                .map(|e| e.system)
+                .ok_or_else(|| err("Game is not in the library"))
+        })?;
+        let platform = crate::romfacts::tgdb_platform(&system).ok_or_else(|| {
+            err("This platform is not supported by the game-details provider yet")
+        })?;
+        let key = self
+            .key("thegamesdb")?
+            .ok_or_else(|| err("Add a TheGamesDB API key in Settings to search game details"))?;
+        // Query-string credentials must never be included in surfaced HTTP errors.
+        let json = crate::http::get_json(&format!(
+            "https://api.thegamesdb.net/v1/Games/ByGameName?apikey={}&name={}&fields=overview,players,genres,platform&filter%5Bplatform%5D={platform}",
+            crate::romart::encode(&key), crate::romart::encode(query)
+        )).map_err(|_| err("TheGamesDB search failed. Check your API key, allowance and connection."))?;
+        let genres = crate::romfacts::tgdb_genres(&self.paths.cache_dir, &key);
+        let items = fact_candidates(&json, &system, platform, &genres);
+        let token = Uuid::new_v4().to_string();
+        self.with_db(|db| {
+            db.conn.execute(
+                "DELETE FROM metadata_search_reviews WHERE edition_id=?1 OR created<?2",
+                params![edition_id, now() - 1800],
+            )?;
+            db.conn.execute(
+                "INSERT INTO metadata_search_reviews VALUES(?1,?2,?3,?4)",
+                params![token, edition_id, serde_json::to_string(&items)?, now()],
+            )?;
+            Ok(())
+        })?;
+        Ok(Review {
+            token,
+            provider: format!("TheGamesDB · {system} game details · review the release"),
+            candidates: items,
+        })
+    }
+
+    pub fn apply_game_facts(&self, edition_id: &str, token: &str, id: u64) -> Result<()> {
+        self.with_db(|db| {
+            let transaction = db.conn.unchecked_transaction()?;
+            let candidate = reviewed(&db.conn, edition_id, token, id)?;
+            let facts = candidate
+                .facts
+                .ok_or_else(|| err("This is an artwork result, not a game-details match"))?;
+            let edition = db
+                .edition_by_id(edition_id)?
+                .ok_or_else(|| err("Game was removed"))?;
+            if candidate.system.as_deref() != Some(edition.system.as_str()) {
+                return Err(err("Game platform changed; search again"));
+            }
+            let mut info = crate::romfacts::list(db)?
+                .remove(edition_id)
+                .unwrap_or_default();
+            crate::romfacts::fill(&mut info, &facts);
+            crate::romfacts::add_source(&mut info, &format!("thegamesdb:{id}"));
+            crate::romfacts::upsert(db, edition_id, &info)?;
+            db.conn.execute(
+                "DELETE FROM metadata_search_reviews WHERE token=?1",
+                [token],
+            )?;
+            transaction.commit()?;
+            Ok(())
+        })?;
+        self.events.emit(crate::CoreEvent::LibraryChanged);
+        Ok(())
+    }
+
     pub fn apply_metadata_match(&self, edition_id: &str, token: &str, id: u64) -> Result<()> {
         let candidate = self.with_db(|db| reviewed(&db.conn, edition_id, token, id))?;
+        if candidate.facts.is_some() {
+            return Err(err("This is a game-details result, not an artwork match"));
+        }
         let key = self
             .key("steamgriddb")?
             .ok_or_else(|| err("SteamGridDB API key is not configured"))?;
@@ -116,6 +197,67 @@ impl Core {
         Ok(())
     }
 }
+fn fact_candidates(
+    json: &Value,
+    system: &str,
+    platform: u32,
+    genres: &std::collections::BTreeMap<u64, String>,
+) -> Vec<Candidate> {
+    json["data"]["games"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .take(100)
+        .filter_map(|game| {
+            if game["platform"].as_u64()? != u64::from(platform) {
+                return None;
+            }
+            let id = game["id"].as_u64().filter(|id| *id > 0)?;
+            let title = game["game_title"].as_str()?.trim();
+            if title.is_empty() || title.len() > 300 || title.chars().any(char::is_control) {
+                return None;
+            }
+            let genre: Vec<_> = game["genres"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(|id| genres.get(&id.as_u64()?))
+                .take(3)
+                .cloned()
+                .collect();
+            let year = game["release_date"]
+                .as_str()
+                .and_then(|s| s.get(..4))
+                .and_then(|s| s.parse::<i64>().ok())
+                .filter(|y| (1950..=2100).contains(y));
+            let description = game["overview"]
+                .as_str()
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(|s| s.chars().take(4000).collect());
+            let players = game["players"]
+                .as_i64()
+                .or_else(|| game["players"].as_str()?.parse().ok())
+                .filter(|n| (1..=16).contains(n));
+            Some(Candidate {
+                id,
+                title: title.into(),
+                system: Some(system.into()),
+                facts: Some(crate::model::GameInfo {
+                    genre: (!genre.is_empty()).then(|| genre.join(", ")),
+                    year,
+                    players,
+                    description,
+                    developer: None,
+                    publisher: None,
+                    source: format!("thegamesdb:{id}"),
+                }),
+            })
+        })
+        .take(20)
+        .collect()
+}
+
 fn reviewed(db: &rusqlite::Connection, edition: &str, token: &str, id: u64) -> Result<Candidate> {
     let (payload, created): (String, i64) = db
         .query_row(
@@ -136,6 +278,41 @@ fn reviewed(db: &rusqlite::Connection, edition: &str, token: &str, id: u64) -> R
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn facts_are_platform_scoped_and_only_fill_missing_fields() {
+        let json = serde_json::json!({"data":{"games":[
+            {"id":843,"game_title":"God of War III","platform":12,"release_date":"2010-03-16","overview":"A provider description","players":1},
+            {"id":844,"game_title":"Remastered","platform":4919,"overview":"Wrong platform"}
+        ]}});
+        let candidates = fact_candidates(&json, "ps3", 12, &Default::default());
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].facts.as_ref().unwrap().year, Some(2010));
+        let temp = tempfile::tempdir().unwrap();
+        let core = Core::open_isolated(Some(temp.path().join("data")), false).unwrap();
+        core.with_db(|db| {
+            db.conn.execute("INSERT INTO editions(id,system,scan_title,imported_at) VALUES('game','ps3','My title','2026-01-01'),('other','ps2','Other title','2026-01-01')", [])?;
+            crate::romfacts::upsert(db, "game", &crate::model::GameInfo { description: Some("My existing description".into()), developer: Some("My developer".into()), source: "manual".into(), ..Default::default() })?;
+            db.conn.execute("INSERT INTO metadata_search_reviews VALUES('review','game',?1,?2)", params![serde_json::to_string(&candidates)?, now()])?;
+            Ok(())
+        }).unwrap();
+        assert!(core.apply_game_facts("other", "review", 843).is_err());
+        assert!(core.apply_metadata_match("game", "review", 843).is_err());
+        core.apply_game_facts("game", "review", 843).unwrap();
+        let edition = core
+            .snapshot()
+            .unwrap()
+            .editions
+            .into_iter()
+            .find(|e| e.id == "game")
+            .unwrap();
+        assert_eq!(edition.title, "My title");
+        let info = edition.info.unwrap();
+        assert_eq!(info.description.as_deref(), Some("My existing description"));
+        assert_eq!(info.developer.as_deref(), Some("My developer"));
+        assert_eq!(info.year, Some(2010));
+        assert!(info.source.contains("thegamesdb:843"));
+        assert!(core.apply_game_facts("game", "review", 843).is_err());
+    }
     #[test]
     fn provider_reviews_are_bounded_edition_bound_and_expire() {
         let input = serde_json::json!({"data":[{"id":1,"name":"God of War III"},{"id":0,"name":"Invalid"},{"id":2,"name":"Bad\nname"}]});

@@ -175,7 +175,7 @@ fn year_of(text: &str) -> Option<i64> {
     (1950..=2100).contains(&y).then_some(y)
 }
 
-fn tgdb_platform(system: &str) -> Option<u32> {
+pub(crate) fn tgdb_platform(system: &str) -> Option<u32> {
     Some(match system {
         "nes" => 7,
         "snes" => 6,
@@ -186,6 +186,7 @@ fn tgdb_platform(system: &str) -> Option<u32> {
         "ds" => 8,
         "ps1" => 10,
         "ps2" => 11,
+        "ps3" => 12,
         "dreamcast" => 16,
         "genesis" => 18,
         "neogeo" => 24,
@@ -230,7 +231,7 @@ fn pick_game(json: &Value, wanted: &str, genres: &BTreeMap<u64, String>) -> Opti
     (info.description.is_some() || info.genre.is_some() || info.year.is_some()).then_some(info)
 }
 
-fn tgdb_genres(cache: &Path, key: &str) -> BTreeMap<u64, String> {
+pub(crate) fn tgdb_genres(cache: &Path, key: &str) -> BTreeMap<u64, String> {
     let file = cache.join("tgdb-genres.json");
     let known: BTreeMap<u64, String> = romart::load(&file);
     if !known.is_empty() {
@@ -272,14 +273,14 @@ fn tgdb_lookup(
     pick_game(&json, &term, genres)
 }
 
-fn fill(info: &mut GameInfo, from: &GameInfo) {
+pub(crate) fn fill(info: &mut GameInfo, from: &GameInfo) {
     macro_rules! gap {
         ($($f:ident),*) => {$( if info.$f.is_none() { info.$f = from.$f.clone(); } )*};
     }
     gap!(genre, year, developer, publisher, players, description);
 }
 
-fn add_source(info: &mut GameInfo, label: &str) {
+pub(crate) fn add_source(info: &mut GameInfo, label: &str) {
     let mut parts: Vec<&str> = info.source.split('+').filter(|s| !s.is_empty()).collect();
     if !parts.contains(&label) {
         parts.push(label);
