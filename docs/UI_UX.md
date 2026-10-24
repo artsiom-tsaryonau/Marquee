@@ -153,6 +153,16 @@ behavior. This dated checklist does not close rendered/native/controller gates.
 
 ## Presentation goals still to validate or extend
 
+The owner-selected game-page layout now follows a Steam-style media/details
+structure without commerce or reviews: compact title, a large real-media stage
+with selectable thumbnails, release information alongside it, then Play/manage
+controls with local activity. Overview and OST remain below. The shared page
+width aligns these sections; narrow windows stack the media and summary.
+Cover-only games retain the cover's proportions in the stage. Missing images
+show a labelled decorative placeholder; screenshots/trailers are not invented.
+Installation/source details remain secondary. Gallery controls and native
+desktop layout still require rendered keyboard/responsive acceptance.
+
 The artwork/details pass adds a playtime/last-played/runner strip and a larger
 cover alongside the game hero at desktop widths. Missing descriptions use an
 honest library summary with artwork/metadata/music actions rather than leaving

@@ -196,6 +196,11 @@ no additional engine download is needed for these systems.
 
 ## Soundtrack foundation — 2026-10-24
 
+The game-page layout now uses a Steam-inspired media stage/thumbnail strip,
+adjacent release summary and a Play/activity toolbar, followed by Overview/OST.
+Only available assets are shown, with contained box art when that is the only
+image. Prices, purchase panels and review sections are outside this launcher UI.
+
 The artwork slice now imports embedded music visuals or chosen local JPEG/PNG
 images, with bounded decoding and persistent source labels. Explicit game links
 provide a labelled fallback image across Music and OST views. Genesis joins the

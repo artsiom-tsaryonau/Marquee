@@ -5,7 +5,7 @@
   import { canonicalId, groupGames, editionKey, editionLabel, launchMethod, methodLabel } from '../unified';
   import { canPlay, emulatorName, gameStatus, portAction } from '../presentation';
   import { cleanTitle, ago, hours, transferLine } from '../format';
-  import Artwork from '../components/Artwork.svelte';
+  import GameMedia from '../components/GameMedia.svelte';
   import Icon from '../components/Icon.svelte';
   import Row from '../components/Row.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
@@ -74,15 +74,6 @@
   </article>
 {:else}
 <article class="page" style="--accent-h:{g.art.hue2}">
-  <div class="banner" class:cover-backdrop={!g.heroUrl}>
-    {#if g.heroUrl || g.coverUrl}
-      <img class="banner-cover" src={g.heroUrl ?? g.coverUrl} alt="" />
-    {:else}
-      <Artwork art={g.art} />
-    {/if}
-    <div class="fade"></div>
-  </div>
-
   <div class="head" in:fly={{ y: 20, duration: dur }}>
     <button class="back" data-nav onclick={() => app.back()}><Icon name="back" size={18} /> Back</button>
     {#if editing && offline}
@@ -91,7 +82,6 @@
     {:else}
       <h1 title={g.title}>{cleanTitle(g.title)}</h1>
     {/if}
-    {#if g.coverUrl}<img class="detail-poster" src={g.coverUrl} alt="{cleanTitle(g.title)} cover" />{/if}
     <p class="tagline">{platformLabel[g.platform]}{g.region ? ` · ${g.region}` : ''}{g.revision ? ` · Revision ${g.revision}` : ''}</p>
     {#if status}<p class="availability" role="status">{status.label}</p>{/if}
     {#if variants.length > 1 || g.editionLabel}
@@ -109,6 +99,22 @@
         <span>Your choice is remembered. Playtime and saves belong to this installation.</span>
       </div>
     {/if}
+    {#if g.wanted}<p class="tagline" role="status">{g.wanted === 'wishlist' ? 'On your wishlist.' : 'You own this game.'} Play unlocks when a file for it is added: scan a folder that contains it, or use archive intake. It attaches to this entry automatically.</p>{/if}
+    {#if offline && share}<p class="tagline" role="status">{transferLine(share)}</p>{/if}
+    {#if offline && (g.mediaIssue || g.setupState === 'runner_missing')}<p class="tagline" role="status">{g.mediaIssue || `${emulator} is not installed or available for this platform. Open Tools to set it up.`}</p>{/if}
+  </div>
+
+  <div class="feature-layout">
+    {#key g.id}<GameMedia game={g} />{/key}
+    <aside class="feature-summary">
+      {#if g.coverUrl && (g.heroUrl || g.screenshots?.length)}<img class="summary-cover" src={g.coverUrl} alt="{cleanTitle(g.title)} cover" />{/if}
+      {#if g.description}<p class="short-description">{g.description.length > 450 ? `${g.description.slice(0,447)}…` : g.description}</p>{:else}<p class="short-description">{cleanTitle(g.title)}{g.year ? ` · ${g.year}` : ''}<br />{platformLabel[g.platform]}</p>{/if}
+      <dl><dt>Platform</dt><dd>{platformLabel[g.platform]}</dd>{#if g.year}<dt>Released</dt><dd>{g.year}</dd>{/if}{#if g.developer}<dt>Developer</dt><dd>{g.developer}</dd>{/if}{#if g.publisher}<dt>Publisher</dt><dd>{g.publisher}</dd>{/if}{#if g.players}<dt>Players</dt><dd>{g.players}</dd>{/if}</dl>
+      {#if g.genre}<div class="genre-tag">{g.genre}</div>{/if}
+      {#if g.descriptionSource}<p class="media-credit">Details: {g.descriptionSource}</p>{/if}
+    </aside>
+  </div>
+  <div class="launch-toolbar">
     <div class="actions">
       {#if g.wanted}
         <button class="btn primary big" data-nav onclick={() => app.addGames()}><Icon name="folder" /> Add game files</button>
@@ -156,15 +162,12 @@
         <button class="btn glass" data-nav onclick={() => app.openPortFolder(port)}><Icon name="folder" /> Folder</button>
       {/if}
     </div>
-    {#if g.wanted}<p class="tagline" role="status">{g.wanted === 'wishlist' ? 'On your wishlist.' : 'You own this game.'} Play unlocks when a file for it is added: scan a folder that contains it, or use archive intake. It attaches to this entry automatically.</p>{/if}
-    {#if offline && share}<p class="tagline" role="status">{transferLine(share)}</p>{/if}
-    {#if offline && (g.mediaIssue || g.setupState === 'runner_missing')}<p class="tagline" role="status">{g.mediaIssue || `${emulator} is not installed or available for this platform. Open Tools to set it up.`}</p>{/if}
-  </div>
-
   <div class="play-strip" aria-label="Game activity">
     <div><Icon name="clock" size={19} /><span><small>PLAYTIME</small><strong>{g.source === 'catalogue' || port ? 'Not tracked' : g.playtimeMin ? hours(g.playtimeMin) : 'Not played yet'}</strong></span></div>
     <div><span><small>LAST PLAYED</small><strong>{g.lastPlayed ? ago(g.lastPlayed) : '—'}</strong></span></div>
     <div><Icon name="controller" size={19} /><span><small>PLAY WITH</small><strong>{launchVia}</strong></span></div>
+  </div>
+
   </div>
 
   <div class="game-tabs" role="tablist" tabindex="-1" aria-label="Game details" onkeydown={(event) => {
@@ -188,15 +191,8 @@
         {#if g.descriptionSource}<p class="media-credit">Description source: {g.descriptionSource}</p>{/if}
       {/if}
 
-      {#if g.screenshots?.length}
-      <h3>Screenshots</h3>
-      <div class="shots" data-nav-row>
-        {#each g.screenshots as shot}<a class="shot" href={shot.url} target="_blank" rel="noreferrer" data-nav aria-label={shot.caption}><img src={shot.url} alt={shot.caption} loading="lazy" /></a>{/each}
-      </div>
-      <p class="media-credit">{g.mediaCredit} <a href={g.mediaSource} target="_blank" rel="noreferrer" data-nav>Source gallery</a></p>
-      {/if}
       {#if !g.description && !g.screenshots?.length}
-        <section class="library-summary glass-panel"><h3>Your copy</h3><p>{platformLabel[g.platform]}{g.region ? ` · ${g.region}` : ''}{g.year ? ` · ${g.year}` : ''}</p><p class="summary-note">{g.coverUrl ? 'Artwork is available. Release details and screenshots have not been added yet.' : 'Add artwork to make this game easier to find in your library.'}</p><div class="summary-actions">{#if offline && !g.coverUrl}<button class="btn glass small" data-nav disabled={app.fetchingArt} onclick={() => app.refreshArtwork(g.id)}><Icon name="image" size={17} />{app.fetchingArt ? 'Finding artwork…' : 'Find artwork'}</button>{/if}{#if offline || g.metadata}<button class="btn glass small" data-nav onclick={showIdentification}>Review game metadata</button>{/if}<button class="btn glass small" data-nav onclick={() => tab = 'ost'}><Icon name="music" size={17} />Soundtracks</button></div></section>
+        <section class="library-summary glass-panel"><h3>Your copy</h3><p>{platformLabel[g.platform]}{g.region ? ` · ${g.region}` : ''}{g.year ? ` · ${g.year}` : ''}</p><p class="summary-note">{g.coverUrl ? 'Description and screenshots are not available for this entry yet.' : 'Add artwork to make this game easier to find in your library.'}</p><div class="summary-actions">{#if offline && !g.coverUrl}<button class="btn glass small" data-nav disabled={app.fetchingArt} onclick={() => app.refreshArtwork(g.id)}><Icon name="image" size={17} />{app.fetchingArt ? 'Finding artwork…' : 'Find artwork'}</button>{/if}{#if offline || g.metadata}<button class="btn glass small" data-nav onclick={showIdentification}>Review game metadata</button>{/if}<button class="btn glass small" data-nav onclick={() => tab = 'ost'}><Icon name="music" size={17} />Soundtracks</button></div></section>
       {/if}
       {#if g.lutris}
         <h3>Managed by Lutris</h3>
@@ -213,7 +209,7 @@
     </div>
 
     <aside class="facts glass-panel">
-      <h3>Game details</h3>
+      <h3>Installation details</h3>
       <dl>
         <dt>{g.source === 'rom' || g.source === 'port' ? 'Run method' : 'Library source'}</dt>
         <dd><span class="pill">{g.source === 'rom' || g.source === 'port' ? methodLabel[launchMethod(g)] : sourceLabel[g.source]}</span></dd>
@@ -231,10 +227,6 @@
         <dd>{launchVia}</dd>
 
         {#if g.lutris}<dt>Library provider</dt><dd>Lutris · {g.installed ? 'configured installation' : 'cached store listing'}</dd>{/if}
-        {#if g.genre}<dt>Genre</dt><dd>{g.genre}</dd>{/if}
-        {#if g.year}<dt>Released</dt><dd>{g.year}</dd>{/if}
-        {#if g.developer}<dt>Developer</dt><dd>{g.developer}</dd>{/if}
-        {#if g.publisher && g.publisher !== g.developer}<dt>Publisher</dt><dd>{g.publisher}</dd>{/if}
         {#if g.serial}
           <dt>Serial</dt>
           <dd>{g.serial}{g.region ? ` · ${g.region}` : ''}</dd>
@@ -266,6 +258,17 @@
 {/if}
 
 <style>
+  .feature-layout { display: grid; grid-template-columns: minmax(0,2.3fr) minmax(250px,1fr); gap: 24px; padding: 0 var(--gutter) 24px; max-width: 1500px; margin: 0 auto; }
+  .feature-summary { min-width: 0; padding: 4px 0; }
+  .summary-cover { width: 100%; max-height: 165px; object-fit: contain; object-position: left; margin-bottom: 12px; }
+  .short-description { font-size: 14px; line-height: 1.6; color: var(--text-soft); margin: 0 0 20px; }
+  .feature-summary dl { display: grid; grid-template-columns: 90px minmax(0,1fr); gap: 10px 12px; margin: 0; font-size: 12px; }
+  .feature-summary dt { color: var(--text-dim); } .feature-summary dd { margin: 0; color: var(--text-soft); overflow-wrap: anywhere; }
+  .genre-tag { display: inline-block; margin-top: 20px; padding: 5px 9px; border-radius: 4px; background: var(--field); color: var(--text-soft); font-size: 11px; }
+  .launch-toolbar { margin: 0 var(--gutter) 12px; padding: 18px 20px; display: flex; align-items: center; flex-wrap: wrap; gap: 20px 32px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+  .launch-toolbar .actions { margin: 0; } .launch-toolbar .play-strip { flex: 1; padding: 0; border: 0; background: transparent; gap: 18px 28px; }
+  @media(max-width:850px) { .feature-layout { grid-template-columns: 1fr; } .feature-summary { padding: 4px 0 0; } .summary-cover { display: none; } .feature-summary dl { grid-template-columns: 100px minmax(0,1fr); } }
+
   .play-strip { display: flex; align-items: center; flex-wrap: wrap; gap: 20px 40px; padding: 20px var(--gutter); background: var(--surface); border-block: 1px solid var(--line); }
   .play-strip > div { display: flex; align-items: center; gap: 10px; min-width: 110px; color: var(--text-dim); }
   .play-strip span { display: grid; gap: 6px; } .play-strip small { font-size: 10px; letter-spacing: .09em; } .play-strip strong { font-size: 13px; font-weight: 600; color: var(--text-soft); }
@@ -281,25 +284,13 @@
   .variant-picker label { display:grid; gap:8px; font-size:12px; color:var(--text-soft); }
   .variant-picker select { max-width:100%; min-height:42px; }
   .variant-picker span, .media-credit { font-size:12px; color:var(--text-dim); }
-  .shot img { width:100%; height:100%; object-fit:cover; }
   .page {
     position: relative;
     isolation: isolate;
     padding-bottom: 40px;
+    max-width: 1500px;
+    margin: 0 auto;
   }
-  .banner {
-    position: absolute;
-    inset: 0 0 auto;
-    height: clamp(320px, 48vh, 480px);
-    z-index: -1;
-    overflow: hidden;
-  }
-  .cover-backdrop .banner-cover { filter:blur(32px) saturate(.55) brightness(.45); transform:scale(1.15); }
-  h1 { margin:0; font-size:clamp(30px, 4vw, 54px); line-height:1.12; letter-spacing:-.03em; text-wrap:balance; max-width:22ch; }
-  .detail-poster { position:absolute; right:var(--gutter); bottom:28px; width:clamp(120px,16vw,190px); max-height:260px; object-fit:contain; border-radius:8px; filter:drop-shadow(0 16px 25px #0006); }
-  @media(min-width:850px) { .head:has(.detail-poster) { padding-right:calc(var(--gutter) + 230px); } }
-  @media(max-width:849px) { .detail-poster { display:none; } }
-  .head { position:relative; }
   .availability { margin:0; color:var(--warn); font-size:14px; }
   .technical { margin-top:24px; }
   .technical > summary { cursor:pointer; padding:14px 0; color:var(--text-soft); }
@@ -308,46 +299,9 @@
   .manage-actions { position:absolute; top:calc(100% + 8px); left:0; z-index:10; display:grid; gap:8px; min-width:210px; border-radius:12px; padding:10px; background:var(--surface-strong); }
   .rename-label { display:grid; gap:8px; }
   .rename-actions { display:flex; gap:8px; }
-  .banner-cover {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-  .fade {
-    position: absolute;
-    inset: 0;
-    background:
-      linear-gradient(90deg, var(--bg) 0%, color-mix(in srgb, var(--bg) 40%, transparent) 45%, transparent 75%),
-      linear-gradient(180deg, transparent 40%, var(--bg));
-  }
-  .head {
-    min-height: clamp(280px, 42vh, 430px);
-    padding: 84px var(--gutter) 28px;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    gap: 14px;
-    max-width: 1400px;
-  }
-  .back {
-    position: absolute;
-    top: 24px;
-    left: var(--gutter);
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: rgb(0 0 0 / 0.35);
-    color: #fff;
-    border: 1px solid rgb(255 255 255 / 0.15);
-    border-radius: 999px;
-    padding: 8px 14px 8px 10px;
-    font: inherit;
-    font-weight: 600;
-    cursor: pointer;
-    backdrop-filter: var(--overlay-filter);
-    -webkit-backdrop-filter: var(--overlay-filter);
-  }
+  .head { position: relative; padding: 68px var(--gutter) 24px; display: grid; gap: 12px; }
+  h1 { margin: 0; font-size: clamp(24px,2.8vw,38px); line-height: 1.2; letter-spacing: -.02em; max-width: 38ch; }
+  .back { position: absolute; top: 18px; left: var(--gutter); display: flex; align-items: center; gap: 6px; padding: 6px 0; border: 0; background: transparent; color: var(--text-soft); font: inherit; cursor: pointer; }
   .tagline {
     margin: 0;
     font-size: var(--tagline);
@@ -410,27 +364,7 @@
   .scores {
     margin-bottom: 28px;
   }
-  .shots {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 14px;
-    margin-bottom: 28px;
-  }
-  .shot {
-    aspect-ratio: 16 / 9;
-    border: 0;
-    padding: 0;
-    border-radius: 12px;
-    overflow: hidden;
-    cursor: zoom-in;
-    transition: transform 200ms var(--ease), box-shadow 200ms;
-    outline: none;
-  }
-  .shot:hover,
-  .shot:focus-visible {
-    transform: scale(1.04);
-    box-shadow: 0 0 0 2px hsl(var(--accent-h) 95% 72%), 0 0 28px hsl(var(--accent-h) 95% 60% / 0.5);
-  }
+
   .reqs {
     list-style: none;
     margin: 0;

@@ -38,3 +38,13 @@ test('launch names follow the selected emulator rather than defaulting every ROM
   assert.equal(emulatorName(game({ platform: 'ds' })), 'melonDS');
   assert.equal(emulatorName(game({ platform: 'ps2', runnerName: 'Custom PCSX2 (Marquee)' })), 'Custom PCSX2');
 });
+
+test('game media gallery orders real assets and deduplicates URLs without inventing screenshots', async () => {
+  const {gameMedia}=await import('../src/lib/gameMedia');
+  assert.deepEqual(gameMedia({title:'Sonic 2'}),[]);
+  const cover=gameMedia({title:'Sonic 2',coverUrl:'/cover.png'});
+  assert.equal(cover.length,1);assert.equal(cover[0].kind,'cover');
+  const items=gameMedia({title:'Game',heroUrl:'/hero.jpg',coverUrl:'/cover.jpg',screenshots:[{url:'/hero.jpg',caption:'duplicate'},{url:'/shot.jpg',caption:'Actual gameplay'}]});
+  assert.deepEqual(items.map(i=>i.kind),['hero','screenshot','cover']);
+  assert.equal(items[1].caption,'Actual gameplay');
+});
