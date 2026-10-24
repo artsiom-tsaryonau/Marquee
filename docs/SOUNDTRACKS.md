@@ -7,22 +7,39 @@ planned. This stays independent of [streaming acceptance](STREAMING.md).
 ## Current implementation
 
 Open a game → **OST** → **Add soundtrack**. Save an album title, optional
-composer/artist and HTTPS source page, then **Choose local files**. The native
+composer/artist and HTTPS source page, then **Add tracks**. The native
 app opens a multi-file picker. Browser mode asks for absolute paths on the
 computer running Marquee; it does not upload browser files. Tracks are added in
 filename order. MP3, FLAC, OGG and WAV are accepted for import, with extension and
 header checks. Import success does not establish complete decoding or runtime
 codec availability.
 
-**Play album** or select a track. The compact player survives navigation and
-provides native play/pause, seek, elapsed/duration and volume controls, plus
-previous/next. It skips unavailable tracks, stops at the end of an album and
+Use the album's circular **Play** control or select a track. Selecting the current
+track pauses/resumes it without fetching it again or resetting its position.
+The compact player survives navigation and provides consistent icon transport,
+seek, elapsed/duration, mute and volume controls. Previous restarts the current
+track after three seconds, otherwise selects the previous track. It skips
+unavailable tracks, stops at the end of an album and
 reports playback errors. It does not automatically play after restarting the
 launcher. Volume and **Pause when a game starts** are saved on the current
 surface. Music pauses before game/port launch and opening a stream viewer, and
 on observed local session-start events. It never resumes automatically after
 game exit or reconnect. The preference can explicitly allow music during play.
 An externally opened stream is not currently observable by this player.
+
+The 2026-10-24 controls pass replaces the browser-specific audio widget with
+Marquee controls. Track rows show ordinals that become play/pause controls on
+hover, focus or active playback; touch devices keep the icons visible. Repeated
+filename ordinals are hidden only when they match the displayed track position.
+Track removal, album editing/unlinking and player settings live in labelled
+options disclosures instead of competing with Play. Disclosures close on Escape,
+outside clicks or focus departure. All transport controls have accessible labels
+and keyboard focus, while native range inputs preserve keyboard seeking/volume.
+Only actual media duration/time events drive progress; there is no fake waveform.
+
+The output indicator **This device** describes current routing. It does not
+select an output device or automatically mix music into a game stream. See the
+[streamed launcher/audio plan](STREAMING.md#launcher-music-and-media-streaming).
 
 Use **Link an existing soundtrack** to reuse an album for another game. Existing
 explicit canonical game identities are reused; similar titles are not merged.

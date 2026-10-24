@@ -1,7 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { app } from '../state.svelte';
-  import { music } from '../music.svelte';
+  import { music, trackTitle } from '../music.svelte';
+  import Icon from './Icon.svelte';
+  import MusicMenu from './MusicMenu.svelte';
   import { asError } from '../api/core';
   import type { MusicAlbum } from '../api/contracts';
   let { gameKey, gameTitle }: { gameKey: string; gameTitle: string } = $props();
@@ -31,6 +33,10 @@
   }
   function openSource(event: MouseEvent, album: MusicAlbum) {
     if (app.api.kind === 'desktop') { event.preventDefault(); void run(() => app.api.musicOpenSource(album.id)); }
+  }
+  async function toggleAlbum(album: MusicAlbum) {
+    if (music.current?.albumId === album.id) await music.toggle(app.api);
+    else { const first = album.tracks.find(t => t.available); if (first) await music.play(app.api, album, first.id); }
   }
   async function save(event: SubmitEvent) {
     event.preventDefault();
@@ -62,8 +68,26 @@
   {#if !albums.length && !busy}<div class="glass-panel empty"><span class="disc" aria-hidden="true">♫</span><h3>Give this game a soundtrack</h3><p>Add an album, then choose its local audio files. Music keeps playing while you browse Marquee.</p><p class="hint">MP3, FLAC, OGG and WAV are accepted for import; playback depends on the decoder available in your browser or desktop runtime.</p></div>{/if}
   {#each albums as album (album.id)}<article class="glass-panel album">
     <div class="album-head"><div class="album-art" aria-hidden="true">♫</div><div class="album-info"><span class="eyebrow">SOUNDTRACK · {album.tracks.length} TRACKS</span><h3>{album.title}</h3>{#if album.artist}<p>{album.artist}</p>{/if}{#if album.source_url}<a data-nav href={album.source_url} onclick={(event) => openSource(event, album)} target="_blank" rel="noreferrer">View source ↗</a>{/if}</div></div>
-    <div class="actions"><button class="btn primary" data-nav disabled={!album.tracks.some(t => t.available)} onclick={() => { const first = album.tracks.find(t => t.available); if (first) void music.play(app.api, album, first.id); }}>Play album</button><button class="btn glass" data-nav disabled={busy} onclick={() => addFiles(album)}>Choose local files</button><button class="btn glass small" data-nav disabled={busy} onclick={() => edit(album)}>Edit details</button><button class="btn glass small" data-nav disabled={busy} onclick={() => run(() => app.api.musicLink(gameKey, album.id, false))}>Unlink from game</button></div>
-    {#if album.tracks.length}<ol class="tracks">{#each album.tracks as track (track.id)}<li class:current={music.current?.id === track.id}><button class="track" data-nav disabled={!track.available} onclick={() => music.play(app.api, album, track.id)}><span>{track.title}</span><span class="hint">{track.available ? music.current?.id === track.id ? music.paused ? 'Paused' : 'Playing' : 'Play' : 'File unavailable'}</span></button><button class="btn glass small" data-nav disabled={busy} aria-label={`Remove ${track.title} from this album`} onclick={() => run(async () => { await app.api.musicRemoveTrack(album.id, track.id); music.removed(track.id); })}>Remove</button></li>{/each}</ol>{:else}<p class="hint">No audio attached. Choose local files to build this album’s track list.</p>{/if}
+    <div class="album-actions">
+      <button class="album-play" data-nav aria-label={music.current?.albumId === album.id && (!music.paused || music.loading) ? 'Pause album' : 'Play album'} title={music.current?.albumId === album.id && (!music.paused || music.loading) ? 'Pause album' : 'Play album'} disabled={!album.tracks.some(t => t.available)} onclick={() => toggleAlbum(album)}><Icon name={music.current?.albumId === album.id && (!music.paused || music.loading) ? 'pause' : 'play'} size={25} filled /></button>
+      <button class="add-tracks" data-nav disabled={busy} title="Choose local audio files" onclick={() => addFiles(album)}><Icon name="plus" size={18} />Add tracks</button>
+      <MusicMenu label={`Album options for ${album.title}`}><button data-nav disabled={busy} onclick={() => edit(album)}><Icon name="settings" size={16} />Edit album details</button><button data-nav disabled={busy} onclick={() => run(() => app.api.musicLink(gameKey, album.id, false))}>Unlink from this game</button></MusicMenu>
+    </div>
+    {#if album.tracks.length}
+      <div class="list-heading" aria-hidden="true"><span>#</span><span>Track</span></div>
+      <ol class="tracks">{#each album.tracks as track, index (track.id)}
+        {@const current = music.current?.id === track.id}
+        {@const title = trackTitle(track.title, index + 1)}
+        <li class:current aria-current={current ? 'true' : undefined}>
+          <button class="track" data-nav disabled={!track.available} aria-label={`${current && (!music.paused || music.loading) ? 'Pause' : 'Play'} ${title}`} onclick={() => music.select(app.api, album, track.id)}>
+            <span class="track-control" aria-hidden="true"><span class="ordinal">{index + 1}</span><span class="row-icon"><Icon name={current && (!music.paused || music.loading) ? 'pause' : 'play'} size={17} filled /></span></span>
+            <span class="track-title" title={title}>{title}</span>
+            <span class="row-state">{current ? music.loading ? 'Loading…' : music.paused ? 'Paused' : 'Playing' : !track.available ? 'Unavailable' : ''}</span>
+          </button>
+          <MusicMenu label={`Options for ${title}`}><button class="danger" data-nav disabled={busy} onclick={() => run(async () => { await app.api.musicRemoveTrack(album.id, track.id); music.removed(track.id); })}>Remove from album</button></MusicMenu>
+        </li>
+      {/each}</ol>
+    {:else}<p class="hint">No audio attached. Add tracks to build this album’s track list.</p>{/if}
   </article>{/each}
   {#if unlinked.length}<form class="reuse" onsubmit={(e) => { e.preventDefault(); if (existing) void run(async () => { await app.api.musicLink(gameKey, existing, true); existing = ''; }); }}><label>Link an existing soundtrack<select data-nav bind:value={existing} disabled={busy}><option value="">Choose album</option>{#each unlinked as album}<option value={album.id}>{album.title}{album.artist ? ` · ${album.artist}` : ''}</option>{/each}</select></label><button class="btn glass" data-nav disabled={busy || !existing}>Link album</button></form>{/if}
   <p class="hint">Original files are kept intact. Removing a track or unlinking an album leaves the copied audio on disk. yt-dlp downloads, Jellyfin and automatic release matching are planned separately; source links open in your browser.</p>
@@ -79,8 +103,28 @@
   .empty { text-align: center; padding: 44px 24px; } .disc { font-size: 48px; color: var(--accent); }
   .album-art { width: 108px; height: 108px; border-radius: 16px; background: radial-gradient(circle, var(--bg) 9%, var(--accent) 10%, var(--surface) 65%); border: 1px solid var(--line); display: grid; place-items: center; font-size: 32px; }
   .album-head { margin-bottom: 24px; } .album-info { flex: 1; min-width: 180px; } .album-info h3 { font-size: 22px; } a { color: var(--text-soft); }
-  .tracks { padding-left: 28px; margin-bottom: 0; } li { padding: 8px 0; border-top: 1px solid var(--line); } li::marker { font-size: 12px; color: var(--text-dim); }
-  .track { display: inline-flex; align-items: center; justify-content: space-between; gap: 18px; width: calc(100% - 100px); text-align: left; color: inherit; background: none; border: 0; padding: 12px 10px; cursor: pointer; vertical-align: middle; }
-  .track > span:first-child { overflow-wrap: anywhere; } .current .track { color: var(--accent); } .track:disabled { opacity: .5; cursor: default; }
+  .album-actions { display: flex; align-items: center; gap: 18px; }
+  .album-play { width: 54px; height: 54px; display: grid; place-items: center; flex: 0 0 auto; border: 0; border-radius: 50%; color: white; background: var(--accent); cursor: pointer; }
+  .album-play:hover:not(:disabled) { filter: brightness(1.12); transform: scale(1.04); } .album-play:disabled { opacity: .35; cursor: default; }
+  .album-play:focus-visible, .add-tracks:focus-visible, .track:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .add-tracks { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 24px; border: 1px solid var(--line); background: transparent; color: var(--text-soft); font: inherit; font-size: 13px; cursor: pointer; }
+  .add-tracks:hover { color: var(--text); border-color: var(--text-dim); } .add-tracks:disabled { opacity: .4; cursor: default; }
+  .list-heading { display: grid; grid-template-columns: 36px 1fr; gap: 12px; padding: 22px 10px 10px; color: var(--text-dim); font-size: 11px; border-bottom: 1px solid var(--line); }
+  .list-heading span:first-child { text-align: center; } .tracks { padding: 6px 0 0; margin: 0; list-style: none; }
+  .tracks li { display: flex; align-items: center; gap: 8px; padding: 2px 6px; border-radius: 7px; min-height: 48px; }
+  .tracks li:hover, .tracks li:focus-within { background: var(--field); } .tracks li.current { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  .track { flex: 1; display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-width: 0; min-height: 44px; text-align: left; color: var(--text-soft); background: none; border: 0; padding: 4px; cursor: pointer; border-radius: 4px; font: inherit; }
+  .track-control { position: relative; display: grid; place-items: center; width: 36px; height: 30px; color: var(--text-dim); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .row-icon { position: absolute; display: none; } .track-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+  .row-state { font-size: 11px; color: var(--text-dim); } .current .track-title { color: var(--accent); }
+  .tracks li:hover .row-icon, .tracks li:focus-within .row-icon, .current .row-icon { display: flex; }
+  .tracks li:hover .ordinal, .tracks li:focus-within .ordinal, .current .ordinal { visibility: hidden; }
+  .tracks li :global(.music-menu > summary) { opacity: 0; }
+  .tracks li:hover :global(.music-menu > summary), .tracks li:focus-within :global(.music-menu > summary), .tracks li :global(.music-menu[open] > summary) { opacity: 1; }
+  .track:disabled { opacity: .45; cursor: default; }
+  @media(hover:none) { .row-icon { display: flex; } .ordinal { visibility: hidden; } .tracks li :global(.music-menu > summary) { opacity: 1; } }
+  @media(max-width:600px) { .row-state { display: none; } }
+  @media(prefers-reduced-motion:reduce) { .album-play:hover:not(:disabled) { transform: none; } }
+  :global(:root[data-motion='reduce']) .album-play:hover:not(:disabled) { transform: none; }
   .hint { color: var(--text-dim); font-size: 12px; } .error { color: var(--bad); } .reuse { display: flex; gap: 14px; flex-wrap: wrap; align-items: end; }
 </style>

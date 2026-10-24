@@ -196,6 +196,13 @@ no additional engine download is needed for these systems.
 
 ## Soundtrack foundation — 2026-10-24
 
+The player controls now use a central play/pause transport, track-row controls,
+seek/volume sliders and quieter options menus. Current-track pause/resume keeps
+position. **This device** identifies the current local output; streamed launcher
+music is a [separate hosting/routing gate](STREAMING.md#launcher-music-and-media-streaming).
+Plan a reviewed **Stream Marquee** desktop session before claiming that remote
+clients receive its OST audio. Audio-only client playback remains another track.
+
 Game details now have an **OST** tab with named albums, source attribution,
 local audio import, explicit reusable links and a persistent compact player.
 Audio uses separate records and copied media; game scanning and acquisition

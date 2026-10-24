@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { MusicPlayer } from '../src/lib/music.svelte';
+import { MusicPlayer, trackTitle, musicTime } from '../src/lib/music.svelte';
 import { commands } from '../src/lib/api/core';
 
 const album = {id:'album',title:'OST',artist:'Composer',source_url:'',tracks:[{id:'one',title:'Opening',available:true},{id:'missing',title:'Missing',available:false},{id:'two',title:'Stage',available:true}]};
 function setup() {
   const player = new MusicPlayer();
-  const output = {src:'',volume:.5,currentTime:0,plays:0,pauses:0,load(){},pause(){this.pauses++;},async play(){this.plays++;}};
+  const output = {src:'',volume:.5,muted:false,duration:120,currentTime:0,plays:0,pauses:0,loads:0,load(){this.loads++;},pause(){this.pauses++;},async play(){this.plays++;}};
   player.attach(output);
   return {player,output};
 }
@@ -41,4 +41,43 @@ test('shared transport keeps music separate from game ingestion and stores expli
   const calls=[];const api=commands(async(cmd,args)=>calls.push([cmd,args]));
   await api.musicImport('album',['/audio/01.mp3']);await api.musicLink('game','album',false);
   assert.deepEqual(calls,[['music_import',{album_id:'album',paths:['/audio/01.mp3']}],['music_unlink',{game_key:'game',album_id:'album'}]]);
+});
+
+test('selecting the current track toggles pause and resume without resetting seek or fetching again', async () => {
+  const {player,output}=setup();let requests=0;
+  const api={musicUrl:async()=>{requests++;return '/music/one';}};
+  await player.select(api,album,'one');output.currentTime=42;player.syncTime();
+  await player.select(api,album,'one');assert.equal(player.paused,true);assert.equal(output.currentTime,42);
+  await player.select(api,album,'one');assert.equal(player.paused,false);assert.equal(output.currentTime,42);
+  assert.equal(requests,1);assert.equal(output.loads,1);assert.equal(output.plays,2);
+});
+test('seek clamps to real duration and previous restarts after three seconds', async () => {
+  const {player,output}=setup();const api={musicUrl:async id=>'/music/'+id};
+  await player.play(api,album,'two');output.currentTime=10;player.syncTime();
+  await player.previous(api);assert.equal(player.current.id,'two');assert.equal(output.currentTime,0);
+  player.seek(-5);assert.equal(output.currentTime,0);player.seek(500);assert.equal(output.currentTime,120);
+  player.seek(Number.NaN);assert.equal(output.currentTime,120);
+  player.seek(1);await player.previous(api);assert.equal(player.current.id,'one');
+  output.duration=Number.POSITIVE_INFINITY;player.syncTime();assert.equal(player.duration,0);
+});
+test('volume preserves the last audible level and zero-volume unmute restores it', () => {
+  const {player,output}=setup();player.setVolume(.4);player.toggleMute();assert.equal(output.muted,true);
+  player.toggleMute();assert.equal(output.muted,false);assert.equal(output.volume,.4);
+  player.setVolume(0);player.toggleMute();assert.equal(output.volume,.4);assert.equal(output.muted,false);
+  player.setVolume(5);assert.equal(output.volume,1);player.setVolume(Number.NaN);assert.equal(output.volume,1);
+});
+test('display names remove only matching ordinals and time labels reject nonfinite metadata', () => {
+  assert.equal(trackTitle('001 Title Theme',1),'Title Theme');assert.equal(trackTitle('002 Emerald Hill',2),'Emerald Hill');
+  assert.equal(trackTitle('007 James Bond',1),'007 James Bond');assert.equal(trackTitle('2048',1),'2048');
+  assert.equal(musicTime(142.9),'2:22');assert.equal(musicTime(Number.POSITIVE_INFINITY),'0:00');assert.equal(musicTime(-4),'0:00');
+});
+
+test('resuming after cancelling another track load cannot play the previous track under new metadata', async () => {
+  const {player,output}=setup();let finish;
+  await player.play({musicUrl:async()=>'/music/one'},album,'one');
+  const pending=player.play({musicUrl:()=>new Promise(resolve=>finish=resolve)},album,'two');
+  player.pause();finish('/music/two');await pending;
+  assert.equal(output.src,'/music/one');
+  await player.toggle({musicUrl:async()=>'/music/two'});
+  assert.equal(output.src,'/music/two');assert.equal(player.current.id,'two');assert.equal(output.plays,2);
 });

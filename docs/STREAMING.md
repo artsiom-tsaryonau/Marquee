@@ -163,6 +163,38 @@ probe. Local documentation links and whitespace checks passed.
 
 ## ST2 — Fedora-to-itself streaming
 
+### Launcher music and media streaming
+
+The OST player currently renders audio on the device running that player. The
+validated Wolf pilot streams BlastEm inside a private desktop/audio session;
+the ordinary Fedora Marquee launcher is outside it. Connecting Moonlight to that
+game does not include the launcher's OST audio. The current receiver integration
+also does not remotely expose the full Marquee launcher or its music controls.
+
+A future **Stream Marquee** entry should run the launcher inside a reviewed
+virtual desktop and route its audio into that session's private sink. The viewer
+would receive launcher UI and music as part of its video/audio stream, similar
+to using a Sunshine/Apollo desktop session with the player on its captured output.
+Do not route the entire physical desktop or unrelated apps into the current
+isolated game sink as an implicit shortcut.
+
+Before this ships, prove launcher rendering in Wolf, remote player input,
+audio routing without feedback/double playback, explicit library/save ownership,
+game launch handoff, pause/mix policy, receiver loss/reconnect and clean exit.
+The default pause-on-game policy must remain explicit. Same-session music and
+game mixing is an opt-in capability after routing acceptance, not a new UI toggle
+that claims the current pilot can already do it.
+
+Audio-only playback is a separate option: stream stored music to an authenticated
+client player, without encoding a desktop video stream. Current music URLs are
+loopback-only and do not provide a LAN/Internet music service. That path needs
+authentication/TLS, library/media access scopes and remote seek/reconnect tests;
+Jellyfin can supply a distinct optional server-backed music integration. A remote
+control-only interface and direct playback on the client are different modes.
+
+References: [Wolf virtual audio](https://games-on-whales.github.io/wolf/stable/dev/how-it-works.html#virtual-audio),
+[Sunshine audio sink configuration](https://docs.lizardbyte.dev/projects/sunshine/latest/md_docs_2configuration.html).
+
 ### ST2a progress — 2026-10-24
 
 The optional native `streaming receiver-install` command now downloads the pinned
