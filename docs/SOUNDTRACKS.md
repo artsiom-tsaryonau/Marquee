@@ -45,9 +45,12 @@ Only actual media duration/time events drive progress; there is no fake waveform
 
 Music has its own accent under **Settings → Appearance → Music accent**. Mint is
 the default; presets and a custom color are saved on this surface independently
-of the game Play accent. Music play/pause controls are circular and 48 px in both
-the album and compact player; secondary transport controls are 40 px (44 px on
-coarse pointers). Contrast-adjusted icons and selected-track text keep custom colors
+of the game Play accent. Album Play is circular and 48 px. The compact player
+uses a Spotify-inspired 32 px circle, sharp rectangular pause bars and filled
+previous/next glyphs; transport targets increase to 44 px on coarse pointers and
+48 px in Big Screen. Secondary compact controls are normally 40 px.
+Filled transport glyphs omit the rounded outline stroke that previously distorted the
+pause bars. Contrast-adjusted icons and selected-track text keep custom colors
 readable. The song list separates title/artist, album and duration; small screens
 hide the repeated album column. The playing indicator respects reduced motion.
 

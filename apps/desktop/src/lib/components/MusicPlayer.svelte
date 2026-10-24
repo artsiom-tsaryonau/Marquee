@@ -40,9 +40,9 @@
   </div>
   <div class="center">
     <div class="transport">
-      <button class="control" data-nav aria-label="Previous track or restart" title="Previous track · restart after 3 seconds" disabled={music.loading} onclick={() => music.previous(app.api)}><Icon name="previous" size={20} /></button>
-      <button class="control primary-play" class:loading={music.loading} data-nav aria-label={music.loading ? 'Cancel loading' : music.paused ? 'Play soundtrack' : 'Pause soundtrack'} title={music.loading ? 'Cancel loading' : music.paused ? 'Play' : 'Pause'} onclick={() => music.toggle(app.api)}><Icon name={music.loading || !music.paused ? 'pause' : 'play'} size={21} filled /></button>
-      <button class="control" data-nav aria-label="Next track" title="Next track" disabled={music.loading || music.index >= music.queue.length - 1} onclick={() => music.next(app.api)}><Icon name="next" size={20} /></button>
+      <button class="control" data-nav aria-label="Previous track or restart" title="Previous track · restart after 3 seconds" disabled={music.loading} onclick={() => music.previous(app.api)}><Icon name="previous" size={18} filled /></button>
+      <button class="control primary-play" class:loading={music.loading} data-nav aria-label={music.loading ? 'Cancel loading' : music.paused ? 'Play soundtrack' : 'Pause soundtrack'} title={music.loading ? 'Cancel loading' : music.paused ? 'Play' : 'Pause'} onclick={() => music.toggle(app.api)}><Icon name={music.loading || !music.paused ? 'pause' : 'play'} size={18} filled /></button>
+      <button class="control" data-nav aria-label="Next track" title="Next track" disabled={music.loading || music.index >= music.queue.length - 1} onclick={() => music.next(app.api)}><Icon name="next" size={18} filled /></button>
     </div>
     <div class="timeline">
       <span aria-hidden="true">{musicTime(music.position)}</span>
@@ -75,7 +75,9 @@
   .center { display: grid; gap: 8px; min-width: 0; } .transport { display: flex; align-items: center; justify-content: center; gap: 18px; }
   .control { flex: 0 0 auto; display: grid; place-items: center; width: var(--music-control-size); height: var(--music-control-size); padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--text-dim); cursor: pointer; }
   .control:hover:not(:disabled) { color: var(--text); background: var(--field); } .control:disabled { opacity: .3; cursor: default; }
-  .control:focus-visible { outline: 2px solid var(--music-text); outline-offset: 3px; } .primary-play { width: var(--music-play-size); height: var(--music-play-size); color: var(--music-ink); background: var(--music-accent); }
+  .control:focus-visible { outline: 2px solid var(--music-text); outline-offset: 3px; } .primary-play { width: 32px; height: 32px; color: var(--music-ink); background: var(--music-accent); }
+  .transport { min-height: 40px; gap: 16px; }
+  :global(:root[data-mode='big']) .transport .control { width: 48px; height: 48px; }
   .primary-play:hover:not(:disabled) { color: var(--music-ink); background: var(--music-accent); transform: scale(1.05); } .loading { box-shadow: 0 0 0 3px color-mix(in srgb, var(--music-accent) 60%, transparent); }
   .timeline { display: flex; align-items: center; gap: 10px; } .timeline span { min-width: 34px; color: var(--text-dim); font-size: 11px; font-variant-numeric: tabular-nums; text-align: center; }
   input[type='range'] { appearance: none; -webkit-appearance: none; min-width: 0; height: 24px; padding: 0; margin: 0; background: transparent; cursor: pointer; }
@@ -88,7 +90,7 @@
   .utilities { display: flex; align-items: center; gap: 5px; } .volume { width: 80px; } .message { grid-column: 1 / -1; margin: 0; font-size: 12px; color: var(--text-dim); } .error { color: var(--bad); }
   @media(max-width:900px) { .music-player { grid-template-columns: minmax(110px, 1fr) minmax(210px, 1.4fr); } .right { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; width: 100%; } }
   @media(max-width:560px) { .music-player { padding: 12px; gap: 12px; grid-template-columns: 1fr; } .record { width: var(--music-control-size); height: var(--music-control-size); } }
-  @media(pointer:coarse) { .control:not(.primary-play) { width: 44px; height: 44px; } input[type='range'] { height: 36px; } }
+  @media(pointer:coarse) { .control { width: 44px; height: 44px; } input[type='range'] { height: 36px; } }
   @media(prefers-reduced-motion:reduce) { .primary-play:hover:not(:disabled) { transform: none; } }
   :global(:root[data-motion='reduce']) .primary-play:hover:not(:disabled) { transform: none; }
 </style>

@@ -22,9 +22,9 @@
     back: 'M15 5l-7 7 7 7',
     sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4',
     moon: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
-    pause: 'M8 5h3v14H8zM13 5h3v14h-3z',
-    previous: 'M6 5v14M18 5 8 12l10 7z',
-    next: 'M18 5v14M6 5l10 7-10 7z',
+    pause: 'M7 5h4v14H7zM13 5h4v14h-4z',
+    previous: 'M5 5h2v14H5zM19 5 8 12l11 7z',
+    next: 'M17 5h2v14h-2zM5 5l11 7-11 7z',
     volume: 'M4 9v6h4l5 4V5L8 9zM16 8a6 6 0 0 1 0 8M19 5a10 10 0 0 1 0 14',
     muted: 'M4 9v6h4l5 4V5L8 9zM17 9l5 6M22 9l-5 6',
     more: 'M5 12h.01M12 12h.01M19 12h.01',
@@ -45,5 +45,5 @@
 </script>
 
 <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-  <path d={paths[name]} fill={filled || name === 'play' ? 'currentColor' : 'none'} />
+  <path d={paths[name]} fill={filled || name === 'play' ? 'currentColor' : 'none'} stroke={name === 'play' || filled && ['pause', 'previous', 'next'].includes(name) ? 'none' : undefined} />
 </svg>
