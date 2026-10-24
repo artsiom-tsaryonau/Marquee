@@ -38,7 +38,7 @@
           <p class="path">{item.path}</p>
           {#if item.metadata}<dl><dt>Title ID</dt><dd>{item.metadata.title_id}</dd><dt>Content category</dt><dd>{item.metadata.category} · {names[item.kind]}</dd>{#if item.metadata.app_version}<dt>Version</dt><dd>{item.metadata.app_version}</dd>{/if}<dt>Boot file</dt><dd>{item.boot_file_present ? 'Present; not launched' : 'Not found in this layout'}</dd><dt>Artwork</dt><dd>{item.artwork_present ? 'ICON0.PNG present; not decoded' : 'Not found'}</dd></dl>{/if}
           {#if item.bytes !== null}<p>{bytes(item.bytes)}</p>{/if}
-          {#if item.kind==='disc_image'&&report.source_kind!=='archive'}<button class="btn glass small" data-nav disabled={busy} onclick={()=>add(item.path)}>Add disc to Games</button><p>Registers a verified disc. RPCS3 launch remains pending validation.</p>{/if}
+          {#if item.kind==='disc_image'&&report.source_kind!=='archive'}<button class="btn glass small" data-nav disabled={busy} onclick={()=>add(item.path)}>Add disc to Games</button><p>Registers a verified disc for RPCS3. Install firmware through Firmware setup before playing.</p>{/if}
           <p class="status">{item.status}</p><p>{item.next_action}</p>
         </article>
       {/each}

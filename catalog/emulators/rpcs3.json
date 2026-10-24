@@ -9,7 +9,7 @@
   "asset_excludes": [],
   "binary": "AppRun",
   "config_subdir": "rpcs3",
-  "requirement": "PS3 firmware must be installed through Firmware setup. A stored PUP alone is not ready. PS3 content discovery is available; library Play remains in development.",
+  "requirement": "Install PS3 firmware through Firmware setup. Verified base-disc ISOs launch directly in the managed RPCS3 profile; game compatibility varies.",
   "firmware": [
     {
       "name": "PS3UPDAT.PUP",
@@ -18,5 +18,13 @@
       "dir": "rpcs3/firmware",
       "note": "Use reviewed Firmware setup to install this package into RPCS3. Files in the inbox are stored packages, not proof of installed firmware."
     }
+  ],
+  "kind": "emulator",
+  "launch": [
+    "--no-gui",
+    "{rom}"
+  ],
+  "fullscreen_args": [
+    "--fullscreen"
   ]
 }

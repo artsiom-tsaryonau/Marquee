@@ -104,9 +104,11 @@ test('GB defaults and per-game overrides use compatible engines without hiding a
   assert.equal(pickRunner(snap,'gb',mesen.id).id,mesen.id);
 });
 
- test('registered PS3 discs are visible but never claim PCSX2 or playable readiness',async()=>{
+ test('PS3 discs require an RPCS3 runner and never claim PCSX2 readiness',async()=>{
  const {editionToGame}=await import('../src/lib/api/map');
  const snap={runners:[],settings:{},roots:[],media:[{id:'disc',kind:'ps3_iso',path:'/game.iso',available:true}]};
  const entry=editionToGame({id:'gow3',system:'ps3',title:'God of War III',media_id:'disc',missing:false,playtime_seconds:0},snap);
- assert.equal(entry.platform,'ps3');assert.equal(entry.installed,true);assert.equal(canPlay(entry),false);assert.match(gameStatus(entry).label,/launch integration pending/i);assert.equal(emulatorName(entry),'RPCS3');
+ assert.equal(entry.platform,'ps3');assert.equal(entry.installed,true);assert.equal(canPlay(entry),false);assert.match(gameStatus(entry).label,/install|setup|emulator/i);assert.equal(emulatorName(entry),'RPCS3');
+ const ready=editionToGame({id:'gow3',system:'ps3',title:'God of War III',media_id:'disc',missing:false,playtime_seconds:0},{...snap,runners:[{id:'runner.rpcs3.marquee',kind:'emulator',systems:['ps3'],available:true,bios_state:'unverified',source:'marquee'}]});
+ assert.equal(canPlay(ready),true);assert.equal(ready.runnerId,'runner.rpcs3.marquee');
  });

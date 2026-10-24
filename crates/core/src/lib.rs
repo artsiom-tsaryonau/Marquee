@@ -260,6 +260,7 @@ impl Core {
         extra_args: &[String],
         sink: Arc<dyn EventSink>,
     ) -> Result<Session> {
+        self.prepare_ps3_launch(edition_id)?;
         // Hands-off setup: pick up any BIOS dropped into the inbox folder.
         let inbox = self
             .with_db(|db| db.get_setting("bios_inbox"))

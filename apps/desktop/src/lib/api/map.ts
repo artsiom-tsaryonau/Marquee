@@ -9,7 +9,7 @@ import { webToken } from './http';
 
 /** Cartridge/disc systems run by a catalogue emulator (mirrors `catalog/systems/*.json`). */
 const SYSTEM_EMULATOR: Record<string, string> = {
-  genesis: 'blastem', ds: 'melonds', neogeo: 'fbneo', dreamcast: 'flycast', nes: 'mesen', snes: 'mesen', gb: 'mesen', gbc: 'mesen', pce: 'mesen', n64: 'rmg',
+  ps3: 'rpcs3', genesis: 'blastem', ds: 'melonds', neogeo: 'fbneo', dreamcast: 'flycast', nes: 'mesen', snes: 'mesen', gb: 'mesen', gbc: 'mesen', pce: 'mesen', n64: 'rmg',
 };
 /** Backend system id -> UI platform id. */
 const PLATFORM: Record<string, GameEntry['platform']> = {
@@ -68,7 +68,6 @@ export function editionToGame(edition: Edition, snap: LibrarySnapshot): GameEntr
     wanted: edition.wanted ?? undefined,
     rootOffline,
     setupState,
-    launchPending: edition.system==='ps3'?'RPCS3 launch integration pending':undefined,
     runnerId: runner?.id,
     runnerName: runner?.display_name,
     mediaIssue: media?.skip_reason ?? undefined,

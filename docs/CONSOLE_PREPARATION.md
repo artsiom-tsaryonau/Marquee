@@ -19,7 +19,7 @@ platform identifiers without providing import or launch support.
 | Platform / proposed ID | Existing tool entry | Missing before library Play |
 | --- | --- | --- |
 | Nintendo Switch / `switch` | No managed emulator entry found | Select and validate a runner; content inventory, prerequisites, installation/launch adapter and live evidence |
-| PlayStation 3 / `ps3` | RPCS3 managed install/open, read-only discovery, reviewed manager-owned firmware setup | Content/installed-title inventory, package or image/folder preparation, launch/profile/save mapping |
+| PlayStation 3 / `ps3` | RPCS3 managed install/open, read-only discovery, reviewed manager-owned firmware setup | Verified ISO registration and direct launch implemented; live acceptance, broader package preparation and edition relationships remain |
 | PlayStation 4 / `ps4` | shadPS4 managed install/open, experimental | Package or prepared-folder inspection, title/version relationships, explicit supported install method and per-game launch/validation |
 | Original Xbox / `xbox` | xemu managed install/open; BIOS/MCPX/HDD requirements recorded | Firmware/HDD configuration, input format inspection, tested conversion only when needed, library/launch/save adapter |
 | Xbox 360 / `xbox360` | No managed emulator entry found | Select and validate a runner on the target Linux host; content inventory, setup, launch and compatibility evidence |
@@ -38,7 +38,7 @@ platforms. Full paths/sizes and ZIP-header summaries are in ignored
 
 | Platform | Observed source shape | Preparation status |
 | --- | --- | --- |
-| PS3 | God of War III `.7z`, 35,786,199,527 bytes; headers contain a 38,169,870,336-byte `.dec.iso` plus text | Read-only header inspection implemented; title ID/encryption unverified, no extraction or PS3 game adapter |
+| PS3 | God of War III `.7z`, 35,786,199,527 bytes; headers contain a 38,169,870,336-byte `.dec.iso` plus text | Explicitly unpacked; verified BCUS98111 ISO registered and launched directly through RPCS3; gameplay acceptance pending |
 | PS4 | The Last of Us Remastered `.pkg.rar`, about 47.2 GB; separate Shadow of the Colossus `.torrent` metadata | Filename is only a format hint; RAR payload/torrent files not installed or fetched |
 | Switch | Firmware ZIP containing `.nca`; Nightshade ZIP containing `.nsp`; Zelda base ZIP containing `.xci` plus `.url`; separate DLC ZIP containing `.nsp`; two `.keys` files | Containers recorded separately; no base/update/DLC identity or key validity inferred |
 | Xbox | Splinter Cell `.iso.rar`, about 6.3 GB | Inner layout not inspected; requires xemu-specific format/configuration work |
@@ -55,7 +55,7 @@ read-only archive and folder inspection. It does not close the broader inventory
 preparation or launch gates below. Reviewed firmware setup is implemented with
 isolated staging and output receipts; see the same PS3 page for live evidence. The supplied archive contains an ISO,
 so its next recipe needs image/filesystem inspection rather than assuming a loose
-PS3_GAME folder. No source payload was extracted.
+PS3_GAME folder. The owner later authorized unpacking; its verified BCUS98111 ISO now uses the direct launch adapter.
 
 ## P0 — Read-only inventory (in progress)
 

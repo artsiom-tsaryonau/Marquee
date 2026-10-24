@@ -105,9 +105,6 @@ pub fn emulator_runner_for(system: &str) -> Option<String> {
 
 /// Compatibility comes from reviewed system descriptors, never executable names.
 pub fn compatible(runner: &Runner, system: &str) -> bool {
-    if system == "ps3" {
-        return false;
-    }
     if let Ok(desc) = crate::catalog::by_id(system) {
         if let Some(default) = desc.emulator {
             return runner.kind == RunnerKind::Emulator
@@ -125,9 +122,6 @@ fn compatible_systems(id: &str, kind: &RunnerKind) -> Vec<String> {
         .unwrap_or_default()
         .into_iter()
         .filter(|d| {
-            if d.id == "ps3" {
-                return false;
-            }
             if let Some(default) = &d.emulator {
                 *kind == RunnerKind::Emulator
                     && std::iter::once(default)

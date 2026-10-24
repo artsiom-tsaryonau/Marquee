@@ -78,7 +78,7 @@ streamed/controller acceptance.
 | BlastEm | Genesis / Mega Drive | Pinned source build and direct cartridge launch; no BIOS |
 | DuckStation | PS1 | Managed lifecycle plus library-disc launch adapter |
 | PPSSPP | PSP | Managed lifecycle and standalone opening |
-| RPCS3 | PS3 | Managed lifecycle/standalone opening, [PS3 discovery, reviewed firmware setup and verified ISO registration](PS3.md); library Play remains open |
+| RPCS3 | PS3 | Managed lifecycle/standalone opening, [PS3 discovery, reviewed firmware setup and verified ISO registration](PS3.md); direct ISO Library Play implemented; live game acceptance pending |
 | Flycast | Dreamcast | Managed lifecycle and generic disc adapter; live game acceptance separate |
 | Azahar | Nintendo 3DS | Managed lifecycle and standalone opening |
 | Cemu | Wii U | Managed lifecycle and standalone opening |
@@ -259,7 +259,7 @@ Upstream source/docs checked 2026-10-21. Three distinct capabilities:
 | PCSX2 | [`-nogui`](https://github.com/PCSX2/pcsx2/blob/master/pcsx2-qt/QtHost.cpp) hides the main window and implies batch. | Library argv: `-batch -fullscreen -nogui -- <disc>`. Not displayless; real launch/exit is a live gate. |
 | DuckStation | [`-nogui`](https://github.com/stenzek/duckstation/blob/master/src/duckstation-qt/qthost.cpp) hides the main window, exits on shutdown. | Library argv: `-batch -fullscreen -nogui <disc>`. Needs a display and working BIOS. |
 | mGBA | Separate [Qt](https://github.com/mgba-emu/mgba/blob/0.10.5/src/platform/qt/main.cpp) and [SDL](https://github.com/mgba-emu/mgba/blob/0.10.5/src/platform/sdl/main.c) frontends; `-f` is fullscreen. | Source pilot builds both. Open selects Qt; `--marquee-sdl -f <game>` selects the game-only frontend. GB/GBC library Play uses Qt with the game path; no displayless mode. |
-| RPCS3 | [CLI](https://github.com/RPCS3/rpcs3/blob/master/rpcs3/rpcs3.cpp): `--no-gui`, `--fullscreen`, `--headless`; all need a boot target. | Standalone only. A PS3 adapter should use no-gui plus firmware/install checks. |
+| RPCS3 | [CLI](https://github.com/RPCS3/rpcs3/blob/master/rpcs3/rpcs3.cpp): `--no-gui`, `--fullscreen`, `--headless`; all need a boot target. | Library Play uses no-gui with verified ISO identity and installed-firmware checks; configuration remains separate. |
 | Dolphin | [NoGUI frontend](https://github.com/dolphin-emu/dolphin/blob/master/Source/Core/DolphinNoGUI/MainNoGUI.cpp) accepts `x11` or `headless`; may still open a game window. | No recipe or adapter yet. Don't assume a Wayland NoGUI backend. |
 | Cemu | [LaunchSettings](https://github.com/cemu-project/Cemu/blob/main/src/config/LaunchSettings.cpp): `-g <game>`, `-f`. | No generic no-GUI option found. Standalone only. |
 | PPSSPP | [CLI parser](https://github.com/hrydgard/ppsspp/blob/master/Core/CmdLine.cpp) and [SDL frontend](https://github.com/hrydgard/ppsspp/blob/master/SDL/SDLMain.cpp) handle boot/fullscreen. | Standalone only. Confirm flags against the installed release. |

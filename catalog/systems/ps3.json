@@ -1,5 +1,16 @@
 {
-  "id":"ps3", "display_name":"PlayStation 3",
-  "supported_extensions":["iso"], "skipped_extensions":["pkg","7z","zip","rar"],
-  "runner_kind":"rpcs3", "notes":"Verified ISO library registration and Media links. RPCS3 library launch remains pending validation."
+  "id": "ps3",
+  "display_name": "PlayStation 3",
+  "supported_extensions": [
+    "iso"
+  ],
+  "skipped_extensions": [
+    "pkg",
+    "7z",
+    "zip",
+    "rar"
+  ],
+  "runner_kind": "emulator",
+  "notes": "Verified base-disc ISO registration and direct RPCS3 launch. PKG, licenses and encrypted-image preparation remain unsupported.",
+  "emulator": "rpcs3"
 }

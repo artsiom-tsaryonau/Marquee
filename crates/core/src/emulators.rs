@@ -426,7 +426,7 @@ pub fn info(
             "fbneo" => "Library Play passes a zipped Neo Geo ROM set to the SDL2 frontend. A matching BIOS and any parent sets must be beside the game. F12 exits; Tab opens in-game controls. A display is required.",
             "duckstation" => "Library Play hides the main window with -nogui and shows the game fullscreen. A display is still required.",
             "mgba" => "Open uses Qt. To launch only the game window, add --marquee-sdl, -f, then an absolute game path as separate arguments. GB/GBC library Play uses Qt with the selected game. SDL is an optional game-only frontend; neither is displayless emulation.",
-            "rpcs3" => "Upstream supports --no-gui --fullscreen with a boot target, and a separate --headless mode. Marquee currently opens the tool; it has no PS3 game adapter.",
+            "rpcs3" => "Library Play uses --no-gui with a verified base-disc ISO and the managed firmware/save profile. Tools opens RPCS3 configuration separately.",
             "shadps4" => "Experimental. Marquee installs the official Linux SDL build and opens Big Picture mode. No PS4 library adapter or automated firmware flow yet.",
             "kytyps5" => "Experimental research runner. Marquee unpacks the published Linux tarball and opens kyty_launcher. Compatibility and config paths are upstream-defined.",
             _ => "Marquee currently opens this emulator’s own interface. Direct game launch and displayless execution need a separate verified adapter; no generic headless flag is applied.",
@@ -1269,6 +1269,7 @@ mod tests {
             kinds,
             [
                 "duckstation",
+                "emulator",
                 "emulator",
                 "emulator",
                 "emulator",

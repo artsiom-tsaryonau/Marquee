@@ -439,7 +439,71 @@ pub fn inspect_disc_metadata(path: &Path) -> Result<Metadata> {
     }
     Ok(metadata)
 }
+fn firmware_number(raw: &str) -> Result<u32> {
+    let (major, minor) = raw
+        .trim()
+        .split_once('.')
+        .ok_or_else(|| invalid("Invalid firmware version"))?;
+    if minor.is_empty() || minor.len() > 4 || !minor.bytes().all(|c| c.is_ascii_digit()) {
+        return Err(invalid("Invalid firmware version"));
+    }
+    let minor = minor.trim_end_matches('0');
+    let minor = format!("{minor:0<3}");
+    if major.is_empty()
+        || !major.bytes().all(|c| c.is_ascii_digit())
+        || minor.len() > 3
+        || !minor.bytes().all(|c| c.is_ascii_digit())
+    {
+        return Err(invalid("Invalid firmware version"));
+    }
+    let major: u32 = major
+        .parse()
+        .map_err(|_| invalid("Invalid firmware version"))?;
+    major
+        .checked_mul(1000)
+        .and_then(|v| v.checked_add(minor.parse::<u32>().ok()?))
+        .ok_or_else(|| invalid("Invalid firmware version"))
+}
 impl crate::Core {
+    /// Revalidate the current disc and installed firmware before creating a session.
+    pub(crate) fn prepare_ps3_launch(&self, edition_id: &str) -> Result<()> {
+        let media = self.with_db(|db| {
+            let edition = db.edition_by_id(edition_id)?;
+            if edition.is_none_or(|e| e.system != "ps3") {
+                return Ok(None);
+            }
+            crate::library::find_media_for_edition(db, edition_id)
+        })?;
+        let Some(media) = media else {
+            return Ok(());
+        };
+        self.require_ps3_setup_idle("rpcs3")?;
+        let version = marquee_manager::ps3_firmware::installed_version(&self.paths.data_dir)?
+            .ok_or_else(|| {
+                crate::AppError::new(
+                    "PS3_FIRMWARE_MISSING",
+                    "Install PS3 firmware through Tools → RPCS3 → Firmware setup before playing",
+                )
+            })?;
+        let metadata = inspect_disc_metadata(&media.path)?;
+        if media.serial.as_deref() != Some(metadata.title_id.as_str()) {
+            return Err(invalid(
+                "Disc identity changed; rescan this game before playing",
+            ));
+        }
+        if let Some(required) = metadata.system_version.as_deref() {
+            if firmware_number(&version)? < firmware_number(required)? {
+                return Err(crate::AppError::new(
+                    "PS3_FIRMWARE_OLD",
+                    format!("Game requires firmware {required}; installed version is {version}"),
+                ));
+            }
+        }
+        for dir in ["xdg-config", "xdg-data", "xdg-cache"] {
+            fs::create_dir_all(self.paths.data_dir.join("rpcs3").join(dir))?;
+        }
+        Ok(())
+    }
     pub fn import_ps3_disc(&self, path: &Path) -> Result<String> {
         let metadata = inspect_disc_metadata(path)?;
         let path = std::fs::canonicalize(path)?;
@@ -573,7 +637,44 @@ mod tests {
         fs::write(path, bytes).unwrap();
     }
     #[test]
-    fn ps3_disc_registration_is_idempotent_and_linkable_but_cannot_launch_yet() {
+    fn firmware_comparison_and_rpc3_launch_recipe() {
+        assert!(firmware_number("4.93").unwrap() > firmware_number("04.2100").unwrap());
+        for invalid in ["4.", "bad", "4.abc", "4.9999"] {
+            assert!(firmware_number(invalid).is_err());
+        }
+        let def = crate::emulators::find("rpcs3").unwrap();
+        assert_eq!(def.kind.as_deref(), Some("emulator"));
+        let runner = crate::model::Runner {
+            id: crate::emulators::runner_id("rpcs3"),
+            kind: crate::model::RunnerKind::Emulator,
+            display_name: "RPCS3".into(),
+            command: vec!["/RPCS3/AppRun".into()],
+            bios_state: crate::model::BiosState::Unverified,
+            bios_hint: None,
+            source: "marquee".into(),
+            available: true,
+            systems: vec!["ps3".into()],
+        };
+        assert!(crate::runners::compatible(&runner, "ps3"));
+        assert!(!crate::runners::compatible(&runner, "ps2"));
+        assert_eq!(
+            crate::runners::launch_argv(
+                &runner,
+                Path::new("/games/God of War III.iso"),
+                &[],
+                false
+            )
+            .unwrap(),
+            ["/RPCS3/AppRun", "--no-gui", "/games/God of War III.iso"]
+        );
+        assert!(
+            crate::runners::launch_argv(&runner, Path::new("/game.iso"), &[], true)
+                .unwrap()
+                .contains(&"--fullscreen".into())
+        );
+    }
+    #[test]
+    fn ps3_disc_registration_is_idempotent_and_requires_installed_firmware() {
         let t = tempfile::tempdir().unwrap();
         let p = t.path().join("disc.iso");
         disc_iso(&p, "DG");
@@ -593,7 +694,7 @@ mod tests {
         assert_eq!(snap.media[0].kind, crate::model::MediaKind::Ps3Iso);
         assert_eq!(
             core.launch(&id, &[], core.hub()).unwrap_err().code,
-            "PS3_LAUNCH_PENDING"
+            "PS3_FIRMWARE_MISSING"
         );
         let collection = core.media_create("Extras", None).unwrap();
         core.media_link(&collection, &id, true).unwrap();

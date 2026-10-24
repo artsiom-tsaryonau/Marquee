@@ -1,7 +1,7 @@
 # PS3 integration
 
-Updated 2026-10-25. **Discovery, reviewed firmware setup and verified ISO library registration; PS3 Library Play is not implemented.**
-RPCS3 remains a managed standalone tool. This page records the staged PS3 work
+Updated 2026-10-25. **Discovery, reviewed firmware setup, verified ISO registration and direct RPCS3 Library Play are implemented. Live game acceptance is in progress.**
+RPCS3 uses a managed profile for Library Play and separate standalone configuration. This page records the staged PS3 work
 under [console preparation](CONSOLE_PREPARATION.md).
 
 ## P3-0 — Read-only discovery (implemented)
@@ -185,9 +185,7 @@ headers are rejected before creating an entry.
 This creates an actual library entry attached to the ISO, not a wishlist entry.
 Media collections link to its edition ID; game details have **Overview**, **Media**
 and **Metadata**, with Soundtrack / Images / Videos sections inside Media. Games
-can therefore own extras before their launch adapter is accepted. **Launch
-pending** remains disabled, and the backend rejects PS3 launch explicitly. PCSX2
-and fake runners are never advertised as PS3-compatible. The shared archive
+can therefore own extras before their launch adapter is accepted. Library Play resolves only the RPCS3 runner. PCSX2 and fake runners are never advertised as PS3-compatible. The shared archive
 preparation picker/recipe still excludes PS3; this slice does not add PKG, digital
 license import, decryption or a universal PS3 archive workflow.
 
@@ -206,15 +204,14 @@ layout works. No RPCS3 game process was launched during this registration step.
 
 ## Remaining steps
 
-1. **P3-2 — One real preparation path.** This collection needs a reviewed archive
-   → disc-image path. Verify the pinned RPCS3 build's accepted filesystem/image
+1. **P3-2 — Broader preparation paths.** The supplied archive was unpacked explicitly and its verified ISO now launches directly. A general reviewed archive
+   → disc-image path remains future work. Verify the pinned RPCS3 build's accepted filesystem/image
    formats and encryption requirements before choosing direct ISO or a prepared
    folder. Inspect title identity after preparation; reject unsupported content.
    Use manager jobs, space checks, recovery and receipts. No automatic 38 GB
    extraction was started by discovery or firmware setup.
 2. **P3-3 — Library launch and ownership (registration implemented).** PS3
-   descriptors, verified ISO entries and Media links are implemented. Add launch
-   ownership, edition/version relationships and isolated user saves.
+   descriptors, verified ISO entries, Media links, process ownership and stable managed saves are implemented. Edition/version relationships and per-edition users remain future work.
    Launch directly with `--no-gui`; keep setup/configuration a separate action.
    Track the game process and exit; never mark an update/extra as a base title.
 3. **P3-4 — Live game acceptance.** Observe boot/video/audio, keyboard mappings,
@@ -222,3 +219,32 @@ layout works. No RPCS3 game process was launched during this registration step.
    Streaming follows local acceptance; physical-controller testing waits for
    hardware. A heavy title may require a smaller pilot to distinguish adapter
    failures from game-specific compatibility.
+
+## Direct ISO launch adapter (2026-10-25)
+
+Library Play now starts the managed RPCS3 `--no-gui <absolute ISO>` recipe,
+adding `--fullscreen` only for fullscreen display mode. The pinned upstream
+BootGame implementation accepts ISO images directly; this path does not mount or
+extract another full copy. Setup and Tools → Open still use the configuration UI.
+
+Before creating a session, Marquee requires firmware setup to be idle, validates
+installed firmware markers/version, rereads bounded disc metadata and executable/
+manifest headers, compares the stored title ID and checks the minimum firmware.
+Missing/old firmware and changed/unreadable discs fail before spawning. Registration
+alone is not compatibility proof. PKG/license import and encrypted-image preparation
+remain unsupported.
+
+The regular session owner tracks the RPCS3 process, prevents a second game,
+checkpoints duration, records failures/exits and supports existing process recovery.
+The command carries XDG config/data/cache paths under `<data>/rpcs3/`; firmware,
+`dev_hdd0` game installs and user saves therefore stay in that stable managed
+profile across launches. Games share RPCS3's emulated user and title-scoped native
+saves; per-edition emulated users are not implemented. Marquee does not replace
+RPCS3's input mappings, graphics settings or saves on launch.
+
+Validation: the full check script and production build passed; tests cover the
+catalogue capability, argument boundaries, firmware-version comparison, refusal
+without installed firmware and frontend runner readiness. The owner's BCUS98111
+ISO started through the actual main-library API, selected Vulkan on the RTX 5090
+and began PPU compilation. Video/audio, keyboard play and native save/relaunch
+acceptance remain pending the live test. RPCS3 process start is not proof of gameplay.
