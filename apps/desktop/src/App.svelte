@@ -247,13 +247,13 @@
   .side {
     position: fixed;
     top: 12px;
-    bottom: calc(var(--player-height, 0px) + 12px);
+    bottom: 0;
     left: 12px;
     overflow-y: auto;
     box-sizing: border-box;
     width: 64px;
-    padding: 14px 8px;
-    border-radius: 22px;
+    padding: 14px 8px calc(var(--player-height, 0px) + 14px);
+    border-radius: 12px 12px 0 0;
     display: flex;
     flex-direction: column;
     gap: 4px;

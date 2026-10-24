@@ -1,5 +1,8 @@
 <script lang="ts">
   import { fly } from 'svelte/transition';
+  import { tick } from 'svelte';
+  import { gameDetailTabs, nextGameDetailTab, type GameDetailTab } from '../gameDetails';
+  import { libraryView } from '../libraryView.svelte';
   import { app } from '../state.svelte';
   import { platformLabel, sourceLabel } from '../labels';
   import { canonicalId, groupGames, editionKey, editionLabel, launchMethod, methodLabel } from '../unified';
@@ -11,7 +14,7 @@
   import InstallMenu from '../components/InstallMenu.svelte';
   import CatalogueDetails from '../components/CatalogueDetails.svelte';
   import Soundtrack from '../components/Soundtrack.svelte';
-  let tab = $state<'overview' | 'ost'>('overview');
+  let tab = $state<GameDetailTab>('overview');
 
   const g = $derived(app.current ?? app.hero);
   const variants = $derived(g ? app.games.filter((x) => canonicalId(x) === canonicalId(g)) : []);
@@ -19,7 +22,7 @@
   const choices = $derived(g ? variants.filter((x) => editionKey(x) === editionKey(g)) : []);
   function choose(id: string) { app.chooseVariant(id); }
   const port = $derived(g?.source === 'port' ? app.ports.find((p) => `port:${p.id}` === g.id) : undefined);
-  const similar = $derived(g?.genre ? groupGames(app.games.filter((x) => canonicalId(x) !== canonicalId(g) && x.genre === g.genre && canPlay(x))).map((group) => group.game).slice(0, 10) : []);
+  const similar = $derived(g ? groupGames(app.games.filter((x) => canonicalId(x) !== canonicalId(g) && (g.genre ? x.genre === g.genre : x.platform === g.platform) && canPlay(x))).map((group) => group.game).slice(0, 10) : []);
   const dur = $derived(app.motionReduced ? 0 : 360);
   const offline = $derived(!!g && g.source === 'rom' && g.platform !== 'unknown');
   const emulator = $derived(g ? emulatorName(g) : 'emulator');
@@ -28,8 +31,11 @@
   $effect(() => { if (app.torrentsOn) return app.watchTransfers(); });
   let editing = $state(false);
   let titleDraft = $state('');
-  let identification = $state<HTMLDetailsElement>();
-  function showIdentification() { if (identification) { identification.open = true; identification.scrollIntoView({ block: 'center', behavior: app.motionReduced ? 'auto' : 'smooth' }); identification.querySelector('summary')?.focus(); } }
+  let titleInput = $state<HTMLInputElement>();
+  async function beginEdit() { if (!g || !offline) return; titleDraft = g.title; editing = true; await tick(); titleInput?.focus(); titleInput?.select(); }
+  async function saveTitle(event: SubmitEvent) { event.preventDefault(); if (!g || !titleDraft.trim()) return; await app.rename(g, titleDraft.trim()); editing = false; }
+  function browseCatalogue() { libraryView('all').discovery = true; app.go('library'); }
+
 
   const launchVia = $derived(
     g?.lutris ? `Lutris · ${g.lutris.runner ?? 'store installer'}` : g
@@ -76,12 +82,13 @@
 <article class="page" style="--accent-h:{g.art.hue2}">
   <div class="head" in:fly={{ y: 20, duration: dur }}>
     <button class="back" data-nav onclick={() => app.back()}><Icon name="back" size={18} /> Back</button>
+    {#if offline && !editing}<button class="edit-game btn glass small" data-nav onclick={beginEdit}><Icon name="edit" size={16} />Edit</button>{/if}
     {#if editing && offline}
-      <label class="rename-label">Game title<input class="rename" data-nav bind:value={titleDraft} onkeydown={(e) => { if (e.key === 'Enter') { void app.rename(g, titleDraft); editing = false; } if (e.key === 'Escape') { editing = false; e.stopPropagation(); } }} /></label>
-      <div class="rename-actions"><button class="btn glass small" data-nav onclick={() => { void app.rename(g, titleDraft); editing = false; }}>Save title</button><button class="btn glass small" data-nav onclick={() => (editing = false)}>Cancel</button></div>
-    {:else}
-      <h1 title={g.title}>{cleanTitle(g.title)}</h1>
-    {/if}
+      <form class="title-editor" onsubmit={saveTitle}>
+        <label class="rename-label">Game title<input bind:this={titleInput} class="rename" data-nav bind:value={titleDraft} maxlength="300" required onkeydown={(event) => { if (event.key === 'Escape') { editing = false; event.stopPropagation(); } }} /></label>
+        <div class="rename-actions"><button class="btn glass small" data-nav disabled={!titleDraft.trim()}>Save title</button><button type="button" class="btn glass small" data-nav onclick={() => editing = false}>Cancel</button></div>
+      </form>
+    {:else}<h1 title={g.title}>{cleanTitle(g.title)}</h1>{/if}
     <p class="tagline">{platformLabel[g.platform]}{g.region ? ` · ${g.region}` : ''}{g.revision ? ` · Revision ${g.revision}` : ''}</p>
     {#if status}<p class="availability" role="status">{status.label}</p>{/if}
     {#if variants.length > 1 || g.editionLabel}
@@ -117,22 +124,17 @@
   <div class="launch-toolbar">
     <div class="actions game-actions">
       {#if g.wanted}
-        <button class="btn primary big" data-nav onclick={() => app.addGames()}><Icon name="folder" /> Add game files</button>
+        <button class="btn primary" data-nav onclick={() => app.addGames()}><Icon name="folder" /> Add game files</button>
         <button class="btn glass" data-nav onclick={() => app.setWantedStatus(g, g.wanted === 'wishlist' ? 'owned' : 'wishlist')}>{g.wanted === 'wishlist' ? 'I own this' : 'Move to wishlist'}</button>
         <button class="btn glass" data-nav onclick={() => app.removeWantedGame(g)}><Icon name="x" /> Remove</button>
       {:else if g.source === 'catalogue'}
         <p class="catalogue-note" role="status">Not in your library — catalogue discovery only. Open the source page from the facts panel when you want to browse Vimm’s Lair.</p>
       {:else if offline && g.setupState === 'runner_missing'}
-        {#if g.platform === 'ps2'}<InstallMenu tone="primary" size="big" />
-        {:else}<button class="btn primary big" data-nav onclick={() => app.go('tools')}><Icon name="settings" /> Set up {g.platform === 'ps1' ? 'DuckStation' : g.platform === 'genesis' ? 'BlastEm' : g.platform === 'ds' ? 'melonDS' : g.platform === 'neogeo' ? 'FinalBurn Neo' : 'emulator'}</button>{/if}
+        {#if g.platform === 'ps2'}<InstallMenu tone="primary" />
+        {:else}<button class="btn primary" data-nav onclick={() => app.go('tools')}><Icon name="settings" /> Set up {g.platform === 'ps1' ? 'DuckStation' : g.platform === 'genesis' ? 'BlastEm' : g.platform === 'ds' ? 'melonDS' : g.platform === 'neogeo' ? 'FinalBurn Neo' : 'emulator'}</button>{/if}
       {:else}
-        <button class="btn primary big" class:game-play={playReady} data-nav onclick={primary}>
+        <button class="btn primary" class:game-play={playLabel === 'Play' || playLabel === 'Open port'} data-nav onclick={primary}>
           <Icon name={playReady ? 'play' : 'folder'} size={22} /> {playLabel}
-        </button>
-      {/if}
-      {#if offline && !g.coverUrl}
-        <button class="btn glass" data-nav onclick={() => app.refreshArtwork(g.id)} disabled={app.fetchingArt}>
-          <Icon name="image" /> {app.fetchingArt ? 'Finding artwork…' : 'Find artwork'}
         </button>
       {/if}
       {#if g.portStatus === 'update'}
@@ -141,26 +143,6 @@
       <button class="btn glass icon" data-nav aria-label="Favourite" aria-pressed={g.favorite} disabled={g.source === 'port' || g.source === 'catalogue' || !!g.lutris} onclick={() => app.toggleFavorite(g)}>
         <Icon name="star" filled={g.favorite} />
       </button>
-      {#if offline}
-        <details class="manage-menu"><summary class="btn glass" data-nav>Manage game <Icon name="chevron" size={16} /></summary>
-          <div class="manage-actions glass-panel">
-            <button class="btn glass small" data-nav onclick={() => { titleDraft = g.title; editing = true; }}>Edit title</button>
-            <button class="btn glass small" data-nav onclick={() => app.go('tools')}>Emulator settings</button>
-          </div>
-        </details>
-        {#if app.torrentsOn && app.torrentSettings.seeding}
-          {#if !share}
-            <button class="btn glass" data-nav onclick={() => app.shareGame(g)}><Icon name="share" /> Share</button>
-          {:else}
-            {#if share.link}<button class="btn glass" data-nav onclick={() => app.copyTransferLink(share)}><Icon name="share" /> Copy link</button>{/if}
-            {#if share.info_hash}<button class="btn glass" data-nav onclick={() => app.stopTransfer(share)}><Icon name="x" /> Stop sharing</button>{/if}
-          {/if}
-        {/if}
-      {:else if g.lutris}
-        <button class="btn glass" data-nav onclick={() => app.go('tools')}><Icon name="settings" /> Lutris connection</button>
-      {:else if port}
-        <button class="btn glass" data-nav onclick={() => app.openPortFolder(port)}><Icon name="folder" /> Folder</button>
-      {/if}
     </div>
   <div class="play-strip" aria-label="Game activity">
     <div><Icon name="clock" size={19} /><span><small>PLAYTIME</small><strong>{g.source === 'catalogue' || port ? 'Not tracked' : g.playtimeMin ? hours(g.playtimeMin) : 'Not played yet'}</strong></span></div>
@@ -172,43 +154,32 @@
 
   <div class="game-tabs" role="tablist" tabindex="-1" aria-label="Game details" onkeydown={(event) => {
     if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
-      event.preventDefault(); tab = event.key === 'Home' ? 'overview' : event.key === 'End' ? 'ost' : tab === 'overview' ? 'ost' : 'overview';
+      event.preventDefault(); tab = nextGameDetailTab(tab, event.key);
       (event.currentTarget.querySelector(`[data-tab="${tab}"]`) as HTMLButtonElement)?.focus();
     }
   }}>
-    <button id="overview-tab" data-tab="overview" role="tab" aria-selected={tab === 'overview'} aria-controls="overview-panel" tabindex={tab === 'overview' ? 0 : -1} data-nav onclick={() => tab = 'overview'}>Overview</button>
-    <button id="ost-tab" data-tab="ost" role="tab" aria-selected={tab === 'ost'} aria-controls="ost-panel" tabindex={tab === 'ost' ? 0 : -1} data-nav onclick={() => tab = 'ost'}>OST</button>
+    {#each gameDetailTabs as item}<button id={`${item}-tab`} data-tab={item} role="tab" aria-selected={tab === item} aria-controls={`${item}-panel`} tabindex={tab === item ? 0 : -1} data-nav onclick={() => tab = item}>{item === 'overview' ? 'Overview' : item === 'ost' ? 'OST' : 'Metadata'}</button>{/each}
   </div>
-  {#if tab === 'ost'}
-    <div id="ost-panel" role="tabpanel" aria-labelledby="ost-tab" tabindex="0">{#key canonicalId(g)}<Soundtrack gameKey={canonicalId(g)} gameTitle={cleanTitle(g.title)} />{/key}</div>
-  {:else}
-  <div id="overview-panel" role="tabpanel" aria-labelledby="overview-tab" tabindex="0">
   <div class="body">
-    <div class="main">
-      {#if g.description}
-        <h3>About</h3>
-        <p class="about">{g.description}</p>
+    <div class="main" id={`${tab}-panel`} role="tabpanel" aria-labelledby={`${tab}-tab`} tabindex="0">
+      {#if tab === 'ost'}
+        {#key canonicalId(g)}<Soundtrack gameKey={canonicalId(g)} gameTitle={cleanTitle(g.title)} />{/key}
+      {:else if tab === 'metadata'}
+        <section class="metadata-intro"><h3>Metadata and artwork</h3><p class="about">Release information and source links for this installation. Matching updates metadata; it does not change your game files, saves or launch method.</p>
+          {#if offline}<button class="btn glass small" data-nav disabled={app.fetchingArt} onclick={() => app.refreshArtwork(g.id)}><Icon name="refresh" size={16} />{app.fetchingArt ? 'Refreshing…' : 'Refresh artwork and details'}</button>{/if}
+        </section>
+        {#if g.metadata || offline && app.catalogue.records.length}<CatalogueDetails game={g} />{:else}<p class="about">No catalogue metadata is linked to this entry.</p><button class="btn glass small" data-nav onclick={browseCatalogue}>Browse catalogue</button>{/if}
         {#if g.descriptionSource}<p class="media-credit">Description source: {g.descriptionSource}</p>{/if}
+      {:else}
+        <section class="overview-about"><h3>About this game</h3>
+          {#if g.description}<p class="about">{g.description}</p>{:else}<p class="about muted">A release description has not been added yet.</p>{/if}
+          {#if g.descriptionSource}<p class="media-credit">Description source: {g.descriptionSource}</p>{/if}
+        </section>
+        {#if g.lutris}<h3>Managed by Lutris</h3><p class="about">Lutris manages installation and compatibility settings. Refresh its connection in Tools after installing or playing.</p>{/if}
+        {#if port}<h3>Requirements</h3><ul class="reqs glass-panel"><li>{port.name}{port.version ? ` · ${port.version}` : ''} · {port.status === 'not-installed' ? 'Not installed' : 'Installed'}</li><li>{port.requirement}</li></ul>{/if}
       {/if}
-
-      {#if !g.description && !g.screenshots?.length}
-        <section class="library-summary glass-panel"><h3>Your copy</h3><p>{platformLabel[g.platform]}{g.region ? ` · ${g.region}` : ''}{g.year ? ` · ${g.year}` : ''}</p><p class="summary-note">{g.coverUrl ? 'Description and screenshots are not available for this entry yet.' : 'Add artwork to make this game easier to find in your library.'}</p><div class="summary-actions">{#if offline && !g.coverUrl}<button class="btn glass small" data-nav disabled={app.fetchingArt} onclick={() => app.refreshArtwork(g.id)}><Icon name="image" size={17} />{app.fetchingArt ? 'Finding artwork…' : 'Find artwork'}</button>{/if}{#if offline || g.metadata}<button class="btn glass small" data-nav onclick={showIdentification}>Review game metadata</button>{/if}<button class="btn glass small" data-nav onclick={() => tab = 'ost'}><Icon name="music" size={17} />Soundtracks</button></div></section>
-      {/if}
-      {#if g.lutris}
-        <h3>Managed by Lutris</h3>
-        <p>Lutris owns installation, compatibility settings, and playtime. Store listings come from its last local sync. Refresh the connection in Tools after an installation or play session.</p>
-      {/if}
-      {#if port}
-        <h3>Requirements</h3>
-        <ul class="reqs glass-panel">
-          <li>{port.name}{port.version ? ` · ${port.version}` : ''} · {port.status === 'not-installed' ? 'Not installed' : 'Installed'} · {port.upstream}</li>
-          <li>{port.requirement}</li>
-        </ul>
-      {/if}
-      {#if g.metadata || offline}<details class="technical" bind:this={identification}><summary data-nav>Identification and source metadata</summary><CatalogueDetails game={g} /></details>{/if}
     </div>
-
-    <aside class="facts glass-panel">
+    <aside class="facts glass-panel" aria-label="Installation and identification">
       <h3>Installation details</h3>
       <dl>
         <dt>{g.source === 'rom' || g.source === 'port' ? 'Run method' : 'Library source'}</dt>
@@ -227,10 +198,6 @@
         <dd>{launchVia}</dd>
 
         {#if g.lutris}<dt>Library provider</dt><dd>Lutris · {g.installed ? 'configured installation' : 'cached store listing'}</dd>{/if}
-        {#if g.serial}
-          <dt>Serial</dt>
-          <dd>{g.serial}{g.region ? ` · ${g.region}` : ''}</dd>
-        {/if}
         {#if g.setupState && (g.setupState !== 'unverified' || ['ps1', 'ps2', 'ds', 'neogeo'].includes(g.platform))}
           <dt>{emulator}</dt>
           <dd>{{ runner_missing: 'Not installed', missing: 'Firmware required', unverified: 'Firmware not yet checked', launch_tested: 'Previously started' }[g.setupState]}</dd>
@@ -248,16 +215,45 @@
           <dd>Unknown · no verified report</dd>
         {/if}
       </dl>
+      {#if offline || g.lutris || port}<div class="side-actions">
+        {#if offline}<button class="btn glass small" data-nav onclick={() => app.go('tools')}><Icon name="settings" size={16} />Emulator settings</button>{/if}
+      {#if offline}
+        {#if app.torrentsOn && app.torrentSettings.seeding}
+          {#if !share}
+            <button class="btn glass" data-nav onclick={() => app.shareGame(g)}><Icon name="share" /> Share</button>
+          {:else}
+            {#if share.link}<button class="btn glass" data-nav onclick={() => app.copyTransferLink(share)}><Icon name="share" /> Copy link</button>{/if}
+            {#if share.info_hash}<button class="btn glass" data-nav onclick={() => app.stopTransfer(share)}><Icon name="x" /> Stop sharing</button>{/if}
+          {/if}
+        {/if}
+      {:else if g.lutris}
+        <button class="btn glass" data-nav onclick={() => app.go('tools')}><Icon name="settings" /> Lutris connection</button>
+      {:else if port}
+        <button class="btn glass" data-nav onclick={() => app.openPortFolder(port)}><Icon name="folder" /> Folder</button>
+      {/if}
+      </div>{/if}
+      <section class="identity"><h4>Identification</h4><dl>
+        {#if g.serial}<dt>Serial</dt><dd>{g.serial}</dd>{/if}
+        <dt>Metadata</dt><dd>{g.source === 'catalogue' ? 'Catalogue entry' : g.metadata ? g.metadataMatch === 'sha1' ? 'Exact SHA-1 link' : 'Manually linked' : 'No catalogue link'}</dd>
+        {#if tab === 'metadata'}<dt>Library ID</dt><dd class="identifier">{g.id}</dd>{#if canonicalId(g) !== g.id}<dt>Game identity</dt><dd class="identifier">{canonicalId(g)}</dd>{/if}{/if}
+      </dl></section>
     </aside>
   </div>
+  {#if tab === 'overview'}<Row title={g.genre ? 'More in this genre' : `More for ${platformLabel[g.platform]}`} games={similar} />{/if}
 
-  <Row title="More in this genre" games={similar} />
-  </div>
-  {/if}
 </article>
 {/if}
 
 <style>
+  .edit-game { position: absolute; top: 18px; right: var(--gutter); }
+  .title-editor { display: grid; gap: 12px; } .rename-actions { display: flex; gap: 8px; }
+  .side-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+  .identity { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+  .identity h4 { font-size: 13px; margin: 0 0 14px; } .identifier { overflow-wrap: anywhere; font-family: ui-monospace,monospace; font-size: 11px; }
+  .metadata-intro { margin-bottom: 20px; } .overview-about { margin: 12px 0 28px; }
+  .muted { color: var(--text-dim); }
+  .main { min-width: 0; } .main :global(.soundtrack) { padding: 0; max-width: none; }
+
   .feature-layout { display: grid; grid-template-columns: minmax(0,2.3fr) minmax(250px,1fr); gap: 24px; padding: 0 var(--gutter) 24px; max-width: 1500px; margin: 0 auto; }
   .feature-summary { min-width: 0; padding: 4px 0; }
   .summary-cover { width: 100%; max-height: 165px; object-fit: contain; object-position: left; margin-bottom: 12px; }
@@ -272,10 +268,6 @@
   .play-strip { display: flex; align-items: center; flex-wrap: wrap; gap: 20px 40px; padding: 20px var(--gutter); background: var(--surface); border-block: 1px solid var(--line); }
   .play-strip > div { display: flex; align-items: center; gap: 10px; min-width: 110px; color: var(--text-dim); }
   .play-strip span { display: grid; gap: 6px; } .play-strip small { font-size: 10px; letter-spacing: .09em; } .play-strip strong { font-size: 13px; font-weight: 600; color: var(--text-soft); }
-  .library-summary { padding: 24px; border-radius: 14px; margin-bottom: 24px; }
-  .library-summary p { color: var(--text-soft); line-height: 1.6; } .library-summary .summary-note { color: var(--text-dim); font-size: 13px; }
-  .summary-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
-
   .game-tabs { display: flex; gap: 24px; padding: 0 var(--gutter); margin: 12px 0 0; border-bottom: 1px solid var(--line); }
   .game-tabs button { border: 0; border-bottom: 2px solid transparent; padding: 14px 4px; background: none; color: var(--text-dim); cursor: pointer; font: inherit; }
   .game-tabs button[aria-selected='true'] { border-color: var(--accent); color: var(--text); }
@@ -292,11 +284,6 @@
     margin: 0 auto;
   }
   .availability { margin:0; color:var(--warn); font-size:14px; }
-  .technical { margin-top:24px; }
-  .technical > summary { cursor:pointer; padding:14px 0; color:var(--text-soft); }
-  .manage-menu { position:relative; }
-  .manage-menu summary { list-style:none; cursor:pointer; }
-  .manage-actions { position:absolute; top:calc(100% + 8px); left:0; z-index:10; display:grid; gap:8px; min-width:210px; border-radius:12px; padding:10px; background:var(--surface-strong); }
   .rename-label { display:grid; gap:8px; }
   .rename-actions { display:flex; gap:8px; }
   .head { position: relative; padding: 68px var(--gutter) 24px; display: grid; gap: 12px; }

@@ -118,7 +118,7 @@
 :root[data-style='aircloud'] .btn.glass { color: var(--text-soft); background: var(--field); border-color: var(--line); }
 :root[data-style='aircloud'] .btn.primary { box-shadow: 0 5px 18px -9px hsl(var(--accent-h) 90% 60% / .65); }
 :root[data-style='aircloud'] .btn:hover { transform: translateY(-1px); }
-:root[data-style='aircloud'] .side { border-radius: 12px; }
+:root[data-style='aircloud'] .side { border-radius: 12px 12px 0 0; }
 :root[data-style='aircloud'] .nav { border-radius: 8px; font-size: 13px; }
 :root[data-style='aircloud'] .desktop-toolbar { background: var(--surface); }
 :root[data-style='aircloud'] .row h2 { font-size: var(--row-title); letter-spacing: .01em; }
@@ -237,6 +237,8 @@ button {
   --button-font-size: 14px;
   --button-padding: 18px;
 }
+:root .game-actions > .btn { height: var(--button-height); min-height: var(--button-height); padding-inline: var(--button-padding); font-size: var(--button-font-size); }
+:root .game-actions > .btn.icon { width: var(--button-height); min-width: var(--button-height); padding: 0; }
 :root[data-mode='big'] .game-actions { --button-height: 54px; --button-font-size: 17px; --button-padding: 24px; }
 :root .btn.primary.game-play {
   color: var(--game-play-ink);

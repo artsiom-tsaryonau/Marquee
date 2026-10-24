@@ -153,6 +153,25 @@ behavior. This dated checklist does not close rendered/native/controller gates.
 
 ## Presentation goals still to validate or extend
 
+Game details now have **Overview**, **OST** and **Metadata** tabs with wrapping
+Left/Right and Home/End keyboard navigation. Metadata owns catalogue matching and
+artwork refresh; the duplicate Your copy / Review metadata / Soundtracks shortcut
+panel is removed. Installation and compact identification occupy the right rail
+across tabs, with full library/canonical IDs shown when Metadata is selected.
+Overview shows the real description and related playable games, falling back to
+the same platform when genre data is absent. Missing descriptions remain explicit.
+**Edit** sits at the top right for locally editable ROM entries and focuses the
+title field. Emulator settings is a direct installation action; the redundant
+Manage game dropdown is removed. Source, firmware and sharing controls remain
+installation-specific.
+
+The desktop sidebar now extends to the viewport bottom. The full-width music
+footer overlays its lower edge, while internal bottom padding keeps navigation
+accessible above playback; the page still reserves measured player height.
+Narrow layouts keep their navigation above the footer. Game action buttons have
+an explicit shared height, and ready launch labels use the same blue treatment
+on both Home and game details. The earlier mixed big/default sizing is removed.
+
 Game Play now uses a consistent solid blue with contrast-adjusted ink for dark
 and light themes, independent of cover hue and the music accent. Home/game-page
 action groups share a 46 px height (54 px in Big Screen), common text sizing and
@@ -199,14 +218,16 @@ desktop layout still require rendered keyboard/responsive acceptance.
 The artwork/details pass adds a playtime/last-played/runner strip and a larger
 cover alongside the game hero at desktop widths. Missing descriptions use an
 honest library summary with artwork/metadata/music actions rather than leaving
-technical matching as the main content. Identification stays in a secondary
-disclosure. Find artwork is available for ROM entries without disc serials;
+technical matching as the main content. The later organization pass puts full
+matching in Metadata and compact identification in the right rail. Find artwork
+is available for ROM entries without disc serials;
 Genesis now participates in the existing hash-based libretro cover lookup.
 An unchecked firmware label is suppressed for systems without that requirement.
 Music artwork distinguishes embedded/local album images from linked-game covers.
 
-The 2026-10-24 music shell pass aligns the sidebar/content above a full-width
-player footer, using its measured height rather than unrelated fixed offsets.
+The 2026-10-24 music shell pass uses a full-width player footer and measured
+height rather than unrelated fixed offsets. The desktop rail now continues
+behind that footer, with internal padding keeping navigation accessible.
 Desktop navigation includes Music; Add games stays in the Games library header,
 and Big Screen moves to the top-right toolbar. Narrow navigation sits above the
 player. Music albums and the session queue share the OST playback state. Visual

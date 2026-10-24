@@ -196,6 +196,11 @@ no additional engine download is needed for these systems.
 
 ## Soundtrack foundation — 2026-10-24
 
+Game details now split Overview / OST / Metadata, with installation and identity
+information on the right, Edit at the top right, direct emulator settings and
+no duplicate Overview shortcut panel. The desktop rail reaches the bottom behind
+the player overlay. These changes remain subject to native visual acceptance.
+
 The library now offers saved platform shelves or a flat grid; mixed Home shelves
 keep chronological ordering and a shared image height with native image widths.
 Aircloud Color adapts the dashboard's panel/control hierarchy with brighter
