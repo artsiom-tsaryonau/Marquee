@@ -115,7 +115,7 @@
     </aside>
   </div>
   <div class="launch-toolbar">
-    <div class="actions">
+    <div class="actions game-actions">
       {#if g.wanted}
         <button class="btn primary big" data-nav onclick={() => app.addGames()}><Icon name="folder" /> Add game files</button>
         <button class="btn glass" data-nav onclick={() => app.setWantedStatus(g, g.wanted === 'wishlist' ? 'owned' : 'wishlist')}>{g.wanted === 'wishlist' ? 'I own this' : 'Move to wishlist'}</button>
@@ -126,8 +126,8 @@
         {#if g.platform === 'ps2'}<InstallMenu tone="primary" size="big" />
         {:else}<button class="btn primary big" data-nav onclick={() => app.go('tools')}><Icon name="settings" /> Set up {g.platform === 'ps1' ? 'DuckStation' : g.platform === 'genesis' ? 'BlastEm' : g.platform === 'ds' ? 'melonDS' : g.platform === 'neogeo' ? 'FinalBurn Neo' : 'emulator'}</button>{/if}
       {:else}
-        <button class="btn primary big" data-nav onclick={primary}>
-          <Icon name={playReady ? 'play' : 'folder'} size={24} /> {playLabel}
+        <button class="btn primary big" class:game-play={playReady} data-nav onclick={primary}>
+          <Icon name={playReady ? 'play' : 'folder'} size={22} /> {playLabel}
         </button>
       {/if}
       {#if offline && !g.coverUrl}

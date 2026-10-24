@@ -153,6 +153,14 @@ behavior. This dated checklist does not close rendered/native/controller gates.
 
 ## Presentation goals still to validate or extend
 
+Game Play now uses a consistent solid blue with contrast-adjusted ink for dark
+and light themes, independent of cover hue and the music accent. Home/game-page
+action groups share a 46 px height (54 px in Big Screen), common text sizing and
+horizontal padding; icon-only Favourite uses the same height as its width.
+Aircloud's compact secondary-button rule respects this group height, avoiding
+the previous 40/46/54 px mismatch. Setup/acquisition actions retain their own
+meaning rather than being styled as ready-to-play controls.
+
 The cover-layout pass uses **Platform shelves** as the saved library layout,
 with **Grid** retained in the layout selector. Shelves group the existing chosen
 play option's platform without changing canonical identities; sorting/filtering

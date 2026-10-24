@@ -9,6 +9,9 @@
   --text-soft: rgb(244 243 255 / 0.82);
   --text-dim: rgb(244 243 255 / 0.68);
   --accent: #8b5cf6;
+  --game-play: #88baff;
+  --game-play-hover: #a3caff;
+  --game-play-ink: #10213d;
   --music-accent: #63e6be;
   --music-ink: #08120f;
   --music-text: #63e6be;
@@ -67,6 +70,9 @@
   --text-soft: rgb(18 19 31 / 0.8);
   --text-dim: rgb(18 19 31 / 0.68);
   --accent: #7c3aed;
+  --game-play: #245bc1;
+  --game-play-hover: #1d4fae;
+  --game-play-ink: #ffffff;
   --ok: #059669;
   --warn: #b45309;
   --bad: #dc2626;
@@ -107,8 +113,8 @@
   --select-bg-hover: #e5edfa;
 }
 :root[data-style='aircloud'] .glass-panel { box-shadow: 0 1px 0 rgb(255 255 255 / .03) inset; }
-:root[data-style='aircloud'] .btn { border-radius: 8px; font-size: 13px; }
-:root[data-style='aircloud'] .btn:not(.primary):not(.icon):not(.big) { height: 40px; }
+:root[data-style='aircloud'] .btn { border-radius: 8px; font-size: var(--button-font-size, 13px); }
+:root[data-style='aircloud'] .btn:not(.primary):not(.icon):not(.big) { height: var(--button-height, 40px); }
 :root[data-style='aircloud'] .btn.glass { color: var(--text-soft); background: var(--field); border-color: var(--line); }
 :root[data-style='aircloud'] .btn.primary { box-shadow: 0 5px 18px -9px hsl(var(--accent-h) 90% 60% / .65); }
 :root[data-style='aircloud'] .btn:hover { transform: translateY(-1px); }
@@ -195,13 +201,13 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 46px;
-  padding: 0 20px;
+  height: var(--button-height, 46px);
+  padding: 0 var(--button-padding, 20px);
   border-radius: 14px;
   border: 0;
   font: inherit;
   font-weight: 700;
-  font-size: 15px;
+  font-size: var(--button-font-size, 15px);
   cursor: pointer;
   color: var(--text);
   background: var(--field-strong);
@@ -226,6 +232,23 @@ button {
 .btn.primary:focus-visible {
   box-shadow: 0 0 0 3px hsl(var(--accent-h) 95% 80%), 0 0 40px hsl(var(--accent-h) 95% 60% / 0.8);
 }
+.game-actions {
+  --button-height: 46px;
+  --button-font-size: 14px;
+  --button-padding: 18px;
+}
+:root[data-mode='big'] .game-actions { --button-height: 54px; --button-font-size: 17px; --button-padding: 24px; }
+:root .btn.primary.game-play {
+  color: var(--game-play-ink);
+  background: var(--game-play);
+  box-shadow: 0 2px 8px #0002;
+}
+:root .btn.primary.game-play:hover { background: var(--game-play-hover); }
+:root .btn.primary.game-play:focus-visible {
+  outline: 2px solid var(--game-play);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 2px var(--bg);
+}
 .btn.glass {
   color: #fff;
   background: rgb(255 255 255 / 0.12);
@@ -241,14 +264,14 @@ button {
   box-shadow: 0 0 0 2px #fff, 0 0 24px rgb(255 255 255 / 0.4);
 }
 .btn.icon {
-  width: 46px;
+  width: var(--button-height, 46px);
   padding: 0;
   justify-content: center;
 }
 .btn.big {
-  height: 54px;
-  padding: 0 30px;
-  font-size: 17px;
+  height: var(--button-height, 54px);
+  padding: 0 var(--button-padding, 30px);
+  font-size: var(--button-font-size, 17px);
 }
 .btn.play {
   width: 68px;

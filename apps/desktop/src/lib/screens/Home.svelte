@@ -87,7 +87,7 @@
         {#if app.installProgress}
           <p class="tagline">{app.installProgress}</p>
         {/if}
-        <div class="actions">
+        <div class="actions game-actions">
           <button class="btn primary" data-nav onclick={() => app.addGames()}><Icon name="plus" /> Add games</button>
           <button class="btn glass" data-nav onclick={() => app.go('tools')}>Manage tools</button>
         </div>
@@ -108,7 +108,7 @@
           {#if g.playtimeMin}<span><Icon name="clock" size={16} /> {hours(g.playtimeMin)}</span>{/if}
           {#if g.lastPlayed}<span>Last played {ago(g.lastPlayed)}</span>{/if}
         </div>
-        <div class="actions">
+        <div class="actions game-actions">
           {#if g.wanted}
             <button class="btn primary" data-nav onclick={() => app.addGames()}><Icon name="folder" /> Add game files</button>
           {:else if g.setupState === 'runner_missing'}
@@ -116,8 +116,8 @@
           {:else}
             <button
               class="btn primary"
+              class:game-play={playReady}
               data-nav
-              style="--accent-h:{g.art.hue2}"
               aria-label={playReady ? 'Play' : undefined}
               onclick={() => {
                 if (g.rootOffline || g.mediaMissing || g.source === 'port' && !playReady) app.open(g);
@@ -126,7 +126,7 @@
                 else app.open(g);
               }}
             >
-              <Icon name={playReady ? 'play' : 'folder'} size={playReady ? 28 : 24} />
+              <Icon name={playReady ? 'play' : 'folder'} size={22} />
               {playReady ? 'Play' : g.rootOffline || g.mediaMissing ? 'Check game files' : g.setupState === 'missing' ? 'Add firmware' : 'View setup'}
             </button>
           {/if}
