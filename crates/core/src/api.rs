@@ -29,6 +29,23 @@ fn out<T: Serialize>(value: T) -> Result<Value> {
 pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
     let sink: Arc<dyn EventSink> = core.hub();
     match cmd {
+        "music_find" => out(core.music_find(&text(&args, "title")?)?),
+        "music_open_source" => out(core.music_open_source(&text(&args, "album_id")?)?),
+        "music_albums" => out(core.music_albums(maybe(&args, "game_key").as_deref())?),
+        "music_save_album" => out(core.music_save_album(serde_json::from_value(args)?)?),
+        "music_link" => {
+            out(core.music_link(&text(&args, "game_key")?, &text(&args, "album_id")?, true)?)
+        }
+        "music_unlink" => {
+            out(core.music_link(&text(&args, "game_key")?, &text(&args, "album_id")?, false)?)
+        }
+        "music_import" => out(core.music_import(
+            &text(&args, "album_id")?,
+            serde_json::from_value(args.get("paths").cloned().unwrap_or_default())?,
+        )?),
+        "music_remove_track" => {
+            out(core.music_remove_track(&text(&args, "album_id")?, &text(&args, "track_id")?)?)
+        }
         "streaming_state" => core.streaming_state(),
         "streaming_save_connection" => {
             out(core.streaming_save_connection(serde_json::from_value(args)?)?)

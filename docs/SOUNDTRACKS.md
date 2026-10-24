@@ -1,8 +1,82 @@
 # Game soundtracks and music player
 
-Updated 2026-10-24. Owner-requested feature plan; no music player, Jellyfin adapter
-or soundtrack acquisition provider is implemented by this document. Build the
-local experience first, without blocking [streaming acceptance](STREAMING.md).
+Updated 2026-10-24. The initial local OST tab and compact player are implemented.
+Jellyfin, yt-dlp/torrent audio acquisition and automatic release matching remain
+planned. This stays independent of [streaming acceptance](STREAMING.md).
+
+## Current implementation
+
+Open a game → **OST** → **Add soundtrack**. Save an album title, optional
+composer/artist and HTTPS source page, then **Choose local files**. The native
+app opens a multi-file picker. Browser mode asks for absolute paths on the
+computer running Marquee; it does not upload browser files. Tracks are added in
+filename order. MP3, FLAC, OGG and WAV are accepted for import, with extension and
+header checks. Import success does not establish complete decoding or runtime
+codec availability.
+
+**Play album** or select a track. The compact player survives navigation and
+provides native play/pause, seek, elapsed/duration and volume controls, plus
+previous/next. It skips unavailable tracks, stops at the end of an album and
+reports playback errors. It does not automatically play after restarting the
+launcher. Volume and **Pause when a game starts** are saved on the current
+surface. Music pauses before game/port launch and opening a stream viewer, and
+on observed local session-start events. It never resumes automatically after
+game exit or reconnect. The preference can explicitly allow music during play.
+An externally opened stream is not currently observable by this player.
+
+Use **Link an existing soundtrack** to reuse an album for another game. Existing
+explicit canonical game identities are reused; similar titles are not merged.
+Unlinking preserves the album. Editing a shared album updates it for every linked
+game. Track names currently come from filenames; embedded tags, track renaming/
+reordering and album artwork remain later work. The record graphic is a placeholder.
+
+**Find OST on YouTube** opens a title-based search. **View source** opens a saved
+page. Neither downloads, embeds or plays that URL, nor claims it is a matching
+release. yt-dlp belongs to acquisition phase MU4: a pinned managed helper and
+reviewed, cancellable manager jobs. The local player needs no yt-dlp or FFmpeg
+installation and does not import browser cookies.
+
+### Storage and media access
+
+`music_albums`, `music_tracks` and `music_links` are separate library tables.
+Copied audio lives under private `<data>/music/media` with SHA-256-derived names;
+originals remain untouched. Imports allow 200 files, 512 MiB per file and 1 GiB
+per batch. Relative paths, symlinks, nonregular files and extension/header
+mismatches are rejected. Duplicate content in an album is skipped. Failed
+batches publish no partial track list; copies already made can remain unreferenced.
+
+Removing a track deletes its album attachment, including for other games sharing
+that album, while keeping copied audio. Unlinking affects only the selected game.
+There is no automatic orphan cleanup or disk-deletion action. Missing stored
+files leave album/track metadata intact and mark the track unavailable; adding
+the original again repairs the file.
+
+Playback uses registered opaque track IDs on a loopback media endpoint, with
+ordinary and suffix byte ranges for seeking. No arbitrary filesystem path is
+accepted. Read capabilities are scoped to individual tracks and cannot authorize
+API changes or other tracks. Removing the track invalidates its lookup. Responses
+are uncached and send no referrers. The native app starts its media server on
+first playback; its CSP permits loopback audio. Browser playback is same-origin.
+
+### Acceptance
+
+Tests cover persistence/restart, multi-game links, deduplication, failed batch
+publication, bounds, symlinks, unsafe source URLs, missing files and separation
+from game records. Real HTTP tests check track capabilities, API isolation,
+seek/suffix ranges and malformed requests. Player tests check queue order,
+unavailable tracks, stale responses, pause during loading, retry and preferences.
+The full repository checks include native compilation and Svelte checks/tests/build.
+
+An isolated live HTTP run also imported generated WAV, MP3, FLAC and OGG files,
+verified exact copied bytes and partial-range reads, and independently decoded
+the fetched media with FFmpeg. It confirmed that no game editions were created.
+The server was stopped afterward; fixtures and receipts remain under ignored
+`data/music-pilot`. FFmpeg was used only for this test, not by the player.
+
+Visual UI, actual WebKit/browser decoding, audible output, seek and volume still
+require live acceptance. No codec is claimed as successfully decoded on those
+surfaces based on header/import tests. Physical controller focus awaits hardware.
+MU0/MU1 are initial implementations, with acceptance gates still open.
 
 ## Product experience
 

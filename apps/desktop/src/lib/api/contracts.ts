@@ -364,7 +364,20 @@ export interface StreamingState {
   last_error: AppError | null;
 }
 
+export interface MusicTrack { id: string; title: string; available: boolean }
+export interface MusicAlbum { id: string; title: string; artist: string; source_url: string; tracks: MusicTrack[] }
+export interface MusicDraft { game_key: string; album_id: string | null; title: string; artist: string; source_url: string }
+
 export interface LibraryApi {
+  musicAlbums(gameKey?: string): Promise<MusicAlbum[]>;
+  musicFind(title: string): Promise<void>;
+  musicOpenSource(albumId: string): Promise<void>;
+  musicSaveAlbum(draft: MusicDraft): Promise<string>;
+  musicLink(gameKey: string, albumId: string, linked: boolean): Promise<void>;
+  musicImport(albumId: string, paths: string[]): Promise<number>;
+  musicRemoveTrack(albumId: string, trackId: string): Promise<void>;
+  musicUrl(trackId: string): Promise<string>;
+  pickMusic(): Promise<string[]>;
   streamingState(): Promise<StreamingState>;
   streamingSaveConnection(connection: StreamingConnection): Promise<void>;
   streamingOpenViewer(appId: string): Promise<void>;

@@ -10,6 +10,7 @@ use tauri::{Emitter, Manager};
 pub struct AppState {
     pub core: Arc<Core>,
     pub web_url: Option<String>,
+    pub music_server: std::sync::Mutex<Option<server::ServerHandle>>,
 }
 
 /// UI files for the browser: the bundled assets in a release build, or the built
@@ -115,7 +116,11 @@ pub fn run() {
                 }
             });
 
-            app.manage(AppState { core, web_url });
+            app.manage(AppState {
+                core,
+                web_url,
+                music_server: std::sync::Mutex::new(None),
+            });
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -134,7 +139,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::core_call,
-            commands::web_url
+            commands::web_url,
+            commands::music_url
         ])
         .run(tauri::generate_context!())
         .expect("error while running Marquee");

@@ -10,6 +10,8 @@
   import Row from '../components/Row.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
   import CatalogueDetails from '../components/CatalogueDetails.svelte';
+  import Soundtrack from '../components/Soundtrack.svelte';
+  let tab = $state<'overview' | 'ost'>('overview');
 
   const g = $derived(app.current ?? app.hero);
   const variants = $derived(g ? app.games.filter((x) => canonicalId(x) === canonicalId(g)) : []);
@@ -157,6 +159,19 @@
     {#if offline && (g.mediaIssue || g.setupState === 'runner_missing')}<p class="tagline" role="status">{g.mediaIssue || `${emulator} is not installed or available for this platform. Open Tools to set it up.`}</p>{/if}
   </div>
 
+  <div class="game-tabs" role="tablist" tabindex="-1" aria-label="Game details" onkeydown={(event) => {
+    if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+      event.preventDefault(); tab = event.key === 'Home' ? 'overview' : event.key === 'End' ? 'ost' : tab === 'overview' ? 'ost' : 'overview';
+      (event.currentTarget.querySelector(`[data-tab="${tab}"]`) as HTMLButtonElement)?.focus();
+    }
+  }}>
+    <button id="overview-tab" data-tab="overview" role="tab" aria-selected={tab === 'overview'} aria-controls="overview-panel" tabindex={tab === 'overview' ? 0 : -1} data-nav onclick={() => tab = 'overview'}>Overview</button>
+    <button id="ost-tab" data-tab="ost" role="tab" aria-selected={tab === 'ost'} aria-controls="ost-panel" tabindex={tab === 'ost' ? 0 : -1} data-nav onclick={() => tab = 'ost'}>OST</button>
+  </div>
+  {#if tab === 'ost'}
+    <div id="ost-panel" role="tabpanel" aria-labelledby="ost-tab" tabindex="0">{#key canonicalId(g)}<Soundtrack gameKey={canonicalId(g)} gameTitle={cleanTitle(g.title)} />{/key}</div>
+  {:else}
+  <div id="overview-panel" role="tabpanel" aria-labelledby="overview-tab" tabindex="0">
   <div class="body">
     <div class="main">
       {#if g.description}
@@ -235,10 +250,15 @@
   </div>
 
   <Row title="More in this genre" games={similar} />
+  </div>
+  {/if}
 </article>
 {/if}
 
 <style>
+  .game-tabs { display: flex; gap: 24px; padding: 0 var(--gutter); margin: 12px 0 0; border-bottom: 1px solid var(--line); }
+  .game-tabs button { border: 0; border-bottom: 2px solid transparent; padding: 14px 4px; background: none; color: var(--text-dim); cursor: pointer; font: inherit; }
+  .game-tabs button[aria-selected='true'] { border-color: var(--accent); color: var(--text); }
   .about { white-space:pre-line; line-height:1.6; max-width:70ch; color:var(--text-soft); }
   .variant-picker { display:flex; flex-wrap:wrap; gap:18px; padding:16px; border-radius:14px; margin:16px 0; align-items:end; }
   .variant-picker label { display:grid; gap:8px; font-size:12px; color:var(--text-soft); }

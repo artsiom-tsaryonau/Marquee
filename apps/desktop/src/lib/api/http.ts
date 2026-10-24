@@ -68,6 +68,11 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export const httpApi: LibraryApi = {
   kind: 'web',
   ...commands(call),
+  musicUrl: (trackId) => call('music_url', { track_id: trackId }),
+  async pickMusic() {
+    const paths = window.prompt('Audio paths on the computer running Marquee, one absolute path per line (MP3, FLAC, OGG or WAV). This copies files; it is not a browser upload.');
+    return paths?.split('\n').map(p => p.trim()).filter(Boolean) ?? [];
+  },
   async pickArchives() {
     const path = window.prompt('Absolute ZIP/7z/RAR archive path on the computer running Marquee (not a browser upload)');
     return path?.trim() ? [path.trim()] : [];

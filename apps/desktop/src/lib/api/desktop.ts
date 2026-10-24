@@ -18,6 +18,11 @@ let listenReady: Promise<void> = Promise.resolve();
 export const desktopApi: LibraryApi = {
   kind: 'desktop',
   ...commands(call),
+  musicUrl: (trackId) => invoke<string>('music_url', { trackId }),
+  async pickMusic() {
+    const selected = await open({ directory: false, multiple: true, title: 'Add soundtrack audio', filters: [{ name: 'Audio files', extensions: ['mp3', 'flac', 'ogg', 'wav'] }] });
+    return typeof selected === 'string' ? [selected] : selected ?? [];
+  },
   async pickTorrent() {
     const selected = await open({ directory:false, multiple:false, title:'Review torrent download', filters:[{name:'BitTorrent metadata',extensions:['torrent']}] });
     return typeof selected === 'string' ? selected : null;

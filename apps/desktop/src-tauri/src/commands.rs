@@ -25,3 +25,21 @@ pub async fn core_call(
 pub fn web_url(state: State<'_, AppState>) -> Option<String> {
     state.web_url.clone()
 }
+
+/// Lazily start a loopback media surface; URLs grant read access to one track.
+#[tauri::command]
+pub fn music_url(state: State<'_, AppState>, track_id: String) -> Result<String> {
+    state.core.music_open(&track_id)?;
+    let mut server = state.music_server.lock().unwrap_or_else(|e| e.into_inner());
+    if server.is_none() {
+        *server = Some(marquee_core::server::start(
+            Arc::clone(&state.core),
+            None,
+            None,
+        )?);
+    }
+    Ok(server
+        .as_ref()
+        .expect("server initialized")
+        .music_url(&track_id))
+}

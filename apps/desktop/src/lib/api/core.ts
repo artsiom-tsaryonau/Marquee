@@ -39,8 +39,15 @@ export function asError(err: unknown): AppError {
 }
 
 /** The commands are identical on every surface; only the transport (`call`) differs. */
-export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable' | 'pickArchives' | 'pickTorrent' | 'onArchiveDrop'> {
+export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable' | 'pickArchives' | 'pickTorrent' | 'onArchiveDrop' | 'pickMusic' | 'musicUrl'> {
   return {
+    musicAlbums: (gameKey) => call('music_albums', gameKey === undefined ? {} : { game_key: gameKey }),
+    musicFind: (title) => call('music_find', { title }),
+    musicOpenSource: (albumId) => call('music_open_source', { album_id: albumId }),
+    musicSaveAlbum: (draft) => call('music_save_album', { ...draft }),
+    musicLink: (gameKey, albumId, linked) => call(linked ? 'music_link' : 'music_unlink', { game_key: gameKey, album_id: albumId }),
+    musicImport: (albumId, paths) => call('music_import', { album_id: albumId, paths }),
+    musicRemoveTrack: (albumId, trackId) => call('music_remove_track', { album_id: albumId, track_id: trackId }),
     streamingState: () => call('streaming_state'),
     streamingSaveConnection: (c) => call('streaming_save_connection', { data_dir: c.data_dir, socket: c.socket }),
     streamingOpenViewer: (appId) => call('streaming_open_viewer', { app_id: appId }),

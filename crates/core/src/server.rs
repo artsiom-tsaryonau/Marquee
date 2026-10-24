@@ -6,7 +6,7 @@ use crate::api;
 use crate::error::{AppError, Result};
 use crate::Core;
 use std::fs;
-use std::io::Read;
+use std::io::{Read, Seek, SeekFrom};
 use std::net::SocketAddr;
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
@@ -33,6 +33,89 @@ impl ServerHandle {
     pub fn url(&self) -> String {
         format!("http://{}/#token={}", self.addr, self.token)
     }
+
+    /// Read-only track capability, never the general API bearer token.
+    pub fn music_url(&self, id: &str) -> String {
+        format!(
+            "http://{}/music/{}?key={}",
+            self.addr,
+            id,
+            music_key(&self.token, id)
+        )
+    }
+}
+
+fn music_key(token: &str, id: &str) -> String {
+    use sha2::{Digest, Sha256};
+    format!(
+        "{:x}",
+        Sha256::digest(format!("marquee-music:{token}:{id}"))
+    )
+}
+
+fn audio_range(value: Option<&str>, size: u64) -> Option<(u64, u64, bool)> {
+    if size == 0 {
+        return None;
+    }
+    let Some(value) = value else {
+        return Some((0, size - 1, false));
+    };
+    let (start, end) = value.strip_prefix("bytes=")?.split_once('-')?;
+    if start.is_empty() {
+        let count = end.parse::<u64>().ok()?;
+        return (count > 0).then_some((size.saturating_sub(count), size - 1, true));
+    }
+    let start = start.parse::<u64>().ok()?;
+    let end = if end.is_empty() {
+        size - 1
+    } else {
+        end.parse::<u64>().ok()?.min(size - 1)
+    };
+    (start < size && start <= end).then_some((start, end, true))
+}
+
+fn serve_music(core: &Core, req: Request, id: &str) {
+    let Ok((mut file, mime)) = core.music_open(id) else {
+        return respond(req, 404, "text/plain", b"Track unavailable".to_vec(), true);
+    };
+    let Ok(size) = file.metadata().map(|m| m.len()) else {
+        return respond(req, 404, "text/plain", b"Track unavailable".to_vec(), true);
+    };
+    let range = req
+        .headers()
+        .iter()
+        .find(|h| h.field.equiv("Range"))
+        .map(|h| h.value.as_str());
+    let Some((start, end, partial)) = audio_range(range, size) else {
+        let mut response = Response::empty(StatusCode(416));
+        response.add_header(header("Content-Range", &format!("bytes */{size}")));
+        let _ = req.respond(response);
+        return;
+    };
+    if file.seek(SeekFrom::Start(start)).is_err() {
+        return respond(req, 404, "text/plain", b"Track unavailable".to_vec(), true);
+    }
+    let length = end - start + 1;
+    let mut headers = vec![
+        header("Content-Type", mime),
+        header("Accept-Ranges", "bytes"),
+        header("Cache-Control", "no-store"),
+        header("Referrer-Policy", "no-referrer"),
+        header("X-Content-Type-Options", "nosniff"),
+    ];
+    if partial {
+        headers.push(header(
+            "Content-Range",
+            &format!("bytes {start}-{end}/{size}"),
+        ));
+    }
+    let _ = req.respond(Response::new(
+        StatusCode(if partial { 206 } else { 200 }),
+        headers,
+        file.take(length),
+        Some(length as usize),
+        None,
+    ));
 }
 
 pub fn load_or_create_token(path: &Path) -> Result<String> {
@@ -198,6 +281,17 @@ fn handle(core: &Arc<Core>, token: &str, port: u16, assets: Option<&Assets>, mut
         return respond(req, 403, "text/plain", b"forbidden".to_vec(), true);
     }
 
+    if let Some(id) = path.strip_prefix("/music/") {
+        if !matches!(method, Method::Get | Method::Head) {
+            return respond(req, 405, "text/plain", b"use GET or HEAD".to_vec(), true);
+        }
+        let supplied = query_value(&query, "key").unwrap_or_default();
+        if uuid::Uuid::parse_str(id).is_err() || !same(supplied, &music_key(token, id)) {
+            return respond(req, 403, "text/plain", b"forbidden".to_vec(), true);
+        }
+        return serve_music(core, req, id);
+    }
+
     if let Some(cmd) = path.strip_prefix("/api/") {
         if !authorized(&req, &query, token) {
             return respond_error(
@@ -242,6 +336,20 @@ fn handle(core: &Arc<Core>, token: &str, port: u16, assets: Option<&Assets>, mut
                 }
             }
         };
+        if cmd == "music_url" {
+            let id = args
+                .get("track_id")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default();
+            return match core.music_open(id) {
+                Ok(_) => respond_json(
+                    req,
+                    200,
+                    &format!("/music/{id}?key={}", music_key(token, id)),
+                ),
+                Err(e) => respond_error(req, 404, e),
+            };
+        }
         return match api::dispatch(core, cmd, args) {
             Ok(value) => respond_json(req, 200, &value),
             Err(err) => respond_error(req, 400, err),
@@ -328,6 +436,50 @@ mod tests {
         let core = Arc::new(Core::open_isolated(Some(dir.to_path_buf()), false).unwrap());
         let handle = start(Arc::clone(&core), None, Some(48900)).unwrap();
         (core, handle)
+    }
+
+    #[test]
+    fn music_capabilities_are_track_scoped_and_support_seek_ranges() {
+        let dir = tempfile::tempdir().unwrap();
+        let (core, h) = start_test_server(dir.path());
+        let source = dir.path().join("audio.wav");
+        fs::write(&source, b"RIFF1234WAVEabcdefghijklmnop").unwrap();
+        let album = core
+            .music_save_album(crate::music::AlbumDraft {
+                game_key: "game".into(),
+                album_id: None,
+                title: "OST".into(),
+                artist: String::new(),
+                source_url: String::new(),
+            })
+            .unwrap();
+        core.music_import(&album, vec![source]).unwrap();
+        let id = core.music_albums(None).unwrap()[0].tracks[0].id.clone();
+        let url = h.music_url(&id);
+        let path = url.strip_prefix(&format!("http://{}", h.addr)).unwrap();
+        let get = |path: &str, range: &str| {
+            request(
+                h.addr,
+                &format!(
+                    "GET {path} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n{range}\r\n",
+                    h.addr
+                ),
+            )
+        };
+        let partial = get(path, "Range: bytes=12-15\r\n");
+        assert!(partial.starts_with("HTTP/1.1 206"));
+        assert!(partial.contains("bytes 12-15/28"));
+        assert!(partial.ends_with("abcd"));
+        assert!(get(path, "Range: bytes=99-\r\n").starts_with("HTTP/1.1 416"));
+        assert!(get(path, "Range: bytes=-4\r\n").ends_with("mnop"));
+        assert!(get(&format!("/music/{id}?key=bad"), "").starts_with("HTTP/1.1 403"));
+        assert!(
+            get(&path.replace(&id, &Uuid::new_v4().to_string()), "").starts_with("HTTP/1.1 403")
+        );
+        assert!(!url.contains(&h.token));
+        let unauthorized=request(h.addr,&format!("POST /api/music_albums HTTP/1.1\r\nHost: {}\r\nAuthorization: Bearer {}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",h.addr,music_key(&h.token,&id)));
+        assert!(unauthorized.starts_with("HTTP/1.1 401"));
+        assert_eq!(audio_range(Some("bytes=1-2,4-5"), 28), None);
     }
 
     #[test]

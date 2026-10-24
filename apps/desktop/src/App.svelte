@@ -18,6 +18,7 @@
   import Tools from './lib/screens/Tools.svelte';
   import Settings from './lib/screens/Settings.svelte';
   import Streaming from './lib/screens/Streaming.svelte';
+  import MusicPlayer from './lib/components/MusicPlayer.svelte';
 
   const nav: { route: Route; label: string; icon: IconName }[] = [
     { route: 'home', label: 'Home', icon: 'home' },
@@ -170,6 +171,8 @@
     </footer>
   {/if}
 </div>
+
+<MusicPlayer />
 
 {#if app.installToolId}
   <InstallDialog />

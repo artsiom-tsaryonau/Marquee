@@ -193,3 +193,14 @@ records title-specific evidence, an earlier unexplained SNES termination, and
 remaining native-save, streamed-profile and hardware-controller gates. Next is
 a Mesen virtual-desktop streaming profile, then the GB/GBC/PCE collection cohort;
 no additional engine download is needed for these systems.
+
+## Soundtrack foundation — 2026-10-24
+
+Game details now have an **OST** tab with named albums, source attribution,
+local audio import, explicit reusable links and a persistent compact player.
+Audio uses separate records and copied media; game scanning and acquisition
+remain independent. Tests cover persistence, pause/queue races and track-scoped
+HTTP seek access. Live WebKit/browser decoding and visual acceptance remain open.
+The [soundtrack guide](SOUNDTRACKS.md) owns usage, limits and MU0–MU5 gates.
+yt-dlp acquisition, Jellyfin and automatic matching remain later work; the source
+search link is not a downloader.

@@ -32,6 +32,7 @@ torrent/browser migration, event replay and console recipes remain proposals.
 | --- | --- |
 | [PS1](PS1.md), [PS2](PS2.md) | Existing disc adapters and independent open live acceptance gates |
 | [Emulators](EMULATORS.md) | Managed tool catalogue, adapter matrix, source recipes, firmware and live evidence |
+| [Soundtracks](SOUNDTRACKS.md) | Game OST tab, local player, storage/media access and acquisition roadmap |
 | [Archive preparation](INTAKE.md) | Implemented persistent ZIP/7z/RAR preparation, CLI/API/UI, recovery evidence and legacy intake |
 | [Torrents](TORRENTS.md) | Current embedded transport, history, private/public policy and remaining limits |
 | [Purple](PURPLE.md) | Narrow managed recipe and unverified game compatibility |

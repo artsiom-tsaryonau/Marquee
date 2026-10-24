@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { app } from '../state.svelte';
   import { StreamingControls } from '../streaming.svelte';
+  import { music } from '../music.svelte';
   const controls = new StreamingControls(app.api);
   const snapshot = $derived(controls.state);
   const occupied = $derived(controls.busy || !!snapshot?.operation || !!snapshot?.viewer.running);
@@ -77,7 +78,7 @@
     <section>
       <h2>Games offered by host</h2>
       <div class="games">{#each snapshot.host?.apps ?? [] as game (game.id)}
-        <article class="glass-panel panel"><h3>{game.title}</h3><button class="btn primary" data-nav disabled={occupied || !snapshot.receiver_installed} onclick={() => controls.act(() => app.api.streamingOpenViewer(game.id))}>Open viewer</button></article>
+        <article class="glass-panel panel"><h3>{game.title}</h3><button class="btn primary" data-nav disabled={occupied || !snapshot.receiver_installed} onclick={() => { music.pauseForGame(); void controls.act(() => app.api.streamingOpenViewer(game.id)); }}>Open viewer</button></article>
       {:else}<p class="hint">{snapshot.host ? 'No games are configured on this host.' : 'Connect a local host to see its games.'}</p>{/each}</div>
       <p class="hint">Only configured host games appear here. Library-wide streaming and host setup are next. Physical controller testing awaits a controller.</p>
     </section>

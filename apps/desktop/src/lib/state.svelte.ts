@@ -5,6 +5,7 @@ import { nativePortGame, canonicalId } from './unified';
 import { lutrisToGame } from './lutris';
 import { artFromSeed } from './art';
 import { libraryView } from './libraryView.svelte';
+import { music } from './music.svelte';
 import { portAction } from './presentation';
 import { describeScan } from './format';
 import { installOption } from './install';
@@ -322,6 +323,7 @@ class AppState {
   }
 
   play(game: GameEntry) {
+    music.pauseForGame();
     if (game.source === 'catalogue') { this.notify('Catalogue entry only. Open its source page or link an existing installation.'); return; }
     this.heroId = game.id;
     if (game.lutris) { void this.openLutrisGame(game); return; }
@@ -929,6 +931,7 @@ class AppState {
   }
 
   async launchPort(port: PortEntry) {
+    music.pauseForGame();
     delete this.portErrors[port.id];
     try {
       await this.api.launchPort(port.id);

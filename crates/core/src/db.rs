@@ -180,6 +180,7 @@ impl Db {
         }
         crate::romfacts::ensure_table(&self.conn)?;
         crate::wanted::ensure_table(&self.conn)?;
+        crate::music::ensure_tables(&self.conn)?;
         if version > SCHEMA_VERSION {
             return Err(crate::error::AppError::new(
                 "DB",
