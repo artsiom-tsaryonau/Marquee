@@ -229,7 +229,7 @@
         <button data-nav aria-pressed={app.mode === 'big'} class:on={app.mode === 'big'} onclick={() => (app.mode = 'big')}><Icon name="tv" size={16} /> Big Screen</button>
       </div>
     </div>
-    <div class="item"><div><strong>Keep navigation expanded</strong><span>Show sidebar labels in desktop mode.</span></div><button class="switch" class:on={app.sidebarExpanded} data-nav role="switch" aria-checked={app.sidebarExpanded} aria-label="Keep navigation expanded" onclick={() => (app.sidebarExpanded = !app.sidebarExpanded)}><i></i></button></div>
+    <div class="item"><div><strong>Expanded sidebar</strong><span>Show sidebar labels and resize the page. You can also use the sidebar toggle.</span></div><button class="switch" class:on={app.sidebarExpanded} data-nav role="switch" aria-checked={app.sidebarExpanded} aria-label="Expanded sidebar" onclick={() => (app.sidebarExpanded = !app.sidebarExpanded)}><i></i></button></div>
     <div class="item">
       <div><strong>Theme</strong><span>Dark is the default</span></div>
       <div class="seg" data-nav-row>

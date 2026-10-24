@@ -159,7 +159,10 @@ popover with outside-click/Escape dismissal and focus return. The device panel
 reports local output only and does not imply remote music-device support. The
 desktop player uses tighter vertical spacing, with a two-row narrow layout.
 The sidebar is flush to the window's left/top/bottom edges, and the page meets
-its right edge; persistent expansion reserves content space.
+its right edge. An explicit Expand/Collapse sidebar button toggles the saved
+expanded state; sidebar width and content offset animate together without an
+overlay. Hover and keyboard focus do not expand it. Reduced motion disables
+these transitions; the narrow-screen bottom navigation stays compact.
 
 OST content ends after its album list without the persistent unlink/storage
 footnote or added bottom padding. The relevant unlink action has a tooltip.

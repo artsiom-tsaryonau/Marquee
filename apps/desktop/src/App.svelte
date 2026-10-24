@@ -123,8 +123,11 @@
 
 <div class="shell" inert={!!(app.launching || app.running || app.installToolId)}>
   {#if app.mode === 'desktop'}
-    <nav class="side glass-panel" class:expanded={app.sidebarExpanded} aria-label="Main">
+    <nav id="desktop-navigation" class="side glass-panel" class:expanded={app.sidebarExpanded} aria-label="Main">
       <div class="brand"><span class="mark">M</span><span class="word">Marquee</span></div>
+      <button class="nav sidebar-toggle" data-nav aria-expanded={app.sidebarExpanded} aria-controls="desktop-navigation" aria-label={app.sidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'} title={app.sidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'} onclick={() => app.sidebarExpanded = !app.sidebarExpanded}>
+        <Icon name="sidebar" size={22} /><span>Collapse sidebar</span>
+      </button>
       {#each nav as n (n.route)}
         <button class="nav" class:on={app.route === n.route} aria-current={app.route === n.route ? 'page' : undefined} title={n.label} data-nav onclick={() => app.go(n.route)}>
           <Icon name={n.icon} size={22} />
@@ -233,6 +236,7 @@
     min-width: 0;
     display: block;
     margin-left: 76px;
+    transition: margin-left 220ms var(--ease);
   }
   :global([data-mode='big']) main { margin-left: 0; }
   .shell:has(.side.expanded) main { margin-left: 220px; }
@@ -243,7 +247,7 @@
     min-width: 0;
   }
 
-  /* Desktop sidebar: icons, labels slide out on hover. */
+  /* Explicit expansion and page offset animate together; navigation never overlays content. */
   .side {
     position: fixed;
     top: 0;
@@ -260,15 +264,9 @@
     gap: 4px;
     z-index: 20;
     overflow-x: hidden;
-    transition: width var(--side-close-duration) var(--ease);
+    transition: width 220ms var(--ease);
   }
-  .side.expanded,
-  .side:hover,
-  .side:focus-within {
-    width: 220px;
-    transition:
-      width var(--side-open-duration) var(--ease) var(--side-open-delay);
-  }
+  .side.expanded { width: 220px; }
   .brand {
     display: flex;
     align-items: center;
@@ -322,11 +320,9 @@
     opacity: 0;
     transition: opacity 160ms var(--ease);
   }
-  .side.expanded :is(.nav span, .word),
-  .side:hover :is(.nav span, .word),
-  .side:focus-within :is(.nav span, .word) {
+  .side.expanded :is(.nav span, .word) {
     opacity: 1;
-    transition: opacity 280ms var(--ease) var(--side-label-delay);
+    transition: opacity 160ms var(--ease);
   }
   .nav:hover,
   .nav:focus-visible {
@@ -596,25 +592,13 @@
     }
   }
 
-  :global(:root[data-motion='reduce']) .side,
-  :global(:root[data-motion='reduce']) .side:hover,
-  :global(:root[data-motion='reduce']) .side:focus-within {
-    transition-duration: 0.001ms !important;
-    transition-delay: 0ms !important;
-  }
-  :global(:root[data-motion='reduce']) .nav span,
-  :global(:root[data-motion='reduce']) .word,
-  :global(:root[data-motion='reduce']) .side:hover :is(.nav span, .word),
-  :global(:root[data-motion='reduce']) .side:focus-within :is(.nav span, .word) {
-    transition-duration: 0.001ms !important;
-    transition-delay: 0ms !important;
+  :global(:root[data-motion='reduce']) :is(.side, main, .nav span, .word) {
+    transition: none !important;
   }
 
   @media (max-width: 640px) {
     .side,
-    .side.expanded,
-    .side:hover,
-    .side:focus-within {
+    .side.expanded {
       position: fixed;
       top: auto;
       left: 0;
@@ -628,7 +612,7 @@
       justify-content: space-around;
       transition: none;
     }
-    .side :is(.brand, .nav span) {
+    .side :is(.brand, .nav span, .sidebar-toggle) {
       display: none;
     }
     .nav.on::before {

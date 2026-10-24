@@ -1,6 +1,7 @@
 <script lang="ts" module>
   // Line icons on a 24px grid, stroke = currentColor.
   const paths = {
+    sidebar: 'M3 4h18v16H3zM9 4v16M5.5 8h1M5.5 12h1',
     home: 'M3 11.5 12 4l9 7.5M5.5 9.5V20h13V9.5',
     grid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',
     puzzle: 'M9 4h3a2 2 0 1 1 4 0h0v4h0a2 2 0 1 1 0 4v4h-4a2 2 0 1 0-4 0H4v-4a2 2 0 1 0 0-4V4z',
