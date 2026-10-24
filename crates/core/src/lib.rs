@@ -1,4 +1,5 @@
 pub mod api;
+pub mod app_lists;
 pub mod artwork;
 pub mod bios;
 pub mod catalog;

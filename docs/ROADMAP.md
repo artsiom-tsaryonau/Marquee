@@ -38,7 +38,7 @@ local loopback success does not prove network performance. The initial
 local host, pairing, viewer controls and confirmed session stop/revoke on both
 surfaces. Host startup automation, edition mapping and an embedded receiver
 remain open. This does not mark the existing manager/store
-gates complete or restart the deferred Quiver work.
+gates complete. Quiver source review/import resumed on 2026-10-25; native recipe work remains separate.
 
 ST2a passed on 2026-10-24: pinned reference receiver installation, pairing and
 synthetic sustained video/ticking audio were observed. A source fix removed an
@@ -90,8 +90,7 @@ concrete deliverables and recovery acceptance. M3/M4 are independent after M2;
 do not block one on every provider in the other. Read-only console inventory and
 Steam discovery may proceed alongside the foundation. Console support ships one
 validated format/title path at a time, not as a prerequisite to every store flow.
-The store sequence remains Steam → compatibility/Epic → GOG; Quiver, optional
-enrichment and a separate manager UI remain deferred.
+The store sequence remains Steam → compatibility/Epic → GOG; optional enrichment and a separate manager UI remain deferred. Quiver Q0/Q1 now adds local app-list discovery, not another installation authority.
 
 [PS3 integration](PS3.md) now includes read-only discovery, pinned reviewed
 firmware installation, verified ISO registration, linked Media and direct RPCS3
@@ -179,8 +178,7 @@ Keep these open until observed; fixture/demo success does not close them:
   [scraper integration](https://github.com/artsiom-tsaryonau/fmhy-marquee-scrapers/blob/main/docs/MARQUEE_INTEGRATION.md).
 
 Continue [OpenGOAL/unified library](UNIFIED_LIBRARY.md) and
-[platform expansion](EXPANSION_CATALOGUE.md) against these contracts. Quiver remains
-[planning only](QUIVER_INTEGRATION.md). Artwork/enrichment never gates Play.
+[platform expansion](EXPANSION_CATALOGUE.md) against these contracts. [Quiver Q0/Q1](QUIVER_INTEGRATION.md) now supports reviewed local-list discovery; installation pilots remain Q2. Artwork/enrichment never gates Play.
 Separate manager UI, remote/NAS service, universal installer, additional providers
 and advanced collections are later work. Native streaming now has its own
 owner-scheduled [implementation track](STREAMING.md).
@@ -318,6 +316,4 @@ cross-instance acceptance and later private transfer. This is planned work, not
 native PS3 conversion or an implemented package format.
 
 The owner also resumed [Quiver integration](QUIVER_INTEGRATION.md). Q0 now pins
-upstream, retains notices and defines existing/new Linux port fixtures. Q1 is the
-next implementation step; hosted-catalogue mirroring and unattended installs are
-outside the first slice.
+upstream, retains notices and defines existing/new Linux port fixtures. Q1 now provides bounded local-file preview, selected import, stable source-scoped identities and existing-recipe mappings through Tools, shared APIs and CLI. Q2 native install/setup/launch acceptance remains next; hosted-catalogue mirroring and unattended installs are outside this slice.

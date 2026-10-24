@@ -1,6 +1,6 @@
 # Quiver integration roadmap
 
-Created 2026-10-22; resumed 2026-10-25. **Q0 source/schema review complete. Q1 implementation is next; no dynamic installation recipes are enabled.**
+Created 2026-10-22; resumed 2026-10-25. **Q0 and Q1 implemented: pinned source/schema review and offline app-list discovery import. Dynamic installation recipes remain Q2 work.**
 
 This track supports later native-port and catalogue expansion. It does not
 change the direct-store implementation order in [ROADMAP.md](ROADMAP.md), add a
@@ -28,8 +28,8 @@ engine becomes playable only after its adapter validates the required inputs.
 
 | Phase | Scope | Depends on |
 | --- | --- | --- |
-| Q0 | Pin upstream, review reuse rights and choose pilot entries | Owner schedules this deferred track |
-| Q1 | Offline app-list import, normalization and review | Q0 |
+| Q0 | Pin upstream, review reuse rights and choose pilot entries | **Done 2026-10-25** |
+| Q1 | Offline app-list import, normalization and review | **Done 2026-10-25** (Q0) |
 | Q2 | Reviewed native Linux installation pilot | Q1; shared persistent jobs and installation recovery |
 | Q3 | Catalogue refresh, release selection and update review | Q2 |
 | Q4 | Optional mod adapters | Q2/Q3; game-specific mod and save contracts |
@@ -40,18 +40,18 @@ only; do not delay it for a universal installer or the optional mods/kiosk work.
 
 ## Q0 — Reuse inventory and pilot selection
 
-- [ ] Pin the exact Quiver commit reviewed; record its version, source URLs and
+- [x] Pin the exact Quiver commit reviewed; record its version, source URLs and
   the files/algorithms/tests proposed for reuse. Recheck current code rather than
   treating the initial assessment as a quality or security audit.
-- [ ] Check root, core and file-level licenses, inherited notices and any copied
+- [x] Check root, core and file-level licenses, inherited notices and any copied
   dependencies. Preserve applicable copyright and MIT notices for copied or
   adapted code in a third-party attribution record and packaged notices.
-- [ ] Keep Marquee branding, identifiers, data directories and update endpoints.
+- [x] Keep Marquee branding, identifiers, data directories and update endpoints.
   Quiver's name, logo and app icons are excluded by its branding policy.
-- [ ] Evaluate catalogue data, reviews, artwork and hosted API usage separately
+- [x] Evaluate catalogue data, reviews, artwork and hosted API usage separately
   from the code license. Start with a user-provided local app list; no dependency
   on Quiver's hosted service or assumption of permission to mirror its database.
-- [ ] Inventory existing Marquee port/emulator capabilities and select two
+- [x] Inventory existing Marquee port/emulator capabilities and select two
   supported native Linux ports: one already represented and one genuinely new.
   Record game-data prerequisites and a known-good upstream release for each.
 
@@ -60,25 +60,25 @@ pilot fixtures. No upstream binary, script or catalogue entry is executed.
 
 ## Q1 — Reviewed app-list import
 
-- [ ] Implement bounded JSON parsing in core for the supported Quiver `apps`
+- [x] Implement bounded JSON parsing in core for the supported Quiver `apps`
   format. Reject malformed input as a failed import; never turn it into an empty
   library or overwrite personal data. Unknown fields get explicit diagnostics.
-- [ ] Map `name`, `project`, `repository`, `repositorySource`, `folderName`,
+- [x] Map `name`, `project`, `repository`, `repositorySource`, `folderName`,
   `releaseAssetFilter` and `tags` into discovery records. Treat `appIconUrl` as
   optional remote artwork with separate provenance and validation. Preserve
   unsupported requirements in the review result rather than silently dropping
   fields that change installation or launch behavior.
-- [ ] Preserve original field values and source provenance alongside normalized
+- [x] Preserve original field values and source provenance alongside normalized
   values. Use source-scoped entry identity; repository alone is insufficient
   because several apps may share one release repository. Never merge by title
   or derive a writable installation path directly from `folderName`.
-- [ ] Keep an explicit mapping to existing Marquee recipes and installations.
+- [x] Keep an explicit mapping to existing Marquee recipes and installations.
   Re-import is idempotent and preserves titles, favorites, sessions and profiles.
   Manual apps and unsupported providers remain discovery/manual entries.
-- [ ] Expose preview/approve through shared core commands and events, desktop,
+- [x] Expose preview/approve through shared core commands and events, desktop,
   browser and CLI. Show Add, Already present, Needs recipe and Unsupported, with
   actionable reasons. Preview cannot install or run anything.
-- [ ] Test malformed/oversized lists, unknown fields, path-like names, duplicate
+- [x] Test malformed/oversized lists, unknown fields, path-like names, duplicate
   entries, multiple apps per repository, repeat import and preserved user edits.
 
 **Gate:** import a local fixture, review and approve supported entries, restart,
@@ -207,3 +207,72 @@ release asset or retail data was downloaded or executed during Q0. Q2 must pin
 asset digests, validate setup/save contracts and observe launch before claiming
 the new port works. Q0's source/data/fixture inventory is complete; its live-game
 evidence belongs to Q2.
+
+
+## Q1 implementation record (2026-10-25)
+
+Tools → **App lists** accepts a user-selected local JSON file in the pinned modern
+`apps` format. The source name is a logical namespace, not an install path; reuse
+it for re-import. Preview shows Add, Already present or Update discovery details,
+a managed recipe mapping or Needs recipe/Unsupported, normalized tags, retained
+requirements and expandable original fields. Explicitly select and import the
+records. A preview never installs or launches anything. New list records stay in
+Tools discovery and do not add playable entries to Games.
+
+Original Rust parsing supports the documented name/project/customDisplayName,
+repository/provider, folderName, asset-filter, tags and optional icon fields.
+Unknown entry fields (including launch commands, local paths and setup/mod
+requirements) remain visible in the original record and block recipe reuse.
+Unknown root fields are reported and retained in the source snapshot. GitLab,
+manual and unsupported providers never silently become GitHub installers.
+Remote icons are retained as unfetched metadata. Only a known shipped GitHub
+recipe without external filters/unsupported fields receives a mapping; it is
+not proof of installed game data or readiness. The current new pilot needs a recipe.
+
+Bounds: 384 KiB UTF-8 JSON, 500 apps, bounded strings and tags, standard JSON
+recursion limit. Invalid JSON/field types, oversized input and duplicate
+source/provider/repository/folder identities fail the whole preview. Multiple
+apps in one repository require distinct folderName values. Path-like folders
+remain Unsupported and are never converted into writable paths. Legacy root
+arrays/sections are not supported by this first importer.
+
+New additive SQLite tables: `app_list_reviews`, `app_list_sources`,
+`app_list_entries`. Sources retain original JSON, SHA-256 and import timestamp;
+entries retain original values and normalized discovery metadata. IDs hash the
+source/provider/repository/folder identity, not the display title. A review
+expires after 30 minutes; a newer preview for the same source invalidates it.
+Approval checks every selected ID and publishes transactionally. Re-import only
+changes explicitly approved discovery records, and never removes absent entries,
+installs software or touches game titles, favorites, sessions, profiles or saves.
+This is separate from full source-refresh/removal/version-diff work in Q3.
+
+Shared API: `preview_app_list {source,json}`, `approve_app_list {token,ids}` and
+`app_list_entries`. CLI (uses the normal library lease; use an isolated data dir
+for experiments or close the main library first):
+
+```sh
+marquee app-list preview catalog/app-lists/pilots.json --source my-app-list
+marquee app-list approve <review-token> <entry-id> [<entry-id>...]
+marquee app-list list
+```
+
+Acceptance: full repository checks and production build passed. Unit tests cover
+bounds, malformed lists, duplicate/multi-app repositories, unknown executable
+requirements, unsafe folder names, unsupported providers, expired/cross-review
+IDs, restart/re-import identity and preserved game preferences. The real CLI
+preview/approve/list/re-import cycle passed across process restarts. Browser file
+selection and preview/approve/re-import passed at desktop and 390 px, with no
+horizontal overflow or JS errors. Fixtures were hand-authored locally; no hosted
+Quiver catalogue, remote icon, engine binary or retail data was fetched by import.
+
+Q2 remains open: the new port needs a pinned native recipe, durable manager
+installation/setup and real input/save/launch acceptance. The checked local N64
+input directory did not contain a compatible Majora’s Mask ROM. Do not report
+2 Ship 2 Harkinian as installed or playable from this discovery slice.
+
+
+Main-app rollout: two selected hand-authored pilot records were previewed and
+approved under the `marquee native-port pilots` source. Existing edition IDs,
+titles, favorites, artwork and runner overrides were checked unchanged. The
+updated native app exposes both records in Tools → App lists. No game binary
+was installed or launched by this rollout.

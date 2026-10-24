@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AppListImport from '../components/AppListImport.svelte';
   import type { PortEntry } from '../types';
   import { portAction, portStatusLabel } from '../presentation';
   import PortDialog from '../components/PortDialog.svelte';
@@ -176,6 +177,8 @@
     </form>
     </div>
   {/if}
+
+  <AppListImport />
 
   <div class="toolbar glass-panel">
     <label class="search"><Icon name="search" size={18} /><input bind:value={query} data-nav aria-label="Search tools" placeholder="Search emulators, ports, launchers, firmware…" /></label>

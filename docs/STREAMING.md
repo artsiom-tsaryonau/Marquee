@@ -375,5 +375,4 @@ the adapted contract and unmodified OpenAPI schema; it does not link a decoder.
 
 Marquee can replace orchestration or individual engine components when measured
 requirements justify it. Reimplementing encoding, the streaming protocol and
-controller transport is not a prerequisite for native UX. Quiver remains a
-separate [planning-only reuse track](QUIVER_INTEGRATION.md).
+controller transport is not a prerequisite for native UX. Quiver remains a separate [app-list integration track](QUIVER_INTEGRATION.md); Q0/Q1 discovery is implemented and does not add streaming runtime dependencies.

@@ -321,3 +321,11 @@ and content offset, rather than a relational `:has()` selector. Hidden labels
 leave layout completely, icon buttons center in the collapsed rail, and the
 sticky toolbar explicitly fills the content column. Expansion still moves the
 content; mobile navigation and Big Screen retain their independent layout.
+
+
+Tools → App lists now offers an offline Quiver-format discovery importer with
+source naming, file selection, candidate selection, original-field/requirements
+review and explicit import. Imported entries remain discovery metadata; recipe
+mappings name existing Marquee adapters, while new/manual/unsupported entries
+clearly require further work. Re-import reports Already present rather than
+adding duplicate games. No new sidebar destination or launch button is added.

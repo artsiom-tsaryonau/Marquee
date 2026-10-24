@@ -42,6 +42,8 @@ enum Command {
     #[command(subcommand)]
     Prepare(PrepareCmd),
     #[command(subcommand)]
+    AppList(AppListCmd),
+    #[command(subcommand)]
     Catalogue(CatalogueCmd),
     #[command(subcommand)]
     Library(LibraryCmd),
@@ -200,6 +202,20 @@ enum PrepareCmd {
     Cancel {
         id: String,
     },
+}
+
+#[derive(Subcommand)]
+enum AppListCmd {
+    /// Review a local Quiver-format list; does not install or run entries
+    Preview {
+        path: PathBuf,
+        #[arg(long, default_value = "my-app-list")]
+        source: String,
+    },
+    /// Approve selected entry IDs from a preview token
+    Approve { token: String, ids: Vec<String> },
+    /// List approved discovery entries
+    List,
 }
 
 #[derive(Subcommand)]
@@ -702,6 +718,23 @@ fn run() -> marquee_core::error::Result<()> {
             };
             println!("{}", serde_json::to_string_pretty(&value)?);
         }
+        Command::AppList(command) => match command {
+            AppListCmd::Preview { path, source } => println!(
+                "{}",
+                serde_json::to_string_pretty(
+                    &core
+                        .preview_app_list(&source, &marquee_core::app_lists::read_local(&path)?)?
+                )?
+            ),
+            AppListCmd::Approve { token, ids } => println!(
+                "{} discovery entries approved",
+                core.approve_app_list(&token, &ids)?
+            ),
+            AppListCmd::List => println!(
+                "{}",
+                serde_json::to_string_pretty(&core.app_list_entries()?)?
+            ),
+        },
         Command::Catalogue(command) => match command {
             CatalogueCmd::Import { path } => {
                 use std::io::Read;

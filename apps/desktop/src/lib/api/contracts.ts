@@ -403,10 +403,15 @@ export interface Ps3Inspection {
 export interface MediaAsset { id:string; title:string; kind:'image'|'video'; bytes:number; source:string; spoiler:boolean; position:number; available:boolean; }
 export interface MediaCollection { id:string; title:string; game_keys:string[]; assets:MediaAsset[]; }
 export interface MediaDisc { path:string; source_bytes:number; signature:string; items:{path:string; bytes:number; kind:'image'|'video'; supported:boolean}[]; }
+export interface AppListEntry { id:string; source:string; name:string; project:string|null; display_name:string; repository:string; provider:string; folder_name:string; release_asset_filter:string|null; tags:string[]; icon_url:string|null; recipe_id:string|null; status:'supported_recipe'|'needs_recipe'|'unsupported'; change:'add'|'already_present'|'update'; diagnostics:string[]; original:Record<string,unknown>; }
+export interface AppListReview { token:string; source:string; sha256:string; diagnostics:string[]; entries:AppListEntry[]; }
 export interface YoutubeSource { id:string; title:string; uploader:string; url:string; kind:'playlist'|'video'; duration:number|null; }
 export interface YoutubePlaylist { title:string; uploader:string; url:string; tracks:YoutubeSource[]; truncated:boolean; }
 export interface MetadataReview {token:string;provider:string;candidates:{id:number;title:string;system?:string;facts?:{year?:number;genre?:string;players?:number;description?:string}}[];}
 export interface LibraryApi {
+  previewAppList(source:string,json:string):Promise<AppListReview>;
+  approveAppList(token:string,ids:string[]):Promise<number>;
+  appListEntries():Promise<AppListEntry[]>;
   importPs3Disc(path:string):Promise<string>;
   searchGameMetadata(editionId:string,query:string):Promise<MetadataReview>;
   searchGameFacts(editionId:string,query:string):Promise<MetadataReview>;

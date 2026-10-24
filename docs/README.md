@@ -1,6 +1,6 @@
 # Marquee documentation
 
-Updated 2026-10-24. Marquee is the library and launcher; the hidden
+Updated 2026-10-25. Marquee is the library and launcher; the hidden
 `marquee-manager` runs local-archive preparation, torrent transport and the
 browser-job bridge as a separate background process. Remaining M3/M4 gates are
 live-provider, package and packaging work, not the first worker cutover. Steam
@@ -14,13 +14,14 @@ ready games must remain launchable without the manager.
 | [Roadmap](ROADMAP.md) | Product priority, current status and milestone summary |
 | [Marquee manager](MARQUEE_MANAGER.md) | Acquisition flow, architecture, process/data ownership, M0–M6 gates, migration and recovery |
 | [Console preparation](CONSOLE_PREPARATION.md) | Added Switch/PS3/PS4/Xbox/Xbox 360 collection: inventory, format/recipe work and per-platform acceptance |
-| [PS3](PS3.md) | Read-only discovery and reviewed firmware setup; Library Play remains open |
+| [PS3](PS3.md) | Verified ISO registration/direct RPCS3 launch; menu/video/audio and clean exit accepted |
 | [Streaming](STREAMING.md) | Native Wolf host/viewer track, ST2 acceptance and remaining ST3–ST5 gates |
 | [Store implementation](STORE_INTEGRATION.md) | Current Steam inventory evidence; Steam → compatibility/Epic → GOG tasks and acceptance |
 | [Unified library](UNIFIED_LIBRARY.md) | Game/edition/installation/profile identity, wishlist/without-files behavior and OpenGOAL track |
 | [Connector priorities](MEDIA_CONNECTOR_PRIORITIES.md) | Provider scope and source-specific constraints |
 | [Expansion catalogue](EXPANSION_CATALOGUE.md) | Future platform/port/collection ideas; not implemented capability or a competing work order |
-| [Quiver integration](QUIVER_INTEGRATION.md) | Deferred reuse/integration plan |
+| [Quiver integration](QUIVER_INTEGRATION.md) | Pinned schema/license review and implemented local app-list discovery; Q2 native recipes next |
+| [Portable packages](PORTABLE_PACKAGES.md) | Proposed manifest/receipt export and import across instances; no package format implemented |
 
 The 2026-10-22 manager decision supersedes launcher-owned universal jobs and puts
 the common preparation foundation ahead of completing direct stores. It does

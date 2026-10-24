@@ -122,7 +122,7 @@ Game → Media → Soundtrack → **Find soundtrack** offers playlist and video
 search, an ordered playlist preview and **Link source**. A browser YouTube search
 link remains available. Opening a result is explicit; it never launches a browser
 automatically to solve sign-in or verification challenges. No Quiver code is used:
-Quiver remains the deferred app/recomp catalogue track, not a soundtrack provider.
+Quiver’s separate app-list discovery integration does not provide soundtrack search.
 
 The first search installs the same pinned official Linux x86-64 yt-dlp release and
 SHA-256 recorded above under `<data>/music-tools/yt-dlp/2026.10.21/yt-dlp`.

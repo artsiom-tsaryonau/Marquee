@@ -35,6 +35,16 @@ fn out<T: Serialize>(value: T) -> Result<Value> {
 pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
     let sink: Arc<dyn EventSink> = core.hub();
     match cmd {
+        "preview_app_list" => {
+            out(core.preview_app_list(&text(&args, "source")?, &text(&args, "json")?)?)
+        }
+        "approve_app_list" => out(core.approve_app_list(
+            &text(&args, "token")?,
+            &serde_json::from_value::<Vec<String>>(
+                args.get("ids").cloned().unwrap_or(Value::Null),
+            )?,
+        )?),
+        "app_list_entries" => out(core.app_list_entries()?),
         "ps3_firmware_status" => out(core.ps3_firmware_status()?),
         "review_ps3_firmware" => {
             out(core.review_ps3_firmware(PathBuf::from(text(&args, "path")?).as_path())?)
