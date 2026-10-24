@@ -17,10 +17,10 @@ export function contrastRatio(a: string, b: string): number {
   const x = luminance(a), y = luminance(b);
   return (Math.max(x, y) + .05) / (Math.min(x, y) + .05);
 }
-export function musicPalette(value: unknown, theme: 'dark' | 'light') {
+export function musicPalette(value: unknown, theme: 'dark' | 'light', surface?: string) {
   const fill = musicAccent(value);
   const ink = contrastRatio(fill, '#000000') >= contrastRatio(fill, '#ffffff') ? '#000000' : '#ffffff';
-  const background = theme === 'light' ? '#eef0f7' : '#181826';
+  const background = surface ?? (theme === 'light' ? '#eef0f7' : '#181826');
   const target = theme === 'light' ? 0 : 255;
   let text = fill;
   for (let step = 1; contrastRatio(text, background) < 4.5 && step <= 100; step++) {

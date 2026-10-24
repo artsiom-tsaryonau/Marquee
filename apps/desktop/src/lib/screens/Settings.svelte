@@ -237,6 +237,10 @@
         <button data-nav aria-pressed={app.theme === 'light'} class:on={app.theme === 'light'} onclick={() => (app.theme = 'light')}><Icon name="sun" size={16} /> Light</button>
       </div>
     </div>
+    <div class="item">
+      <div><strong>Visual style</strong><span>Aircloud panels and compact controls, with brighter color for your games.</span></div>
+      <div class="seg" data-nav-row><button data-nav aria-pressed={app.visualStyle === 'aircloud'} class:on={app.visualStyle === 'aircloud'} onclick={() => app.visualStyle = 'aircloud'}>Aircloud Color</button><button data-nav aria-pressed={app.visualStyle === 'classic'} class:on={app.visualStyle === 'classic'} onclick={() => app.visualStyle = 'classic'}>Classic</button></div>
+    </div>
     <div class="item music-appearance">
       <div><strong>Music accent</strong><span>Music uses round play buttons and its own color, separate from game Play.</span></div>
       <div class="music-colors" role="group" aria-label="Music accent color">

@@ -153,6 +153,31 @@ behavior. This dated checklist does not close rendered/native/controller gates.
 
 ## Presentation goals still to validate or extend
 
+The cover-layout pass uses **Platform shelves** as the saved library layout,
+with **Grid** retained in the layout selector. Shelves group the existing chosen
+play option's platform without changing canonical identities; sorting/filtering
+still determines the order within each system. Each shelf initially renders 12
+games, with Show more and View all controls. View all selects that platform and
+uses the paginated grid. Search, catalogue and single-platform views remain flat.
+Grouping is therefore by the displayed installation, not a new game identity or
+an assertion that each console has only one packaging shape.
+
+Home shelves preserve recent-play/recent-add order. All shelf images share a
+height and use variable widths; the decoded image supplies its actual ratio,
+without cropping, with bounded width reservation. Platform case ratios are only
+defaults for loading/missing-art states; regional packaging varies. In a filtered
+grid, the platform default also reserves a more suitable row height. Missing-art
+cards no longer repeat the game title both inside and beneath the cover.
+
+**Settings → Appearance → Visual style** now offers **Aircloud Color** (default)
+and **Classic**. The workspace dashboard's `web/src/theme.js` and `dashboard.css`
+informed the slate surfaces, thin borders, compact 8–14 px controls/panels and
+blue/teal palette. Marquee keeps its existing readable sans font, brighter game
+accents and independently saved music color. Dark/light and effects preferences
+remain independent; this is a Marquee adaptation, not an Aircloud runtime package
+dependency. Cover frames remain hover/focus treatments. Rendered acceptance at
+desktop/narrow/Big Screen sizes remains open.
+
 The owner-selected game-page layout now follows a Steam-style media/details
 structure without commerce or reviews: compact title, a large real-media stage
 with selectable thumbnails, release information alongside it, then Play/manage

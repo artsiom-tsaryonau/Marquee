@@ -59,7 +59,8 @@
   $effect(() => {
     const root = document.documentElement;
     root.dataset.theme = app.theme;
-    const palette = musicPalette(app.musicAccent, app.theme);
+    root.dataset.style = app.visualStyle;
+    const palette = musicPalette(app.musicAccent, app.theme, app.visualStyle === 'aircloud' ? app.theme === 'light' ? '#edf2fb' : '#20273b' : undefined);
     root.style.setProperty('--music-accent', palette.fill);
     root.style.setProperty('--music-ink', palette.ink);
     root.style.setProperty('--music-text', palette.text);

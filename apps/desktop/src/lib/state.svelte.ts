@@ -46,6 +46,8 @@ class AppState {
   showLegacyIntegrations = $state(load('showLegacyIntegrations', false));
   sidebarExpanded = $state(load('sidebarExpanded', false));
   theme = $state<'dark' | 'light'>(load('theme', 'dark'));
+  visualStyle = $state<'aircloud' | 'classic'>(load<string>('visualStyle', 'aircloud') === 'classic' ? 'classic' : 'aircloud');
+  libraryLayout = $state<'platform' | 'grid'>(load<string>('libraryLayout', 'platform') === 'grid' ? 'grid' : 'platform');
   musicAccent = $state(musicAccent(load<unknown>('musicAccent', '#63e6be')));
   reduceMotion = $state<boolean>(load('reduceMotion', false));
   visualEffects = $state<'balanced' | 'full'>(load<string>('visualEffects', 'balanced') === 'full' ? 'full' : 'balanced');
@@ -123,6 +125,8 @@ class AppState {
     $effect.root(() => {
       $effect(() => save('mode', this.mode));
       $effect(() => save('theme', this.theme));
+      $effect(() => save('visualStyle', this.visualStyle));
+      $effect(() => save('libraryLayout', this.libraryLayout));
       $effect(() => save('musicAccent', musicAccent(this.musicAccent)));
       $effect(() => save('sidebarExpanded', this.sidebarExpanded));
       $effect(() => save('showLegacyIntegrations', this.showLegacyIntegrations));

@@ -9,24 +9,29 @@
     shape = 'cover',
     placeholders = 0,
     onPlaceholder,
+    onViewAll,
+    initialCount = 24,
   }: {
     title: string;
     games: GameEntry[];
     shape?: 'cover' | 'wide';
     placeholders?: number;
     onPlaceholder?: () => void;
+    onViewAll?: () => void;
+    initialCount?: number;
   } = $props();
   let visibleCount = $state(24);
+  $effect(() => { visibleCount = initialCount; });
   let scroller = $state<HTMLDivElement>();
   function scroll(direction: number) { scroller?.scrollBy({ left: direction * scroller.clientWidth * .8, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }); }
 </script>
 
 {#if games.length || placeholders}
   <section class="row">
-    <div class="heading"><h2>{title} {#if games.length}<span>{games.length}</span>{/if}</h2><div class="row-actions"><button data-nav aria-label={`Scroll ${title} left`} onclick={() => scroll(-1)}>←</button><button data-nav aria-label={`Scroll ${title} right`} onclick={() => scroll(1)}>→</button></div></div>
+    <div class="heading"><h2>{title} {#if games.length}<span>{games.length}</span>{/if}</h2><div class="row-actions">{#if onViewAll}<button class="view-all" data-nav onclick={onViewAll}>View all →</button>{/if}<button data-nav aria-label={`Scroll ${title} left`} onclick={() => scroll(-1)}>←</button><button data-nav aria-label={`Scroll ${title} right`} onclick={() => scroll(1)}>→</button></div></div>
     <div bind:this={scroller} class="scroller" data-nav-row>
       {#each games.slice(0, visibleCount) as game (game.id)}
-        <Cover {game} {shape} showTitle />
+        <Cover {game} {shape} showTitle shelf />
       {/each}
       {#if games.length > visibleCount}
         <button class="more btn glass" data-nav onclick={() => (visibleCount += 24)}>Show more · {visibleCount} of {games.length}</button>

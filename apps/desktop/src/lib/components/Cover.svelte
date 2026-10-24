@@ -6,12 +6,14 @@
   import { app } from '../state.svelte';
   import Icon from './Icon.svelte';
   import Mark, { hasMark } from './Mark.svelte';
+  import { caseRatio } from '../coverLayout';
 
   let {
     game,
     shape = 'cover',
     showTitle = false,
-  }: { game: GameEntry; shape?: 'cover' | 'wide'; showTitle?: boolean } = $props();
+    shelf = false,
+  }: { game: GameEntry; shape?: 'cover' | 'wide'; showTitle?: boolean; shelf?: boolean } = $props();
 
   const status = $derived(gameStatus(game));
   const imageUrl = $derived(shape === 'wide' ? game.heroUrl ?? game.coverUrl : game.coverUrl);
@@ -19,11 +21,11 @@
   let failedUrl = $state<string>();
   const hasImage = $derived(!!imageUrl && failedUrl !== imageUrl);
   // Reserve a plausible case size until the real artwork dimensions arrive.
-  const defaultRatio = $derived(shape === 'wide' && game.heroUrl ? 16 / 9 : ['ps1', 'ds', '3ds', 'dreamcast'].includes(game.platform) ? 1 : 2 / 3);
+  const defaultRatio = $derived(shape === 'wide' && game.heroUrl ? 16 / 9 : caseRatio(game.platform));
   const ratio = $derived(hasImage && loaded && loaded.url === imageUrl ? loaded.ratio : defaultRatio);
 </script>
 
-<div class="wrap {shape}" style="--art-ratio:{ratio}">
+<div class="wrap {shape}" class:shelf style="--art-ratio:{ratio}">
   <div class="stage">
   <button
     class="card"
@@ -44,7 +46,7 @@
       {:else}
         <div class="fallback">
           {#if hasMark(game.platform)}<Mark id={game.platform} size={28} />{:else}<Icon name="controller" size={28} />{/if}
-          <span class="fallback-title">{cleanTitle(game.title)}</span>
+          {#if !showTitle}<span class="fallback-title">{cleanTitle(game.title)}</span>{/if}
           <span class="plat">{platformLabel[game.platform]}</span>
         </div>
       {/if}
@@ -66,7 +68,7 @@
 
 <style>
   .wrap {
-    --art-h: calc(var(--cover-w) * 1.5);
+    --art-h: calc(var(--cover-w) / var(--slot-ratio, .6666667));
     flex: none;
     width: var(--cover-w);
   }
@@ -80,6 +82,8 @@
     align-items: flex-end;
     justify-content: center;
   }
+  .wrap.shelf { --art-h: calc(var(--cover-w) * 1.35); width: calc(var(--art-h) * clamp(0.55, var(--art-ratio), 2.2)); }
+  .shelf .card { width: 100%; height: 100%; aspect-ratio: auto; }
   .card {
     position: relative;
     display: block;
@@ -118,7 +122,7 @@
     align-items: center;
     justify-content: center;
     gap: 14px;
-    padding: 42px 12px;
+    padding: 20px 12px;
     text-align: center;
   }
   .fallback-title {

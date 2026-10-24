@@ -196,6 +196,12 @@ no additional engine download is needed for these systems.
 
 ## Soundtrack foundation — 2026-10-24
 
+The library now offers saved platform shelves or a flat grid; mixed Home shelves
+keep chronological ordering and a shared image height with native image widths.
+Aircloud Color adapts the dashboard's panel/control hierarchy with brighter
+Marquee accents, with Classic available in Appearance. These presentation
+choices preserve canonical game IDs and independent music preferences.
+
 The game-page layout now uses a Steam-inspired media stage/thumbnail strip,
 adjacent release summary and a Play/activity toolbar, followed by Overview/OST.
 Only available assets are shown, with contained box art when that is the only

@@ -10,6 +10,8 @@
   import { canonicalId, groupGames, launchMethod, matchesVariant, methodLabel } from '../unified';
   import type { Platform } from '../types';
   import Cover from '../components/Cover.svelte';
+  import Row from '../components/Row.svelte';
+  import { caseRatio, platformShelves } from '../coverLayout';
   import GhostCover from '../components/GhostCover.svelte';
   import Icon from '../components/Icon.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
@@ -97,6 +99,8 @@
     untrack(() => { if (view.signature !== signature) { view.signature = signature; view.visibleCount = PAGE; } });
   });
   const grouped = $derived(groupGames(shown, app.variantPreferences));
+  const shelves = $derived(platformShelves(grouped.map(g => g.game)));
+  const showShelves = $derived(app.libraryLayout === 'platform' && !view.platform && !view.query.trim() && !view.discovery && grouped.length > 0);
 
   const filtering = $derived(!!view.query || !!view.platform || !!view.sourceFilter || !!view.region || !!view.language || !!view.revision || !!view.playerMode || view.installedOnly || view.noFiles || view.favOnly);
   function changeScope(discovery: boolean) { clearFilters(); view.discovery = discovery; }
@@ -199,6 +203,7 @@
       <button class="chip" class:on={view.noFiles} data-nav aria-pressed={view.noFiles} onclick={() => (view.noFiles = !view.noFiles)} title="Wishlist and games whose files are not here">Without files{#if noFilesCount} <span>{noFilesCount}</span>{/if}</button>
       <button class="chip" class:on={view.favOnly} data-nav aria-pressed={view.favOnly} onclick={() => (view.favOnly = !view.favOnly)}><Icon name="star" size={14} filled={view.favOnly} /> Favourites</button>
       <button class="chip" class:on={secondaryActive > 0} data-nav aria-expanded={view.filtersOpen} aria-controls="more-filters" onclick={() => (view.filtersOpen = !view.filtersOpen)}>Filters{#if secondaryActive}<span class="badge">{secondaryActive}</span>{/if}</button>
+      <select class="ui-select" bind:value={app.libraryLayout} data-nav aria-label="Library layout"><option value="platform">Layout: Platform shelves</option><option value="grid">Layout: Grid</option></select>
       <select class="ui-select" bind:value={view.sort} data-nav aria-label="Sort by">
         <option value="title">Sort: A → Z</option>
         <option value="added">Sort: Recently added</option>
@@ -247,7 +252,10 @@
   {/if}
 
   {#if app.lutrisError}<div class="empty-banner"><p>Lutris refresh failed. Previously imported entries may be out of date.</p><button class="btn glass small" data-nav onclick={() => app.go('tools')}>Check connection</button></div>{/if}
-  <div class="grid">
+  {#if showShelves}
+    <div class="platform-shelves">{#each shelves as [platform, games] (platform)}<Row title={platformLabel[platform]} {games} initialCount={12} onViewAll={() => view.platform = platform} />{/each}</div>
+  {:else}
+  <div class="grid" style="--slot-ratio:{view.platform ? caseRatio(view.platform) : 2 / 3}">
     {#each grouped.slice(0, view.visibleCount) as group (group.game.id)}
       {@const platformTags = [...new Set(group.entries.map((e) => e.platform))]}
       <div class="grid-cell" animate:flip={{ duration: dur }} in:scale={{ start: 0.92, duration: dur }}>
@@ -270,11 +278,13 @@
   {#if grouped.length > view.visibleCount}
     {#key view.visibleCount}<div class="load-more" use:nearEnd><button class="btn glass" data-nav onclick={() => (view.visibleCount += PAGE)}>Show more · {view.visibleCount} of {grouped.length}</button></div>{/key}
   {/if}
+  {/if}
   {#if view.discovery}<CatalogueImport />{/if}
   <ArchiveImport />
 </div>
 
 <style>
+  .platform-shelves { margin-inline: calc(-1 * var(--gutter)); }
   .archive-entry { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-bottom:20px; }
   .archive-entry span { font-size:13px; color:var(--text-dim); }
   .scope { display:flex; gap:8px; margin-bottom:20px; }

@@ -128,3 +128,14 @@ test('album artwork prefers the release image and uses only explicit game links 
   const {player}=setup();await player.play({musicUrl:async()=>'/one'},{...album,cover_data_url:release.url,cover_source:release.label},'one');
   assert.equal(player.current.artwork,release.url);assert.equal(player.current.artworkSource,'Chosen locally');
 });
+
+test('custom music accents stay readable against Aircloud panel surfaces', () => {
+  for (const theme of ['light','dark']) {
+    const surface=theme==='light'?'#edf2fb':'#20273b';
+    for (const fill of ['#000000','#ffffff','#777777',...musicAccents.map(p=>p.value)]) {
+      const palette=musicPalette(fill,theme,surface);
+      assert.ok(contrastRatio(palette.text,surface)>=4.5);
+      assert.ok(contrastRatio(palette.fill,palette.ink)>=4.5);
+    }
+  }
+});

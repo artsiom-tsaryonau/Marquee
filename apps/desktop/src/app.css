@@ -76,6 +76,52 @@
   color-scheme: light;
 }
 
+/* Aircloud dashboard structure, with a brighter Marquee palette. */
+:root[data-style='aircloud'] {
+  --bg: #101321;
+  --surface: #171d30;
+  --surface-strong: #20273b;
+  --field: rgb(138 165 225 / .1);
+  --field-strong: rgb(138 165 225 / .2);
+  --line: #303a52;
+  --text: #eef3ff;
+  --text-soft: #c7d3e8;
+  --text-dim: #a6b6d2;
+  --accent: #79c9ff;
+  --radius: 8px;
+  --select-bg: #1b2237;
+  --select-bg-hover: #28314a;
+}
+:root[data-style='aircloud'][data-theme='light'] {
+  --bg: #edf2fb;
+  --surface: #ffffff;
+  --surface-strong: #f7f9ff;
+  --field: rgb(55 80 130 / .07);
+  --field-strong: rgb(55 80 130 / .15);
+  --line: #c6d2e7;
+  --text: #172137;
+  --text-soft: #33445f;
+  --text-dim: #4d607c;
+  --accent: #225fc6;
+  --select-bg: #ffffff;
+  --select-bg-hover: #e5edfa;
+}
+:root[data-style='aircloud'] .glass-panel { box-shadow: 0 1px 0 rgb(255 255 255 / .03) inset; }
+:root[data-style='aircloud'] .btn { border-radius: 8px; font-size: 13px; }
+:root[data-style='aircloud'] .btn:not(.primary):not(.icon):not(.big) { height: 40px; }
+:root[data-style='aircloud'] .btn.glass { color: var(--text-soft); background: var(--field); border-color: var(--line); }
+:root[data-style='aircloud'] .btn.primary { box-shadow: 0 5px 18px -9px hsl(var(--accent-h) 90% 60% / .65); }
+:root[data-style='aircloud'] .btn:hover { transform: translateY(-1px); }
+:root[data-style='aircloud'] .side { border-radius: 12px; }
+:root[data-style='aircloud'] .nav { border-radius: 8px; font-size: 13px; }
+:root[data-style='aircloud'] .desktop-toolbar { background: var(--surface); }
+:root[data-style='aircloud'] .row h2 { font-size: var(--row-title); letter-spacing: .01em; }
+:root[data-style='aircloud'] .chip { border-radius: 7px; }
+:root[data-style='aircloud'] .row { border-top: 1px solid color-mix(in srgb,var(--line) 65%,transparent); padding-top: 16px; }
+:root[data-style='aircloud'] .row h2::before { content: ''; display: inline-block; width: 3px; height: .85em; margin-right: 10px; border-radius: 2px; background: linear-gradient(#79c9ff,#a78bfa); }
+:root[data-style='aircloud'] .art.generated { background: radial-gradient(ellipse at 75% 10%,hsl(var(--accent-h) 55% 30% / .65),transparent 75%),linear-gradient(145deg,#202a42,#141b2e); }
+:root[data-style='aircloud'] .cover .card:hover, :root[data-style='aircloud'] .wide .card:hover { box-shadow: 0 0 0 2px hsl(var(--accent-h) 85% 72%),0 8px 24px #0003; }
+
 /* Big Screen: ten-foot UI, everything larger. */
 :root[data-mode='big'] {
   --cover-w: 220px;

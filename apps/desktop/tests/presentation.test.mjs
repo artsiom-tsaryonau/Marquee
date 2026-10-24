@@ -48,3 +48,14 @@ test('game media gallery orders real assets and deduplicates URLs without invent
   assert.deepEqual(items.map(i=>i.kind),['hero','screenshot','cover']);
   assert.equal(items[1].caption,'Actual gameplay');
 });
+
+test('platform shelves preserve filtered order inside each system and keep every game once', async () => {
+  const {caseRatio,platformShelves}=await import('../src/lib/coverLayout');
+  const games=[{id:'unknown',platform:'unknown'},{id:'ps2-b',platform:'ps2'},{id:'ps1-a',platform:'ps1'},{id:'ps2-a',platform:'ps2'}];
+  const shelves=platformShelves(games);
+  assert.deepEqual(shelves.map(([p])=>p),['ps2','ps1','unknown']);
+  assert.deepEqual(shelves[0][1].map(g=>g.id),['ps2-b','ps2-a']);
+  assert.equal(new Set(shelves.flatMap(([,list])=>list.map(g=>g.id))).size,games.length);
+  assert.deepEqual(games.map(g=>g.id),['unknown','ps2-b','ps1-a','ps2-a']);
+  assert.equal(caseRatio('ps1'),1);assert.equal(caseRatio('ps2'),2/3);assert.ok(caseRatio('snes')>1);
+});
