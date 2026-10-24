@@ -51,6 +51,7 @@ pub fn snapshot(db: &Db) -> Result<Vec<Runner>> {
             let kind = RunnerKind::parse(&row.kind);
             let available = command_available(&command);
             Ok(Runner {
+                systems: compatible_systems(&row.id, &kind),
                 id: row.id,
                 kind,
                 display_name: row.display_name,
@@ -102,47 +103,87 @@ pub fn emulator_runner_for(system: &str) -> Option<String> {
         .map(|id| crate::emulators::runner_id(&id))
 }
 
-pub fn pick_for_system<'a>(runners: &'a [Runner], system: &str) -> Option<&'a Runner> {
-    if let Some(id) = emulator_runner_for(system) {
-        return runners.iter().find(|r| r.id == id && r.available);
+/// Compatibility comes from reviewed system descriptors, never executable names.
+pub fn compatible(runner: &Runner, system: &str) -> bool {
+    if let Ok(desc) = crate::catalog::by_id(system) {
+        if let Some(default) = desc.emulator {
+            return runner.kind == RunnerKind::Emulator
+                && std::iter::once(default)
+                    .chain(desc.alternative_emulators)
+                    .any(|id| runner.id == crate::emulators::runner_id(&id));
+        }
+        return runner.kind == preferred_kind(system) || runner.kind == RunnerKind::Fake;
     }
-    let wanted = preferred_kind(system);
+    false
+}
+
+fn compatible_systems(id: &str, kind: &RunnerKind) -> Vec<String> {
+    crate::catalog::all()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|d| {
+            if let Some(default) = &d.emulator {
+                *kind == RunnerKind::Emulator
+                    && std::iter::once(default)
+                        .chain(d.alternative_emulators.iter())
+                        .any(|e| id == crate::emulators::runner_id(e))
+            } else {
+                *kind == preferred_kind(&d.id) || *kind == RunnerKind::Fake
+            }
+        })
+        .map(|d| d.id)
+        .collect()
+}
+
+pub fn pick_for_system<'a>(runners: &'a [Runner], system: &str) -> Option<&'a Runner> {
+    let default = emulator_runner_for(system);
     runners
         .iter()
         .find(|r| {
-            r.kind == wanted && (r.id == PCSX2_RUNNER_ID || r.source == "marquee") && r.available
+            r.available
+                && compatible(r, system)
+                && default
+                    .as_ref()
+                    .map_or(r.source == "marquee", |id| &r.id == id)
         })
-        .or_else(|| runners.iter().find(|r| r.kind == wanted && r.available))
         .or_else(|| {
             runners
                 .iter()
-                .find(|r| r.kind == RunnerKind::Fake && r.available)
+                .find(|r| r.available && compatible(r, system))
         })
 }
 
-/// Honour a stored runner selection only when it belongs to this system's
-/// emulator family. Otherwise a PCSX2 pin left by a PS2 session hijacks a PS1
-/// launch (and vice versa), booting the wrong emulator.
-///
-/// The fake runner is deliberately system-agnostic: it is the explicit test
-/// stand-in (`--allow-fake`) and never boots a real disc.
 pub fn selection_for<'a>(
     runners: &'a [Runner],
     selected: Option<&str>,
     system: &str,
 ) -> Option<&'a str> {
     let id = selected?;
-    if let Some(runner_id) = emulator_runner_for(system) {
-        return runners
-            .iter()
-            .find(|r| r.id == id && r.id == runner_id)
-            .map(|r| r.id.as_str());
-    }
-    let wanted = preferred_kind(system);
     runners
         .iter()
-        .find(|r| r.id == id && (r.kind == wanted || r.kind == RunnerKind::Fake))
+        .find(|r| r.id == id && compatible(r, system))
         .map(|r| r.id.as_str())
+}
+
+/// Explicit selections never fall back to a different engine with different saves.
+pub fn resolve<'a>(
+    runners: &'a [Runner],
+    system: &str,
+    profile: Option<&str>,
+    selected: Option<&str>,
+) -> Result<&'a Runner> {
+    if let Some(id) = profile.or(selected) {
+        let runner = runners.iter().find(|r| r.id == id && compatible(r, system))
+            .ok_or_else(|| AppError::new("RUNNER_MISSING", "The selected emulator is unavailable or incompatible. Choose another emulator."))?;
+        require_launchable(runner)?;
+        return Ok(runner);
+    }
+    pick_for_system(runners, system).ok_or_else(|| {
+        AppError::new(
+            "RUNNER_MISSING",
+            format!("No compatible emulator is installed for {system}"),
+        )
+    })
 }
 
 pub fn uses_marquee_prefix(runner: &Runner) -> bool {
@@ -245,8 +286,25 @@ fn command_available(command: &[String]) -> bool {
     let Some(bin) = command.first() else {
         return false;
     };
-    if !executable(Path::new(bin)) && which(bin).is_none() {
+    let exists = |bin: &str| executable(Path::new(bin)) || which(bin).is_some();
+    if !exists(bin) {
         return false;
+    }
+    // Managed commands start with env plus XDG assignments. Checking only env
+    // would incorrectly report a deleted emulator executable as available.
+    if Path::new(bin).file_name().is_some_and(|name| name == "env") {
+        return command
+            .iter()
+            .skip(1)
+            .find(|arg| {
+                !arg.split_once('=').is_some_and(|(key, _)| {
+                    !key.is_empty()
+                        && key.bytes().enumerate().all(|(i, b)| {
+                            b == b'_' || b.is_ascii_alphabetic() || i > 0 && b.is_ascii_digit()
+                        })
+                })
+            })
+            .is_some_and(|program| exists(program));
     }
     true
 }

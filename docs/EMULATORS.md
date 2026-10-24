@@ -2,6 +2,45 @@
 
 Updated 2026-10-24. Marquee installs emulators and holds BIOS images inside its own data folder, so everything can be removed on demand. **Policy (2026-10-21):** Marquee installs, configures and runs emulators itself, from verified archives or reviewed pinned source recipes named in the catalogue. It does not use Flatpak or other package managers, and it no longer discovers host copies of emulators. Setup that an emulator would normally ask the user for is written by Marquee before launch.
 
+## GB/GBC engine selection
+
+Game Boy and Game Boy Color descriptors retain Mesen as their default and list
+mGBA as a reviewed alternative. Installing mGBA now registers a library runner;
+its catalogue launch template opens Qt with the selected cartridge path and adds
+`-f` only for fullscreen. GBA is not enabled by this change.
+
+Settings → Games and controls offers independent GB and GBC defaults. A game’s
+installation sidebar offers **Play with**, including **Platform default** to
+clear its override. The shared core validates compatibility and availability;
+choices persist through restart. The native and browser UI use the same APIs.
+Snapshots publish compatible systems and game overrides so displayed readiness
+matches launch resolution. An unavailable explicit default/override blocks Play
+until repaired or changed, rather than switching engines and save directories.
+
+CLI equivalents:
+
+```sh
+marquee runners select runner.mgba.marquee --system gb
+marquee runners for-game <edition-id> runner.mesen.marquee
+marquee runners for-game <edition-id>  # clear the game override
+```
+
+Mesen retains its existing `mesen/xdg-config/Mesen2` data. mGBA writes to its own
+`mgba/xdg-data/saves` and `mgba/xdg-data/states` through the managed wrapper.
+Selection does not copy, convert or merge battery saves or states. Both engines
+retain their existing isolated XDG paths; no personal settings are rewritten.
+Tests cover persistence, override precedence, incompatible-engine rejection,
+missing-engine blocking and literal game paths. Real GB/GBC video/audio/input,
+battery-save persistence, state restoration and streaming remain separate live
+gates; the earlier NES/SNES Mesen acceptance does not establish them.
+
+Host check (2026-10-24): the pinned mGBA source recipe completed in an isolated
+library and in the main library. A copied DryMouth GB cartridge launched through
+the isolated library adapter and exited with code 0 after 87 seconds. This is
+process/session evidence; video, audio and keyboard acceptance await owner
+confirmation. Main-library installation did not create GB/GBC default settings
+or change Mesen’s data. Pilot files and logs remain ignored local artifacts.
+
 ## Manager and added collection (planned)
 
 [Marquee manager](MARQUEE_MANAGER.md) will run durable setup/preparation jobs;
@@ -44,7 +83,7 @@ streamed/controller acceptance.
 | Azahar | Nintendo 3DS | Managed lifecycle and standalone opening |
 | Cemu | Wii U | Managed lifecycle and standalone opening |
 | xemu | Original Xbox | Managed lifecycle and standalone opening |
-| mGBA | GB / GBC / GBA | Opt-in pinned source build, Qt/SDL standalone tools; no library adapter |
+| mGBA | GB / GBC / GBA | Opt-in pinned source build; GB/GBC library launch and explicit Mesen/mGBA selection implemented; live GB/GBC acceptance pending. GBA remains standalone. |
 | melonDS | Nintendo DS | Pinned source build, `.nds` folder scanning and library Play; saves/states isolated |
 | FinalBurn Neo | Neo Geo | Pinned SDL2 source build, intact ZIP scanning, BIOS/legacy-set diagnostics and library adapter; complete matching sets required |
 | shadPS4 | PS4 | Managed lifecycle and standalone opening (experimental) |
@@ -219,7 +258,7 @@ Upstream source/docs checked 2026-10-21. Three distinct capabilities:
 | --- | --- | --- |
 | PCSX2 | [`-nogui`](https://github.com/PCSX2/pcsx2/blob/master/pcsx2-qt/QtHost.cpp) hides the main window and implies batch. | Library argv: `-batch -fullscreen -nogui -- <disc>`. Not displayless; real launch/exit is a live gate. |
 | DuckStation | [`-nogui`](https://github.com/stenzek/duckstation/blob/master/src/duckstation-qt/qthost.cpp) hides the main window, exits on shutdown. | Library argv: `-batch -fullscreen -nogui <disc>`. Needs a display and working BIOS. |
-| mGBA | Separate [Qt](https://github.com/mgba-emu/mgba/blob/0.10.5/src/platform/qt/main.cpp) and [SDL](https://github.com/mgba-emu/mgba/blob/0.10.5/src/platform/sdl/main.c) frontends; `-f` is fullscreen. | Source pilot builds both. Open selects Qt; `--marquee-sdl -f <game>` selects the game-only frontend. No GB library adapter or displayless mode. |
+| mGBA | Separate [Qt](https://github.com/mgba-emu/mgba/blob/0.10.5/src/platform/qt/main.cpp) and [SDL](https://github.com/mgba-emu/mgba/blob/0.10.5/src/platform/sdl/main.c) frontends; `-f` is fullscreen. | Source pilot builds both. Open selects Qt; `--marquee-sdl -f <game>` selects the game-only frontend. GB/GBC library Play uses Qt with the game path; no displayless mode. |
 | RPCS3 | [CLI](https://github.com/RPCS3/rpcs3/blob/master/rpcs3/rpcs3.cpp): `--no-gui`, `--fullscreen`, `--headless`; all need a boot target. | Standalone only. A PS3 adapter should use no-gui plus firmware/install checks. |
 | Dolphin | [NoGUI frontend](https://github.com/dolphin-emu/dolphin/blob/master/Source/Core/DolphinNoGUI/MainNoGUI.cpp) accepts `x11` or `headless`; may still open a game window. | No recipe or adapter yet. Don't assume a Wayland NoGUI backend. |
 | Cemu | [LaunchSettings](https://github.com/cemu-project/Cemu/blob/main/src/config/LaunchSettings.cpp): `-g <game>`, `-f`. | No generic no-GUI option found. Standalone only. |
@@ -277,17 +316,17 @@ The program runs in its local OCI image, so Podman stays a runtime prerequisite;
 **Next gates**
 
 1. Live mGBA game/audio/controller/save/exit acceptance with a user-owned game.
-2. GB/GBC/GBA descriptors, import, runner, session tracking and save acceptance; until then it stays standalone.
+2. GB/GBC runner selection and session integration are implemented; real game/save acceptance remains open. GBA descriptor/import remains unimplemented.
 3. Managed prerequisites, smaller runtime images, storage cleanup, crash-safe promotion.
 4. Dolphin is the evaluated next candidate (pin revision and recursive submodules, choose Qt/batch and optional NoGUI); not implemented.
 5. Add recipes only where binaries are unavailable or a patch justifies the maintenance.
 
-## Not done
+## Historical gaps (2026-10-21; current matrix above supersedes this list)
 
-- Emulators other than DuckStation do not launch library games; their systems cannot be scanned yet.
+- At that date, emulators other than DuckStation lacked library launch adapters.
 - A live DuckStation Play, quit and duration check has not been run. See [PS1](PS1.md).
 - Ports still have no uninstall.
-- PCSX2 is not yet on the catalogue.
+- At that date, PCSX2 was not yet on the catalogue; it is now integrated.
 - [DuckStation settings profile v1](SETTINGS_PROFILES.md) is implemented with conservative host detection, custom options and per-key user-edit preservation. Profiles for other emulators and live presentation acceptance remain open.
 - The new Tools layout has been type-checked and built but not yet looked at in a live window.
 

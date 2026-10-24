@@ -16,21 +16,25 @@ const PLATFORM: Record<string, GameEntry['platform']> = {
   ps1: 'ps1', ps2: 'ps2', genesis: 'genesis', ds: 'ds', neogeo: 'neogeo', dreamcast: 'dreamcast', nes: 'nes', snes: 'snes', gb: 'gb', gbc: 'gbc', pce: 'tg16', n64: 'n64',
 };
 
-function pickRunner(snap: Pick<LibrarySnapshot, 'runners' | 'settings'>, system = 'ps2'): Runner | null {
+export function runnerSupports(runner: Runner, system: string): boolean {
+  if (runner.systems) return runner.systems.includes(system);
+  // Older fixtures/snapshots carry no capability list.
+  if (SYSTEM_EMULATOR[system]) return runner.id === `runner.${SYSTEM_EMULATOR[system]}.marquee`;
+  return ['ps1', 'ps2'].includes(system) && (runner.kind === (system === 'ps1' ? 'duckstation' : 'pcsx2') || runner.kind === 'fake');
+}
+
+function pickRunner(snap: Pick<LibrarySnapshot, 'runners' | 'settings'>, system = 'ps2', override?: string | null): Runner | null {
+  const selected = override ?? snap.settings.selected_runner_ids?.[system];
+  if (selected) return snap.runners.find(r => r.id === selected && runnerSupports(r, system)) ?? null;
+  const legacy = snap.runners.find(r => r.id === snap.settings.selected_runner_id && r.available && runnerSupports(r, system));
+  if (legacy) return legacy;
+  const compatible = snap.runners.filter(r => runnerSupports(r, system) && r.available);
   const emulator = SYSTEM_EMULATOR[system];
-  if (emulator) return snap.runners.find((r) => r.id === `runner.${emulator}.marquee` && r.available) ?? null;
-  const kind = system === 'ps1' ? 'duckstation' : 'pcsx2';
-  const selectedId = snap.settings.selected_runner_ids?.[system] ?? snap.settings.selected_runner_id;
-  const matches = (r: Runner) => r.kind === kind || r.kind === 'fake';
-  return snap.runners.find((r) => r.id === selectedId && r.available && matches(r))
-    ?? snap.runners.find((r) => r.kind === kind && r.id === 'runner.pcsx2.unpacked' && r.available)
-    ?? snap.runners.find((r) => r.kind === kind && r.available)
-    ?? snap.runners.find((r) => r.kind === 'fake' && r.available)
-    ?? null;
+  return compatible.find(r => emulator ? r.id === `runner.${emulator}.marquee` : r.source === 'marquee') ?? compatible[0] ?? null;
 }
 
 export function editionToGame(edition: Edition, snap: LibrarySnapshot): GameEntry {
-  const runner = pickRunner(snap, edition.system);
+  const runner = pickRunner(snap, edition.system, edition.runner_override);
   const platform = PLATFORM[edition.system] ?? 'unknown';
   const media = snap.media.find((m) => m.id === edition.media_id);
   const rootOffline = snap.roots.some((r: LibraryRoot) => r.system === edition.system && r.status === 'offline' && !!media && (media.path === r.path || media.path.startsWith(`${r.path}/`))) && !media?.available;
@@ -39,6 +43,7 @@ export function editionToGame(edition: Edition, snap: LibrarySnapshot): GameEntr
   else if (runner) setupState = 'runner_missing';
   return {
     id: edition.id,
+    runnerOverride: edition.runner_override ?? undefined,
     title: edition.title,
     tagline: edition.serial
       ? `${edition.serial}${edition.region ? ` · ${edition.region}` : ''}`

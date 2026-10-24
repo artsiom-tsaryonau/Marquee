@@ -108,6 +108,13 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
             out(core.scan(root.as_deref(), Some(sink))?)
         }
         "list_runners" => out(core.refresh_runners()?),
+        "select_system_runner" => {
+            out(core.select_system_runner(&text(&args, "system")?, &text(&args, "runner_id")?)?)
+        }
+        "set_game_runner" => out(core.set_game_runner(
+            &text(&args, "edition_id")?,
+            maybe(&args, "runner_id").as_deref(),
+        )?),
         "select_runner" => out(core.select_runner(&text(&args, "runner_id")?)?),
         "open_runner_setup" => out(core.open_setup(&text(&args, "runner_id")?)?),
         "launch_game" => out(core.launch(&text(&args, "edition_id")?, &[], sink)?),

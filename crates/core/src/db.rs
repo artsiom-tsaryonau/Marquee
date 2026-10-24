@@ -278,7 +278,7 @@ impl Db {
                 // Manager-owned; the legacy library database never stored a proxy.
                 proxy: None,
             },
-            selected_runner_ids: ["ps1", "ps2"]
+            selected_runner_ids: ["ps1", "ps2", "gb", "gbc"]
                 .into_iter()
                 .filter_map(
                     |system| match self.get_setting(&format!("selected_runner.{system}")) {
@@ -671,6 +671,14 @@ impl Db {
             "INSERT INTO launch_profiles(edition_id, runner_id) VALUES(?1, ?2)
              ON CONFLICT(edition_id) DO UPDATE SET runner_id = excluded.runner_id",
             params![edition_id, runner_id],
+        )?;
+        Ok(())
+    }
+
+    pub fn clear_profile(&self, edition_id: &str) -> Result<()> {
+        self.conn.execute(
+            "DELETE FROM launch_profiles WHERE edition_id = ?1",
+            [edition_id],
         )?;
         Ok(())
     }

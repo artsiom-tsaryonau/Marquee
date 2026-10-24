@@ -1,5 +1,5 @@
 import { createApi, type LibraryApi } from './api';
-import { gamesFromSnapshot, pickRunner } from './api/map';
+import { gamesFromSnapshot, pickRunner, runnerSupports } from './api/map';
 import type { BiosFile, CoreEvent, IntakeResult, TorrentSettings, TransferItem, TransferStatus, EmulatorInfo, KeyInfo, LauncherConfig, LauncherInfo, LutrisConfig, LutrisSnapshot, LibraryRoot, LibrarySnapshot, PortInfo, Runner, ScanReport, Session } from './api/contracts';
 import { nativePortGame, canonicalId } from './unified';
 import { lutrisToGame } from './lutris';
@@ -91,6 +91,7 @@ class AppState {
   runners = $state<Runner[]>([]);
   selectedRunner = $state<Runner | null>(null);
   runnerSettings = $state<LibrarySnapshot['settings']>({ last_root: null, last_collection: null, last_focus: null, selected_runner_id: null });
+  runnersFor(system: string) { return this.runners.filter(r => runnerSupports(r, system)); }
   runnerFor(system: string) { return pickRunner({ runners: this.runners, settings: this.runnerSettings }, system); }
   lastScan = $state<ScanReport | null>(null);
   scanning = $state(false);
@@ -618,6 +619,16 @@ class AppState {
     } catch (err) {
       this.notify((err as { message?: string }).message ?? 'Could not change how games open');
     }
+  }
+
+  async chooseSystemRunner(system: string, id: string) {
+    try { await this.api.selectSystemRunner(system, id); this.applySnapshot(await this.api.snapshot()); }
+    catch (err) { this.notify((err as Error).message ?? 'Could not select emulator'); }
+  }
+
+  async chooseGameRunner(editionId: string, id: string | null) {
+    try { await this.api.setGameRunner(editionId, id); this.applySnapshot(await this.api.snapshot()); }
+    catch (err) { this.notify((err as Error).message ?? 'Could not select emulator'); }
   }
 
   async chooseRunner(id: string) {

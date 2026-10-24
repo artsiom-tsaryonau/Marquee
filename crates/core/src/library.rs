@@ -363,6 +363,7 @@ pub fn snapshot_editions(db: &Db) -> Result<Vec<Edition>> {
                 .as_ref()
                 .and_then(|mid| media.iter().find(|m| &m.id == mid));
             Ok(Edition {
+                runner_override: db.profile_runner(&row.id)?,
                 cover_path: covers.get(&row.id).map(PathBuf::from),
                 info: infos.get(&row.id).cloned(),
                 wanted: wanted.get(&row.id).cloned(),

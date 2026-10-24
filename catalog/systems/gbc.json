@@ -8,5 +8,8 @@
   "skipped_extensions": [],
   "runner_kind": "emulator",
   "emulator": "mesen",
-  "notes": "Cartridge images; original Game Boy files are accepted in this folder too."
+  "notes": "Cartridge images; original Game Boy files are accepted in this folder too.",
+  "alternative_emulators": [
+    "mgba"
+  ]
 }

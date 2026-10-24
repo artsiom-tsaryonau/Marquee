@@ -82,6 +82,21 @@
       {#if choices.length > 1}<div class="item"><div><strong>Default emulator</strong><span>Saved independently for {system.name}</span></div><select data-nav aria-label={`${system.name} default emulator`} value={runner?.id || ''} onchange={(e) => app.chooseRunner(e.currentTarget.value)}>{#each choices as choice}<option value={choice.id} disabled={!choice.available}>{choice.display_name}{choice.available ? '' : ' · unavailable'}</option>{/each}</select></div>{/if}
     </section>
   {/each}
+  <section class="glass-panel" hidden={category !== 'games'}>
+    <h2>Game Boy emulators</h2>
+    <p class="hint">Mesen is the default. Choose an installed engine for each platform; individual games can override it. Saves and states stay separate for each emulator.</p>
+    {#each [{id: 'gb', name: 'Game Boy'}, {id: 'gbc', name: 'Game Boy Color'}] as system}
+      {@const runner = app.runnerFor(system.id)}
+      {@const choices = app.runnersFor(system.id)}
+      <div class="item"><div><strong>{system.name}</strong><span>{runner?.available ? runner.display_name : 'Selected emulator is unavailable'}</span></div>
+        <select data-nav aria-label={`${system.name} default emulator`} value={app.runnerSettings.selected_runner_ids?.[system.id] ?? runner?.id ?? ''} onchange={e => app.chooseSystemRunner(system.id, e.currentTarget.value)}>
+          {#if !choices.some(r => r.id === (app.runnerSettings.selected_runner_ids?.[system.id] ?? runner?.id))}<option value={app.runnerSettings.selected_runner_ids?.[system.id] ?? ''} disabled>Choose an installed emulator</option>{/if}
+          {#each choices as choice}<option value={choice.id} disabled={!choice.available}>{choice.display_name}{choice.available ? '' : ' · unavailable'}</option>{/each}
+        </select>
+      </div>
+    {/each}
+    <div class="item"><div><strong>Mesen and mGBA</strong><span>Install or configure compatible engines in Tools. Changing engines does not convert existing saves.</span></div><button class="btn glass small" data-nav onclick={() => app.go('tools')}>Open Tools</button></div>
+  </section>
   <section class="glass-panel" hidden={category !== 'library'}>
     <h2>Disc library maintenance</h2>
     <div class="item"><div><strong>Last import</strong><span>{app.lastScan ? `${app.lastScan.added} added · ${app.lastScan.skipped_unsupported} companion or unsupported files` : 'No scan results available in this session'}</span></div><button class="btn glass small" data-nav onclick={() => app.rescan()} disabled={app.scanning}>{app.scanning ? 'Scanning…' : 'Rescan folders'}</button></div>

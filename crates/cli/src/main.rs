@@ -390,6 +390,14 @@ enum RunnersCmd {
     },
     Select {
         runner_id: String,
+        /// Save the default for this platform (gb, gbc, ps1, ps2)
+        #[arg(long)]
+        system: Option<String>,
+    },
+    /// Set a game override; omit runner_id to return to the platform default
+    ForGame {
+        edition_id: String,
+        runner_id: Option<String>,
     },
     Setup {
         runner_id: String,
@@ -802,9 +810,20 @@ fn run() -> marquee_core::error::Result<()> {
                 }
             }
         }
-        Command::Runners(RunnersCmd::Select { runner_id }) => {
-            core.select_runner(&runner_id)?;
+        Command::Runners(RunnersCmd::Select { runner_id, system }) => {
+            if let Some(system) = system {
+                core.select_system_runner(&system, &runner_id)?;
+            } else {
+                core.select_runner(&runner_id)?;
+            }
             println!("selected {runner_id}");
+        }
+        Command::Runners(RunnersCmd::ForGame {
+            edition_id,
+            runner_id,
+        }) => {
+            core.set_game_runner(&edition_id, runner_id.as_deref())?;
+            println!("saved emulator choice for {edition_id}");
         }
         Command::Runners(RunnersCmd::Setup { runner_id }) => {
             core.open_setup(&runner_id)?;

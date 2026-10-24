@@ -126,6 +126,8 @@ pub struct Edition {
     pub id: String,
     pub system: String,
     pub title: String,
+    #[serde(default)]
+    pub runner_override: Option<String>,
     pub scan_title: String,
     pub display_title: Option<String>,
     pub favorite: bool,
@@ -209,6 +211,8 @@ impl BiosState {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Runner {
+    #[serde(default)]
+    pub systems: Vec<String>,
     pub id: String,
     pub kind: RunnerKind,
     pub display_name: String,

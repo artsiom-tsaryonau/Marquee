@@ -7,5 +7,8 @@
   "skipped_extensions": [],
   "runner_kind": "emulator",
   "emulator": "mesen",
-  "notes": "Cartridge images."
+  "notes": "Cartridge images.",
+  "alternative_emulators": [
+    "mgba"
+  ]
 }

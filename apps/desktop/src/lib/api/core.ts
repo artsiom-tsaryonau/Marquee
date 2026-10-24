@@ -84,6 +84,8 @@ export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'su
     addRoot: (path, system) => call<LibraryRoot>('add_library_root', { path, system }),
     scan: (rootId) => call<ScanReport>('scan_library_root', { root_id: rootId ?? null }),
     listRunners: () => call<Runner[]>('list_runners'),
+    selectSystemRunner: (system, runnerId) => call<void>('select_system_runner', { system, runner_id: runnerId }),
+    setGameRunner: (editionId, runnerId) => call<void>('set_game_runner', { edition_id: editionId, runner_id: runnerId }),
     selectRunner: (runnerId) => call<void>('select_runner', { runner_id: runnerId }),
     setDisplayMode: (mode) => call<void>('set_display_mode', { mode }),
     setTorrentSettings: (settings) => call<void>('set_torrent_settings', { settings }),

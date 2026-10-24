@@ -188,6 +188,7 @@ fn unresolved_serial_is_kept_and_not_merged_by_title() {
 #[test]
 fn launch_argv_keeps_metacharacters_inert() {
     let runner = crate::model::Runner {
+        systems: vec![],
         id: "runner.pcsx2.appimage".into(),
         kind: RunnerKind::Pcsx2,
         display_name: "PCSX2".into(),
@@ -219,6 +220,7 @@ fn launch_argv_keeps_metacharacters_inert() {
 fn empty_default_bios_dir_is_unverified_not_missing() {
     assert_eq!(
         runners::require_launchable(&crate::model::Runner {
+            systems: vec![],
             id: "r".into(),
             kind: RunnerKind::Pcsx2,
             display_name: "PCSX2".into(),
@@ -232,6 +234,7 @@ fn empty_default_bios_dir_is_unverified_not_missing() {
         ()
     );
     let err = runners::require_launchable(&crate::model::Runner {
+        systems: vec![],
         id: "r".into(),
         kind: RunnerKind::Pcsx2,
         display_name: "PCSX2".into(),
@@ -295,6 +298,7 @@ fn ps1_root_imports_iso_and_uses_duckstation_argv() {
     assert_eq!(pair_media.path.extension().unwrap(), "cue");
 
     let duck = crate::model::Runner {
+        systems: vec![],
         id: "runner.duckstation.marquee".into(),
         kind: RunnerKind::Duckstation,
         display_name: "DuckStation".into(),
@@ -327,6 +331,7 @@ fn ps1_root_imports_iso_and_uses_duckstation_argv() {
 #[test]
 fn pick_for_system_keeps_emulators_apart() {
     let ps2 = crate::model::Runner {
+        systems: vec![],
         id: "runner.pcsx2.appimage".into(),
         kind: RunnerKind::Pcsx2,
         display_name: "PCSX2".into(),
@@ -337,6 +342,7 @@ fn pick_for_system_keeps_emulators_apart() {
         available: true,
     };
     let duck = crate::model::Runner {
+        systems: vec![],
         id: "runner.duckstation.flatpak".into(),
         kind: RunnerKind::Duckstation,
         display_name: "DuckStation".into(),
@@ -356,6 +362,7 @@ fn pick_for_system_keeps_emulators_apart() {
 #[test]
 fn stored_selection_is_scoped_to_the_systems_emulator() {
     let ps2 = crate::model::Runner {
+        systems: vec![],
         id: "runner.pcsx2.flatpak".into(),
         kind: RunnerKind::Pcsx2,
         display_name: "PCSX2 (Flatpak)".into(),
@@ -366,6 +373,7 @@ fn stored_selection_is_scoped_to_the_systems_emulator() {
         available: true,
     };
     let duck = crate::model::Runner {
+        systems: vec![],
         id: "runner.duckstation.flatpak".into(),
         kind: RunnerKind::Duckstation,
         display_name: "DuckStation (Flatpak)".into(),
@@ -393,6 +401,7 @@ fn stored_selection_is_scoped_to_the_systems_emulator() {
 
     // The fake stand-in is system-agnostic, so explicit test selections survive.
     let fake = crate::model::Runner {
+        systems: vec![],
         id: "runner.fake".into(),
         kind: RunnerKind::Fake,
         display_name: "Test runner".into(),
@@ -946,6 +955,7 @@ fn cartridge_systems_scan_pick_their_emulator_and_build_argv() {
     assert!(snap.media[0].serial.is_none());
 
     let runner = |id: &str, source: &str| crate::model::Runner {
+        systems: vec![],
         id: id.into(),
         kind: RunnerKind::Emulator,
         display_name: id.into(),
@@ -1071,7 +1081,8 @@ fn ds_and_neogeo_scan_route_to_their_own_runners_and_block_incomplete_sets() {
         core.add_root(system, root, None).unwrap();
         let program = crate::emulators::program_dir(&core.paths, emulator);
         fs::create_dir_all(&program).unwrap();
-        fs::write(program.join("AppRun"), "fixture").unwrap();
+        fs::write(program.join("AppRun"), "#!/bin/sh\nexit 0\n").unwrap();
+        fs::set_permissions(program.join("AppRun"), fs::Permissions::from_mode(0o755)).unwrap();
         core.set_setting(
             &crate::emulators::setting_key(emulator),
             r#"{"version":"fixture","bin":"AppRun"}"#,
@@ -1122,7 +1133,8 @@ fn source_recipe_version_replaces_stale_binary_release_update_hints() {
     let core = Core::open_isolated(Some(temp.path().join("data")), false).unwrap();
     let program = crate::emulators::program_dir(&core.paths, "melonds");
     fs::create_dir_all(&program).unwrap();
-    fs::write(program.join("AppRun"), "fixture").unwrap();
+    fs::write(program.join("AppRun"), "#!/bin/sh\nexit 0\n").unwrap();
+    fs::set_permissions(program.join("AppRun"), fs::Permissions::from_mode(0o755)).unwrap();
     let version = crate::source_builds::version("melonds").unwrap();
     core.set_setting(
         &crate::emulators::setting_key("melonds"),
@@ -1171,7 +1183,8 @@ fn genesis_archive_becomes_a_playable_cartridge_with_its_own_bios_free_runner() 
     assert!(archive_path.exists());
     let program = crate::emulators::program_dir(&core.paths, "blastem");
     fs::create_dir_all(&program).unwrap();
-    fs::write(program.join("AppRun"), "fixture").unwrap();
+    fs::write(program.join("AppRun"), "#!/bin/sh\nexit 0\n").unwrap();
+    fs::set_permissions(program.join("AppRun"), fs::Permissions::from_mode(0o755)).unwrap();
     core.set_setting(
         &crate::emulators::setting_key("blastem"),
         r#"{"version":"fixture","bin":"AppRun"}"#,
@@ -1192,4 +1205,172 @@ fn genesis_archive_becomes_a_playable_cartridge_with_its_own_bios_free_runner() 
             .unwrap();
     assert!(argv.contains(&"-f".to_string()));
     assert_eq!(argv.last().unwrap(), "/roms/Cartridge (USA).md");
+}
+
+#[test]
+fn game_boy_engine_defaults_and_game_overrides_are_independent_and_survive_restart() {
+    let t = tempfile::tempdir().unwrap();
+    let data = t.path().join("data");
+    let games = t.path().join("games");
+    fs::create_dir_all(&games).unwrap();
+    fs::write(games.join("sample.gb"), vec![0_u8; 32768]).unwrap();
+    let core = Core::open_isolated(Some(data.clone()), false).unwrap();
+    let root = core.add_root("gb", games, None).unwrap();
+    core.scan(Some(&root.id), None).unwrap();
+    let edition = core.snapshot().unwrap().editions.remove(0).id;
+    {
+        let db = core.db_arc();
+        let db = db.lock().unwrap();
+        for id in ["mesen", "mgba", "blastem"] {
+            db.upsert_runner(
+                &format!("runner.{id}.marquee"),
+                "emulator",
+                id,
+                &["/bin/true".into()],
+                BiosState::Unverified,
+                None,
+                "test",
+            )
+            .unwrap();
+        }
+    }
+    core.select_system_runner("gb", "runner.mgba.marquee")
+        .unwrap();
+    core.select_system_runner("gbc", "runner.mesen.marquee")
+        .unwrap();
+    assert_eq!(
+        core.select_system_runner("gb", "runner.blastem.marquee")
+            .unwrap_err()
+            .code,
+        "BAD_REQUEST"
+    );
+    core.set_game_runner(&edition, Some("runner.mesen.marquee"))
+        .unwrap();
+    assert_eq!(
+        core.set_game_runner(&edition, Some("runner.blastem.marquee"))
+            .unwrap_err()
+            .code,
+        "BAD_REQUEST"
+    );
+    drop(core);
+    let core = Core::open_isolated(Some(data), false).unwrap();
+    let snap = core.snapshot().unwrap();
+    assert_eq!(
+        snap.settings.selected_runner_ids["gb"],
+        "runner.mgba.marquee"
+    );
+    assert_eq!(
+        snap.settings.selected_runner_ids["gbc"],
+        "runner.mesen.marquee"
+    );
+    assert_eq!(
+        snap.editions[0].runner_override.as_deref(),
+        Some("runner.mesen.marquee")
+    );
+    assert!(snap
+        .runners
+        .iter()
+        .find(|r| r.id == "runner.mgba.marquee")
+        .unwrap()
+        .systems
+        .contains(&"gbc".into()));
+    assert_eq!(
+        runners::resolve(
+            &snap.runners,
+            "gb",
+            snap.editions[0].runner_override.as_deref(),
+            Some("runner.mgba.marquee")
+        )
+        .unwrap()
+        .id,
+        "runner.mesen.marquee"
+    );
+    core.set_game_runner(&edition, None).unwrap();
+    assert!(core.snapshot().unwrap().editions[0]
+        .runner_override
+        .is_none());
+    let mut runners = snap.runners;
+    runners
+        .iter_mut()
+        .find(|r| r.id == "runner.mgba.marquee")
+        .unwrap()
+        .available = false;
+    assert_eq!(
+        runners::resolve(&runners, "gb", None, Some("runner.mgba.marquee"))
+            .unwrap_err()
+            .code,
+        "RUNNER_MISSING"
+    );
+    runners.retain(|r| r.id != "runner.mgba.marquee");
+    assert_eq!(
+        runners::resolve(&runners, "gb", Some("runner.mgba.marquee"), None)
+            .unwrap_err()
+            .code,
+        "RUNNER_MISSING"
+    );
+    assert_eq!(
+        runners::pick_for_system(&runners, "gb").unwrap().id,
+        "runner.mesen.marquee"
+    );
+}
+
+#[test]
+fn mgba_game_arguments_preserve_one_literal_path_and_display_mode() {
+    let runner = crate::model::Runner {
+        systems: vec!["gb".into(), "gbc".into()],
+        id: "runner.mgba.marquee".into(),
+        kind: RunnerKind::Emulator,
+        display_name: "mGBA".into(),
+        command: vec!["/managed/AppRun".into()],
+        bios_state: BiosState::Unverified,
+        bios_hint: None,
+        source: "marquee".into(),
+        available: true,
+    };
+    let path = Path::new("/games/My Game's $(test).gbc");
+    assert_eq!(
+        runners::launch_argv(&runner, path, &[], false).unwrap(),
+        vec!["/managed/AppRun", path.to_str().unwrap()]
+    );
+    assert_eq!(
+        runners::launch_argv(&runner, path, &[], true).unwrap(),
+        vec!["/managed/AppRun", "-f", path.to_str().unwrap()]
+    );
+    assert!(runners::compatible(&runner, "gb"));
+    assert!(runners::compatible(&runner, "gbc"));
+    assert!(!runners::compatible(&runner, "nes"));
+    assert!(!runners::compatible(&runner, "gba"));
+}
+
+#[test]
+fn env_wrapped_runner_becomes_unavailable_when_the_program_is_removed() {
+    let t = tempfile::tempdir().unwrap();
+    let program = t.path().join("mGBA=pilot");
+    fs::write(&program, "#!/bin/sh\nexit 0\n").unwrap();
+    fs::set_permissions(&program, fs::Permissions::from_mode(0o755)).unwrap();
+    let db = crate::db::Db::open_in_memory().unwrap();
+    db.upsert_runner(
+        "runner.mgba.marquee",
+        "emulator",
+        "mGBA",
+        &[
+            "/usr/bin/env".into(),
+            "XDG_CONFIG_HOME=/isolated=config".into(),
+            program.to_string_lossy().into_owned(),
+        ],
+        BiosState::Unverified,
+        None,
+        "test",
+    )
+    .unwrap();
+    assert!(runners::snapshot(&db).unwrap()[0].available);
+    fs::remove_file(program).unwrap();
+    let rows = runners::snapshot(&db).unwrap();
+    assert!(!rows[0].available);
+    assert_eq!(
+        runners::resolve(&rows, "gb", Some("runner.mgba.marquee"), None)
+            .unwrap_err()
+            .code,
+        "RUNNER_MISSING"
+    );
 }

@@ -26,6 +26,7 @@
   const similar = $derived(g ? groupGames(app.games.filter((x) => canonicalId(x) !== canonicalId(g) && (g.genre ? x.genre === g.genre : x.platform === g.platform) && canPlay(x))).map((group) => group.game).slice(0, 10) : []);
   const dur = $derived(app.motionReduced ? 0 : 360);
   const offline = $derived(!!g && g.source === 'rom' && g.platform !== 'unknown');
+  const runnerChoices = $derived(g && offline ? app.runnersFor(g.platform) : []);
   const emulator = $derived(g ? emulatorName(g) : 'emulator');
   const status = $derived(g ? gameStatus(g) : null);
   const share = $derived(g && offline ? app.transferFor(g.id) : undefined);
@@ -217,6 +218,16 @@
           <dd>Unknown · no verified report</dd>
         {/if}
       </dl>
+      {#if offline && ['gb', 'gbc'].includes(g.platform)}
+        <label class="runner-choice">Play with
+          <select data-nav value={g.runnerOverride ?? ''} onchange={e => app.chooseGameRunner(g.id, e.currentTarget.value || null)}>
+            <option value="">Platform default · {app.runnerFor(g.platform)?.display_name ?? 'unavailable'}</option>
+            {#if g.runnerOverride && !runnerChoices.some(r => r.id === g.runnerOverride)}<option value={g.runnerOverride} disabled>Selected emulator unavailable</option>{/if}
+            {#each runnerChoices as runner}<option value={runner.id} disabled={!runner.available}>{runner.display_name}{runner.available ? '' : ' · unavailable'}</option>{/each}
+          </select>
+        </label>
+        <p class="media-credit">Saved for this game. Each emulator keeps its own saves and states.</p>
+      {/if}
       {#if offline || g.lutris || port}<div class="side-actions">
         {#if offline}<button class="btn glass small" data-nav onclick={() => app.go('tools')}><Icon name="settings" size={16} />Emulator settings</button>{/if}
       {#if offline}
@@ -247,6 +258,8 @@
 {/if}
 
 <style>
+  .runner-choice { display: grid; gap: 8px; margin-top: 16px; color: var(--text-soft); font-size: 13px; }
+  .runner-choice select { width: 100%; min-width: 0; }
   .page.music-view { padding-bottom: 0; } .music-view .body { padding-bottom: 0; }
   .library-identifiers { margin-top: 24px; color: var(--text-dim); } .library-identifiers summary { cursor: pointer; padding: 10px 0; }
 

@@ -28,6 +28,7 @@ export interface LibraryRoot {
 }
 
 export interface Edition {
+  runner_override?: string | null;
   id: string;
   system: string;
   title: string;
@@ -75,7 +76,8 @@ export interface MediaFile {
 
 export interface Runner {
   id: string;
-  kind: 'pcsx2' | 'duckstation' | 'fake';
+  kind: 'pcsx2' | 'duckstation' | 'emulator' | 'fake';
+  systems?: string[];
   display_name: string;
   command: string[];
   bios_state: 'missing' | 'unverified' | 'launch_tested';
@@ -422,6 +424,8 @@ export interface LibraryApi {
   scan(rootId?: string): Promise<ScanReport>;
   listRunners(): Promise<Runner[]>;
   selectRunner(id: string): Promise<void>;
+  selectSystemRunner(system: string, id: string): Promise<void>;
+  setGameRunner(editionId: string, id: string | null): Promise<void>;
   setDisplayMode(mode: 'window' | 'fullscreen'): Promise<void>;
   setTorrentSettings(settings: TorrentSettings): Promise<void>;
   transferStatus(): Promise<TransferStatus>;

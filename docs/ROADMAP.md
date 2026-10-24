@@ -60,6 +60,12 @@ window controlled by the native CLI; hosting UI and an embedded receiver remain
 subsequent increments, not completed by receiver-process ownership.
 The OS window-close button and automatic focus return remain tracked separately.
 
+GB/GBC alternative-engine groundwork now implements Mesen/mGBA compatibility,
+independent platform defaults and saved game overrides. Mesen remains the default;
+explicit unavailable selections do not silently switch save directories. mGBA’s
+existing source recipe registers a GB/GBC runner. Live GB/GBC acceptance, GBA
+import and streamed profiles remain open; see [emulators](EMULATORS.md#gbgbc-engine-selection).
+
 The owner's follow-on tracks are [collection-driven emulator expansion](EMULATOR_EXPANSION.md)
 and [soundtracks/player](SOUNDTRACKS.md). Validate the already installed lightweight
 runners after Sonic streaming; then fill Neo Geo Pocket and useful alternative

@@ -327,6 +327,60 @@ impl Core {
         Ok(())
     }
 
+    pub fn select_system_runner(&self, system: &str, runner_id: &str) -> Result<()> {
+        if !matches!(system, "ps1" | "ps2" | "gb" | "gbc") {
+            return Err(AppError::new(
+                "BAD_REQUEST",
+                "Runner defaults are not exposed for this system yet",
+            ));
+        }
+        let available = self.refresh_runners()?;
+        let runner = available
+            .iter()
+            .find(|r| r.id == runner_id && runners::compatible(r, system))
+            .ok_or_else(|| {
+                AppError::new(
+                    "BAD_REQUEST",
+                    "This emulator does not support the selected platform",
+                )
+            })?;
+        runners::require_launchable(runner)?;
+        self.set_setting(&format!("selected_runner.{system}"), runner_id)?;
+        self.events.emit(CoreEvent::LibraryChanged);
+        Ok(())
+    }
+
+    pub fn set_game_runner(&self, edition_id: &str, runner_id: Option<&str>) -> Result<()> {
+        self.refresh_runners()?;
+        self.with_db(|db| {
+            if db.running_session()?.is_some() {
+                return Err(AppError::new(
+                    "LAUNCH_BUSY",
+                    "Close the running game before changing its emulator",
+                ));
+            }
+            let edition = db
+                .edition_by_id(edition_id)?
+                .ok_or_else(|| AppError::new("MEDIA_MISSING", "Game is not in the library"))?;
+            if let Some(id) = runner_id {
+                let runners = runners::snapshot(db)?;
+                let runner = runners
+                    .iter()
+                    .find(|r| r.id == id && runners::compatible(r, &edition.system))
+                    .ok_or_else(|| {
+                        AppError::new("BAD_REQUEST", "This emulator does not support this game")
+                    })?;
+                runners::require_launchable(runner)?;
+                db.set_profile(edition_id, id)?;
+            } else {
+                db.clear_profile(edition_id)?;
+            }
+            Ok(())
+        })?;
+        self.events.emit(CoreEvent::LibraryChanged);
+        Ok(())
+    }
+
     pub fn set_display_title(&self, edition_id: &str, title: &str) -> Result<()> {
         let trimmed = title.trim();
         if trimmed.is_empty() {

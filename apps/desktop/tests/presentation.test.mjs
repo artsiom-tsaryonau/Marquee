@@ -82,3 +82,24 @@ test('console icon profiles distinguish common systems and missing artwork initi
   assert.equal(gameInitials('The Legend of Zelda (USA)'),'LZ');assert.equal(gameInitials('2048'),'20');
   assert.equal(gameInitials('Sonic the Hedgehog 2'),'SH');assert.equal(gameInitials(''),'?' );
 });
+
+test('GB defaults and per-game overrides use compatible engines without hiding a missing selection', async () => {
+  const { pickRunner, editionToGame } = await import('../src/lib/api/map');
+  const runner = (id, systems, available = true) => ({id:`runner.${id}.marquee`,systems,kind:'emulator',source:'marquee',display_name:id,available,bios_state:'unverified'});
+  const mesen = runner('mesen',['gb','gbc','nes']);
+  const mgba = runner('mgba',['gb','gbc']);
+  const snap = {runners:[mgba,mesen],settings:{},media:[],roots:[]};
+  assert.equal(pickRunner(snap,'gb').id,mesen.id);
+  snap.settings.selected_runner_ids = {gb:mgba.id,gbc:mesen.id};
+  assert.equal(pickRunner(snap,'gb').id,mgba.id);
+  assert.equal(pickRunner(snap,'gbc').id,mesen.id);
+  assert.equal(pickRunner(snap,'gb',mesen.id).id,mesen.id);
+  assert.equal(pickRunner(snap,'nes',mgba.id),null);
+  mgba.available = false;
+  const game = editionToGame({id:'game',system:'gb',title:'Test',playtime_seconds:0},snap);
+  assert.equal(game.runnerId,mgba.id);
+  assert.equal(game.setupState,'runner_missing');
+  snap.runners = [mesen];
+  assert.equal(pickRunner(snap,'gb'),null);
+  assert.equal(pickRunner(snap,'gb',mesen.id).id,mesen.id);
+});

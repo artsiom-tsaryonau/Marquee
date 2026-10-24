@@ -109,12 +109,13 @@ test('DS and Neo Geo entries use their own platforms and runner readiness', () =
   assert.equal(neo.platform,'neogeo'); assert.equal(neo.runnerName,'FinalBurn Neo'); assert.equal(neo.installed,false);
   assert.equal(neo.mediaIssue,'Legacy split set needs parent ROMs');
 });
-test('runner defaults are platform scoped and unavailable pins fall back', () => {
+test('runner defaults are platform scoped and unavailable explicit pins stay visible', () => {
   const snap = discSnapshot(); snap.runners.push({ id: 'duck', kind: 'duckstation', display_name: 'DuckStation', available: true, bios_state: 'unverified' });
   snap.settings.selected_runner_ids = { ps1: 'duck', ps2: 'pcsx2' }; snap.settings.selected_runner_id = 'duck';
   assert.equal(pickRunner(snap, 'ps2').id, 'pcsx2'); assert.equal(pickRunner(snap, 'ps1').id, 'duck');
   snap.runners.push({ id: 'dead', kind: 'pcsx2', available: false }); snap.settings.selected_runner_ids.ps2 = 'dead';
-  assert.equal(pickRunner(snap, 'ps2').id, 'pcsx2');
+  assert.equal(pickRunner(snap, 'ps2').id, 'dead');
+  assert.equal(pickRunner(snap, 'ps2').available, false);
 });
 test('missing companion diagnostics reach cards without unrelated offline folders', () => {
   const snap = discSnapshot(); snap.media[0].available = false; snap.media[0].skip_reason = 'Missing CUE track: audio.bin'; snap.editions[0].missing = true;

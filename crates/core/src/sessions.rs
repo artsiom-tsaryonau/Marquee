@@ -84,32 +84,17 @@ pub fn launch(
         // The stored selection is a hint for one emulator family; only honour it
         // when it matches this title's system, so a PS2 pin cannot hijack a PS1
         // launch (and vice versa).
+        let legacy = db.get_setting("selected_runner_id")?;
         let selected = db
             .get_setting(&format!("selected_runner.{system}"))?
-            .or(db.get_setting("selected_runner_id")?);
-        let selected =
-            runners::selection_for(&runners, selected.as_deref(), &system).map(str::to_string);
+            .or_else(|| {
+                runners::selection_for(&runners, legacy.as_deref(), &system)
+                    .filter(|id| runners.iter().any(|r| r.id == *id && r.available))
+                    .map(str::to_owned)
+            });
         let profile = db.profile_runner(edition_id)?;
-        let profile =
-            runners::selection_for(&runners, profile.as_deref(), &system).map(str::to_string);
-        let runner_id = profile.or(selected);
-        let runner = match runner_id {
-            Some(id) => runners
-                .iter()
-                .find(|r| r.id == id && r.available)
-                .cloned()
-                .or_else(|| runners::pick_for_system(&runners, &system).cloned()),
-            None => runners::pick_for_system(&runners, &system).cloned(),
-        }
-        .ok_or_else(|| {
-            AppError::new(
-                "RUNNER_MISSING",
-                format!(
-                    "no emulator is installed for {system}. See docs/{}.md.",
-                    system.to_ascii_uppercase()
-                ),
-            )
-        })?;
+        let runner =
+            runners::resolve(&runners, &system, profile.as_deref(), selected.as_deref())?.clone();
         runners::require_launchable(&runner)?;
         let fullscreen = db.get_setting("display_mode")?.as_deref() == Some("fullscreen");
         let argv = runners::launch_argv(&runner, &media.path, extra_args, fullscreen)?;

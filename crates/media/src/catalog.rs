@@ -33,6 +33,9 @@ pub struct SystemDescriptor {
     /// for systems with no dedicated runner kind.
     #[serde(default)]
     pub emulator: Option<String>,
+    /// Reviewed alternative engines; `emulator` remains the default.
+    #[serde(default)]
+    pub alternative_emulators: Vec<String>,
 }
 
 impl SystemDescriptor {

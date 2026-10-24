@@ -10,5 +10,9 @@
   "asset_suffix": "",
   "binary": "AppRun",
   "config_subdir": "mgba",
-  "requirement": "Source-build pilot: rootless Podman and Git required. Qt and SDL frontends, with managed compiler/runtime dependencies. No BIOS required. Open a user-owned game in mGBA; Marquee library import is not implemented yet."
+  "requirement": "Managed source build using rootless Podman. Game Boy and Game Boy Color library launch supported; GBA library import is not implemented. No BIOS required. Saves and states stay in mGBA\u2019s own folders; they are not migrated from Mesen.",
+  "kind": "emulator",
+  "fullscreen_args": [
+    "-f"
+  ]
 }

@@ -51,8 +51,10 @@ without inspection. Files in `other` need explicit platform review.
    Select the backend after source/license/capability review. Test one current
    input locally and through streaming before claiming the platform works.
 4. **E3 — mGBA and PSP when useful.** An mGBA source recipe already exists, but
-   it is not a registered library launch path. Add explicit alternative runner
-   selection for GB/GBC and a GBA descriptor; do not silently replace Mesen.
+   it now registers a GB/GBC library runner. Explicit platform defaults and per-game
+   Mesen/mGBA overrides are implemented, retaining Mesen as the default. Real
+   GB/GBC acceptance and a GBA descriptor remain open; selection does not migrate
+   saves or states.
    No loose GBA or PSP sample was found in this inventory, so actual game
    acceptance needs a suitable input. PPSSPP's tool entry alone is insufficient.
 5. **E4 — Broader systems.** Complete Dreamcast/N64 mapping and acceptance, then
