@@ -10,6 +10,7 @@
   import { cleanTitle, ago, hours, transferLine } from '../format';
   import GameMedia from '../components/GameMedia.svelte';
   import Icon from '../components/Icon.svelte';
+  import PlatformIcon from '../components/PlatformIcon.svelte';
   import Row from '../components/Row.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
   import CatalogueDetails from '../components/CatalogueDetails.svelte';
@@ -89,7 +90,7 @@
         <div class="rename-actions"><button class="btn glass small" data-nav disabled={!titleDraft.trim()}>Save title</button><button type="button" class="btn glass small" data-nav onclick={() => editing = false}>Cancel</button></div>
       </form>
     {:else}<h1 title={g.title}>{cleanTitle(g.title)}</h1>{/if}
-    <p class="tagline">{platformLabel[g.platform]}{g.region ? ` · ${g.region}` : ''}{g.revision ? ` · Revision ${g.revision}` : ''}</p>
+    <p class="tagline platform-label"><PlatformIcon platform={g.platform} size={24} />{platformLabel[g.platform]}{g.region ? ` · ${g.region}` : ''}{g.revision ? ` · Revision ${g.revision}` : ''}</p>
     {#if status}<p class="availability" role="status">{status.label}</p>{/if}
     {#if variants.length > 1 || g.editionLabel}
       <div class="variant-picker glass-panel">
@@ -116,7 +117,7 @@
     <aside class="feature-summary">
       {#if g.coverUrl && (g.heroUrl || g.screenshots?.length)}<img class="summary-cover" src={g.coverUrl} alt="{cleanTitle(g.title)} cover" />{/if}
       {#if g.description}<p class="short-description">{g.description.length > 450 ? `${g.description.slice(0,447)}…` : g.description}</p>{:else}<p class="short-description">{cleanTitle(g.title)}{g.year ? ` · ${g.year}` : ''}<br />{platformLabel[g.platform]}</p>{/if}
-      <dl><dt>Platform</dt><dd>{platformLabel[g.platform]}</dd>{#if g.year}<dt>Released</dt><dd>{g.year}</dd>{/if}{#if g.developer}<dt>Developer</dt><dd>{g.developer}</dd>{/if}{#if g.publisher}<dt>Publisher</dt><dd>{g.publisher}</dd>{/if}{#if g.players}<dt>Players</dt><dd>{g.players}</dd>{/if}</dl>
+      <dl><dt>Platform</dt><dd><span class="platform-label"><PlatformIcon platform={g.platform} size={22} />{platformLabel[g.platform]}</span></dd>{#if g.year}<dt>Released</dt><dd>{g.year}</dd>{/if}{#if g.developer}<dt>Developer</dt><dd>{g.developer}</dd>{/if}{#if g.publisher}<dt>Publisher</dt><dd>{g.publisher}</dd>{/if}{#if g.players}<dt>Players</dt><dd>{g.players}</dd>{/if}</dl>
       {#if g.genre}<div class="genre-tag">{g.genre}</div>{/if}
       {#if g.descriptionSource}<p class="media-credit">Details: {g.descriptionSource}</p>{/if}
     </aside>
@@ -189,7 +190,7 @@
           <dd><button type="button" class="facts-link" data-nav onclick={() => app.openCataloguePage(g.metadata!.id)}>Open in browser</button></dd>
         {/if}
         <dt>Platform</dt>
-        <dd>{platformLabel[g.platform]}{g.platform === 'unknown' && g.metadata ? ` · ${g.metadata.system}` : ''}</dd>
+        <dd><span class="platform-label"><PlatformIcon platform={g.platform} size={22} />{platformLabel[g.platform]}</span>{g.platform === 'unknown' && g.metadata ? ` · ${g.metadata.system}` : ''}</dd>
         {#if g.region}<dt>Region</dt><dd>{g.region}</dd>{/if}
         {#if g.languages?.length}<dt>Languages</dt><dd>{g.languages.join(', ')}</dd>{/if}
         {#if g.revision}<dt>ROM revision</dt><dd>{g.revision}</dd>{/if}

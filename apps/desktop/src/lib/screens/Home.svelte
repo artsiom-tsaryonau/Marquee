@@ -7,6 +7,7 @@
   import Row from '../components/Row.svelte';
   import Logo from '../components/Logo.svelte';
   import Icon from '../components/Icon.svelte';
+  import PlatformIcon from '../components/PlatformIcon.svelte';
   import Artwork from '../components/Artwork.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
   import { homeAtmosphere } from '../art';
@@ -97,7 +98,7 @@
         <div class="eyebrow">
           <span class="kicker">{g.lastPlayed && g.id === app.defaultHero()?.id ? 'Pick up where you left off' : 'Selected'}</span>
           <span class="pill">{sourceLabel[g.source]}</span>
-          {#if g.platform !== 'unknown'}<span>{platformLabel[g.platform]}</span>{/if}
+          {#if g.platform !== 'unknown'}<span class="platform-label"><PlatformIcon platform={g.platform} size={22} />{platformLabel[g.platform]}</span>{/if}
           {#if g.genre}<span class="dot">•</span><span>{g.genre}</span>{/if}
           {#if g.year}<span class="dot">•</span><span>{g.year}</span>{/if}
         </div>
@@ -146,7 +147,7 @@
         {#each stats as s (s.label)}<span><b>{s.n.toLocaleString()}</b> {s.label}</span>{/each}
       </div>
       <div class="plats" data-nav-row>
-        {#each topPlatforms as [p, n] (p)}<button class="chip" data-nav onclick={() => browse(p)}>{platformLabel[p]} <span>{n}</span></button>{/each}
+        {#each topPlatforms as [p, n] (p)}<button class="chip" data-nav onclick={() => browse(p)}><PlatformIcon platform={p} size={22} />{platformLabel[p]} <span>{n}</span></button>{/each}
         <button class="chip all" data-nav onclick={() => app.go('library')}>View library →</button>
       </div>
     </nav>

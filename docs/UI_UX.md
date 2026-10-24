@@ -153,6 +153,18 @@ behavior. This dated checklist does not close rendered/native/controller gates.
 
 ## Presentation goals still to validate or extend
 
+Platform identity uses original, bundled vector hardware miniatures beside names
+in library chips/shelf headings, Home shortcuts, game facts and Tools filters.
+Common systems have distinct silhouettes/colors; less common platforms use a
+hardware-family treatment with their readable name retained. These are Marquee
+illustrations under the repository license, not official console logos or exact
+hardware-revision photographs; no new third-party art or runtime fetch is used.
+The shared component is `PlatformIcon.svelte`, with profiles in `platformIcons.ts`.
+Missing-cover cards use the same console identity, decorative game initials and
+an explicit No cover label. Platform shelves avoid repeating their heading on
+every placeholder, while mixed rows retain the platform name. Real covers are
+unchanged. Icons supplement text and remain hidden from assistive technology.
+
 Game details now have **Overview**, **OST** and **Metadata** tabs with wrapping
 Left/Right and Home/End keyboard navigation. Metadata owns catalogue matching and
 artwork refresh; the duplicate Your copy / Review metadata / Soundtracks shortcut

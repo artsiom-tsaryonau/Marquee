@@ -4,7 +4,7 @@
   import { scale } from 'svelte/transition';
   import { app } from '../state.svelte';
   import { platformLabel, sourceLabel } from '../labels';
-  import Mark, { hasMark } from '../components/Mark.svelte';
+  import PlatformIcon from '../components/PlatformIcon.svelte';
   import { fuzzy } from '../format';
   import { libraryView, PAGE } from '../libraryView.svelte';
   import { canonicalId, groupGames, launchMethod, matchesVariant, methodLabel } from '../unified';
@@ -190,7 +190,7 @@
   {/if}
   <div class="categories" data-nav-row aria-label="Game platforms">
     <button class="chip" class:on={!view.platform} data-nav aria-pressed={!view.platform} onclick={() => view.platform = ''}>All platforms <span>{groupGames(inScope).length}</span></button>
-    {#each platforms as p}<button class="chip" class:on={view.platform === p} data-nav aria-pressed={view.platform === p} onclick={() => view.platform = p}>{#if hasMark(p)}<Mark id={p} size={16} />{/if}<b>{chipLabel(p)}</b> <span>{counts.get(p)}</span></button>{/each}
+    {#each platforms as p}<button class="chip" class:on={view.platform === p} data-nav aria-pressed={view.platform === p} onclick={() => view.platform = p}><PlatformIcon platform={p} size={22} /><b>{chipLabel(p)}</b> <span>{counts.get(p)}</span></button>{/each}
   </div>
   <div class="bar glass-panel">
     <label class="search">
@@ -253,16 +253,16 @@
 
   {#if app.lutrisError}<div class="empty-banner"><p>Lutris refresh failed. Previously imported entries may be out of date.</p><button class="btn glass small" data-nav onclick={() => app.go('tools')}>Check connection</button></div>{/if}
   {#if showShelves}
-    <div class="platform-shelves">{#each shelves as [platform, games] (platform)}<Row title={platformLabel[platform]} {games} initialCount={12} onViewAll={() => view.platform = platform} />{/each}</div>
+    <div class="platform-shelves">{#each shelves as [platform, games] (platform)}<Row title={platformLabel[platform]} {platform} {games} initialCount={12} onViewAll={() => view.platform = platform} />{/each}</div>
   {:else}
   <div class="grid" style="--slot-ratio:{view.platform ? caseRatio(view.platform) : 2 / 3}">
     {#each grouped.slice(0, view.visibleCount) as group (group.game.id)}
       {@const platformTags = [...new Set(group.entries.map((e) => e.platform))]}
       <div class="grid-cell" animate:flip={{ duration: dur }} in:scale={{ start: 0.92, duration: dur }}>
-        <Cover game={group.game} showTitle />
+        <Cover game={group.game} showTitle platformContext={!!view.platform} />
         {#if platformTags.length > 1}
           <div class="platform-tags" aria-label="Platforms">
-            {#each platformTags as p}<span class="tag">{platformLabel[p]}</span>{/each}
+            {#each platformTags as p}<span class="tag"><PlatformIcon platform={p} size={18} />{platformLabel[p]}</span>{/each}
           </div>
         {/if}
         {#if group.entries.length > 1}<span class="variants">{group.entries.length} play options</span>{/if}

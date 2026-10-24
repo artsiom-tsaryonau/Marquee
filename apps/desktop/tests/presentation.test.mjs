@@ -70,3 +70,15 @@ test('game detail tabs include Metadata and keyboard navigation wraps across all
   assert.equal(nextGameDetailTab('overview','End'),'metadata');
   assert.equal(nextGameDetailTab('ost','Enter'),'ost');
 });
+
+test('console icon profiles distinguish common systems and missing artwork initials stay decorative', async () => {
+  const {platformIconStyle,gameInitials}=await import('../src/lib/platformIcons');
+  assert.equal(platformIconStyle('gbc').hardware,'handheld');
+  assert.notEqual(platformIconStyle('gbc').shell,platformIconStyle('gb').shell);
+  assert.equal(platformIconStyle('nes').hardware,'nes');assert.equal(platformIconStyle('genesis').hardware,'genesis');
+  assert.equal(platformIconStyle('ps1').hardware,'ps1');assert.equal(platformIconStyle('ps2').hardware,'ps2');
+  assert.equal(platformIconStyle('virtualboy').hardware,'headset');
+  assert.equal(platformIconStyle('constructor').hardware,'console');assert.equal(platformIconStyle('unlisted').hardware,'console');
+  assert.equal(gameInitials('The Legend of Zelda (USA)'),'LZ');assert.equal(gameInitials('2048'),'20');
+  assert.equal(gameInitials('Sonic the Hedgehog 2'),'SH');assert.equal(gameInitials(''),'?' );
+});

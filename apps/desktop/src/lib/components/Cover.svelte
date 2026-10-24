@@ -7,13 +7,16 @@
   import Icon from './Icon.svelte';
   import Mark, { hasMark } from './Mark.svelte';
   import { caseRatio } from '../coverLayout';
+  import { gameInitials } from '../platformIcons';
+  import PlatformIcon from './PlatformIcon.svelte';
 
   let {
     game,
     shape = 'cover',
     showTitle = false,
     shelf = false,
-  }: { game: GameEntry; shape?: 'cover' | 'wide'; showTitle?: boolean; shelf?: boolean } = $props();
+    platformContext = false,
+  }: { game: GameEntry; shape?: 'cover' | 'wide'; showTitle?: boolean; shelf?: boolean; platformContext?: boolean } = $props();
 
   const status = $derived(gameStatus(game));
   const imageUrl = $derived(shape === 'wide' ? game.heroUrl ?? game.coverUrl : game.coverUrl);
@@ -45,9 +48,10 @@
           onerror={() => { failedUrl = imageUrl; }} />
       {:else}
         <div class="fallback">
-          {#if hasMark(game.platform)}<Mark id={game.platform} size={28} />{:else}<Icon name="controller" size={28} />{/if}
+          <div class="fallback-symbols" aria-hidden="true"><PlatformIcon platform={game.platform} size={36} /><span class="game-initials">{gameInitials(cleanTitle(game.title))}</span></div>
           {#if !showTitle}<span class="fallback-title">{cleanTitle(game.title)}</span>{/if}
-          <span class="plat">{platformLabel[game.platform]}</span>
+          {#if !platformContext}<span class="plat">{platformLabel[game.platform]}</span>{/if}
+          <span class="missing-label">No cover</span>
         </div>
       {/if}
     </div>
@@ -67,6 +71,9 @@
 </div>
 
 <style>
+  .fallback-symbols { display: flex; align-items: center; justify-content: center; gap: 12px; }
+  .game-initials { font-size: 25px; font-weight: 750; letter-spacing: -.04em; color: #eaf1ff; }
+  .missing-label { font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: #c4d0e4; }
   .wrap {
     --art-h: calc(var(--cover-w) / var(--slot-ratio, .6666667));
     flex: none;

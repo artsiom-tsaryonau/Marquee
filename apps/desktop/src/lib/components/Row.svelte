@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { GameEntry } from '../types';
   import Cover from './Cover.svelte';
+  import PlatformIcon from './PlatformIcon.svelte';
   import GhostCover from './GhostCover.svelte';
 
   let {
@@ -11,6 +12,7 @@
     onPlaceholder,
     onViewAll,
     initialCount = 24,
+    platform,
   }: {
     title: string;
     games: GameEntry[];
@@ -19,6 +21,7 @@
     onPlaceholder?: () => void;
     onViewAll?: () => void;
     initialCount?: number;
+    platform?: string;
   } = $props();
   let visibleCount = $state(24);
   $effect(() => { visibleCount = initialCount; });
@@ -28,10 +31,10 @@
 
 {#if games.length || placeholders}
   <section class="row">
-    <div class="heading"><h2>{title} {#if games.length}<span>{games.length}</span>{/if}</h2><div class="row-actions">{#if onViewAll}<button class="view-all" data-nav onclick={onViewAll}>View all →</button>{/if}<button data-nav aria-label={`Scroll ${title} left`} onclick={() => scroll(-1)}>←</button><button data-nav aria-label={`Scroll ${title} right`} onclick={() => scroll(1)}>→</button></div></div>
+    <div class="heading"><h2 class:platform-heading={!!platform}>{#if platform}<PlatformIcon {platform} size={28} />{/if}<span class="heading-title">{title}</span>{#if games.length}<span class="count">{games.length}</span>{/if}</h2><div class="row-actions">{#if onViewAll}<button class="view-all" data-nav onclick={onViewAll}>View all →</button>{/if}<button data-nav aria-label={`Scroll ${title} left`} onclick={() => scroll(-1)}>←</button><button data-nav aria-label={`Scroll ${title} right`} onclick={() => scroll(1)}>→</button></div></div>
     <div bind:this={scroller} class="scroller" data-nav-row>
       {#each games.slice(0, visibleCount) as game (game.id)}
-        <Cover {game} {shape} showTitle shelf />
+        <Cover {game} {shape} showTitle shelf platformContext={!!platform} />
       {/each}
       {#if games.length > visibleCount}
         <button class="more btn glass" data-nav onclick={() => (visibleCount += 24)}>Show more · {visibleCount} of {games.length}</button>
@@ -44,6 +47,7 @@
 {/if}
 
 <style>
+  .heading-title { color: inherit; font: inherit; }
   .row {
     position: relative;
     z-index: 1;
@@ -54,13 +58,14 @@
   .row-actions button { border:1px solid var(--line); background:var(--field); color:var(--text); border-radius:8px; min-width:36px; min-height:32px; cursor:pointer; font:inherit; }
   :global([data-mode='big']) .row-actions button { min-width:48px; min-height:48px; }
   h2 {
+    display: flex; align-items: center; gap: 10px;
     margin: 0 0 4px;
     padding: 0 var(--gutter);
     font-size: var(--row-title);
     font-weight: 700;
     letter-spacing: -0.01em;
   }
-  h2 span {
+  h2 .count {
     color: var(--text-dim);
     font-weight: 500;
     font-size: 0.8em;
