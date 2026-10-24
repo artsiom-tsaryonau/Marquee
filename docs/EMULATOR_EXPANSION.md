@@ -38,7 +38,11 @@ without inspection. Files in `other` need explicit platform review.
    separate. Local Sonic acceptance alone does not satisfy this gate.
    Physical controller acceptance is deferred because the owner has no controller
    yet; it does not block keyboard/mouse cohorts or native hosting UX.
-2. **E1 — Existing lightweight adapters.** Mesen NES → SNES → GB/GBC → PCE,
+2. **E1 — Existing lightweight adapters.** [Local NES/SNES acceptance](MESEN_ACCEPTANCE.md)
+   now confirms two Mesen titles with video/audio/keyboard play, normal exit and
+   SNES state restore. Native save persistence, separate NES state testing and
+   streamed Mesen acceptance remain open; one earlier SNES termination is
+   unresolved. Continue Mesen GB/GBC → PCE,
    followed by melonDS and FinalBurn Neo with valid data. Reuse installed runners
    and shared profiles; fix observed launch/save/input problems before adding
    another engine. Record exact title, runner build and tested capabilities.

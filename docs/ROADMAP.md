@@ -183,3 +183,13 @@ Run relevant Rust/UI checks (`scripts/check.sh` for broad implementation work),
 plus process/packaging acceptance when introducing the worker. Documentation-only
 changes require local link, authority/consistency and whitespace checks. This
 planning update starts no jobs and changes no runtime behavior.
+
+## Lightweight emulator acceptance — 2026-10-24
+
+The existing managed Mesen adapter passed local video/audio/keyboard acceptance
+for Alter Ego (NES) and Uwol: Quest for Money (SNES). SNES state restoration and
+normal File → Exit also passed. [The acceptance report](MESEN_ACCEPTANCE.md)
+records title-specific evidence, an earlier unexplained SNES termination, and
+remaining native-save, streamed-profile and hardware-controller gates. Next is
+a Mesen virtual-desktop streaming profile, then the GB/GBC/PCE collection cohort;
+no additional engine download is needed for these systems.

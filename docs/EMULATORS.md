@@ -1,6 +1,6 @@
 # Managed emulators and BIOS
 
-Updated 2026-10-21. Marquee installs emulators and holds BIOS images inside its own data folder, so everything can be removed on demand. **Policy (2026-10-21):** Marquee installs, configures and runs emulators itself, from verified archives or reviewed pinned source recipes named in the catalogue. It does not use Flatpak or other package managers, and it no longer discovers host copies of emulators. Setup that an emulator would normally ask the user for is written by Marquee before launch.
+Updated 2026-10-24. Marquee installs emulators and holds BIOS images inside its own data folder, so everything can be removed on demand. **Policy (2026-10-21):** Marquee installs, configures and runs emulators itself, from verified archives or reviewed pinned source recipes named in the catalogue. It does not use Flatpak or other package managers, and it no longer discovers host copies of emulators. Setup that an emulator would normally ask the user for is written by Marquee before launch.
 
 ## Manager and added collection (planned)
 
@@ -23,10 +23,18 @@ return and the OS window-close button remain open. These
 results are separate from local Sonic acceptance and are not implied by the
 catalogue matrix below.
 
+Local Mesen update, 2026-10-24: the owner confirmed **Alter Ego (NES)** and
+**Uwol: Quest for Money (SNES)** video, audio and keyboard play. NES closed with
+exit 0. SNES slot-1 state restored and File → Exit returned 0. An earlier SNES
+attempt ended without a numeric exit code; its cause is unresolved. These tests
+used fresh isolated profiles and copied inputs. [Exact evidence and remaining
+checks](MESEN_ACCEPTANCE.md) distinguish state restoration, native saves and
+streamed/controller acceptance.
+
 | Emulator | Platform | Current Marquee capability |
 | --- | --- | --- |
 | PCSX2 | PS2 | Managed lifecycle, region-aware BIOS setup and disc launch |
-| Mesen | NES / SNES / GB / GBC / PCE | Generic cartridge adapters; live game acceptance separate |
+| Mesen | NES / SNES / GB / GBC / PCE | Generic cartridge adapters; local NES/SNES video/audio/keyboard and SNES state restore accepted for two titles; GB/GBC/PCE and streaming pending |
 | RMG | Nintendo 64 | Generic cartridge adapter; input acceptance pending |
 | BlastEm | Genesis / Mega Drive | Pinned source build and direct cartridge launch; no BIOS |
 | DuckStation | PS1 | Managed lifecycle plus library-disc launch adapter |
@@ -124,7 +132,7 @@ Added 2026-10-21. A system with no dedicated runner kind is one file in `catalog
 | NES, SNES, Game Boy, Game Boy Color, PC Engine | `.nes .fds .unf`, `.smc .sfc .swc .fig`, `.gb`, `.gbc .gb`, `.pce .sgx` | Mesen 2.1.1 | GitHub `Linux_x64.zip`, published SHA-256; single `Mesen` binary | `--fullscreen {rom}`, run with `LC_ALL=C.UTF-8` |
 | Nintendo 64 | `.z64 .n64 .v64` | Rosalie's Mupen GUI v0.9.0 | GitHub AppImage, published SHA-256 | `--fullscreen --quit-after-emulation --nogui {rom}` |
 
-Verified on this host (2026-10-21): all three installed through `marquee emulators install`, 1,487 images from the local `roms/` folders were scanned into the library (Dreamcast 3, NES 245, SNES 42, GB 26, GBC 1,161, PC Engine 6, N64 4), and one game per emulator was launched with the argument lists above. Flycast (`chroma-circuit`) and RMG (`Kumi-Daiko-Beatoff-64`) stayed running until stopped. **Mesen needed two fixes (2026-10-21).** (1) Its .NET runtime aborts with a C++ `std::bad_cast` on this host (Fedora, ICU libraries) in every code path, even `--help`; `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1` in the entry's `env` fixes it (checked: the process stays up with it and aborts without it). My earlier note that Mesen \"stayed running\" was wrong. (2) With no `settings.json`, Mesen opens a first-run window (storage location, desktop shortcut and icons, default controller mappings) and, when that closes, starts a second copy of itself and exits. Marquee saw the first process end and the game's arguments were lost. The entry now has a `seed` list that writes `Mesen2/settings.json` (`{"Version":"2.1.1","ConfigUpgrade":1}`) only when missing; Mesen reads that as a first run, creates its own defaults (Xbox pad and arrow keys on every port, checked in the file it wrote) and goes straight to the game. A small official icon is fetched at install (`icon_download`, pinned SHA-256) because the zip contains none. Verified: one Mesen process stayed up 15 s through Marquee from a clean folder. **Not verified:** the pictures on screen, input, clean exit and playtime for these systems. Because of that Marquee now treats a normal exit within 10 seconds of launch as a failed start ("the emulator closed itself after Ns without a game being played") instead of a played session; the fake test runner is exempt. 
+Verified on this host (2026-10-21): all three installed through `marquee emulators install`, 1,487 images from the local `roms/` folders were scanned into the library (Dreamcast 3, NES 245, SNES 42, GB 26, GBC 1,161, PC Engine 6, N64 4), and one game per emulator was launched with the argument lists above. Flycast (`chroma-circuit`) and RMG (`Kumi-Daiko-Beatoff-64`) stayed running until stopped. **Mesen needed two fixes (2026-10-21).** (1) Its .NET runtime aborts with a C++ `std::bad_cast` on this host (Fedora, ICU libraries) in every code path, even `--help`; `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1` in the entry's `env` fixes it (checked: the process stays up with it and aborts without it). My earlier note that Mesen \"stayed running\" was wrong. (2) With no `settings.json`, Mesen opens a first-run window (storage location, desktop shortcut and icons, default controller mappings) and, when that closes, starts a second copy of itself and exits. Marquee saw the first process end and the game's arguments were lost. The entry now has a `seed` list that writes `Mesen2/settings.json` (`{"Version":"2.1.1","ConfigUpgrade":1}`) only when missing; Mesen reads that as a first run, creates its own defaults (Xbox pad and arrow keys on every port, checked in the file it wrote) and goes straight to the game. A small official icon is fetched at install (`icon_download`, pinned SHA-256) because the zip contains none. Verified: one Mesen process stayed up 15 s through Marquee from a clean folder. **At that time, not verified:** the pictures on screen, input, clean exit and playtime for these systems. The later [Mesen acceptance](MESEN_ACCEPTANCE.md) supersedes those limits only for its two tested titles. Because of that Marquee now treats a normal exit within 10 seconds of launch as a failed start ("the emulator closed itself after Ns without a game being played") instead of a played session; the fake test runner is exempt.
 
 The earlier Genesis acquisition gap is now covered by the pinned BlastEm source recipe and library adapter described below. Neo Geo Pocket still needs its own managed acquisition recipe and library adapter. mGBA remains a standalone source-built tool; Mesen supplies the current Game Boy library adapter.
 
@@ -182,7 +190,7 @@ Flatpak, distro packages and loose AppImages found on the host are not discovere
 2. List the file in `CATALOGUE` in `crates/core/src/emulators.rs`.
 3. If it is a new emulator family, add a `RunnerKind` in `model.rs`, map its systems in `runners::preferred_kind`, and add its launch flags to `runners::launch_argv`.
 
-Install, update checks, uninstall, runner registration and isolation then come from the catalogue. A direct link has been installed end to end: Mesen now uses one (pinned 2.1.1 zip and SHA-256), and a clean `--data-dir` install produced a working `Mesen` binary (2026-10-21). A wrong checksum is refused in code but was not tried against a live download. `.7z` and other formats are unsupported; the emulator must honour `XDG_CONFIG_HOME` for its user folder. 
+Install, update checks, uninstall, runner registration and isolation then come from the catalogue. A direct link has been installed end to end: Mesen now uses one (pinned 2.1.1 zip and SHA-256), and a clean `--data-dir` install produced a working `Mesen` binary (2026-10-21). A wrong checksum is refused in code but was not tried against a live download. `.7z` and other formats are unsupported; the emulator must honour `XDG_CONFIG_HOME` for its user folder.
 
 ## Game-only windows and headless emulation
 
