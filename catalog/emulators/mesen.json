@@ -12,6 +12,7 @@
   "binary": "Mesen",
   "config_subdir": "Mesen2",
   "launch": [
+    "--preferences.autoHideMenu=true",
     "{rom}"
   ],
   "env": [

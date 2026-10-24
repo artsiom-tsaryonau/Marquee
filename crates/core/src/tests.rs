@@ -982,6 +982,7 @@ fn cartridge_systems_scan_pick_their_emulator_and_build_argv() {
             "/data/runners/mesen/current/Mesen",
             "--x",
             "--fullscreen",
+            "--preferences.autoHideMenu=true",
             "/roms/My Game's (USA).nes"
         ]
     );

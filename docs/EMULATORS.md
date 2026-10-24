@@ -52,6 +52,21 @@ streamed/controller acceptance.
 
 PCSX2 is a normal catalogue entry (`catalog/emulators/pcsx2.json`, runner `runner.pcsx2.marquee`): the same verified-download-and-unpack path as every other emulator. The old dedicated installer (`tools.rs`) is gone. An install made by it is adopted as-is on the next refresh (recorded as version `adopted`), and its old `runner.pcsx2.unpacked` row is disabled, so nothing is downloaded twice (checked on this host). The install command `install_pcsx2` remains for the install dialog and delegates to the catalogue. A catalogue entry is implementation of acquisition/opening, not proof of a successful current upstream install, complete configuration isolation, firmware readiness or a playable game. Binary installation requires a matching upstream artifact with a published checksum; source recipes instead verify their pinned commit and record image/recipe receipts. Missing or changed packaging produces an error. Additional platforms still need system descriptors, media import, launch flags, prerequisite checks, save behavior and live acceptance before their games appear as playable library entries. Standalone emulator lifetime is not recorded as game playtime.
 
+## Mesen menu visibility
+
+Library launches pass `--preferences.autoHideMenu=true`, supported by the pinned
+Mesen 2.1.1 command-line configuration switches. This applies to existing profiles
+as well as new ones. Marquee still controls window versus fullscreen selection;
+the operating system's window decorations are separate. Standalone Tools opening
+remains available for configuration. Mesen may save this preference in its own
+profile; it can be changed in its Preferences dialog.
+
+Reviewed source: [preferences](https://github.com/SourMesen/Mesen2/blob/2.1.1/UI/Config/PreferencesConfig.cs),
+[command switches](https://github.com/SourMesen/Mesen2/blob/2.1.1/UI/Utilities/CommandLineHelper.cs),
+[menu visibility](https://github.com/SourMesen/Mesen2/blob/2.1.1/UI/ViewModels/MainWindowViewModel.cs).
+Earlier gameplay acceptance predates this change; visual auto-hide acceptance
+remains separate.
+
 ## What is needed to install and manage DuckStation
 
 Verified against the upstream release on 2026-10-21.
