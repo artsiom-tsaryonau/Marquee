@@ -308,3 +308,16 @@ metadata; it does not download audio or create remote-playable tracks. The owner
 existing locally attached Sonic 2 album is unaffected. Durable acquisition,
 per-track progress/cancel/retry and verified importer handoff remain the next
 music-manager step. See [YouTube integration](YOUTUBE_OST.md).
+
+### Portable installation packages — proposed 2026-10-25
+
+[Portable packages](PORTABLE_PACKAGES.md) should transfer immutable prepared game
+payloads and reviewed runtime requirements between Marquee instances, preserving
+separate saves and host settings. MP0–MP3 define manifest, local export/import,
+cross-instance acceptance and later private transfer. This is planned work, not
+native PS3 conversion or an implemented package format.
+
+The owner also resumed [Quiver integration](QUIVER_INTEGRATION.md). Q0 now pins
+upstream, retains notices and defines existing/new Linux port fixtures. Q1 is the
+next implementation step; hosted-catalogue mirroring and unattended installs are
+outside the first slice.

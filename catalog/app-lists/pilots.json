@@ -1,0 +1,9 @@
+{
+  "name": "Marquee native-port pilots",
+  "description": "Hand-authored local schema fixture; no hosted catalogue imported.",
+  "version": "1",
+  "apps": [
+    {"name":"The Legend of Zelda: Ocarina of Time","project":"Ship of Harkinian","repository":"HarbourMasters/Shipwright","folderName":"OcarinaOfTime-Shipwright","tags":["n64","decomp"],"appIconUrl":null},
+    {"name":"The Legend of Zelda: Majora's Mask","project":"2 Ship 2 Harkinian","repository":"HarbourMasters/2ship2harkinian","folderName":"MajorasMask-2Ship","tags":["n64","decomp"],"appIconUrl":null}
+  ]
+}

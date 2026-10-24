@@ -1,11 +1,10 @@
 # Quiver integration roadmap
 
-Created 2026-10-22. **Deferred; planning only. No Quiver integration is implemented.**
+Created 2026-10-22; resumed 2026-10-25. **Q0 source/schema review complete. Q1 implementation is next; no dynamic installation recipes are enabled.**
 
 This track supports later native-port and catalogue expansion. It does not
 change the direct-store implementation order in [ROADMAP.md](ROADMAP.md), add a
-required launcher, or block Steam/Epic/GOG delivery. Resume when the owner
-explicitly schedules this work.
+required launcher, or block Steam/Epic/GOG delivery. The owner explicitly scheduled this work on 2026-10-25.
 
 ## Intended outcome and architecture
 
@@ -179,3 +178,32 @@ Initial assessment checked on 2026-10-22; upstream `main` URLs are mutable.
 - [.NET/Avalonia project configuration](https://github.com/tgeorgiadis/quiver-launcher/blob/main/QuiverLauncher.App.csproj)
 - [Platform asset matcher](https://github.com/tgeorgiadis/quiver-launcher/blob/main/lib/QuiverLauncher.Core/Services/PlatformAssetMatcher.cs)
 - [App catalogue service](https://github.com/tgeorgiadis/quiver-launcher/blob/main/Services/AppCatalogService.cs)
+
+
+## Q0 implementation record (2026-10-25)
+
+Pinned upstream revision: `a27f9a7b1f8d188dc693aff9a6567a7d5101ab95`.
+Reviewed the documented modern `apps` array, `Services/AppCatalogService.cs`,
+`Models/GameInfo.cs`, its catalogue tests and the core platform matcher. Upstream
+also accepts legacy arrays/sections; the first Marquee importer intentionally
+supports only the explicit modern object/`apps` format and reports other shapes.
+Upstream currently describes one personal app-list source rather than the older
+subscription model. This does not authorize mirroring its hosted catalogue.
+
+The root MIT license attributes SirDiabo and Thomas Georgiadis (2026); the core
+MIT notice attributes SirDiabo (2025). Both notices and the reference inventory
+are retained in `third_party/quiver/`. This is original Rust schema-compatible
+code; no upstream runtime, dependencies, branding or artwork are copied.
+
+The hand-authored local fixture is `catalog/app-lists/pilots.json`. Pilots:
+
+| Entry | Marquee mapping | Upstream release checked | Game-data prerequisite |
+| --- | --- | --- | --- |
+| Ship of Harkinian | Existing `shipwright` recipe | Shipwright 9.3.1, `SoH-Dewey-Bravo.appimage` | Compatible Ocarina of Time game data and port-native setup |
+| 2 Ship 2 Harkinian | New; needs a reviewed recipe | 2ship2harkinian 5.0.1, `2Ship-Battler-Bravo-Linux.zip` | Compatible Majora’s Mask data and port-native setup |
+
+These are upstream Linux asset candidates, not observed gameplay acceptance. No
+release asset or retail data was downloaded or executed during Q0. Q2 must pin
+asset digests, validate setup/save contracts and observe launch before claiming
+the new port works. Q0's source/data/fixture inventory is complete; its live-game
+evidence belongs to Q2.
