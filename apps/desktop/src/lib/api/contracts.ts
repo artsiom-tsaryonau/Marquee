@@ -365,7 +365,7 @@ export interface StreamingState {
 }
 
 export interface MusicTrack { id: string; title: string; available: boolean; duration_seconds?: number | null }
-export interface MusicAlbum { id: string; title: string; artist: string; source_url: string; tracks: MusicTrack[] }
+export interface MusicAlbum { id: string; title: string; artist: string; source_url: string; cover_data_url?: string | null; cover_source?: string | null; game_keys?: string[]; tracks: MusicTrack[] }
 export interface MusicDraft { game_key: string; album_id: string | null; title: string; artist: string; source_url: string }
 
 export interface LibraryApi {
@@ -378,6 +378,8 @@ export interface LibraryApi {
   musicRemoveTrack(albumId: string, trackId: string): Promise<void>;
   musicUrl(trackId: string): Promise<string>;
   pickMusic(): Promise<string[]>;
+  pickMusicCover(): Promise<string | null>;
+  musicSetCover(albumId: string, path: string | null): Promise<void>;
   streamingState(): Promise<StreamingState>;
   streamingSaveConnection(connection: StreamingConnection): Promise<void>;
   streamingOpenViewer(appId: string): Promise<void>;

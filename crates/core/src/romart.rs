@@ -39,6 +39,11 @@ pub(crate) struct Source {
 
 const SOURCES: &[Source] = &[
     Source {
+        system: "genesis",
+        thumbs: "Sega - Mega Drive - Genesis",
+        dat: Some("Sega - Mega Drive - Genesis"),
+    },
+    Source {
         system: "nes",
         thumbs: "Nintendo - Nintendo Entertainment System",
         dat: Some("Nintendo - Nintendo Entertainment System"),
@@ -300,19 +305,35 @@ pub fn looks_retail(official: &str) -> bool {
     .any(|t| l.contains(t))
 }
 
+fn thumbnail_names(name: &str) -> Vec<&str> {
+    let mut names = vec![name];
+    // No-Intro may append an alternate compilation title that the thumbnail
+    // repository has not adopted. Keep the region and revision intact.
+    if let Some(without_close) = name.strip_suffix(')') {
+        if let Some((base, annotation)) = without_close.rsplit_once(" (") {
+            if annotation.contains(" ~ ") && !annotation.contains('(') {
+                names.push(base);
+            }
+        }
+    }
+    names
+}
+
 fn thumbnail(system: &Source, name: &str) -> Option<(Vec<u8>, &'static str)> {
     for kind in ["Named_Boxarts", "Named_Titles", "Named_Snaps"] {
-        let url = format!(
-            "{THUMB_BASE}/{}/{kind}/{}.png",
-            encode(system.thumbs),
-            encode(&thumb_name(name))
-        );
-        match http::get_bytes(&url) {
-            Ok(bytes) if image_kind(&bytes).is_some() => {
-                return Some((bytes, "libretro-thumbnails"))
+        for name in thumbnail_names(name) {
+            let url = format!(
+                "{THUMB_BASE}/{}/{kind}/{}.png",
+                encode(system.thumbs),
+                encode(&thumb_name(name))
+            );
+            match http::get_bytes(&url) {
+                Ok(bytes) if image_kind(&bytes).is_some() => {
+                    return Some((bytes, "libretro-thumbnails"))
+                }
+                Err(e) if e.code == "NOT_FOUND" => continue,
+                _ => continue,
             }
-            Err(e) if e.code == "NOT_FOUND" => continue,
-            _ => continue,
         }
     }
     None
@@ -607,6 +628,22 @@ mod tests {
 
     #[test]
     fn search_results_must_name_the_same_game() {
+        assert_eq!(
+            thumbnail_names(
+                "Sonic The Hedgehog 2 (World) (Rev B) (Sonic Compilation ~ Sonic Classics)"
+            ),
+            vec![
+                "Sonic The Hedgehog 2 (World) (Rev B) (Sonic Compilation ~ Sonic Classics)",
+                "Sonic The Hedgehog 2 (World) (Rev B)"
+            ]
+        );
+        assert_eq!(
+            thumbnail_names("Sonic The Hedgehog 2 (World) (Rev A)"),
+            vec!["Sonic The Hedgehog 2 (World) (Rev A)"]
+        );
+        let source = source_for("genesis").unwrap();
+        assert_eq!(source.dat, Some("Sega - Mega Drive - Genesis"));
+        assert_eq!(source.thumbs, "Sega - Mega Drive - Genesis");
         assert_eq!(plain_title("Crazy Taxi (USA) [!]"), "Crazy Taxi");
         assert!(names_agree("Crazy Taxi (USA)", "Crazy Taxi"));
         assert!(names_agree(

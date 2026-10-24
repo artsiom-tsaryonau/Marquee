@@ -1,6 +1,7 @@
 //! Explicit soundtrack attachments. Owned audio never enters the game scanner.
 use crate::error::{AppError, Result};
 use crate::Core;
+use base64::Engine;
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -18,6 +19,7 @@ pub fn ensure_tables(db: &Connection) -> Result<()> {
         CREATE TABLE IF NOT EXISTS music_links (game_key TEXT NOT NULL, album_id TEXT NOT NULL REFERENCES music_albums(id), PRIMARY KEY(game_key,album_id));
         CREATE TABLE IF NOT EXISTS music_tracks (id TEXT PRIMARY KEY, album_id TEXT NOT NULL REFERENCES music_albums(id), title TEXT NOT NULL, media TEXT NOT NULL, position INTEGER NOT NULL, UNIQUE(album_id,media));")?;
     db.execute_batch("CREATE TABLE IF NOT EXISTS music_media_metadata (media TEXT PRIMARY KEY, size INTEGER NOT NULL, modified TEXT NOT NULL, duration_seconds REAL);")?;
+    db.execute_batch("CREATE TABLE IF NOT EXISTS music_album_artwork (album_id TEXT PRIMARY KEY REFERENCES music_albums(id), data_url TEXT NOT NULL, source TEXT NOT NULL);")?;
     Ok(())
 }
 
@@ -35,6 +37,9 @@ pub struct Album {
     pub title: String,
     pub artist: String,
     pub source_url: String,
+    pub cover_data_url: Option<String>,
+    pub cover_source: Option<String>,
+    pub game_keys: Vec<String>,
     pub tracks: Vec<Track>,
 }
 
@@ -152,6 +157,48 @@ fn open_regular(path: &Path) -> Result<File> {
     Ok(file)
 }
 
+fn normalize_cover(bytes: &[u8]) -> Result<String> {
+    let invalid = || {
+        AppError::new(
+            "MUSIC_ART",
+            "Choose a valid JPEG or PNG image up to 4 MiB and 4096 pixels per side",
+        )
+    };
+    if bytes.len() > 4 * 1024 * 1024 {
+        return Err(invalid());
+    }
+    let mut reader = image::ImageReader::new(std::io::Cursor::new(bytes))
+        .with_guessed_format()
+        .map_err(|_| invalid())?;
+    if !matches!(
+        reader.format(),
+        Some(image::ImageFormat::Jpeg | image::ImageFormat::Png)
+    ) {
+        return Err(invalid());
+    }
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(4096);
+    limits.max_image_height = Some(4096);
+    limits.max_alloc = Some(64 * 1024 * 1024);
+    reader.limits(limits);
+    let image = reader
+        .decode()
+        .map_err(|_| invalid())?
+        .thumbnail(512, 512)
+        .to_rgb8();
+    let mut jpeg = vec![];
+    image::codecs::jpeg::JpegEncoder::new_with_quality(&mut jpeg, 80)
+        .encode_image(&image)
+        .map_err(|_| invalid())?;
+    if jpeg.len() > 256 * 1024 {
+        return Err(invalid());
+    }
+    Ok(format!(
+        "data:image/jpeg;base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(jpeg)
+    ))
+}
+
 fn copy_audio(source: &Path, destination: &Path, total: &mut u64) -> Result<(String, String)> {
     if !source.is_absolute() {
         return Err(AppError::new(
@@ -254,6 +301,30 @@ fn copy_audio(source: &Path, destination: &Path, total: &mut u64) -> Result<(Str
 }
 
 impl Core {
+    pub fn music_set_cover(&self, album: &str, path: Option<PathBuf>) -> Result<()> {
+        let cover = if let Some(path) = path {
+            if !path.is_absolute() {
+                return Err(AppError::new(
+                    "MUSIC_ART",
+                    "Choose an absolute local image path",
+                ));
+            }
+            let file = open_regular(&path)?;
+            let mut bytes = vec![];
+            file.take(4 * 1024 * 1024 + 1).read_to_end(&mut bytes)?;
+            Some(normalize_cover(&bytes)?)
+        } else {
+            None
+        };
+        self.with_db(|db| {
+            let exists: bool = db.conn.query_row("SELECT EXISTS(SELECT 1 FROM music_albums WHERE id=?1)", [album], |r| r.get(0))?;
+            if !exists { return Err(AppError::new("MUSIC_ALBUM", "Select an existing album")); }
+            if let Some(cover) = cover {
+                db.conn.execute("INSERT INTO music_album_artwork(album_id,data_url,source) VALUES(?1,?2,'Chosen locally') ON CONFLICT(album_id) DO UPDATE SET data_url=excluded.data_url,source=excluded.source",params![album,cover])?;
+            } else { db.conn.execute("DELETE FROM music_album_artwork WHERE album_id=?1", [album])?; }
+            Ok(())
+        })
+    }
     pub fn music_find(&self, title: &str) -> Result<()> {
         open_browser(&search_url(title)?)
     }
@@ -304,30 +375,38 @@ impl Core {
                 let (id,title,artist,source_url) = row?;
                 let mut tracks = db.conn.prepare("SELECT id,title,media FROM music_tracks WHERE album_id=?1 ORDER BY position,id")?;
                 let tracks = tracks.query_map([&id], |r| Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?)))?.collect::<std::result::Result<Vec<_>,_>>()?;
-                albums.push((id,title,artist,source_url,tracks));
+                let artwork = db.conn.query_row("SELECT data_url,source FROM music_album_artwork WHERE album_id=?1", [&id], |r| Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?))).optional()?;
+                let mut links = db.conn.prepare("SELECT game_key FROM music_links WHERE album_id=?1 ORDER BY game_key")?;
+                let game_keys = links.query_map([&id], |r| r.get::<_,String>(0))?.collect::<std::result::Result<Vec<_>,_>>()?;
+                albums.push((id,title,artist,source_url,tracks,artwork,game_keys));
             }
             Ok(albums)
         })?;
         Ok(records
             .into_iter()
-            .map(|(id, title, artist, source_url, tracks)| Album {
-                id,
-                title,
-                artist,
-                source_url,
-                tracks: tracks
-                    .into_iter()
-                    .map(|(id, title, media)| {
-                        let (available, duration_seconds) = self.music_media_info(&media);
-                        Track {
-                            id,
-                            title,
-                            available,
-                            duration_seconds,
-                        }
-                    })
-                    .collect(),
-            })
+            .map(
+                |(id, title, artist, source_url, tracks, artwork, game_keys)| Album {
+                    id,
+                    title,
+                    artist,
+                    source_url,
+                    cover_data_url: artwork.as_ref().map(|a| a.0.clone()),
+                    cover_source: artwork.map(|a| a.1),
+                    game_keys,
+                    tracks: tracks
+                        .into_iter()
+                        .map(|(id, title, media)| {
+                            let (available, duration_seconds) = self.music_media_info(&media);
+                            Track {
+                                id,
+                                title,
+                                available,
+                                duration_seconds,
+                            }
+                        })
+                        .collect(),
+                },
+            )
             .collect())
     }
 
@@ -394,11 +473,28 @@ impl Core {
         for source in paths {
             copied.push(copy_audio(&source, &destination, &mut total)?);
         }
+        let has_cover = self.with_db(|db| {
+            Ok(db.conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM music_album_artwork WHERE album_id=?1)",
+                [album],
+                |r| r.get::<_, bool>(0),
+            )?)
+        })?;
+        let embedded = if has_cover {
+            None
+        } else {
+            copied.iter().take(8).find_map(|(name, _)| {
+                let (file, _) = self.music_open_name(name).ok()?;
+                let bytes = crate::music_metadata::artwork(file, name.rsplit('.').next()?)?;
+                normalize_cover(&bytes).ok()
+            })
+        };
         self.with_db(|db| {
             let tx=db.conn.unchecked_transaction()?;
             let start: i64=tx.query_row("SELECT COALESCE(MAX(position)+1,0) FROM music_tracks WHERE album_id=?1",[album],|r|r.get(0))?;
             let mut added=0;
             for (i,(media,title)) in copied.iter().enumerate() { added+=tx.execute("INSERT OR IGNORE INTO music_tracks(id,album_id,title,media,position) VALUES(?1,?2,?3,?4,?5)",params![Uuid::new_v4().to_string(),album,title,media,start+i as i64])?; }
+            if let Some(cover) = embedded { tx.execute("INSERT OR IGNORE INTO music_album_artwork(album_id,data_url,source) VALUES(?1,?2,'Embedded audio artwork')", params![album,cover])?; }
             tx.commit()?; Ok(added)
         })
     }
@@ -437,6 +533,43 @@ impl Core {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn local_artwork_is_normalized_persistent_and_rejects_unsafe_inputs() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().join("library");
+        let core = Core::open_isolated(Some(root.clone()), true).unwrap();
+        let id = album(&core);
+        let image = dir.path().join("cover.png");
+        image::RgbImage::new(800, 600).save(&image).unwrap();
+        core.music_set_cover(&id, Some(image.clone())).unwrap();
+        let albums = core.music_albums(None).unwrap();
+        assert_eq!(albums[0].game_keys, vec!["game-one"]);
+        assert_eq!(albums[0].cover_source.as_deref(), Some("Chosen locally"));
+        let url = albums[0].cover_data_url.clone().unwrap();
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(url.strip_prefix("data:image/jpeg;base64,").unwrap())
+            .unwrap();
+        let decoded = image::load_from_memory(&bytes).unwrap();
+        assert_eq!((decoded.width(), decoded.height()), (512, 384));
+        let bad = dir.path().join("fake.png");
+        fs::write(&bad, b"<svg>fake</svg>").unwrap();
+        assert!(core.music_set_cover(&id, Some(bad)).is_err());
+        let link = dir.path().join("link.png");
+        std::os::unix::fs::symlink(&image, &link).unwrap();
+        assert!(core.music_set_cover(&id, Some(link)).is_err());
+        assert!(core
+            .music_set_cover(&id, Some(PathBuf::from("relative.png")))
+            .is_err());
+        assert!(normalize_cover(&vec![0; 4 * 1024 * 1024 + 1]).is_err());
+        drop(core);
+        let core = Core::open_isolated(Some(root), true).unwrap();
+        assert_eq!(
+            core.music_albums(None).unwrap()[0].cover_data_url.as_ref(),
+            Some(&url)
+        );
+        core.music_set_cover(&id, None).unwrap();
+        assert!(core.music_albums(None).unwrap()[0].cover_data_url.is_none());
+    }
 
     pub(crate) fn wav(path: &Path) {
         let mut content = b"RIFF\x24\x00\x00\x00WAVEfmt ".to_vec();

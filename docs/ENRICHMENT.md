@@ -1,6 +1,6 @@
 # Metadata enrichment: artwork, facts and provider plans
 
-Updated 2026-10-22. This document owns current optional ROM artwork/facts behavior
+Updated 2026-10-24. This document owns current optional ROM artwork/facts behavior
 and future provider research. [Catalogue metadata](CATALOGUE_METADATA.md) owns
 saved provider snapshots and verified/manual links; [UI/UX](UI_UX.md) owns visual
 and controller presentation. [Roadmap](ROADMAP.md) owns priority. Enrichment must
@@ -17,13 +17,34 @@ fallback as documented in the root README.
 ### Artwork lookup order
 
 1. **PS1/PS2 serial covers** (xlenore sets) — unchanged, see [PS2](PS2.md).
-2. **libretro-database + libretro-thumbnails** for NES, SNES, Game Boy, Game Boy Color, PC Engine, N64 and DS. The ROM is hashed (CRC-32, also without an iNES or SNES copier header), looked up in the No-Intro list to get the **official game name**, and box art (then title screen, then screenshot) is fetched by that name. A messy file name does not matter. No account or key.
+2. **libretro-database + libretro-thumbnails** for Genesis / Mega Drive, NES, SNES, Game Boy, Game Boy Color, PC Engine, N64 and DS. The ROM is hashed (CRC-32, also without an iNES or SNES copier header), looked up in the No-Intro list to get the **official game name**, and box art (then title screen, then screenshot) is fetched by that name. A messy file name does not matter. No account or key.
 3. **SteamGridDB** (needs `STEAM_GRID_DB_API_KEY` in Settings → API keys or `.env`) for games that still have no cover, but **only** when:
    - the game has an official No-Intro name that looks retail (not `World`, `Proto`, `Beta`, `Demo`, `Homebrew`, `Aftermarket`, `Unl`, `Pirate`, `Hack`), or
    - it is a PS1, PS2 or Dreamcast disc image.
    A search result is used only if its name is essentially the same game (`Tetris` does not match `Tetris Effect`).
 
 Homebrew, public-domain and hacked ROMs are deliberately left without a cover: they share names with famous games and a wrong cover is worse than none.
+
+Genesis was missing from the shared source list despite having a TheGamesDB
+platform mapping. It now uses the official `Sega - Mega Drive - Genesis` No-Intro
+and thumbnail names, which also enables the existing checksum-based fact path.
+This does not verify every Genesis release or manufacture a description.
+[Upstream database](https://github.com/libretro/libretro-database/blob/master/metadat/no-intro/Sega%20-%20Mega%20Drive%20-%20Genesis.dat).
+For thumbnail filename compatibility, lookup may omit a trailing alternate-title
+annotation containing ` ~ ` while retaining every region/revision annotation.
+For example, Sonic 2's `(Sonic Compilation ~ Sonic Classics)` can be omitted
+after `(World) (Rev B)`; a different revision or numbered sequel is not substituted.
+
+Music album images follow a separate bounded embedded/local artwork path, with
+explicit source labels and a linked-game fallback; see [soundtracks](SOUNDTRACKS.md).
+A game cover is never silently presented as a verified soundtrack release image.
+
+Live 2026-10-24: selected-game refresh for the owner's existing Sonic 2 Genesis
+entry fetched one libretro cover and filled Action, 1992, SEGA developer/publisher
+facts. The downloaded PNG was visually inspected as Sonic 2 artwork. A private
+database backup and source/hash receipt were retained; no description was invented
+or claimed as fetched. The upstream World/Rev B thumbnail chooses its own cover
+presentation; it does not certify packaging for every territory of a World ROM.
 
 ### Artwork cache and dated measurements
 
@@ -57,7 +78,7 @@ Shown on the game page (About text, Genre · year, Developer, Publisher, Players
 
 ### Fact sources
 
-1. **libretro-database** `metadat/genre`, `releaseyear`, `developer`, `publisher`: for NES, SNES, Game Boy, Game Boy Color, PC Engine, N64 and DS. The ROM is matched by checksum, as for [covers](ENRICHMENT.md#implemented-artwork-and-facts). No account.
+1. **libretro-database** `metadat/genre`, `releaseyear`, `developer`, `publisher`: for Genesis / Mega Drive, NES, SNES, Game Boy, Game Boy Color, PC Engine, N64 and DS. The ROM is matched by checksum, as for [covers](ENRICHMENT.md#implemented-artwork-and-facts). No account.
 2. **TheGamesDB** (key `THE_GAMES_DB_API_KEY`, Settings → API keys): descriptions and player counts for those systems and for PS1, PS2 and Dreamcast, by name; also fills a missing genre or year. Developers and publishers from TheGamesDB are not used (it returns ids that need large lists).
 
 A field is filled once and never overwritten by a later source.

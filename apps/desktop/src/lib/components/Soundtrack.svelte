@@ -6,6 +6,7 @@
   import MusicMenu from './MusicMenu.svelte';
   import { asError } from '../api/core';
   import type { MusicAlbum } from '../api/contracts';
+  import { albumArtwork } from '../musicArtwork';
   let { gameKey = '', gameTitle = '', library = false }: { gameKey?: string; gameTitle?: string; library?: boolean } = $props();
   let query = $state('');
   let selected = $state<string | null>(null);
@@ -24,6 +25,13 @@
   const findUrl = $derived(`https://www.youtube.com/results?search_query=${encodeURIComponent(`${gameTitle} official soundtrack OST`)}`);
   const matches = $derived(albums.filter(a => `${a.title} ${a.artist} ${a.tracks.map(t => t.title).join(' ')}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase())));
   const displayed = $derived(library ? albums.filter(a => a.id === selected) : albums);
+  function forPlayback(album: MusicAlbum) {
+    const art = albumArtwork(album, app.games);
+    return { ...album, cover_data_url: art?.url, cover_source: art?.label };
+  }
+  async function chooseArtwork(album: MusicAlbum) {
+    await run(async () => { const path = await app.api.pickMusicCover(); if (path) await app.api.musicSetCover(album.id, path); });
+  }
   async function refresh() {
     if (library) { albums = await app.api.musicAlbums(); all = albums; }
     else [albums, all] = await Promise.all([app.api.musicAlbums(gameKey), app.api.musicAlbums()]);
@@ -43,7 +51,7 @@
   }
   async function toggleAlbum(album: MusicAlbum) {
     if (music.current?.albumId === album.id) await music.toggle(app.api);
-    else { const first = album.tracks.find(t => t.available); if (first) await music.play(app.api, album, first.id); }
+    else { const first = album.tracks.find(t => t.available); if (first) await music.play(app.api, forPlayback(album), first.id); }
   }
   async function save(event: SubmitEvent) {
     event.preventDefault();
@@ -65,7 +73,7 @@
   {#if library && !selected}
     <label class="music-search"><Icon name="search" size={18} /><input data-nav type="search" bind:value={query} placeholder="Search albums, artists or tracks" aria-label="Search music" /></label>
     <p class="hint">{matches.length} {matches.length === 1 ? 'album' : 'albums'}</p>
-    <div class="album-grid">{#each matches as album (album.id)}<button class="album-card" data-nav onclick={() => selected = album.id}><span class="library-art" aria-hidden="true"><Icon name="music" size={44} /></span><strong>{album.title}</strong><span>{album.artist || 'Soundtrack'} · {album.tracks.length} tracks</span></button>{/each}</div>
+    <div class="album-grid">{#each matches as album (album.id)}<button class="album-card" data-nav onclick={() => selected = album.id}><span class="library-art" aria-hidden="true">{#if albumArtwork(album, app.games)}<img src={albumArtwork(album, app.games)!.url} alt="" loading="lazy" />{:else}<Icon name="music" size={44} />{/if}</span><strong>{album.title}</strong><span>{album.artist || 'Soundtrack'} · {album.tracks.length} tracks</span></button>{/each}</div>
     {#if albums.length && !matches.length}<p>No music matches “{query}”. Try an album, artist or track name.</p>{/if}
   {/if}
   {#if error}<p class="error" role="alert">{error}</p><button class="btn glass small" data-nav disabled={busy} onclick={() => run(async () => {})}>Retry</button>{/if}
@@ -81,11 +89,11 @@
   </form>{/if}
   {#if !albums.length && !busy}<div class="glass-panel empty"><span class="disc" aria-hidden="true">♫</span><h3>{library ? 'Build your music library' : 'Give this game a soundtrack'}</h3><p>Add an album, then choose its local audio files. Music keeps playing while you browse Marquee.</p><p class="hint">MP3, FLAC, OGG and WAV are accepted for import; playback depends on the decoder available in your browser or desktop runtime.</p></div>{/if}
   {#each displayed as album (album.id)}<article class="glass-panel album">
-    <div class="album-head"><div class="album-art" aria-hidden="true">♫</div><div class="album-info"><span class="eyebrow">SOUNDTRACK · {album.tracks.length} TRACKS</span><h3>{album.title}</h3>{#if album.artist}<p>{album.artist}</p>{/if}{#if album.source_url}<a data-nav href={album.source_url} onclick={(event) => openSource(event, album)} target="_blank" rel="noreferrer">View source ↗</a>{/if}</div></div>
+    <div class="album-head"><div class="album-art" aria-hidden="true">{#if albumArtwork(album, app.games)}<img src={albumArtwork(album, app.games)!.url} alt="" />{:else}♫{/if}</div><div class="album-info"><span class="eyebrow">SOUNDTRACK · {album.tracks.length} TRACKS</span><h3>{album.title}</h3>{#if albumArtwork(album, app.games)}<span class="art-credit">{albumArtwork(album, app.games)!.label}</span>{/if}{#if album.artist}<p>{album.artist}</p>{/if}{#if album.source_url}<a data-nav href={album.source_url} onclick={(event) => openSource(event, album)} target="_blank" rel="noreferrer">View source ↗</a>{/if}</div></div>
     <div class="album-actions">
       <button class="album-play" data-nav aria-label={music.current?.albumId === album.id && (!music.paused || music.loading) ? 'Pause album' : 'Play album'} title={music.current?.albumId === album.id && (!music.paused || music.loading) ? 'Pause album' : 'Play album'} disabled={!album.tracks.some(t => t.available)} onclick={() => toggleAlbum(album)}><Icon name={music.current?.albumId === album.id && (!music.paused || music.loading) ? 'pause' : 'play'} size={25} filled /></button>
       <button class="add-tracks" data-nav disabled={busy} title="Choose local audio files" onclick={() => addFiles(album)}><Icon name="plus" size={18} />Add tracks</button>
-      <MusicMenu label={`Album options for ${album.title}`}><button data-nav disabled={busy} onclick={() => edit(album)}><Icon name="settings" size={16} />Edit album details</button>{#if !library}<button data-nav disabled={busy} onclick={() => run(() => app.api.musicLink(gameKey, album.id, false))}>Unlink from this game</button>{/if}</MusicMenu>
+      <MusicMenu label={`Album options for ${album.title}`}><button data-nav disabled={busy} onclick={() => chooseArtwork(album)}><Icon name="image" size={16} />Choose album artwork</button>{#if album.cover_data_url}<button data-nav disabled={busy} onclick={() => run(() => app.api.musicSetCover(album.id, null))}>Remove album artwork</button>{/if}<button data-nav disabled={busy} onclick={() => edit(album)}><Icon name="settings" size={16} />Edit album details</button>{#if !library}<button data-nav disabled={busy} onclick={() => run(() => app.api.musicLink(gameKey, album.id, false))}>Unlink from this game</button>{/if}</MusicMenu>
     </div>
     {#if album.tracks.length}
       <div class="list-heading" aria-hidden="true"><span>#</span><span>Title</span><span class="album-column">Album</span><span class="duration-column"><Icon name="clock" size={14} /></span></div>
@@ -94,13 +102,13 @@
         {@const title = trackTitle(track.title, index + 1)}
         {@const duration = current && music.duration > 0 ? music.duration : track.duration_seconds}
         <li class:current aria-current={current ? 'true' : undefined}>
-          <button class="track" data-nav disabled={!track.available} aria-label={`${current && (!music.paused || music.loading) ? 'Pause' : 'Play'} ${title}`} onclick={() => music.select(app.api, album, track.id)}>
+          <button class="track" data-nav disabled={!track.available} aria-label={`${current && (!music.paused || music.loading) ? 'Pause' : 'Play'} ${title}`} onclick={() => music.select(app.api, forPlayback(album), track.id)}>
             <span class="track-control" aria-hidden="true"><span class="ordinal">{index + 1}</span>{#if current && !music.paused && !music.loading}<span class="equalizer"><i></i><i></i><i></i></span>{/if}<span class="row-icon"><Icon name={current && (!music.paused || music.loading) ? 'pause' : 'play'} size={17} filled /></span></span>
             <span class="track-name"><span class="track-title" title={title}>{title}</span>{#if album.artist}<span class="track-artist">{album.artist}</span>{:else if !track.available}<span class="track-artist">File unavailable</span>{/if}</span>
             <span class="album-column" title={album.title}>{album.title}</span>
             <span class="duration-column">{duration && duration > 0 ? musicTime(duration) : '—'}</span>
           </button>
-          <MusicMenu label={`Options for ${title}`}><button data-nav disabled={!track.available} onclick={() => music.enqueue(album, track.id, true)}>Play next</button><button data-nav disabled={!track.available} onclick={() => music.enqueue(album, track.id)}>Add to queue</button><button class="danger" data-nav disabled={busy} onclick={() => run(async () => { await app.api.musicRemoveTrack(album.id, track.id); music.removed(track.id); })}>Remove from album</button></MusicMenu>
+          <MusicMenu label={`Options for ${title}`}><button data-nav disabled={!track.available} onclick={() => music.enqueue(forPlayback(album), track.id, true)}>Play next</button><button data-nav disabled={!track.available} onclick={() => music.enqueue(forPlayback(album), track.id)}>Add to queue</button><button class="danger" data-nav disabled={busy} onclick={() => run(async () => { await app.api.musicRemoveTrack(album.id, track.id); music.removed(track.id); })}>Remove from album</button></MusicMenu>
         </li>
       {/each}</ol>
     {:else}<p class="hint">No audio attached. Add tracks to build this album’s track list.</p>{/if}
@@ -110,6 +118,8 @@
 </section>
 
 <style>
+  .album-art img, .library-art img { width: 100%; height: 100%; object-fit: contain; display: block; border-radius: inherit; }
+  .art-credit { display: block; color: var(--text-dim); font-size: 11px; margin: 6px 0; }
   .back-albums { display: flex; align-items: center; gap: 6px; justify-self: start; border: 0; background: transparent; color: var(--text-soft); font: inherit; cursor: pointer; padding: 8px 0; }
   .music-search { display: flex; align-items: center; gap: 10px; background: var(--field); padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; }
   .music-search input { flex: 1; border: 0; background: transparent; }

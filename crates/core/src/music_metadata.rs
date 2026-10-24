@@ -5,7 +5,7 @@ use symphonia::core::{
     formats::FormatOptions,
     io::{MediaSource, MediaSourceStream},
     meta::{Limit, MetadataOptions},
-    probe::Hint,
+    probe::{Hint, ProbeResult},
     units::TimeBase,
 };
 
@@ -44,25 +44,7 @@ impl MediaSource for ProbeFile {
 }
 
 pub(crate) fn duration(file: File, extension: &str) -> Option<f64> {
-    let source = ProbeFile {
-        file,
-        remaining: 2 * 1024 * 1024,
-        seeks: 256,
-    };
-    let stream = MediaSourceStream::new(Box::new(source), Default::default());
-    let mut hint = Hint::new();
-    hint.with_extension(extension);
-    let metadata = MetadataOptions {
-        limit_metadata_bytes: Limit::Maximum(64 * 1024),
-        limit_visual_bytes: Limit::Maximum(0),
-    };
-    let format = FormatOptions {
-        enable_gapless: true,
-        ..Default::default()
-    };
-    let probe = symphonia::default::get_probe()
-        .format(&hint, stream, &format, &metadata)
-        .ok()?;
+    let probe = probe(file, extension, 0)?;
     let parameters = &probe.format.default_track()?.codec_params;
     let frames = parameters.n_frames?;
     let base = parameters.time_base.or_else(|| {
@@ -76,10 +58,80 @@ pub(crate) fn duration(file: File, extension: &str) -> Option<f64> {
     (seconds.is_finite() && seconds > 0.0 && seconds <= 7.0 * 24.0 * 3600.0).then_some(seconds)
 }
 
+pub(crate) fn artwork(file: File, extension: &str) -> Option<Vec<u8>> {
+    let mut probe = probe(file, extension, 2 * 1024 * 1024)?;
+    let choose = |revision: &symphonia::core::meta::MetadataRevision| {
+        revision
+            .visuals()
+            .iter()
+            .filter(|v| v.data.len() <= 2 * 1024 * 1024)
+            .min_by_key(|v| v.usage != Some(symphonia::core::meta::StandardVisualKey::FrontCover))
+            .map(|v| v.data.to_vec())
+    };
+    if let Some(metadata) = probe.metadata.get() {
+        if let Some(bytes) = metadata.current().and_then(choose) {
+            return Some(bytes);
+        }
+    }
+    probe.format.metadata().current().and_then(choose)
+}
+
+fn probe(file: File, extension: &str, visual_bytes: usize) -> Option<ProbeResult> {
+    let source = ProbeFile {
+        file,
+        remaining: 2 * 1024 * 1024,
+        seeks: 256,
+    };
+    let stream = MediaSourceStream::new(Box::new(source), Default::default());
+    let mut hint = Hint::new();
+    hint.with_extension(extension);
+    let metadata = MetadataOptions {
+        limit_metadata_bytes: Limit::Maximum(64 * 1024),
+        limit_visual_bytes: Limit::Maximum(visual_bytes),
+    };
+    let format = FormatOptions {
+        enable_gapless: true,
+        ..Default::default()
+    };
+    symphonia::default::get_probe()
+        .format(&hint, stream, &format, &metadata)
+        .ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::io::Write;
+    #[test]
+    fn id3_front_cover_is_read_without_decoding_the_audio() {
+        let mut jpeg = vec![];
+        image::codecs::jpeg::JpegEncoder::new(&mut jpeg)
+            .encode_image(&image::RgbImage::new(8, 8))
+            .unwrap();
+        let mut payload = b"\0image/jpeg\0\x03\0".to_vec();
+        payload.extend(&jpeg);
+        let mut frame = b"APIC".to_vec();
+        frame.extend((payload.len() as u32).to_be_bytes());
+        frame.extend([0, 0]);
+        frame.extend(payload);
+        let size = frame.len() as u32;
+        let mut file = tempfile::tempfile().unwrap();
+        file.write_all(b"ID3\x03\0\0").unwrap();
+        file.write_all(&[
+            ((size >> 21) & 127) as u8,
+            ((size >> 14) & 127) as u8,
+            ((size >> 7) & 127) as u8,
+            (size & 127) as u8,
+        ])
+        .unwrap();
+        file.write_all(&frame).unwrap();
+        for _ in 0..8 {
+            file.write_all(&[0xff, 0xfb, 0x90, 0]).unwrap();
+            file.write_all(&[0; 413]).unwrap();
+        }
+        file.rewind().unwrap();
+        assert_eq!(artwork(file, "mp3"), Some(jpeg));
+    }
     #[test]
     fn valid_pcm_duration_and_malformed_input_are_distinct() {
         let mut file = tempfile::tempfile().unwrap();

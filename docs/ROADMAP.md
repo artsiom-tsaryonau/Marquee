@@ -196,6 +196,13 @@ no additional engine download is needed for these systems.
 
 ## Soundtrack foundation — 2026-10-24
 
+The artwork slice now imports embedded music visuals or chosen local JPEG/PNG
+images, with bounded decoding and persistent source labels. Explicit game links
+provide a labelled fallback image across Music and OST views. Genesis joins the
+existing CRC/No-Intro/libretro artwork path, and game details prioritize artwork,
+play activity and library actions over technical identification. This does not
+complete online release matching, text-tag metadata or rich game descriptions.
+
 The first global Music destination now browses/searches saved albums independently
 of games. Queue inspection, play-next/append and upcoming-track reorder/removal
 are implemented, with session-only state. The shared shell now uses a measured,

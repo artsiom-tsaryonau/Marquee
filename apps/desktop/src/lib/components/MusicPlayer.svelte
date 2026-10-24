@@ -35,7 +35,7 @@
 {#if music.current}
 <section class="music-player" use:measurePlayer aria-label="Soundtrack player">
   <div class="playing">
-    <span class="record" aria-hidden="true"><Icon name="music" size={24} /></span>
+    <span class="record" title={music.current.artworkSource || undefined} aria-hidden="true">{#if music.current.artwork}<img src={music.current.artwork} alt="" />{:else}<Icon name="music" size={24} />{/if}</span>
     <div class="metadata"><strong title={music.current.title}>{music.current.title}</strong><span title={music.current.album}>{music.current.artist || music.current.album}</span></div>
   </div>
   <div class="center">
@@ -65,6 +65,7 @@
 {/if}
 
 <style>
+  .record img { width: 100%; height: 100%; object-fit: contain; border-radius: inherit; }
   .music-player { position: fixed; bottom: 0; left: 0; right: 0; z-index: 35; display: grid; grid-template-columns: minmax(150px, 1fr) minmax(250px, 1.4fr) minmax(260px, 1fr); gap: 18px; align-items: center; padding: 12px 24px; border-top: 1px solid var(--line); background: var(--surface-strong); }
   .control.active { color: var(--music-text); }
   .playing { display: flex; align-items: center; gap: 12px; min-width: 0; } .metadata { min-width: 0; }

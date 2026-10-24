@@ -2,7 +2,7 @@ import type { LibraryApi, MusicAlbum, MusicTrack } from './api/contracts';
 import { asError } from './api/core';
 
 type AudioOutput = Pick<HTMLAudioElement, 'src' | 'currentTime' | 'duration' | 'volume' | 'muted' | 'pause' | 'load' | 'play'>;
-type QueueTrack = MusicTrack & { albumId: string; album: string; artist: string };
+type QueueTrack = MusicTrack & { albumId: string; album: string; artist: string; artwork?: string | null; artworkSource?: string | null };
 
 /** Hide an import's redundant ordinal only when it matches this track's position. */
 export function trackTitle(title: string, position: number): string {
@@ -39,7 +39,7 @@ export class MusicPlayer {
     const tracks = album.tracks.filter(t => t.available);
     const index = tracks.findIndex(t => t.id === trackId);
     if (index < 0) { this.error = 'Track unavailable. Add its audio files again.'; return; }
-    this.queue = tracks.map(t => ({ ...t, title: trackTitle(t.title, album.tracks.findIndex(original => original.id === t.id) + 1), albumId: album.id, album: album.title, artist: album.artist }));
+    this.queue = tracks.map(t => ({ ...t, title: trackTitle(t.title, album.tracks.findIndex(original => original.id === t.id) + 1), albumId: album.id, album: album.title, artist: album.artist, artwork: album.cover_data_url, artworkSource: album.cover_source }));
     this.index = index;
     await this.load(api);
   }
@@ -52,7 +52,7 @@ export class MusicPlayer {
     const track = album.tracks.find(t => t.id === trackId && t.available);
     if (!track) return;
     if (!this.queue.length) this.index = 0;
-    const entry = { ...track, title: trackTitle(track.title, album.tracks.indexOf(track) + 1), albumId: album.id, album: album.title, artist: album.artist };
+    const entry = { ...track, title: trackTitle(track.title, album.tracks.indexOf(track) + 1), albumId: album.id, album: album.title, artist: album.artist, artwork: album.cover_data_url, artworkSource: album.cover_source };
     const position = next && this.queue.length ? this.index + 1 : this.queue.length;
     this.queue.splice(position, 0, entry);
     this.note = next ? 'Added to play next.' : 'Added to queue.';

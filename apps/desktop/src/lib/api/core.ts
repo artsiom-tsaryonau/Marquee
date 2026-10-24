@@ -39,8 +39,9 @@ export function asError(err: unknown): AppError {
 }
 
 /** The commands are identical on every surface; only the transport (`call`) differs. */
-export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable' | 'pickArchives' | 'pickTorrent' | 'onArchiveDrop' | 'pickMusic' | 'musicUrl'> {
+export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable' | 'pickArchives' | 'pickTorrent' | 'onArchiveDrop' | 'pickMusic' | 'pickMusicCover' | 'musicUrl'> {
   return {
+    musicSetCover: (albumId, path) => call('music_set_cover', { album_id: albumId, path }),
     musicAlbums: (gameKey) => call('music_albums', gameKey === undefined ? {} : { game_key: gameKey }),
     musicFind: (title) => call('music_find', { title }),
     musicOpenSource: (albumId) => call('music_open_source', { album_id: albumId }),

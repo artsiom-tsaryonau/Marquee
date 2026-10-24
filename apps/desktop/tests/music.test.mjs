@@ -116,3 +116,15 @@ test('queueing after a cleared queue selects its first track without starting pl
   assert.equal(output.plays,0);assert.equal(player.paused,true);
   await player.toggle({musicUrl:async id=>'/music/'+id});assert.equal(output.src,'/music/two');assert.equal(output.plays,1);
 });
+
+test('album artwork prefers the release image and uses only explicit game links for fallback', async () => {
+  const {albumArtwork}=await import('../src/lib/musicArtwork');
+  const games=[{id:'other',title:'Other',coverUrl:'/other.jpg'},{id:'sonic',title:'Sonic 2',coverUrl:'/sonic.jpg'}];
+  assert.equal(albumArtwork({...album,game_keys:[]},games),null);
+  const fallback=albumArtwork({...album,game_keys:['sonic']},games);
+  assert.equal(fallback.url,'/sonic.jpg');assert.equal(fallback.fallback,true);assert.match(fallback.label,/Game artwork/);
+  const release=albumArtwork({...album,game_keys:['sonic'],cover_data_url:'data:image/jpeg;base64,test',cover_source:'Chosen locally'},games);
+  assert.equal(release.fallback,false);assert.equal(release.url,'data:image/jpeg;base64,test');
+  const {player}=setup();await player.play({musicUrl:async()=>'/one'},{...album,cover_data_url:release.url,cover_source:release.label},'one');
+  assert.equal(player.current.artwork,release.url);assert.equal(player.current.artworkSource,'Chosen locally');
+});

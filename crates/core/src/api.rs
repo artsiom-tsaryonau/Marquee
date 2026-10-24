@@ -33,6 +33,10 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
         "music_open_source" => out(core.music_open_source(&text(&args, "album_id")?)?),
         "music_albums" => out(core.music_albums(maybe(&args, "game_key").as_deref())?),
         "music_save_album" => out(core.music_save_album(serde_json::from_value(args)?)?),
+        "music_set_cover" => out(core.music_set_cover(
+            &text(&args, "album_id")?,
+            maybe(&args, "path").map(PathBuf::from),
+        )?),
         "music_link" => {
             out(core.music_link(&text(&args, "game_key")?, &text(&args, "album_id")?, true)?)
         }

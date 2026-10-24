@@ -153,6 +153,15 @@ behavior. This dated checklist does not close rendered/native/controller gates.
 
 ## Presentation goals still to validate or extend
 
+The artwork/details pass adds a playtime/last-played/runner strip and a larger
+cover alongside the game hero at desktop widths. Missing descriptions use an
+honest library summary with artwork/metadata/music actions rather than leaving
+technical matching as the main content. Identification stays in a secondary
+disclosure. Find artwork is available for ROM entries without disc serials;
+Genesis now participates in the existing hash-based libretro cover lookup.
+An unchecked firmware label is suppressed for systems without that requirement.
+Music artwork distinguishes embedded/local album images from linked-game covers.
+
 The 2026-10-24 music shell pass aligns the sidebar/content above a full-width
 player footer, using its measured height rather than unrelated fixed offsets.
 Desktop navigation includes Music; Add games stays in the Games library header,

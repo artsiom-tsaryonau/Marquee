@@ -67,8 +67,31 @@ select an output device or automatically mix music into a game stream. See the
 Use **Link an existing soundtrack** to reuse an album for another game. Existing
 explicit canonical game identities are reused; similar titles are not merged.
 Unlinking preserves the album. Editing a shared album updates it for every linked
-game. Track names currently come from filenames; embedded tags, track renaming/
-reordering and album artwork remain later work. The record graphic is a placeholder.
+game. Track names currently come from filenames; embedded text tags and track
+renaming/reordering remain later work.
+
+Album artwork is read from embedded audio visuals when importing tracks (first
+eight inputs, only when no album image exists). Album options → **Choose album
+artwork** also accepts a local JPEG/PNG; removal restores the linked-game fallback
+or music placeholder. Existing audio can be reselected through Add tracks to
+inspect its embedded image without duplicating tracks. Explicit artwork is never
+replaced by later audio imports. Linked-game fallback uses explicit game keys,
+not similar names, and is labelled **Game artwork**, not a verified OST cover.
+Artwork appears in Music album cards, album details and the player when playback
+starts. Changing an image takes effect in a newly selected playback queue.
+
+Source images are bounded to 4 MiB, decoded with 4096-pixel/64 MiB allocation
+limits, resized to at most 512 pixels and re-encoded as JPEG (at most 256 KiB).
+The normalized image and source label are stored in `music_album_artwork`, without
+exposing original paths. Embedded inspection uses the existing 2 MiB read/256-seek
+budget with at most 2 MiB of visuals; malformed artwork never blocks audio import.
+Manual image validation errors preserve existing artwork. No remote image URL
+fetcher, online album matching or implicit browser access is introduced.
+
+An isolated HTTP test imported an FFmpeg-generated MP3 with an embedded PNG,
+verified the normalized JPEG/source label, chose a manual cover, and reimported
+the same MP3. The manual image remained and no duplicate track was created.
+This verifies the actual import/API path; native visual acceptance remains open.
 
 **Find OST on YouTube** opens a title-based search. **View source** opens a saved
 page. Neither downloads, embeds or plays that URL, nor claims it is a matching

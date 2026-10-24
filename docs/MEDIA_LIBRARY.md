@@ -11,8 +11,11 @@ The **Music** navigation destination browses every saved album, including albums
 unlinked from games. Search matches album titles, artists and track names. Open
 an album for its existing track list, file import and details controls. **Add
 album** creates an independent album without a fabricated game link; game OST
-tabs can link it later. Album artwork remains a labelled music placeholder;
-embedded tags/artwork and folder rescans are still ML2 work.
+tabs can link it later. Album artwork now supports bounded embedded-image reads
+on audio import and explicitly chosen local JPEG/PNG images. A linked game's
+cover is a labelled fallback, never an asserted release cover. Embedded text
+tags, release discovery and folder rescans remain ML2 work. The
+[soundtrack guide](SOUNDTRACKS.md) owns image limits and precedence.
 
 The player's **Queue** control opens the current selection and upcoming tracks.
 Track options offer **Play next** and **Add to queue**. Upcoming tracks can move

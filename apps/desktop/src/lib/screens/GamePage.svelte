@@ -28,6 +28,8 @@
   $effect(() => { if (app.torrentsOn) return app.watchTransfers(); });
   let editing = $state(false);
   let titleDraft = $state('');
+  let identification = $state<HTMLDetailsElement>();
+  function showIdentification() { if (identification) { identification.open = true; identification.scrollIntoView({ block: 'center', behavior: app.motionReduced ? 'auto' : 'smooth' }); identification.querySelector('summary')?.focus(); } }
 
   const launchVia = $derived(
     g?.lutris ? `Lutris · ${g.lutris.runner ?? 'store installer'}` : g
@@ -89,7 +91,7 @@
     {:else}
       <h1 title={g.title}>{cleanTitle(g.title)}</h1>
     {/if}
-    {#if !g.heroUrl && g.coverUrl}<img class="detail-poster" src={g.coverUrl} alt="" />{/if}
+    {#if g.coverUrl}<img class="detail-poster" src={g.coverUrl} alt="{cleanTitle(g.title)} cover" />{/if}
     <p class="tagline">{platformLabel[g.platform]}{g.region ? ` · ${g.region}` : ''}{g.revision ? ` · Revision ${g.revision}` : ''}</p>
     {#if status}<p class="availability" role="status">{status.label}</p>{/if}
     {#if variants.length > 1 || g.editionLabel}
@@ -122,9 +124,9 @@
           <Icon name={playReady ? 'play' : 'folder'} size={24} /> {playLabel}
         </button>
       {/if}
-      {#if offline && (g.serial || g.wanted) && !g.coverUrl}
+      {#if offline && !g.coverUrl}
         <button class="btn glass" data-nav onclick={() => app.refreshArtwork(g.id)} disabled={app.fetchingArt}>
-          <Icon name="image" /> {app.fetchingArt ? 'Fetching cover…' : 'Fetch cover'}
+          <Icon name="image" /> {app.fetchingArt ? 'Finding artwork…' : 'Find artwork'}
         </button>
       {/if}
       {#if g.portStatus === 'update'}
@@ -159,6 +161,12 @@
     {#if offline && (g.mediaIssue || g.setupState === 'runner_missing')}<p class="tagline" role="status">{g.mediaIssue || `${emulator} is not installed or available for this platform. Open Tools to set it up.`}</p>{/if}
   </div>
 
+  <div class="play-strip" aria-label="Game activity">
+    <div><Icon name="clock" size={19} /><span><small>PLAYTIME</small><strong>{g.source === 'catalogue' || port ? 'Not tracked' : g.playtimeMin ? hours(g.playtimeMin) : 'Not played yet'}</strong></span></div>
+    <div><span><small>LAST PLAYED</small><strong>{g.lastPlayed ? ago(g.lastPlayed) : '—'}</strong></span></div>
+    <div><Icon name="controller" size={19} /><span><small>PLAY WITH</small><strong>{launchVia}</strong></span></div>
+  </div>
+
   <div class="game-tabs" role="tablist" tabindex="-1" aria-label="Game details" onkeydown={(event) => {
     if (['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
       event.preventDefault(); tab = event.key === 'Home' ? 'overview' : event.key === 'End' ? 'ost' : tab === 'overview' ? 'ost' : 'overview';
@@ -179,13 +187,16 @@
         <p class="about">{g.description}</p>
         {#if g.descriptionSource}<p class="media-credit">Description source: {g.descriptionSource}</p>{/if}
       {/if}
-      {#if g.metadata || g.source === 'rom' && app.catalogue.records.length}<details class="technical"><summary data-nav>Game identification and metadata</summary><CatalogueDetails game={g} /></details>{/if}
+
       {#if g.screenshots?.length}
       <h3>Screenshots</h3>
       <div class="shots" data-nav-row>
         {#each g.screenshots as shot}<a class="shot" href={shot.url} target="_blank" rel="noreferrer" data-nav aria-label={shot.caption}><img src={shot.url} alt={shot.caption} loading="lazy" /></a>{/each}
       </div>
       <p class="media-credit">{g.mediaCredit} <a href={g.mediaSource} target="_blank" rel="noreferrer" data-nav>Source gallery</a></p>
+      {/if}
+      {#if !g.description && !g.screenshots?.length}
+        <section class="library-summary glass-panel"><h3>Your copy</h3><p>{platformLabel[g.platform]}{g.region ? ` · ${g.region}` : ''}{g.year ? ` · ${g.year}` : ''}</p><p class="summary-note">{g.coverUrl ? 'Artwork is available. Release details and screenshots have not been added yet.' : 'Add artwork to make this game easier to find in your library.'}</p><div class="summary-actions">{#if offline && !g.coverUrl}<button class="btn glass small" data-nav disabled={app.fetchingArt} onclick={() => app.refreshArtwork(g.id)}><Icon name="image" size={17} />{app.fetchingArt ? 'Finding artwork…' : 'Find artwork'}</button>{/if}{#if offline || g.metadata}<button class="btn glass small" data-nav onclick={showIdentification}>Review game metadata</button>{/if}<button class="btn glass small" data-nav onclick={() => tab = 'ost'}><Icon name="music" size={17} />Soundtracks</button></div></section>
       {/if}
       {#if g.lutris}
         <h3>Managed by Lutris</h3>
@@ -198,9 +209,11 @@
           <li>{port.requirement}</li>
         </ul>
       {/if}
+      {#if g.metadata || offline}<details class="technical" bind:this={identification}><summary data-nav>Identification and source metadata</summary><CatalogueDetails game={g} /></details>{/if}
     </div>
 
     <aside class="facts glass-panel">
+      <h3>Game details</h3>
       <dl>
         <dt>{g.source === 'rom' || g.source === 'port' ? 'Run method' : 'Library source'}</dt>
         <dd><span class="pill">{g.source === 'rom' || g.source === 'port' ? methodLabel[launchMethod(g)] : sourceLabel[g.source]}</span></dd>
@@ -216,10 +229,7 @@
         {#if g.players}<dt>Players</dt><dd>{g.players}</dd>{/if}
         <dt>Launches with</dt>
         <dd>{launchVia}</dd>
-        <dt>Playtime</dt>
-        <dd>{g.source === 'catalogue' ? 'No local installation' : port ? 'Tracking not available yet' : g.playtimeMin ? hours(g.playtimeMin) : 'Not played yet'}</dd>
-        <dt>Last played</dt>
-        <dd>{g.lastPlayed ? ago(g.lastPlayed) : '—'}</dd>
+
         {#if g.lutris}<dt>Library provider</dt><dd>Lutris · {g.installed ? 'configured installation' : 'cached store listing'}</dd>{/if}
         {#if g.genre}<dt>Genre</dt><dd>{g.genre}</dd>{/if}
         {#if g.year}<dt>Released</dt><dd>{g.year}</dd>{/if}
@@ -229,7 +239,7 @@
           <dt>Serial</dt>
           <dd>{g.serial}{g.region ? ` · ${g.region}` : ''}</dd>
         {/if}
-        {#if g.setupState}
+        {#if g.setupState && (g.setupState !== 'unverified' || ['ps1', 'ps2', 'ds', 'neogeo'].includes(g.platform))}
           <dt>{emulator}</dt>
           <dd>{{ runner_missing: 'Not installed', missing: 'Firmware required', unverified: 'Firmware not yet checked', launch_tested: 'Previously started' }[g.setupState]}</dd>
         {/if}
@@ -256,6 +266,13 @@
 {/if}
 
 <style>
+  .play-strip { display: flex; align-items: center; flex-wrap: wrap; gap: 20px 40px; padding: 20px var(--gutter); background: var(--surface); border-block: 1px solid var(--line); }
+  .play-strip > div { display: flex; align-items: center; gap: 10px; min-width: 110px; color: var(--text-dim); }
+  .play-strip span { display: grid; gap: 6px; } .play-strip small { font-size: 10px; letter-spacing: .09em; } .play-strip strong { font-size: 13px; font-weight: 600; color: var(--text-soft); }
+  .library-summary { padding: 24px; border-radius: 14px; margin-bottom: 24px; }
+  .library-summary p { color: var(--text-soft); line-height: 1.6; } .library-summary .summary-note { color: var(--text-dim); font-size: 13px; }
+  .summary-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
+
   .game-tabs { display: flex; gap: 24px; padding: 0 var(--gutter); margin: 12px 0 0; border-bottom: 1px solid var(--line); }
   .game-tabs button { border: 0; border-bottom: 2px solid transparent; padding: 14px 4px; background: none; color: var(--text-dim); cursor: pointer; font: inherit; }
   .game-tabs button[aria-selected='true'] { border-color: var(--accent); color: var(--text); }
@@ -279,9 +296,9 @@
   }
   .cover-backdrop .banner-cover { filter:blur(32px) saturate(.55) brightness(.45); transform:scale(1.15); }
   h1 { margin:0; font-size:clamp(30px, 4vw, 54px); line-height:1.12; letter-spacing:-.03em; text-wrap:balance; max-width:22ch; }
-  .detail-poster { position:absolute; right:var(--gutter); bottom:28px; width:140px; aspect-ratio:2/3; object-fit:contain; border-radius:12px; box-shadow:0 16px 40px rgb(0 0 0 / .4); }
-  @media(min-width:1100px) { .head:has(.detail-poster) { padding-right:210px; } }
-  @media(max-width:1099px) { .detail-poster { display:none; } }
+  .detail-poster { position:absolute; right:var(--gutter); bottom:28px; width:clamp(120px,16vw,190px); max-height:260px; object-fit:contain; border-radius:8px; filter:drop-shadow(0 16px 25px #0006); }
+  @media(min-width:850px) { .head:has(.detail-poster) { padding-right:calc(var(--gutter) + 230px); } }
+  @media(max-width:849px) { .detail-poster { display:none; } }
   .head { position:relative; }
   .availability { margin:0; color:var(--warn); font-size:14px; }
   .technical { margin-top:24px; }
@@ -311,7 +328,7 @@
     flex-direction: column;
     justify-content: flex-end;
     gap: 14px;
-    max-width: 900px;
+    max-width: 1400px;
   }
   .back {
     position: absolute;

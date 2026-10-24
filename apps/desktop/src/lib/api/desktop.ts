@@ -19,6 +19,10 @@ export const desktopApi: LibraryApi = {
   kind: 'desktop',
   ...commands(call),
   musicUrl: (trackId) => invoke<string>('music_url', { trackId }),
+  async pickMusicCover() {
+    const selected = await open({ directory: false, multiple: false, title: 'Choose album artwork', filters: [{ name: 'Album artwork', extensions: ['jpg', 'jpeg', 'png'] }] });
+    return typeof selected === 'string' ? selected : null;
+  },
   async pickMusic() {
     const selected = await open({ directory: false, multiple: true, title: 'Add soundtrack audio', filters: [{ name: 'Audio files', extensions: ['mp3', 'flac', 'ogg', 'wav'] }] });
     return typeof selected === 'string' ? [selected] : selected ?? [];
