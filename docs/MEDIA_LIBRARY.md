@@ -39,6 +39,74 @@ right. Narrow desktop navigation sits above the player, and Big Screen hints
 also reserve its height. Rendered desktop/responsive/controller acceptance is
 still required; these implementation details do not close ML0 or remote gates.
 
+## Local game extras — current use and limits
+
+Open **Media** in the navigation rail to browse collections independently of
+playable games. On a game's details page, its **Media** tab shows linked
+collections. Create a collection there, or link an existing one. Unlinking keeps
+the collection in Media; it never creates or removes a game installation.
+
+- **Add files** copies explicitly chosen PNG/JPEG images and MP4/WebM videos.
+  Originals stay untouched. Up to 20 files and 2 GiB per batch; images are limited
+  to 16 MiB, bounded to 8192 pixels per side/256 MiB decoded allocation, then
+  normalized to PNG at a maximum 2560 pixels per side without upscaling.
+- **Browse disc** reads ISO9660 primary directories, including level-3 split
+  extents, without mounting or scanning game payloads. A size/mtime/directory
+  signature binds selected imports to the inspected image; it is not a content
+  authenticity hash. Only a selected member is streamed into managed storage.
+  Limits: depth 8, 512 directories, 20,000 directory records, 16 MiB total
+  directory data and 2,000 media candidates. Unsupported layouts fail explicitly.
+- Images open in a contained gallery with previous/next and fullscreen controls.
+  Videos use native controls for seeking, volume and fullscreen. Position is
+  persisted periodically and on pause/close. Immediate reopen uses the latest
+  position; closing before metadata loads cannot replace an existing resume point
+  with zero. Starting video pauses Marquee's OST playback.
+- Imported videos default to spoilers. Both titles and playback stay hidden until
+  **Reveal videos** is selected. Media details allow editing titles and spoiler
+  labels. The MP4/WebM container check is not a codec guarantee: unsupported
+  playback produces an explicit conversion message.
+- Raw M2V cinematics are indexed but **Needs conversion** prevents importing them
+  as playable clips. Automated conversion jobs, companion audio pairing,
+  subtitles, generated video posters and video-specific metadata are still open.
+  The one-off GoW3 conversion below is an acceptance pilot, not a shipped
+  automatic converter.
+
+Additive `game_media_*` tables store independent collection IDs, explicit game
+links, opaque asset IDs, source attribution and resume state. Managed copies use
+content hashes beneath `<data>/game-media/`. Removing an asset revokes its stream
+lookup but keeps original files and retained managed copies; garbage collection
+is separate work. HTTP access uses item-scoped capabilities, distinct from music
+capabilities and the API bearer token, with byte ranges and HEAD support. Both
+native and browser surfaces remain loopback-only; this does not close ML3/ML4.
+
+### GoW3 disc acceptance — 2026-10-24
+
+The owner's extracted BCUS98111 ISO contains **69 media candidates**, including
+56 video entries; four are MP4 promotional clips. Their adjacent video metadata
+identifies Gran Turismo 5, Heavy Rain, ModNation and MAG. These are disc extras,
+not asserted GoW3 gameplay cinematics.
+
+The isolated pilot imported three images and the selected 91,404,648-byte MAG
+MP4. It is H.264/AAC, 1920×1080 and 76.777 seconds. A separate selected
+68,005,304-byte `CRONOSDEATH.M2V` was prepared manually using installed NVIDIA
+NVENC into a 26,555,330-byte H.264 MP4, 1280×720, 33 seconds. That preview is
+explicitly **video only**; the separate game audio has not been paired. The source
+ISO and archive remain intact, and no bulk cinematic extraction was performed.
+
+Headless Chrome acceptance exercised actual video decoding/playback, spoiler
+reveal, image loading, immediate resume at 24 seconds and a 390-pixel layout
+without horizontal overflow. Native desktop audio,
+fullscreen and interactive acceptance remain separate checks. Isolated logs,
+codec probes and screenshots are kept under ignored
+`data/manager-pilot/media-ui-pilot/`; no media payloads enter Git.
+
+The main library now contains **God of War III — Disc extras** with two artwork
+images, the correctly labelled MAG promo and the GoW3 video-only preview:
+121,452,900 managed bytes in total. It has no fabricated PS3 installation/game
+link. Open it through Media; a future GoW3 game entry can link this same
+collection. This does not make the PS3 title playable.
+
+
 ## Product shape
 
 Add a top-level **Music** destination with albums, artists, soundtracks and a

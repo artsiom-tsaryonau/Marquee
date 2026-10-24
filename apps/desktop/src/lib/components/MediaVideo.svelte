@@ -3,10 +3,10 @@
   import { app } from '../state.svelte';
   import { music } from '../music.svelte';
   import type { MediaAsset } from '../api/contracts';
-  let { asset, url, onerror }:{asset:MediaAsset;url:string;onerror:()=>void}=$props();
-  let video=$state<HTMLVideoElement>();let saved=0;
-  function remember(){if(video&&Number.isFinite(video.currentTime)){void app.api.mediaPosition(asset.id,video.ended?0:video.currentTime).catch(()=>{});}}
-  function loaded(){if(video&&asset.position>0&&asset.position<video.duration-2)video.currentTime=asset.position;}
+  let { asset, url, onerror, onposition }:{asset:MediaAsset;url:string;onerror:()=>void;onposition:(id:string,position:number)=>void}=$props();
+  let video=$state<HTMLVideoElement>();let saved=0;let ready=false;
+  function remember(){if(ready&&video&&Number.isFinite(video.currentTime)){const position=video.ended?0:video.currentTime;onposition(asset.id,position);void app.api.mediaPosition(asset.id,position).catch(()=>{});}}
+  function loaded(){ready=true;if(video&&asset.position>0&&asset.position<video.duration-2){video.currentTime=asset.position;saved=asset.position;}}
   function progress(){if(video&&Math.abs(video.currentTime-saved)>=10){saved=video.currentTime;remember();}}
   onDestroy(()=>{remember();video?.pause();});
 </script>

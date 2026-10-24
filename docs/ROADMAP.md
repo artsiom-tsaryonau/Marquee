@@ -244,6 +244,13 @@ are implemented, with session-only state. The shared shell now uses a measured,
 full-width player footer; Add games lives in the Games header and Big Screen in
 the top-right desktop toolbar. Native/responsive acceptance remains open.
 
+Local game extras now have a **Media** navigation destination and a game-page
+**Media** tab: independent collections, explicit game links, selected-file/disc
+imports, image gallery, native video controls, spoiler reveal and persisted resume.
+[Media usage and GoW3 acceptance](MEDIA_LIBRARY.md#local-game-extras--current-use-and-limits)
+record the actual pilot and limits. Raw M2V conversion/audio pairing, generated
+video posters and remote hosting remain separate steps.
+
 The selected product direction is a **Marquee-hosted remote media library**,
 starting with music. The [media library roadmap](MEDIA_LIBRARY.md) sequences
 global browsing/queue, metadata/artwork, authenticated hosting, direct remote
