@@ -98,6 +98,12 @@ enum Command {
     Ps3Inspect {
         path: PathBuf,
     },
+    /// Read-only PS4 package / PS5 archive inventory; never extracts or launches
+    ConsoleInspect {
+        #[arg(long)]
+        system: String,
+        path: PathBuf,
+    },
     Health,
 }
 
@@ -591,6 +597,13 @@ fn streaming(
 
 fn run() -> marquee_core::error::Result<()> {
     let args = Args::parse();
+    if let Command::ConsoleInspect { system, path } = &args.command {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&marquee_core::console::inspect(path, system)?)?
+        );
+        return Ok(());
+    }
     if let Command::Ps3Inspect { path } = &args.command {
         println!(
             "{}",
@@ -869,6 +882,7 @@ fn run() -> marquee_core::error::Result<()> {
             };
             println!("{}", serde_json::to_string_pretty(&status)?);
         }
+        Command::ConsoleInspect { .. } => unreachable!("handled without Core"),
         Command::Ps3Inspect { .. } => unreachable!("handled without Core"),
         Command::Runners(RunnersCmd::List { json }) => {
             let runners = core.refresh_runners()?;

@@ -153,3 +153,43 @@ separately before any extraction or installation. None of these packages was
 installed or launched in this pass. The larger Last of Us RAR remains another
 source candidate. No PS5 game input has been identified in this checked pilot
 collection; KytyPS5 acceptance needs an actual supported input independently.
+
+
+## Bounded PS4/PS5 inspection (2026-10-25)
+
+CLI `marquee console-inspect --system ps4 /absolute/input.pkg` and
+`--system ps5 /absolute/input.rar` run without opening the library, starting a
+manager or executing content. The same API is available from shadPS4/KytyPS5's
+Tools dialog under **content inspection**. No inspection confers playability.
+
+The original PS4 reader checks CNT magic, declared size when present, bounded
+metadata tables, duplicate entry IDs, file ranges, a readable PARAM.SFO and
+agreement between header/SFO title IDs. Content roles come from SFO category,
+never filenames. Metadata-only packages can omit the outer size; all table ranges
+remain bounded, and absence is reported. No keys, license data or decryption are
+read by this inspector. Format layout references: LibOrbisPkg revision
+`643477263b2644e0803e0f58b8726ea4e3f3b7d4` PkgReader.cs and ShadPKG revision
+`7a02c1e56b40477b26a660884deda1f3ca8d2eab` PKGHeader. No upstream code copied.
+
+Actual retained PS4 metadata identifies CUSA08809 base 01.00 (`gd`), update 01.01
+(`gp`), and additional content (`ac`, LIFESWORD content ID). The DLC omits the
+outer package-size field; this is reported separately rather than treating it
+as a full game. These are inspected inputs, not installed titles.
+
+The owner's new **Demon's Souls [PPSA01342]** RAR is 53,436,284,598 bytes.
+Its complete header inventory contains 242,951 entries / 223,257 files, declaring
+87,221,552,511 unpacked bytes, with `sce_sys/param.json` (4,103 bytes) and
+`eboot.bin` (46,574,897 bytes) candidates. The PPSA identity is still a filename
+hint until internal JSON is parsed. No full extraction or PS5 launch was performed
+by inventory. Ordinary imports keep their 20,000-entry limit. The new console-only
+RAR inventory streams headers with 500,000-entry, 30-second, 128-GiB declared-size
+and 256-candidate bounds; partial results are explicit and never an install plan.
+Traversal and RAR redirections remain refused.
+
+Runtime source review: shadPS4 v.0.20.0 revision
+`529ceb32f5546b820588f194b903cc39d08015fe`; modern KytyPS5 release
+`KytyPS5-2026-10-25-83f8bfd`, revision
+`83f8bfd3c9c35fcb135ef6c33dfd88bbfe066ee2`. shadPS4's core accepts prepared
+game/ELF paths; it is not a universal package installer. Kyty's CLI accepts
+`--game <directory|elf|zar>` and must have its actual profile/save contract checked
+before a library adapter. Do not pass the RAR directly to that CLI.

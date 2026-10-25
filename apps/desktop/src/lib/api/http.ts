@@ -82,6 +82,9 @@ export const httpApi: LibraryApi = {
   async pickPs3Firmware() {
     return window.prompt('Absolute PS3UPDAT.PUP path on the Marquee computer (not a browser upload)')?.trim() || null;
   },
+  async pickConsoleContent() {
+    return window.prompt('Absolute PS4 PKG or PS4/PS5 RAR path on the Marquee computer (not a browser upload)')?.trim() || null;
+  },
   async pickPs3Content() {
     return window.prompt('Absolute PS3 content path on the Marquee computer (not a browser upload)')?.trim() || null;
   },

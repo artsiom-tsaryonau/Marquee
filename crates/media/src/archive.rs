@@ -83,12 +83,16 @@ pub fn unsafe_entry(name: &str) -> AppError {
 }
 
 pub fn list_entries(path: &Path, kind: Kind) -> Result<Vec<Entry>> {
+    list_entries_bounded(path, kind, MAX_ENTRIES)
+}
+
+fn list_entries_bounded(path: &Path, kind: Kind, max_entries: usize) -> Result<Vec<Entry>> {
     let mut out = Vec::new();
     match kind {
         Kind::Zip => {
             let mut zip = zip::ZipArchive::new(File::open(path)?)
                 .map_err(|e| AppError::new("INTAKE_FORMAT", format!("Invalid ZIP: {e}")))?;
-            if zip.len() > MAX_ENTRIES {
+            if zip.len() > max_entries {
                 return Err(AppError::new(
                     "INTAKE_LIMIT",
                     "Archive has too many entries",
@@ -117,7 +121,7 @@ pub fn list_entries(path: &Path, kind: Kind) -> Result<Vec<Entry>> {
             let mut archive = crate::rar::Archive::open(path)?;
             let mut index = 0usize;
             while let Some(h) = archive.next()? {
-                if index >= MAX_ENTRIES {
+                if index >= max_entries {
                     return Err(AppError::new(
                         "INTAKE_LIMIT",
                         "Archive has too many entries",
@@ -140,7 +144,7 @@ pub fn list_entries(path: &Path, kind: Kind) -> Result<Vec<Entry>> {
             let reader = ArchiveReader::new(File::open(path)?, Password::empty())
                 .map_err(|e| AppError::new("INTAKE_FORMAT", format!("Invalid 7z: {e}")))?;
             let files = &reader.archive().files;
-            if files.len() > MAX_ENTRIES {
+            if files.len() > max_entries {
                 return Err(AppError::new(
                     "INTAKE_LIMIT",
                     "Archive has too many entries",
@@ -517,4 +521,77 @@ impl ArchivePlan {
         File::open(staging)?.sync_all()?;
         Ok(())
     }
+}
+
+/// Bounded, streaming header inventory for large console RARs. Never extracts data.
+#[derive(Debug, Serialize)]
+pub struct ConsoleInventory {
+    pub entries: usize,
+    pub files: usize,
+    pub unpacked_bytes: u64,
+    pub candidates: Vec<ConsoleMember>,
+    pub sample: Vec<PathBuf>,
+    pub truncated: bool,
+}
+#[derive(Debug, Serialize)]
+pub struct ConsoleMember {
+    pub path: PathBuf,
+    pub bytes: u64,
+    pub role: String,
+}
+pub fn console_rar_inventory(path: &Path) -> Result<ConsoleInventory> {
+    let mut archive = crate::rar::Archive::open(path)?;
+    let mut inventory = ConsoleInventory {
+        entries: 0,
+        files: 0,
+        unpacked_bytes: 0,
+        candidates: vec![],
+        sample: vec![],
+        truncated: false,
+    };
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+    while let Some(header) = archive.next()? {
+        if inventory.entries >= 500_000 || std::time::Instant::now() > deadline {
+            inventory.truncated = true;
+            break;
+        }
+        let rel = safe_rel(&header.name).ok_or_else(|| unsafe_entry(&header.name))?;
+        inventory.entries += 1;
+        if !header.directory {
+            inventory.files += 1;
+            inventory.unpacked_bytes = inventory
+                .unpacked_bytes
+                .checked_add(header.size)
+                .filter(|n| *n <= MAX_TOTAL)
+                .ok_or_else(|| AppError::new("INTAKE_LIMIT", "Console archive exceeds 128 GiB"))?;
+            if inventory.sample.len() < 12 {
+                inventory.sample.push(rel.clone());
+            }
+            let filename = rel
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("")
+                .to_ascii_lowercase();
+            let role = match filename.as_str() {
+                "eboot.bin" => Some("boot_candidate"),
+                "param.json" => Some("ps5_metadata_candidate"),
+                "param.sfo" => Some("ps4_metadata_candidate"),
+                _ if ext_of(&rel) == "pkg" => Some("package_candidate"),
+                _ => None,
+            };
+            if let Some(role) = role {
+                if inventory.candidates.len() < 256 {
+                    inventory.candidates.push(ConsoleMember {
+                        path: rel,
+                        bytes: header.size,
+                        role: role.into(),
+                    });
+                } else {
+                    inventory.truncated = true;
+                }
+            }
+        }
+        archive.skip()?;
+    }
+    Ok(inventory)
 }

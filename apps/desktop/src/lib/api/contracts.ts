@@ -471,6 +471,8 @@ export interface LibraryApi {
   cancelPreparation(id: string): Promise<PreparationJob>;
   intakeArchive(path: string, deleteSource?: boolean): Promise<IntakeReport>;
   pickArchives(): Promise<string[]>;
+  pickConsoleContent(): Promise<string | null>;
+  inspectConsole(path:string, system: 'ps4'|'ps5'): Promise<ConsoleInspection>;
   pickPs3Content(): Promise<string | null>;
   pickPs3Firmware(): Promise<string | null>;
   ps3FirmwareStatus(): Promise<Ps3FirmwareStatus>;
@@ -596,4 +598,11 @@ export interface CatalogueSnapshot {
   records: CatalogueRecord[];
   systems: { slug: string; name: string; category: string; launch_year: string; url: string }[];
   links: CatalogueLink[];
+}
+
+export interface ConsoleInspection {
+ source: string; system: string; kind: string; bytes: number; content_id: string|null; content_type:number|null; content_flags:number|null;
+ metadata: {title:string;title_id:string;category:string;app_version:string|null}|null;
+ role:string; archive: {entries:number;files:number;unpacked_bytes:number;candidates:{path:string;bytes:number;role:string}[];sample:string[];truncated:boolean}|null;
+ diagnostics:string[];playable:boolean;
 }

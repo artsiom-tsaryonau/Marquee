@@ -354,3 +354,15 @@ Upstream direction checked against [shadPS4](https://github.com/shadps4-emu/shad
 and [KytyPS5](https://github.com/KytyPS5/KytyPS5). Their current documentation
 supports Linux and reports game-specific progress; neither implies that the
 existing Marquee managed-tool entries already provide game import or Play.
+
+
+Discovery now has a concrete UI slice: Games → Discover games → Native games &
+ports supports searching six shipped recipes, saving projects without downloads,
+reviewing requirements and starting existing durable installs. Broader online
+Quiver/provider search and cached sources remain next; local app-list import is
+not equivalent to the full hosted catalogue. See [Q1b](QUIVER_INTEGRATION.md).
+
+PS4/PS5 now have bounded read-only inspectors and Tools/CLI exposure. The supplied
+PS5 Demon's Souls RAR contains a prepared-folder candidate, with 223,257 files and
+87.2 GB declared output. PS4 base/update/DLC identities were read from metadata.
+Preparation, game registration and launch remain separate gates.

@@ -39,7 +39,7 @@ export function asError(err: unknown): AppError {
 }
 
 /** The commands are identical on every surface; only the transport (`call`) differs. */
-export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable' | 'pickArchives' | 'pickPs3Content' | 'pickPs3Firmware' | 'pickTorrent' | 'onArchiveDrop' | 'pickMusic' | 'pickMusicCover' | 'musicUrl' | 'mediaUrl' | 'pickMedia' | 'pickMediaDisc'> {
+export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable' | 'pickArchives' | 'pickPs3Content' | 'pickConsoleContent' | 'pickPs3Firmware' | 'pickTorrent' | 'onArchiveDrop' | 'pickMusic' | 'pickMusicCover' | 'musicUrl' | 'mediaUrl' | 'pickMedia' | 'pickMediaDisc'> {
   return {
     musicSetCover: (albumId, path) => call('music_set_cover', { album_id: albumId, path }),
     musicAlbums: (gameKey) => call('music_albums', gameKey === undefined ? {} : { game_key: gameKey }),
@@ -108,6 +108,7 @@ export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'su
     applyGameFacts:(editionId,token,id)=>call('apply_game_facts',{edition_id:editionId,token,candidate_id:id}),
     searchGameMetadata:(editionId,query)=>call('search_game_metadata',{edition_id:editionId,query}),
     applyMetadataMatch:(editionId,token,candidateId)=>call('apply_metadata_match',{edition_id:editionId,token,candidate_id:candidateId}),
+    inspectConsole: (path, system) => call('inspect_console', { path, system }),
     inspectPs3: (path) => call('inspect_ps3', { path }),
     selectSystemRunner: (system, runnerId) => call<void>('select_system_runner', { system, runner_id: runnerId }),
     setGameRunner: (editionId, runnerId) => call<void>('set_game_runner', { edition_id: editionId, runner_id: runnerId }),

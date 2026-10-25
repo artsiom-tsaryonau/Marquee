@@ -3,6 +3,7 @@ pub mod app_lists;
 pub mod artwork;
 pub mod bios;
 pub mod catalog;
+pub mod console;
 pub mod cue;
 pub mod db;
 pub mod desktop_rendering;

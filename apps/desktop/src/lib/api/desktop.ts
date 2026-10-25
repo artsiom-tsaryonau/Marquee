@@ -44,6 +44,10 @@ export const desktopApi: LibraryApi = {
     const selected = await open({ directory: false, multiple: false, title: 'Choose PS3 firmware package', filters: [{name: 'PS3 firmware package', extensions: ['pup']}] });
     return typeof selected === 'string' ? selected : null;
   },
+  async pickConsoleContent() {
+    const selected = await open({ directory:false, multiple:false, title:'Inspect PS4 or PS5 content', filters:[{name:'Console content',extensions:['pkg','rar']}] });
+    return typeof selected === 'string' ? selected : null;
+  },
   async pickPs3Content() {
     const selected = await open({ directory: false, multiple: false, title: 'Inspect PS3 content', filters: [{ name: 'PS3 content candidates', extensions: ['zip', '7z', 'rar', 'iso', 'pkg', 'pup', 'sfo'] }] });
     return typeof selected === 'string' ? selected : null;

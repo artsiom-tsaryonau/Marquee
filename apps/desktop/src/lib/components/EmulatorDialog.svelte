@@ -8,6 +8,7 @@
   import Artwork from './Artwork.svelte';
   import Ps3Firmware from './Ps3Firmware.svelte';
   import Ps3Discovery from './Ps3Discovery.svelte';
+  import ConsoleDiscovery from './ConsoleDiscovery.svelte';
   import EmulatorProfile from './EmulatorProfile.svelte';
   import Icon from './Icon.svelte';
   import type { EmulatorBuildStatus } from '../api/contracts';
@@ -175,6 +176,7 @@
       {#if error}<p class="error" role="alert">{error}</p>{/if}
 
       {#if e.id === 'rpcs3'}<Ps3Firmware installed={e.status !== 'not_installed'} /><Ps3Discovery />{/if}
+      {#if e.id === 'shadps4' || e.id === 'kytyps5'}<ConsoleDiscovery system={e.id === 'shadps4' ? 'ps4' : 'ps5'} />{/if}
       {#if e.id !== 'rpcs3' && (e.firmware ?? []).length}
         <section>
           <h3>Firmware</h3>

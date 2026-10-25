@@ -53,6 +53,10 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
         "import_ps3_disc" => {
             out(core.import_ps3_disc(PathBuf::from(text(&args, "path")?).as_path())?)
         }
+        "inspect_console" => out(crate::console::inspect(
+            PathBuf::from(text(&args, "path")?).as_path(),
+            &text(&args, "system")?,
+        )?),
         "inspect_ps3" => out(crate::ps3::inspect(
             PathBuf::from(text(&args, "path")?).as_path(),
         )?),
