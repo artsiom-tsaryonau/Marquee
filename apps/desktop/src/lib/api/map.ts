@@ -17,6 +17,7 @@ const PLATFORM: Record<string, GameEntry['platform']> = {
 };
 
 export function runnerSupports(runner: Runner, system: string): boolean {
+  system = system === 'tg16' ? 'pce' : system;
   if (runner.systems) return runner.systems.includes(system);
   // Older fixtures/snapshots carry no capability list.
   if (SYSTEM_EMULATOR[system]) return runner.id === `runner.${SYSTEM_EMULATOR[system]}.marquee`;
@@ -24,6 +25,7 @@ export function runnerSupports(runner: Runner, system: string): boolean {
 }
 
 function pickRunner(snap: Pick<LibrarySnapshot, 'runners' | 'settings'>, system = 'ps2', override?: string | null): Runner | null {
+  system = system === 'tg16' ? 'pce' : system;
   const selected = override ?? snap.settings.selected_runner_ids?.[system];
   if (selected) return snap.runners.find(r => r.id === selected && runnerSupports(r, system)) ?? null;
   const legacy = snap.runners.find(r => r.id === snap.settings.selected_runner_id && r.available && runnerSupports(r, system));

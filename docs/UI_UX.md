@@ -6,6 +6,22 @@ compatibility/Epic, then GOG remain the store milestones. Navigation is Home,
 Games, Music, Media, Tools, Streaming and Settings. Downloads and archives is a
 Games-library panel, not a top-level destination.
 
+## Emulator selection beside Play (2026-10-25)
+
+Supported local emulated games have an Emulator dropdown immediately beside Play.
+It lists compatible registered runners, remembers the per-game override, and lets
+Platform default restore the configured default. The former GB/GBC-only sidebar
+control is removed. Saving disables launch until the confirmed snapshot arrives;
+failed confirmation offers a retry instead of launching a stale choice. Native
+ports and catalogue-only or launch-pending entries do not show this control.
+
+Validation: state tests cover selection/save races, failed confirmation/retry,
+clearing overrides and the TurboGrafx alias. An isolated browser fixture verified
+Mesen → mGBA → platform default, launch using the saved override, unavailable
+options, equal 46 px control heights and no overflow at 390 px. This validates UI
+routing, not new emulator gameplay compatibility. Full repository checks and the
+production desktop build passed.
+
 ## Implemented
 
 - Home excludes catalogue-only discoveries, groups explicitly linked game

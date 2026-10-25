@@ -25,6 +25,8 @@ beforeEach(() => {
   app.route = 'home';
   app.gameId = null;
   app.heroId = app.games[0].id;
+  app.runnerSelectionBusy = false;
+  app.runnerSelectionUnconfirmed = false;
   app.launching = null;
   app.running = null;
   app.installToolId = null;
@@ -614,4 +616,43 @@ test('reconnecting restores native install progress without advertising a playab
     const {portStatusLabel}=await import('../src/lib/presentation');
     assert.match(portStatusLabel(app.ports[0]),/setup unchecked/i);
   } finally { app.disconnect();app.api=api; }
+});
+
+
+test('TurboGrafx UI platform resolves PC Engine runners and defaults', () => {
+  const runners=[{id:'runner.mesen.marquee',systems:['pce'],available:true,display_name:'Mesen'}];
+  app.runners=runners; app.runnerSettings={selected_runner_ids:{pce:runners[0].id}};
+  assert.deepEqual(app.runnersFor('tg16').map(r=>r.id),[runners[0].id]);
+  assert.equal(app.runnerFor('tg16').id,runners[0].id);
+});
+test('emulator selection blocks launch and duplicate writes until confirmed, and can clear overrides', async () => {
+  const api=app.api; let finish; let writes=0; const launches=[]; const snap=discSnapshot();
+  snap.runners.push({id:'pcsx2-alt',kind:'pcsx2',display_name:'Alternative',available:true,bios_state:'unverified'});
+  try {
+    app.api={...api,setGameRunner:async(id,runner)=>{writes++; await new Promise(r=>finish=r); snap.editions[1].runner_override=runner;},snapshot:async()=>snap,launch:async(id)=>launches.push(id)};
+    const pending=app.chooseGameRunner('e2','pcsx2-alt');
+    assert.equal(app.runnerSelectionBusy,true); app.play(fixtureGame('e2'));
+    await app.chooseGameRunner('e2',null);
+    assert.equal(writes,1); assert.deepEqual(launches,[]);
+    finish(); await pending;
+    const selected=app.games.find(g=>g.id==='e2');
+    assert.equal(selected.runnerName,'Alternative'); assert.equal(selected.runnerOverride,'pcsx2-alt');
+    app.play(selected); assert.deepEqual(launches,['e2']); app.launching=null;
+    app.api.setGameRunner=async(id,runner)=>{snap.editions[1].runner_override=runner;};
+    await app.chooseGameRunner('e2',null);
+    assert.equal(app.games.find(g=>g.id==='e2').runnerName,'PCSX2');
+  } finally {app.api=api;}
+});
+test('failed selection reloads saved choice; failed confirmation blocks launch until retry', async () => {
+  const api=app.api; let launches=0;
+  try {
+    app.api={...api,setGameRunner:async()=>{throw new Error('Unavailable emulator');},snapshot:async()=>discSnapshot(),launch:async()=>launches++};
+    await app.chooseGameRunner('e2','missing');
+    assert.equal(app.games.find(g=>g.id==='e2').runnerId,'pcsx2'); assert.equal(app.runnerSelectionBusy,false);
+    app.api.snapshot=async()=>{throw new Error('Disconnected');};
+    await app.chooseGameRunner('e2','missing');
+    assert.equal(app.runnerSelectionUnconfirmed,true); app.play(fixtureGame('e2')); assert.equal(launches,0);
+    app.api.snapshot=async()=>discSnapshot(); await app.chooseGameRunner('e2',null);
+    assert.equal(app.runnerSelectionUnconfirmed,false);
+  } finally {app.api=api;}
 });

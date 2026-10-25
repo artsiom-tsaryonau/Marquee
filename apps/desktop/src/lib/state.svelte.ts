@@ -91,6 +91,8 @@ class AppState {
   runners = $state<Runner[]>([]);
   selectedRunner = $state<Runner | null>(null);
   runnerSettings = $state<LibrarySnapshot['settings']>({ last_root: null, last_collection: null, last_focus: null, selected_runner_id: null });
+  runnerSelectionBusy = $state(false);
+  runnerSelectionUnconfirmed = $state(false);
   runnersFor(system: string) { return this.runners.filter(r => runnerSupports(r, system)); }
   runnerFor(system: string) { return pickRunner({ runners: this.runners, settings: this.runnerSettings }, system); }
   lastScan = $state<ScanReport | null>(null);
@@ -339,6 +341,10 @@ class AppState {
   }
 
   play(game: GameEntry) {
+    if (this.runnerSelectionBusy || this.runnerSelectionUnconfirmed) {
+      this.notify('Confirm the emulator selection before launching. Select it again to retry.');
+      return;
+    }
     music.pauseForGame();
     if (game.source === 'catalogue') { this.notify('Catalogue entry only. Open its source page or link an existing installation.'); return; }
     this.heroId = game.id;
@@ -631,8 +637,24 @@ class AppState {
   }
 
   async chooseGameRunner(editionId: string, id: string | null) {
-    try { await this.api.setGameRunner(editionId, id); this.applySnapshot(await this.api.snapshot()); }
-    catch (err) { this.notify((err as Error).message ?? 'Could not select emulator'); }
+    if (this.runnerSelectionBusy || this.launching || this.running) return;
+    this.runnerSelectionBusy = true;
+    try {
+      await this.api.setGameRunner(editionId, id);
+    } catch (err) {
+      this.notify((err as Error).message ?? 'Could not select emulator');
+    }
+    // Even a failed response may have reached the server. Confirm its saved choice
+    // before enabling Play; never launch from an outdated displayed selection.
+    try {
+      this.applySnapshot(await this.api.snapshot());
+      this.runnerSelectionUnconfirmed = false;
+    } catch {
+      this.runnerSelectionUnconfirmed = true;
+      this.notify('Could not confirm the saved emulator. Select it again to retry.');
+    } finally {
+      this.runnerSelectionBusy = false;
+    }
   }
 
   async chooseRunner(id: string) {

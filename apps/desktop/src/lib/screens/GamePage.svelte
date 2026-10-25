@@ -137,9 +137,22 @@
         {#if g.platform === 'ps2'}<InstallMenu tone="primary" />
         {:else}<button class="btn primary" data-nav onclick={() => app.go('tools')}><Icon name="settings" /> Set up {g.platform === 'ps1' ? 'DuckStation' : g.platform === 'genesis' ? 'BlastEm' : g.platform === 'ds' ? 'melonDS' : g.platform === 'neogeo' ? 'FinalBurn Neo' : 'emulator'}</button>{/if}
       {:else}
-        <button class="btn primary" class:game-play={playLabel === 'Play' || playLabel === 'Open port'} data-nav onclick={primary}>
+        <button class="btn primary" class:game-play={playLabel === 'Play' || playLabel === 'Open port'} data-nav disabled={app.runnerSelectionBusy || app.runnerSelectionUnconfirmed} onclick={primary}>
           <Icon name={playReady ? 'play' : 'folder'} size={22} /> {playLabel}
         </button>
+      {/if}
+      {#if offline && !g.wanted && !g.launchPending}
+        <label class="runner-choice"><span class="sr-only">Emulator</span>
+          <select aria-label="Emulator" title="Saved for this game. Each emulator keeps its own saves and states." disabled={app.runnerSelectionBusy || !!app.launching || !!app.running} data-nav value={g.runnerOverride ?? ''} onchange={async e => {
+            const select = e.currentTarget, id = g.id;
+            await app.chooseGameRunner(id, select.value || null);
+            select.value = app.games.find(game => game.id === id)?.runnerOverride ?? '';
+          }}>
+            <option value="">Platform default · {app.runnerFor(g.platform)?.display_name ?? 'unavailable'}</option>
+            {#if g.runnerOverride && !runnerChoices.some(r => r.id === g.runnerOverride)}<option value={g.runnerOverride} disabled>Selected emulator unavailable</option>{/if}
+            {#each runnerChoices as runner}<option value={runner.id} disabled={!runner.available}>{runner.display_name}{runner.available ? '' : ' · unavailable'}</option>{/each}
+          </select>
+        </label>
       {/if}
       {#if g.portStatus === 'update'}
         <button class="btn glass" data-nav onclick={() => port && app.installPort(port)}><Icon name="refresh" /> Update</button>
@@ -148,6 +161,7 @@
         <Icon name="star" filled={g.favorite} />
       </button>
     </div>
+  {#if app.runnerSelectionBusy}<span class="selection-status" role="status">Saving emulator…</span>{:else if app.runnerSelectionUnconfirmed}<span class="selection-status" role="status">Select the emulator again to confirm it before playing.</span>{/if}
   <div class="play-strip" aria-label="Game activity">
     <div><span><small><Icon name="clock" size={14} />PLAYTIME</small><strong>{g.source === 'catalogue' || port ? 'Not tracked' : g.playtimeMin ? hours(g.playtimeMin) : 'Not played yet'}</strong></span></div>
     <div><span><small><Icon name="clock" size={14} />LAST PLAYED</small><strong>{g.lastPlayed ? ago(g.lastPlayed) : '—'}</strong></span></div>
@@ -221,16 +235,6 @@
           <dd>Unknown · no verified report</dd>
         {/if}
       </dl>
-      {#if offline && ['gb', 'gbc'].includes(g.platform)}
-        <label class="runner-choice">Play with
-          <select data-nav value={g.runnerOverride ?? ''} onchange={e => app.chooseGameRunner(g.id, e.currentTarget.value || null)}>
-            <option value="">Platform default · {app.runnerFor(g.platform)?.display_name ?? 'unavailable'}</option>
-            {#if g.runnerOverride && !runnerChoices.some(r => r.id === g.runnerOverride)}<option value={g.runnerOverride} disabled>Selected emulator unavailable</option>{/if}
-            {#each runnerChoices as runner}<option value={runner.id} disabled={!runner.available}>{runner.display_name}{runner.available ? '' : ' · unavailable'}</option>{/each}
-          </select>
-        </label>
-        <p class="media-credit">Saved for this game. Each emulator keeps its own saves and states.</p>
-      {/if}
       {#if offline || g.lutris || port}<div class="side-actions">
         {#if offline}<button class="btn glass small" data-nav onclick={() => app.go('tools')}><Icon name="settings" size={16} />Emulator settings</button>{/if}
       {#if offline}
@@ -261,8 +265,13 @@
 {/if}
 
 <style>
-  .runner-choice { display: grid; gap: 8px; margin-top: 16px; color: var(--text-soft); font-size: 13px; }
-  .runner-choice select { width: 100%; min-width: 0; }
+  .runner-choice { display: flex; min-width: 0; max-width: 100%; color: var(--text-soft); font-size: 13px; }
+  .runner-choice select { width: 260px; max-width: 100%; min-width: 0; height: var(--button-height, 46px); border-radius: 8px; }
+  @media (max-width: 650px) {
+    .runner-choice { order: 1; flex-basis: 100%; }
+    .runner-choice select { width: 100%; }
+  }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .page.music-view { padding-bottom: 0; } .music-view .body { padding-bottom: 0; }
   .library-identifiers { margin-top: 24px; color: var(--text-dim); } .library-identifiers summary { cursor: pointer; padding: 10px 0; }
 

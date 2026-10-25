@@ -10,7 +10,7 @@ its catalogue launch template opens Qt with the selected cartridge path and adds
 `-f` only for fullscreen. GBA is not enabled by this change.
 
 Settings → Games and controls offers independent GB and GBC defaults. A game’s
-installation sidebar offers **Play with**, including **Platform default** to
+launch toolbar offers an **Emulator** dropdown beside **Play**, including **Platform default** to
 clear its override. The shared core validates compatibility and availability;
 choices persist through restart. The native and browser UI use the same APIs.
 Snapshots publish compatible systems and game overrides so displayed readiness
@@ -40,6 +40,21 @@ the isolated library adapter and exited with code 0 after 87 seconds. This is
 process/session evidence; video, audio and keyboard acceptance await owner
 confirmation. Main-library installation did not create GB/GBC default settings
 or change Mesen’s data. Pilot files and logs remain ignored local artifacts.
+
+## Launch-toolbar selection (2026-10-25)
+
+Every supported local emulated game now exposes its compatible registered runners
+beside Play, not only GB/GBC. Selection is saved per installation through the same
+core override API. Unavailable runners remain labelled and disabled; an unavailable
+saved override stays visible. Select Platform default to clear the override.
+The selector and Play have matching heights and wrap on narrow windows.
+
+Play waits for the save and a fresh snapshot. If confirmation fails, launch remains
+blocked until selection is retried. Selections cannot change during a game session.
+The TurboGrafx UI alias resolves to backend PC Engine capabilities correctly.
+This exposes existing library adapters; it does not add arbitrary emulator builds.
+PS4/shadPS4 build selection and PS5 library launch remain pending their adapters,
+profile/save isolation and compatibility validation.
 
 ## Manager and added collection (planned)
 
