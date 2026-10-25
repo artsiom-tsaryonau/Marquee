@@ -6,8 +6,9 @@
   import Icon from '../components/Icon.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
   import { musicAccents } from '../musicAppearance';
+  import StoragePanel from '../components/StoragePanel.svelte';
 
-  const categories = [['appearance', 'Appearance'], ['games', 'Games and controls'], ['library', 'Library locations'], ['providers', 'Artwork and API keys'], ['devices', 'Torrents and devices']] as const;
+  const categories = [['appearance', 'Appearance'], ['games', 'Games and controls'], ['library', 'Library locations'], ['storage', 'Storage'], ['providers', 'Artwork and API keys'], ['devices', 'Torrents and devices']] as const;
   let category = $state<string>('appearance');
   let drafts = $state<Record<string, string>>({});
   let link = $state('');
@@ -62,6 +63,7 @@
       {#each categories as [id, label]}<button data-nav class:on={category === id} aria-pressed={category === id} onclick={() => (category = id)}>{label}</button>{/each}
     </nav>
     <div class="settings-content">
+  {#if category === 'storage'}<StoragePanel />{/if}
 
   {#each [{ id: 'ps1', name: 'PlayStation', emulator: 'DuckStation', kind: 'duckstation' }, { id: 'ps2', name: 'PlayStation 2', emulator: 'PCSX2', kind: 'pcsx2' }] as system}
     {@const runner = app.runnerFor(system.id)}

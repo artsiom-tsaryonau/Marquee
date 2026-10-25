@@ -107,6 +107,9 @@ with the sibling Studio checkout and its installed dependencies:
 See [runtime files, BIOS locations and safe cleanup](docs/RUNTIME_FILES.md) for
 what the built app needs, where firmware and saves live, and how existing games
 get covers and metadata.
+**Settings → Storage** now shows those locations and measures usage on demand.
+It also configures the collection folder for new-platform immediate imports and
+an additional BIOS input folder. See [storage controls and migration limits](docs/STORAGE_MANAGER.md).
 
 **Native streaming:** Wolf API controls are available through `marquee streaming
 --socket /absolute/path/wolf.sock` (inspect, pending, pair, unpair, stop). Native

@@ -57,8 +57,8 @@ export const desktopApi: LibraryApi = {
     return typeof selected === 'string' ? [selected] : selected ?? [];
   },
   onArchiveDrop: (handler) => getCurrentWebview().onDragDropEvent((event) => { if (event.payload.type === 'drop') handler(event.payload.paths); }),
-  async pickRoot() {
-    const selected = await open({ directory: true, multiple: false, title: 'Choose a folder of game files' });
+  async pickRoot(title) {
+    const selected = await open({ directory: true, multiple: false, title: title ?? 'Choose a folder of game files' });
     return typeof selected === 'string' ? selected : null;
   },
   async pickExecutable() {

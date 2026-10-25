@@ -48,6 +48,17 @@ impl Core {
         {
             return Ok(root.path.clone());
         }
+        if let Some(collection) = self.collection_root()? {
+            if !collection.is_dir() {
+                return Err(AppError::new("STORAGE_OFFLINE", "The configured collection folder is unavailable. Reconnect it or change Storage settings before importing."));
+            }
+            let dir = collection.join("library/imported-roms").join(system);
+            fs::create_dir_all(&dir)?;
+            if catalog::by_id(system).is_ok() {
+                self.add_root(system, dir.clone(), None)?;
+            }
+            return Ok(dir);
+        }
         let base = snap
             .roots
             .iter()

@@ -41,6 +41,10 @@ export function asError(err: unknown): AppError {
 /** The commands are identical on every surface; only the transport (`call`) differs. */
 export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable' | 'pickArchives' | 'pickPs3Content' | 'pickConsoleContent' | 'pickPs3Firmware' | 'pickTorrent' | 'onArchiveDrop' | 'pickMusic' | 'pickMusicCover' | 'musicUrl' | 'mediaUrl' | 'pickMedia' | 'pickMediaDisc'> {
   return {
+    storageSnapshot: () => call('storage_snapshot'),
+    storageScan: () => call('storage_scan'),
+    storageSetFolder: (kind, path) => call('storage_set_folder', { kind, path }),
+    storageOpen: (id) => call('storage_open', { id }),
     musicSetCover: (albumId, path) => call('music_set_cover', { album_id: albumId, path }),
     musicAlbums: (gameKey) => call('music_albums', gameKey === undefined ? {} : { game_key: gameKey }),
     mediaCollections:(gameKey)=>call('media_collections',{game_key:gameKey??null}),

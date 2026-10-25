@@ -35,6 +35,22 @@ fn out<T: Serialize>(value: T) -> Result<Value> {
 pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
     let sink: Arc<dyn EventSink> = core.hub();
     match cmd {
+        "storage_snapshot" => out(core.storage_snapshot()?),
+        "storage_scan" => out(core.storage_scan()?),
+        "storage_set_folder" => {
+            let path = match args.get("path") {
+                Some(Value::Null) => None,
+                Some(Value::String(value)) => Some(value.as_str()),
+                _ => {
+                    return Err(AppError::new(
+                        "BAD_REQUEST",
+                        "Storage path must be a string or null",
+                    ))
+                }
+            };
+            out(core.storage_set_folder(&text(&args, "kind")?, path)?)
+        }
+        "storage_open" => out(core.storage_open(&text(&args, "id")?)?),
         "preview_app_list" => {
             out(core.preview_app_list(&text(&args, "source")?, &text(&args, "json")?)?)
         }

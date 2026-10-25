@@ -3,7 +3,9 @@
 Storage design and first migration tooling, 2026-10-25. The offline relocation
 tool preserves existing library and receipt paths with compatibility links.
 The current manager, library and emulator paths remain authoritative; a unified
-artifact registry and per-category application settings remain future work.
+artifact registry and complete per-category relocation remain future work.
+The [Storage settings screen](STORAGE_MANAGER.md) now provides locations, usage,
+a future-intake collection folder and an additional BIOS input folder.
 
 Keep three independent lifecycles: original sources, playable installations,
 and mutable user data. Firmware originals have their own versioned vault;
@@ -38,6 +40,9 @@ receipts refer to those paths. `--data-dir` selects an instance's whole data roo
 it does not yet configure every storage class separately. Keep opaque receipt
 paths intact. The first relocation tool deliberately preserves them through
 parent-directory compatibility links instead of rewriting immutable receipts.
+`storage.collection_root` configures the base for new-platform immediate archive
+intake; existing platform roots take precedence and manager destinations do not
+change. Its sources directory also appears in the storage inventory.
 The UI can provide readable platform/title organization independently of them.
 
 The source repository should hold code, recipes, tests and documentation.

@@ -4,6 +4,19 @@ export interface AppError {
   context?: unknown;
 }
 
+export interface StorageUsage {
+  bytes: number; files: number; skipped_links: number; skipped_special: number; incomplete: boolean;
+}
+export interface StorageLocation {
+  id: string; category: string; label: string; path: string;
+  resolved: string | null; exists: boolean; free_bytes: number | null;
+  usage: StorageUsage | null; note: string;
+}
+export interface StorageSnapshot {
+  collection_root: string | null; bios_inbox: string | null;
+  locations: StorageLocation[]; scanning: boolean; measured_at: string | null;
+}
+
 export interface PurpleStatus {
   installed: boolean;
   ready: boolean;
@@ -417,6 +430,10 @@ export interface YoutubeSource { id:string; title:string; uploader:string; url:s
 export interface YoutubePlaylist { title:string; uploader:string; url:string; tracks:YoutubeSource[]; truncated:boolean; }
 export interface MetadataReview {token:string;provider:string;candidates:{id:number;title:string;system?:string;facts?:{year?:number;genre?:string;players?:number;description?:string}}[];}
 export interface LibraryApi {
+  storageSnapshot(): Promise<StorageSnapshot>;
+  storageScan(): Promise<void>;
+  storageSetFolder(kind: 'collection' | 'bios_inbox', path: string | null): Promise<void>;
+  storageOpen(id: string): Promise<void>;
   previewAppList(source:string,json:string):Promise<AppListReview>;
   approveAppList(token:string,ids:string[]):Promise<number>;
   appListEntries():Promise<AppListEntry[]>;
@@ -503,7 +520,7 @@ export interface LibraryApi {
   kind: 'desktop' | 'web';
   snapshot(): Promise<LibrarySnapshot>;
   addRoot(path: string, system?: string): Promise<LibraryRoot>;
-  pickRoot(): Promise<string | null>;
+  pickRoot(title?: string): Promise<string | null>;
   scan(rootId?: string): Promise<ScanReport>;
   listRunners(): Promise<Runner[]>;
   selectRunner(id: string): Promise<void>;

@@ -40,6 +40,7 @@ pub mod server;
 pub mod sessions;
 pub mod source_builds;
 pub mod steam;
+pub mod storage;
 pub mod streaming;
 pub mod transfer;
 pub mod wanted;
@@ -69,6 +70,7 @@ pub struct Core {
     pub(crate) headless: Mutex<streaming::headless::State>,
     pub(crate) headless_gate: Mutex<()>,
     pub streaming_controls: Arc<streaming::controls::Manager>,
+    pub(crate) storage: Mutex<storage::ScanState>,
     pub(crate) transfers: transfer::Transfers,
     pub(crate) preparation: marquee_manager::Client,
 }
@@ -90,6 +92,7 @@ impl Core {
         let lock = InstanceLock::acquire(&paths.instance_lock())?;
         let db = Db::open(&paths)?;
         let core = Self {
+            storage: Mutex::new(storage::ScanState::default()),
             source_builds: source_builds::Manager::default(),
             headless: Mutex::new(streaming::headless::State::default()),
             headless_gate: Mutex::new(()),

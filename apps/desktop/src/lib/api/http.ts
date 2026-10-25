@@ -96,9 +96,9 @@ export const httpApi: LibraryApi = {
     return window.prompt('Absolute .torrent path on the Marquee computer (not a browser upload)')?.trim() || null;
   },
   onArchiveDrop: async () => () => {},
-  async pickRoot() {
+  async pickRoot(title) {
     // A browser cannot open a native folder dialog; the path is on the machine running Marquee.
-    const path = window.prompt('Folder on the Marquee machine that holds your game files');
+    const path = window.prompt(title ? `${title}: absolute folder path on the Marquee host (not a browser upload)` : 'Folder on the Marquee machine that holds your game files');
     return path && path.trim() ? path.trim() : null;
   },
   async pickExecutable() {
