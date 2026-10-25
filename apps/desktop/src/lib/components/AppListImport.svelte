@@ -80,6 +80,7 @@
           {#if entry.project}<span>{entry.project}</span>{/if}
           <small>{entry.provider === 'manual' ? 'Manual project' : `${entry.provider} · ${entry.repository}`} · Source: {entry.source}</small>
           <div class="badges">{#if review}<span>{change(entry)}</span>{/if}<span>{status(entry)}</span>{#each entry.tags as tag}<span>{tag}</span>{/each}</div>
+          {#if !review && entry.recipe_id}<div><button class="btn glass small" data-nav disabled={!app.ports.some(p => p.id === entry.recipe_id)} onclick={() => app.portDialogId = entry.recipe_id}>Review managed recipe</button></div>{/if}
           {#if entry.diagnostics.length}<details><summary>Requirements and notes ({entry.diagnostics.length})</summary><ul>{#each entry.diagnostics as diagnostic}<li>{diagnostic}</li>{/each}</ul></details>{/if}
           <details><summary>Original source fields</summary><pre>{JSON.stringify(entry.original, null, 2)}</pre></details>
         </div>

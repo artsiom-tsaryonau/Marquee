@@ -197,9 +197,13 @@ fn parse(source: &str, raw: &str) -> Result<(Vec<Entry>, Vec<String>)> {
             || (!repository.is_empty()
                 && (!matches!(provider.as_str(), "github" | "gitlab")
                     || !repository_valid(&repository, &provider)));
-        let matching = ports
-            .iter()
-            .find(|p| provider == "github" && p.github.eq_ignore_ascii_case(&repository));
+        let matching = ports.iter().find(|p| {
+            provider == "github"
+                && (p.github.eq_ignore_ascii_case(&repository)
+                    || p.repository_aliases
+                        .iter()
+                        .any(|alias| alias.eq_ignore_ascii_case(&repository)))
+        });
         let supported =
             matching.is_some() && unknown.is_empty() && release_asset_filter.is_none() && !invalid;
         if !safe_folder(&folder_name) {
@@ -377,7 +381,7 @@ mod tests {
         let (entries, _) = parse("pilot", PILOTS).unwrap();
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[0].recipe_id.as_deref(), Some("shipwright"));
-        assert_eq!(entries[1].status, "needs_recipe");
+        assert_eq!(entries[1].recipe_id.as_deref(), Some("2ship2harkinian"));
         for bad in [
             "{}",
             "[]",

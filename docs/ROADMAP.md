@@ -317,3 +317,11 @@ native PS3 conversion or an implemented package format.
 
 The owner also resumed [Quiver integration](QUIVER_INTEGRATION.md). Q0 now pins
 upstream, retains notices and defines existing/new Linux port fixtures. Q1 now provides bounded local-file preview, selected import, stable source-scoped identities and existing-recipe mappings through Tools, shared APIs and CLI. Q2 native install/setup/launch acceptance remains next; hosted-catalogue mirroring and unattended installs are outside this slice.
+
+
+Quiver Q2a now adds a pinned 2 Ship 2 Harkinian engine recipe, explicit canonical
+repository alias handling and discovery-to-recipe navigation. Isolated engine
+installation, executable integrity repair and settings preservation passed.
+This uses the existing foreground installer; durable manager jobs, actual ROM
+setup, native saves and gameplay/relaunch acceptance remain open. No game data
+was downloaded or an engine launched by this installation-only test.

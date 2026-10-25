@@ -1,0 +1,21 @@
+{
+  "id": "2ship2harkinian",
+  "name": "2 Ship 2 Harkinian",
+  "game": "The Legend of Zelda: Majora's Mask",
+  "family": "HarbourMasters",
+  "platform": "n64",
+  "github": "2ship2harkinian/2ship2harkinian",
+  "asset_suffix": "-Linux.zip",
+  "asset_excludes": [],
+  "binary": "2ship.appimage",
+  "requirement": "Requires a supported Majora's Mask ROM beside 2ship.appimage; open the port to complete its own setup. Installing the engine does not include game data. Managed release is pinned to 5.0.1.",
+  "pinned_release": {
+    "tag": "5.0.1",
+    "asset": "2Ship-Battler-Bravo-Linux.zip",
+    "sha256": "6cdd4fe06f3f9b095e99c86fef70b9265cc921fb6faa7ba1e18e94e90ed0b345",
+    "binary_sha256": "2b1e34c84e4ec011e7c50e131786ff83454f1a9cf12f041e5efcec01c4cc2964"
+  },
+  "repository_aliases": [
+    "HarbourMasters/2ship2harkinian"
+  ]
+}

@@ -1,6 +1,6 @@
 # Quiver integration roadmap
 
-Created 2026-10-22; resumed 2026-10-25. **Q0 and Q1 implemented: pinned source/schema review and offline app-list discovery import. Dynamic installation recipes remain Q2 work.**
+Created 2026-10-22; resumed 2026-10-25. **Q0 and Q1 implemented: pinned source/schema review and offline app-list discovery import. Q2a adds a pinned native-engine recipe pilot; durable manager jobs and game acceptance remain open.**
 
 This track supports later native-port and catalogue expansion. It does not
 change the direct-store implementation order in [ROADMAP.md](ROADMAP.md), add a
@@ -276,3 +276,53 @@ approved under the `marquee native-port pilots` source. Existing edition IDs,
 titles, favorites, artwork and runner overrides were checked unchanged. The
 updated native app exposes both records in Tools → App lists. No game binary
 was installed or launched by this rollout.
+
+
+## Q2a — Pinned 2 Ship engine recipe (2026-10-25)
+
+A shipped `2ship2harkinian` recipe now names the exact 5.0.1 Linux ZIP and
+`2ship.appimage` member. Approved app-list records can open **Review managed
+recipe**; this opens the existing port settings dialog, without downloading or
+executing anything. Installation is still a separate explicit action. External
+asset filters, setup fields and commands cannot alter the shipped recipe.
+
+The original HarbourMasters repository now redirects to the canonical
+`2ship2harkinian/2ship2harkinian` project. The recipe uses that canonical owner;
+the old path is an explicit compiled import alias, not a general redirect rule.
+Original list fields and source-scoped IDs are preserved. Re-preview/re-import
+the original pilot list to refresh its recipe mapping.
+
+Reviewed source: `8a24047fbce8915993804e7819f4df4fa591551f` (tag 5.0.1).
+Pinned asset: `2Ship-Battler-Bravo-Linux.zip`, 16,262,941 bytes, SHA-256
+`6cdd4fe06f3f9b095e99c86fef70b9265cc921fb6faa7ba1e18e94e90ed0b345`.
+Installed `2ship.appimage`: 16,553,152 bytes, SHA-256
+`2b1e34c84e4ec011e7c50e131786ff83454f1a9cf12f041e5efcec01c4cc2964`.
+These identify the upstream bytes; they are not publisher-signature verification
+or gameplay evidence. The verified archive contains the AppImage and readme only.
+
+The new pinned-recipe path selects the exact tag/asset and canonical GitHub URL,
+refuses changed upstream digests, verifies the archive against the compiled pin,
+and validates ELF64/x86-64 plus the extracted executable hash before promotion.
+It never falls back to the legacy HTTPS-only/no-digest behavior. Repeat install
+reuses only a matching executable; a damaged program is repaired from the pinned
+release while the existing user-file preservation path retains settings. The
+reviewed release remains pinned until its recipe is deliberately updated.
+
+The isolated install and real corruption/repair test passed without executing
+the engine or obtaining game data. Test settings survived unchanged. Full checks
+and production build pass; browser discovery-to-recipe navigation shows **Install**,
+the 5.0.1 pin and missing-game-data requirements at desktop and 390 px without
+JS errors or horizontal overflow. Main-library game data is untouched.
+
+**Q2 is not complete.** This slice uses the existing foreground port installer;
+it has not moved native ports into durable manager-owned jobs. It does not test
+AppImage startup/FUSE behavior, supported-ROM preparation, controls, saves,
+gameplay, process/session ownership or relaunch. No compatible Majora’s Mask
+input was found in the checked local collection. Tools/Game views retain
+**setup unchecked** after installing an engine; they do not claim Ready to play.
+Next: durable install/setup receipts and recovery, then a real supported-ROM
+pilot with native save/relaunch acceptance. Do not copy another game's ROM or
+mark the engine as a complete game installation to close that gate.
+
+Primary references: [pinned source README](https://github.com/2ship2harkinian/2ship2harkinian/blob/8a24047fbce8915993804e7819f4df4fa591551f/README.md),
+[release](https://github.com/2ship2harkinian/2ship2harkinian/releases/tag/5.0.1).

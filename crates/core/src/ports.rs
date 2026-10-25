@@ -12,8 +12,9 @@ use crate::paths::Paths;
 use crate::sessions::EventSink;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use sha2::{Digest, Sha256};
 use std::fs::{self, File};
-use std::io;
+use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::Arc;
@@ -21,6 +22,7 @@ use std::time::Duration;
 
 const CATALOGUE: &[&str] = &[
     include_str!("../../../catalog/ports/shipwright.json"),
+    include_str!("../../../catalog/ports/2ship2harkinian.json"),
     include_str!("../../../catalog/ports/zelda64recomp.json"),
     include_str!("../../../catalog/ports/sm64coopdx.json"),
     include_str!("../../../catalog/ports/fallout2-ce.json"),
@@ -37,12 +39,24 @@ pub struct PortDef {
     pub family: String,
     pub platform: String,
     pub github: String,
+    #[serde(default)]
+    pub repository_aliases: Vec<String>,
     pub asset_suffix: String,
     #[serde(default)]
     pub asset_excludes: Vec<String>,
     /// File to run inside an extracted archive; `None` means the asset itself is the executable (AppImage).
     pub binary: Option<String>,
     pub requirement: String,
+    #[serde(default)]
+    pub pinned_release: Option<PinnedRelease>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PinnedRelease {
+    pub tag: String,
+    pub asset: String,
+    pub sha256: String,
+    pub binary_sha256: String,
 }
 
 /// What Marquee remembers about an installed port.
@@ -138,6 +152,59 @@ pub fn pick_asset(def: &PortDef, release: &serde_json::Value) -> Result<Release>
         .and_then(|v| v.as_str())
         .ok_or_else(|| AppError::new("NETWORK", "GitHub release has no tag"))?
         .to_string();
+    if let Some(pin) = &def.pinned_release {
+        if pin.tag != tag
+            || pin.sha256.len() != 64
+            || !pin.sha256.bytes().all(|c| c.is_ascii_hexdigit())
+        {
+            return Err(AppError::new(
+                "PORT_RELEASE",
+                "Release does not match the reviewed port recipe",
+            ));
+        }
+        let matching: Vec<_> = release["assets"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|a| a["name"].as_str() == Some(pin.asset.as_str()))
+            .collect();
+        if matching.len() != 1 {
+            return Err(AppError::new(
+                "PORT_RELEASE",
+                "Pinned release asset is missing or ambiguous",
+            ));
+        }
+        let asset = matching[0];
+        let url = asset["browser_download_url"]
+            .as_str()
+            .ok_or_else(|| AppError::new("PORT_RELEASE", "Pinned asset has no URL"))?;
+        let expected_url = format!(
+            "https://github.com/{}/releases/download/{}/{}",
+            def.github, pin.tag, pin.asset
+        );
+        if !url.eq_ignore_ascii_case(&expected_url) {
+            return Err(AppError::new(
+                "PORT_RELEASE",
+                "Pinned asset URL does not match the reviewed repository",
+            ));
+        }
+        if let Some(digest) = asset["digest"].as_str() {
+            if !digest.eq_ignore_ascii_case(&format!("sha256:{}", pin.sha256)) {
+                return Err(AppError::new(
+                    "PORT_RELEASE",
+                    "Upstream digest changed; the port recipe needs review",
+                ));
+            }
+        }
+        return Ok(Release {
+            tag,
+            asset: Asset {
+                name: pin.asset.clone(),
+                url: url.into(),
+                sha256: Some(pin.sha256.to_ascii_lowercase()),
+            },
+        });
+    }
     let assets = release
         .get("assets")
         .and_then(|v| v.as_array())
@@ -174,8 +241,13 @@ pub fn pick_asset(def: &PortDef, release: &serde_json::Value) -> Result<Release>
 }
 
 pub fn latest_release(def: &PortDef) -> Result<serde_json::Value> {
+    let selector = def
+        .pinned_release
+        .as_ref()
+        .map(|pin| format!("tags/{}", crate::romart::encode(&pin.tag)))
+        .unwrap_or_else(|| "latest".into());
     http::get_json(&format!(
-        "https://api.github.com/repos/{}/releases/latest",
+        "https://api.github.com/repos/{}/releases/{selector}",
         def.github
     ))
 }
@@ -198,7 +270,9 @@ pub fn install_latest(
     let release = pick_asset(def, &latest_release(def)?)?;
     let dir = port_dir(paths, &def.id);
     if current_tag == Some(release.tag.as_str()) {
-        if let Some(bin) = locate_binary(&dir, def) {
+        if let Some(bin) =
+            locate_binary(&dir, def).filter(|bin| validate_pinned_binary(def, bin).is_ok())
+        {
             return Ok(InstalledPort {
                 tag: release.tag,
                 bin: rel(&dir, &bin),
@@ -294,6 +368,7 @@ pub fn install_latest(
             )
         })?,
     };
+    validate_pinned_binary(def, &bin)?;
     make_executable(&bin)?;
     let installed = InstalledPort {
         tag: release.tag,
@@ -301,6 +376,47 @@ pub fn install_latest(
     };
     promote_installation(&release_dir, &dir)?;
     Ok(installed)
+}
+
+fn validate_pinned_binary(def: &PortDef, binary: &Path) -> Result<()> {
+    let Some(pin) = &def.pinned_release else {
+        return Ok(());
+    };
+    if !cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+        return Err(AppError::new(
+            "PORT_PLATFORM",
+            "This pinned recipe requires Linux x86-64",
+        ));
+    }
+    let mut file = File::open(binary)?;
+    if file.metadata()?.len() > http::PORT_MAX_BYTES {
+        return Err(AppError::new(
+            "PORT_PLATFORM",
+            "Port executable exceeds its size limit",
+        ));
+    }
+    let mut header = [0; 20];
+    file.read_exact(&mut header)?;
+    if &header[..4] != b"\x7fELF"
+        || header[4] != 2
+        || header[5] != 1
+        || u16::from_le_bytes([header[18], header[19]]) != 62
+    {
+        return Err(AppError::new(
+            "PORT_PLATFORM",
+            "Pinned recipe did not contain a Linux x86-64 executable",
+        ));
+    }
+    let mut hash = Sha256::new();
+    hash.update(header);
+    std::io::copy(&mut file.take(http::PORT_MAX_BYTES), &mut hash)?;
+    if format!("{:x}", hash.finalize()) != pin.binary_sha256.to_ascii_lowercase() {
+        return Err(AppError::new(
+            "PORT_CHECKSUM",
+            "Pinned port executable checksum did not match",
+        ));
+    }
+    Ok(())
 }
 
 /// Only promote validated release files. A failed copy/extraction leaves the
@@ -580,11 +696,11 @@ mod tests {
     #[test]
     fn catalogue_parses_and_ids_are_unique() {
         let all = catalogue().unwrap();
-        assert_eq!(all.len(), 5);
+        assert_eq!(all.len(), 6);
         let mut ids: Vec<_> = all.iter().map(|p| p.id.clone()).collect();
         ids.sort();
         ids.dedup();
-        assert_eq!(ids.len(), 5);
+        assert_eq!(ids.len(), 6);
     }
 
     #[test]
@@ -594,6 +710,64 @@ mod tests {
         assert_eq!(picked.tag, "v1.2.2");
         assert_eq!(picked.asset.url, "https://x/x64");
         assert_eq!(picked.asset.sha256.as_deref(), Some("abcd"));
+    }
+
+    #[test]
+    fn pinned_port_rejects_release_asset_url_and_digest_changes() {
+        let def = find("2ship2harkinian").unwrap();
+        let pin = def.pinned_release.as_ref().unwrap();
+        let mut release = json!({"tag_name":pin.tag,"assets":[{"name":pin.asset,"browser_download_url":format!("https://github.com/{}/releases/download/{}/{}",def.github,pin.tag,pin.asset),"digest":format!("sha256:{}",pin.sha256)}]});
+        assert_eq!(
+            pick_asset(&def, &release).unwrap().asset.sha256.as_deref(),
+            Some(pin.sha256.as_str())
+        );
+        release["assets"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("digest");
+        assert_eq!(
+            pick_asset(&def, &release).unwrap().asset.sha256.as_deref(),
+            Some(pin.sha256.as_str())
+        );
+        for (key, value) in [
+            ("digest", "sha256:changed"),
+            ("name", "2Ship-Windows.zip"),
+            ("browser_download_url", "https://other.invalid/asset"),
+        ] {
+            let mut changed = release.clone();
+            changed["assets"][0][key] = serde_json::Value::String(value.into());
+            assert!(pick_asset(&def, &changed).is_err());
+        }
+        release["tag_name"] = serde_json::Value::String("different".into());
+        assert!(pick_asset(&def, &release).is_err());
+    }
+
+    #[test]
+    fn pinned_binary_validation_checks_machine_and_content() {
+        let temp = tempfile::tempdir().unwrap();
+        let binary = temp.path().join("appimage");
+        let mut def = find("2ship2harkinian").unwrap();
+        let mut bytes = vec![0; 64];
+        bytes[..4].copy_from_slice(b"\x7fELF");
+        bytes[4] = 2;
+        bytes[5] = 1;
+        bytes[18] = 62;
+        def.pinned_release.as_mut().unwrap().binary_sha256 =
+            format!("{:x}", Sha256::digest(&bytes));
+        fs::write(&binary, &bytes).unwrap();
+        assert!(validate_pinned_binary(&def, &binary).is_ok());
+        bytes[63] = 1;
+        fs::write(&binary, &bytes).unwrap();
+        assert_eq!(
+            validate_pinned_binary(&def, &binary).unwrap_err().code,
+            "PORT_CHECKSUM"
+        );
+        bytes[18] = 183;
+        fs::write(&binary, &bytes).unwrap();
+        assert_eq!(
+            validate_pinned_binary(&def, &binary).unwrap_err().code,
+            "PORT_PLATFORM"
+        );
     }
 
     #[test]

@@ -491,3 +491,12 @@ untested. The launch was through the real core/CLI, not a fake runner. A timed
 8-second diagnostic probe was explicitly excluded from Enter/crash conclusions.
 New browser acquisition through real provider gates and manager torrent adoption
 remain separate milestones.
+
+
+### Quiver native-port pilot
+
+Tools also offers the 2 Ship 2 Harkinian 5.0.1 Linux engine through an exact
+release/archive/executable pin. Approved local app-list entries can open that
+recipe for review. Installation does not include Majora’s Mask game data or
+prove gameplay. The source alias, integrity tests and remaining manager/setup
+gates are recorded in [Quiver Q2a](QUIVER_INTEGRATION.md#q2a--pinned-2-ship-engine-recipe-2026-10-25).
