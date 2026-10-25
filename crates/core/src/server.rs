@@ -430,7 +430,9 @@ fn handle(core: &Arc<Core>, token: &str, port: u16, assets: Option<&Assets>, mut
         if !clean {
             return respond(req, 404, "text/plain", b"not found".to_vec(), true);
         }
-        let file = core.paths.cache_dir.join("art").join(name);
+        let local = core.paths.cache_dir.join("art").join(name);
+        let instance = core.paths.data_dir.join("cache/art").join(name);
+        let file = if local.is_file() { local } else { instance };
         return match fs::read(&file) {
             Ok(bytes) => {
                 let mime = mime_for(&file);
@@ -651,6 +653,31 @@ mod tests {
         );
         assert!(ok.starts_with("HTTP/1.1 200"), "{ok}");
         assert!(ok.contains("ok:0:"));
+    }
+
+    #[test]
+    fn instance_cache_covers_remain_visible_when_the_desktop_uses_xdg_cache() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut core = Core::open_isolated(Some(dir.path().to_path_buf()), false).unwrap();
+        let instance = core.paths.cache_dir.join("art");
+        fs::create_dir_all(&instance).unwrap();
+        fs::write(instance.join("test.png"), b"cover-bytes").unwrap();
+        core.paths.cache_dir = dir.path().join("other-cache");
+        let h = start(Arc::new(core), None, Some(48900)).unwrap();
+        let own = format!("127.0.0.1:{}", h.addr.port());
+        let response = request(
+            h.addr,
+            &format!(
+                "GET /art/test.png?token={} HTTP/1.1\r\nHost: {own}\r\nConnection: close\r\n\r\n",
+                h.token
+            ),
+        );
+        assert!(response.starts_with("HTTP/1.1 200") && response.ends_with("cover-bytes"));
+        let response = request(
+            h.addr,
+            &format!("GET /art/test.png HTTP/1.1\r\nHost: {own}\r\nConnection: close\r\n\r\n"),
+        );
+        assert!(response.starts_with("HTTP/1.1 401"));
     }
 
     #[test]

@@ -1,0 +1,15 @@
+ARG HOST_IMAGE
+FROM ${HOST_IMAGE}
+RUN dnf install -y gamescope xorg-x11-server-Xwayland gtk3 alsa-lib fontconfig libX11-xcb vulkan-loader \
+    && dnf clean all
+COPY xenia /opt/xenia
+COPY xenia-entrypoint.py xenia-game.py /opt/marquee-wolf/
+RUN chmod -R a+rX /opt/xenia \
+    && chmod 644 /opt/marquee-wolf/xenia-entrypoint.py /opt/marquee-wolf/xenia-game.py \
+    && setcap -r /usr/bin/gamescope \
+    && ldd /opt/xenia/usr/bin/xenia_canary > /tmp/xenia-ldd \
+    && ! grep -q 'not found' /tmp/xenia-ldd \
+    && gamescope --help > /opt/marquee-wolf/gamescope-help.txt 2>&1 \
+    && rpm -qa --qf '%{NAME}\t%{VERSION}-%{RELEASE}\t%{LICENSE}\n' | sort > /opt/marquee-wolf/licenses/xenia-runtime-packages.tsv
+LABEL io.marquee.integration="xenia-stream-pilot-v1"
+ENTRYPOINT ["python3", "/opt/marquee-wolf/xenia-entrypoint.py"]

@@ -33,9 +33,14 @@
       browserJobs = await app.api.browserJobs();
       torrentDownloads = await app.api.torrentDownloads();
       if (!mounted) return;
-      const changed = next.some(j => j.state === 'registered' && jobs.find(old => old.id === j.id)?.state !== 'registered');
+      const added = next.filter(j => j.state === 'registered' && jobs.find(old => old.id === j.id)?.state !== 'registered');
       jobs = next; refreshError = '';
-      if (changed) app.applySnapshot(await app.api.snapshot());
+      if (added.length) {
+        app.applySnapshot(await app.api.snapshot());
+        // Match the normal import flow: registration also starts cover/facts lookup.
+        // One global pass handles multi-edition jobs and the provider miss caches.
+        void app.refreshArtwork();
+      }
     } catch (err) { if (mounted) refreshError = (err as Error).message ?? 'Could not load preparation history'; }
     finally { refreshing = false; }
   }

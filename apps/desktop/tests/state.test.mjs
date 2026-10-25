@@ -665,3 +665,24 @@ test('verified Xbox 360 installations map to Xenia and retain per-game selection
   assert.equal(game.platform,'xbox360'); assert.equal(game.runnerName,'Xenia Canary');
   assert.equal(game.setupState,'unverified'); assert.equal(game.runnerOverride,'runner.xenia.marquee');
 });
+
+const { emulatorChoices } = await import('../src/lib/runnerChoices');
+test('emulator menu lists the default once and clears its override', () => {
+  const a = { id:'xenia',display_name:'Xenia',available:true };
+  const b = { id:'other',display_name:'Other',available:false };
+  assert.deepEqual(emulatorChoices([a,a,b], 'xenia'), [
+    { id:'xenia',value:'',label:'Xenia (default)',available:true },
+    { id:'other',value:'other',label:'Other · unavailable',available:false },
+  ]);
+});
+
+test('artwork refresh updates the page and releases busy state even without events', async () => {
+  const api=app.api;let calls=0;
+  try {
+    app.fetchingArt=false;
+    app.api={...api,refreshArtwork:async()=>{calls++;},snapshot:async()=>discSnapshot()};
+    await app.refreshArtwork('disc-a');
+    assert.equal(calls,1);assert.equal(app.fetchingArt,false);assert.ok(app.games.length);
+    await app.refreshArtwork('disc-a');assert.equal(calls,2);
+  } finally {app.api=api;app.fetchingArt=false;}
+});

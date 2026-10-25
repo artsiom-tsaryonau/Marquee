@@ -15,6 +15,7 @@ ready games must remain launchable without the manager.
 | [Marquee manager](MARQUEE_MANAGER.md) | Acquisition flow, architecture, process/data ownership, M0–M6 gates, migration and recovery |
 | [Console preparation](CONSOLE_PREPARATION.md) | Added Switch/PS3/PS4/Xbox/Xbox 360 collection: inventory, format/recipe work and per-platform acceptance |
 | [PS3](PS3.md) | Verified ISO registration/direct RPCS3 launch; menu/video/audio and clean exit accepted |
+| [Headless library streaming](HEADLESS_STREAMING.md) | Shared private-display contract, per-runner rollout and Xenia acceptance pilot |
 | [Streaming](STREAMING.md) | Native Wolf host/viewer track, ST2 acceptance and remaining ST3–ST5 gates |
 | [Store implementation](STORE_INTEGRATION.md) | Current Steam inventory evidence; Steam → compatibility/Epic → GOG tasks and acceptance |
 | [Unified library](UNIFIED_LIBRARY.md) | Game/edition/installation/profile identity, wishlist/without-files behavior and OpenGOAL track |

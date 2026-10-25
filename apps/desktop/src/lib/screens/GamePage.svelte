@@ -13,6 +13,7 @@
   import PlatformIcon from '../components/PlatformIcon.svelte';
   import Row from '../components/Row.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
+  import EmulatorMenu from '../components/EmulatorMenu.svelte';
   import CatalogueDetails from '../components/CatalogueDetails.svelte';
   import MetadataSearch from '../components/MetadataSearch.svelte';
   import GameMediaHub from '../components/GameMediaHub.svelte';
@@ -142,17 +143,7 @@
         </button>
       {/if}
       {#if offline && !g.wanted && !g.launchPending}
-        <label class="runner-choice"><span class="sr-only">Emulator</span>
-          <select aria-label="Emulator" title="Saved for this game. Each emulator keeps its own saves and states." disabled={app.runnerSelectionBusy || !!app.launching || !!app.running} data-nav value={g.runnerOverride ?? ''} onchange={async e => {
-            const select = e.currentTarget, id = g.id;
-            await app.chooseGameRunner(id, select.value || null);
-            select.value = app.games.find(game => game.id === id)?.runnerOverride ?? '';
-          }}>
-            <option value="">Platform default · {app.runnerFor(g.platform)?.display_name ?? 'unavailable'}</option>
-            {#if g.runnerOverride && !runnerChoices.some(r => r.id === g.runnerOverride)}<option value={g.runnerOverride} disabled>Selected emulator unavailable</option>{/if}
-            {#each runnerChoices as runner}<option value={runner.id} disabled={!runner.available}>{runner.display_name}{runner.available ? '' : ' · unavailable'}</option>{/each}
-          </select>
-        </label>
+        <EmulatorMenu runners={runnerChoices} defaultId={app.runnerFor(g.platform)?.id} value={g.runnerOverride} disabled={app.runnerSelectionBusy || !!app.launching || !!app.running} onchange={id => app.chooseGameRunner(g.id, id)} />
       {/if}
       {#if g.portStatus === 'update'}
         <button class="btn glass" data-nav onclick={() => port && app.installPort(port)}><Icon name="refresh" /> Update</button>
@@ -235,7 +226,7 @@
           <dd>Unknown · no verified report</dd>
         {/if}
       </dl>
-      {#if g.platform === 'xbox360' && offline}<p class="media-credit">Click the game to focus it. Keyboard: Enter starts; WASD moves; arrows look; J/K/U/I are A/B/X/Y; Q/E are triggers and 1/3 are bumpers; Shift+WASD is the D-pad. Alt+F4 closes Xenia. Existing custom mappings are kept.</p>{/if}
+      {#if g.platform === 'xbox360' && offline}<p class="media-credit">Click the game to focus it. Keyboard: Enter is Start; Z is Back; WASD moves; arrows look; J/K/U/I are A/B/X/Y; Q/E are triggers and 1/3 are bumpers; Shift+WASD is the D-pad. Alt+F4 closes Xenia. Existing custom mappings are kept.</p>{/if}
       {#if offline || g.lutris || port}<div class="side-actions">
         {#if offline}<button class="btn glass small" data-nav onclick={() => app.go('tools')}><Icon name="settings" size={16} />Emulator settings</button>{/if}
       {#if offline}
@@ -266,11 +257,7 @@
 {/if}
 
 <style>
-  .runner-choice { display: flex; min-width: 0; max-width: 100%; color: var(--text-soft); font-size: 13px; }
-  .runner-choice select { width: 260px; max-width: 100%; min-width: 0; height: var(--button-height, 46px); border-radius: 8px; }
   @media (max-width: 650px) {
-    .runner-choice { order: 1; flex-basis: 100%; }
-    .runner-choice select { width: 100%; }
   }
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .page.music-view { padding-bottom: 0; } .music-view .body { padding-bottom: 0; }

@@ -395,3 +395,19 @@ The [collection storage proposal](STORAGE_LAYOUT.md) separates retained original
 versioned firmware, playable installations, replaceable programs and mutable user
 data. A unified artifact registry, configurable roots, receipt-aware relocation
 and dependency-aware cleanup remain planned; no collection migration was performed.
+
+
+### Library-wide private-display streaming (2026-10-25)
+
+The owner wants all supported emulators and ports to stream without a visible
+host-desktop window. [Headless library streaming](HEADLESS_STREAMING.md) owns the
+shared contract and per-runner rollout. Sonic remains the accepted baseline.
+The new Xenia image adds the Gamescope/XWayland route and a separate Vanquish
+acceptance slot; a built image does not complete input/save/reconnect validation.
+Mesen and the Qt runners follow; local compatibility gates remain authoritative
+for PS4/PS5. Library-wide Local / Stream launch orchestration remains open.
+
+The per-game emulator selector now has one row per runner and a `(default)`
+marker, styled popup, unavailable selection visibility and keyboard navigation.
+Prepared-game registration triggers cover/facts lookup. Desktop and browser
+artwork access now includes the instance-local cache used by CLI preparation.

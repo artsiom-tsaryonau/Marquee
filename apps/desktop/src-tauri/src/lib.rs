@@ -69,6 +69,16 @@ pub fn run() {
             let allow_fake = std::env::var_os("MARQUEE_ALLOW_FAKE").is_some();
             let core = Arc::new(Core::open(data_dir, allow_fake).map_err(Box::new)?);
 
+            // CLI preparations may share this library while using its instance-local
+            // cache. Grant only artwork trees, never the whole data/home directory.
+            for art in [
+                core.paths.cache_dir.join("art"),
+                core.paths.data_dir.join("cache/art"),
+            ] {
+                std::fs::create_dir_all(&art)?;
+                app.asset_protocol_scope().allow_directory(art, true)?;
+            }
+
             // The desktop app is standalone by default. Set MARQUEE_WEB=1 (or MARQUEE_PORT)
             // to also serve this same library to a browser; `marquee run web` runs the web
             // UI without the app.

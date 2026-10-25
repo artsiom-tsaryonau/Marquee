@@ -697,9 +697,11 @@ class AppState {
     this.fetchingArt = true;
     try {
       await this.api.refreshArtwork(editionId);
+      this.applySnapshot(await this.api.snapshot());
     } catch (err) {
-      this.fetchingArt = false;
       this.notify((err as { message?: string }).message ?? 'Could not fetch covers');
+    } finally {
+      this.fetchingArt = false;
     }
   }
 
