@@ -5,6 +5,7 @@
   import type { StorageSnapshot } from '../api/contracts';
   import { bytes } from '../format';
   import Icon from './Icon.svelte';
+  import StorageMove from './StorageMove.svelte';
 
   const groups = [
     ['library', 'Games and library'], ['sources', 'Originals and acquisition'],
@@ -90,6 +91,7 @@
           {#if snapshot.bios_inbox}<button class="btn glass small" data-nav disabled={busy || loading || snapshot.scanning} onclick={() => folder('bios_inbox', true)}>Reset</button>{/if}</div>
       </div>
     </section>
+    <StorageMove onchange={() => void refresh()} />
     <nav class="filters" aria-label="Storage categories">
       <button data-nav class:on={filter === 'all'} aria-pressed={filter === 'all'} onclick={() => filter = 'all'}>All locations</button>
       {#each groups as [id, label]}<button data-nav class:on={filter === id} aria-pressed={filter === id} onclick={() => filter = id}>{label}</button>{/each}
@@ -121,7 +123,7 @@
         </section>
       {/if}
     {/each}
-    <aside class="move-note glass-panel"><h3>Moving existing files</h3><p>Keep compatibility links and manager receipts intact. The verified offline relocation tool supports reviewed source and ROM moves with recovery and rollback. Managed installations, profiles and streaming storage require a coordinated migration; their locations cannot be changed here yet.</p></aside>
+    <aside class="move-note glass-panel"><h3>Other storage moves</h3><p>The offline relocation tool supports reviewed source and ROM moves. Emulator profiles, firmware and streaming storage still require separate coordinated migrations. Keep their paths and existing compatibility links intact.</p></aside>
   {/if}
 </div>
 

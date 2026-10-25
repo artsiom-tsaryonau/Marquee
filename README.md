@@ -110,6 +110,8 @@ get covers and metadata.
 **Settings → Storage** now shows those locations and measures usage on demand.
 It also configures the collection folder for new-platform immediate imports and
 an additional BIOS input folder. See [storage controls and migration limits](docs/STORAGE_MANAGER.md).
+Managed installations can be moved on the same filesystem through a reviewed,
+exclusive workflow with receipt verification, interruption recovery and rollback.
 
 **Native streaming:** Wolf API controls are available through `marquee streaming
 --socket /absolute/path/wolf.sock` (inspect, pending, pair, unpair, stop). Native

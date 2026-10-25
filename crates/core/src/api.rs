@@ -36,6 +36,26 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
     let sink: Arc<dyn EventSink> = core.hub();
     match cmd {
         "storage_snapshot" => out(core.storage_snapshot()?),
+        "storage_move_status" => core.storage_move_status(),
+        "storage_move_review" => out(core.storage_move_start("review", &text(&args, "parent")?)?),
+        "storage_move_apply" => {
+            if !flag(&args, "confirmed")? {
+                return Err(AppError::new(
+                    "STORAGE_MOVE",
+                    "Confirm the reviewed installation move",
+                ));
+            }
+            out(core.storage_move_start("apply", &text(&args, "id")?)?)
+        }
+        "storage_move_rollback" => {
+            if !flag(&args, "confirmed")? {
+                return Err(AppError::new(
+                    "STORAGE_MOVE",
+                    "Confirm rollback of the installation move",
+                ));
+            }
+            out(core.storage_move_start("rollback", &text(&args, "id")?)?)
+        }
         "storage_scan" => out(core.storage_scan()?),
         "storage_set_folder" => {
             let path = match args.get("path") {

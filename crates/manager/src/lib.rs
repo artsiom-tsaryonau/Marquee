@@ -6,6 +6,7 @@ mod endpoint;
 mod migration;
 pub mod protocol;
 pub mod ps3_firmware;
+pub mod relocation;
 pub mod service;
 pub mod torrent;
 pub mod torrent_source;

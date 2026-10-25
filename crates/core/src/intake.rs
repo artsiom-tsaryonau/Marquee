@@ -41,9 +41,18 @@ impl Core {
     /// no root exists yet. Returns the path and whether the system is known.
     pub(crate) fn intake_root(&self, system: &str) -> Result<PathBuf> {
         let snap = self.snapshot()?;
+        // A prepared title's folder is receipt-owned, not a general destination
+        // for unrelated archive imports (including after its parent relocates).
+        let managed = fs::canonicalize(self.paths.data_dir.join("manager/installations")).ok();
+        let general_root = |root: &&crate::model::LibraryRoot| {
+            !managed.as_ref().is_some_and(|base| {
+                fs::canonicalize(&root.path).is_ok_and(|path| path.starts_with(base))
+            })
+        };
         if let Some(root) = snap
             .roots
             .iter()
+            .filter(general_root)
             .find(|r| r.system == system && r.path.is_dir())
         {
             return Ok(root.path.clone());
@@ -62,6 +71,7 @@ impl Core {
         let base = snap
             .roots
             .iter()
+            .filter(general_root)
             .find_map(|r| r.path.parent().map(Path::to_path_buf))
             .unwrap_or_else(|| self.paths.data_dir.join("roms"));
         let dir = base.join(system);
@@ -74,6 +84,9 @@ impl Core {
 
     /// Unpack one archive into the library. Does not rescan; call `scan` after.
     pub fn intake_archive(&self, archive: &Path, delete_source: bool) -> Result<IntakeReport> {
+        self.storage_move_ready()?;
+        let _storage_gate = self.headless_gate.lock().unwrap_or_else(|e| e.into_inner());
+        self.storage_move_ready()?;
         let report = |outcome, system: Option<String>, dest, files, message: String| IntakeReport {
             archive: archive.to_path_buf(),
             outcome,

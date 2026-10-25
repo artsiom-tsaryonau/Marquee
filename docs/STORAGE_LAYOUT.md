@@ -5,7 +5,8 @@ tool preserves existing library and receipt paths with compatibility links.
 The current manager, library and emulator paths remain authoritative; a unified
 artifact registry and complete per-category relocation remain future work.
 The [Storage settings screen](STORAGE_MANAGER.md) now provides locations, usage,
-a future-intake collection folder and an additional BIOS input folder.
+a future-intake collection folder, an additional BIOS input folder and reviewed
+same-filesystem managed-installation moves with recovery/rollback.
 
 Keep three independent lifecycles: original sources, playable installations,
 and mutable user data. Firmware originals have their own versioned vault;
@@ -184,9 +185,17 @@ test does not constitute a new gameplay or save-state acceptance test.
 The private recovery journal is `~/Games/Marquee/.storage/migration.json`.
 The source checkout retains ignored compatibility links, not second copies.
 Nothing was deleted. Keep those links for existing references. Program binaries,
-working firmware, saves, receipt-owned installations and torrent/streaming pilot
+working firmware, saves and torrent/streaming pilot
 data retain their existing paths. Their next migration needs category settings
 and coordinated owner shutdown/restart; portable package export is still separate.
+
+The subsequent manager-owned move relocated Vanquish's single 7,838,695,424-byte
+installation to `~/Games/Marquee/library/managed-installations`. The former
+`<data>/manager/installations` is retained as a journal-owned compatibility link.
+Receipt payloads, manager job IDs and all 858 library identities/paths were kept.
+The manager now resolves this physical root for new preparations. See
+[review, recovery and rollback](STORAGE_MANAGER.md#managed-installations);
+do not use the generic source relocation script to bypass manager ownership.
 
 See [manager ownership](MARQUEE_MANAGER.md),
 [torrent storage](TORRENTS.md), [console preparation](CONSOLE_PREPARATION.md) and

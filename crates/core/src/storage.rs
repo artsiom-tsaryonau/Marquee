@@ -170,7 +170,7 @@ impl Core {
         let mut locations = vec![
             location("database", "library", "Library database", self.paths.db_path(), "Game IDs, metadata, favorites and play history. Back up consistently with SQLite."),
             location("configuration", "library", "Configuration", self.paths.config_dir.clone(), "Contains private provider keys. Keep out of shared packages."),
-            location("installations", "library", "Managed installations", data.join("manager/installations"), "Receipt-owned game payloads. Keep this location until a coordinated manager migration is available."),
+            location("installations", "library", "Managed installations", data.join("manager/installations"), "Receipt-owned game payloads. Use the reviewed move controls; existing paths are preserved through a journal-owned link."),
             location("programs", "programs", "Emulator programs", data.join("runners"), "Keep each installed build with its libraries, resources and receipt."),
             location("bios-inbox", "firmware", "BIOS import inbox", data.join("bios-inbox"), "Inputs are copied into the appropriate emulator profile; this is not installed firmware."),
             location("ps1-bios", "firmware", "PlayStation BIOS", self.paths.duckstation_bios_dir(), "Working DuckStation BIOS files."),
@@ -478,5 +478,21 @@ mod tests {
         core.storage_set_folder("collection", collection.to_str())
             .unwrap();
         assert!(core.intake_root("nes").is_ok());
+    }
+
+    #[test]
+    fn loose_archive_intake_does_not_write_into_a_receipt_owned_title_folder() {
+        let temp = tempfile::tempdir().unwrap();
+        let core = Core::open_isolated(Some(temp.path().join("data")), false).unwrap();
+        let managed = core.paths.data_dir.join("manager/installations/title");
+        fs::create_dir_all(&managed).unwrap();
+        core.add_root("nes", managed.clone(), None).unwrap();
+        let collection = temp.path().join("collection");
+        fs::create_dir(&collection).unwrap();
+        core.storage_set_folder("collection", collection.to_str())
+            .unwrap();
+        let selected = core.intake_root("nes").unwrap();
+        assert_eq!(selected, collection.join("library/imported-roms/nes"));
+        assert_ne!(selected, managed);
     }
 }

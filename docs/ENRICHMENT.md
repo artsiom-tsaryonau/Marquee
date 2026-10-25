@@ -12,6 +12,14 @@ For the owner's current coverage audit and the on-disk locations to preserve,
 see [runtime files and existing-game metadata](RUNTIME_FILES.md#metadata-and-covers-for-existing-games).
 The 2026-10-25 gap-fill refresh added seven covers (14 total) and expanded fact
 records from six to 22 while preserving all 858 game identities and play history.
+The later audit found 182 cached official-name matches and 138 uncovered games
+whose provider fallback was excluded solely by the blanket `(World)` rule below.
+That is a known heuristic limitation: **World is a region label, not proof of
+homebrew**. Removing that rule alone can also confuse homebrew with same-name
+retail games. A reviewed platform/release-aware fallback and local game-cover
+selection remain follow-up work. Cached misses also delay ordinary retries for
+14 days; a selected-game refresh bypasses that backoff. Missing artwork does not
+mean a game is fake, or establish that no provider has information about it.
 
 `Fetch covers`, automatic refresh after scans, and `Core::refresh_artwork` use
 `crates/core/src/romart.rs` and `romfacts.rs`. Covers fill gaps without replacing

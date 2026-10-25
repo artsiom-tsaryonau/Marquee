@@ -54,6 +54,47 @@ impl Drop for Fixture {
 }
 
 #[test]
+fn restarted_manager_prepares_new_jobs_after_offline_installation_relocation() {
+    let fixture = Fixture::new();
+    let source = fixture.source(b"first game payload");
+    let job = fixture.client.inspect(&source, "genesis").unwrap();
+    fixture
+        .client
+        .start_job(&job.id, &job.review_token)
+        .unwrap();
+    fixture.wait(|| fixture.client.get(&job.id).unwrap().state == State::AwaitingLibrary);
+    let original = fixture.client.get(&job.id).unwrap().receipt.unwrap();
+    fixture
+        .client
+        .acknowledge(
+            &job.id,
+            &original.fingerprint().unwrap(),
+            vec!["original".into()],
+        )
+        .unwrap();
+    fixture.client.stop().unwrap();
+    fixture.wait(|| !fixture.client.status().unwrap().running);
+    let parent = fixture.temp.path().join("relocated");
+    fs::create_dir(&parent).unwrap();
+    let owner = marquee_manager::relocation::Offline::acquire(fixture.client.data_dir()).unwrap();
+    let review = owner.review(&parent).unwrap();
+    owner.apply(&review.id).unwrap();
+    drop(owner);
+    fixture.client.start_manager().unwrap();
+    original.verify(&original.destination).unwrap();
+    let next_source = fixture.source(b"second game payload");
+    let next = fixture.client.inspect(&next_source, "genesis").unwrap();
+    assert!(next.destination.starts_with(&review.destination));
+    fixture
+        .client
+        .start_job(&next.id, &next.review_token)
+        .unwrap();
+    fixture.wait(|| fixture.client.get(&next.id).unwrap().state == State::AwaitingLibrary);
+    let receipt = fixture.client.get(&next.id).unwrap().receipt.unwrap();
+    receipt.verify(&receipt.destination).unwrap();
+}
+
+#[test]
 fn single_owner_private_socket_protocol_rejection_and_clean_stop() {
     let fixture = Fixture::new();
     assert!(!fixture.client.status().unwrap().running);

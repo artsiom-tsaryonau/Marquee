@@ -100,7 +100,7 @@ bridge; legacy JSON remains until explicit cutover.
   advertises snapshot polling; event replay and active preparation cancellation are
   unsupported. v5 adds isolated PS3 firmware review/start/status operations;
   v4 torrent provenance remains intact. Browser cancellation is a request/acknowledgement flow. The existing browser/native-host protocol is still a separate bridge.
-- Job state/receipts use private `manager/jobs.db` schema 4; the worker never opens
+- Job state/receipts use private `manager/jobs.db` schema 4 (schema 5 after an installation relocation retires older writers); the worker never opens
   `library.db` or holds the library's instance lease. The launcher transactionally
   imports receipts into library schema 6 and sends a fingerprint-bound acknowledgement.
   Failed/lost acknowledgements remain replayable. The active frontend reconciles

@@ -41,6 +41,7 @@ pub mod sessions;
 pub mod source_builds;
 pub mod steam;
 pub mod storage;
+mod storage_moves;
 pub mod streaming;
 pub mod transfer;
 pub mod wanted;
@@ -71,6 +72,7 @@ pub struct Core {
     pub(crate) headless_gate: Mutex<()>,
     pub streaming_controls: Arc<streaming::controls::Manager>,
     pub(crate) storage: Mutex<storage::ScanState>,
+    pub(crate) storage_moves: Mutex<storage_moves::MoveState>,
     pub(crate) transfers: transfer::Transfers,
     pub(crate) preparation: marquee_manager::Client,
 }
@@ -93,6 +95,7 @@ impl Core {
         let db = Db::open(&paths)?;
         let core = Self {
             storage: Mutex::new(storage::ScanState::default()),
+            storage_moves: Mutex::new(storage_moves::MoveState::default()),
             source_builds: source_builds::Manager::default(),
             headless: Mutex::new(streaming::headless::State::default()),
             headless_gate: Mutex::new(()),
@@ -162,6 +165,9 @@ impl Core {
         root_id: Option<&str>,
         sink: Option<Arc<dyn EventSink>>,
     ) -> Result<ScanReport> {
+        self.storage_move_ready()?;
+        let _storage_gate = self.headless_gate.lock().unwrap_or_else(|e| e.into_inner());
+        self.storage_move_ready()?;
         if let Some(id) = root_id {
             if let Some(sink) = &sink {
                 sink.emit(CoreEvent::ScanStarted {
@@ -270,7 +276,9 @@ impl Core {
         extra_args: &[String],
         sink: Arc<dyn EventSink>,
     ) -> Result<Session> {
+        self.storage_move_ready()?;
         let _headless_gate = self.headless_gate.lock().unwrap_or_else(|e| e.into_inner());
+        self.storage_move_ready()?;
         if self.headless_active()? {
             return Err(AppError::new(
                 "LAUNCH_BUSY",
@@ -564,6 +572,9 @@ impl Core {
     }
 
     pub fn launch_port(&self, id: &str) -> Result<()> {
+        self.storage_move_ready()?;
+        let _storage_gate = self.headless_gate.lock().unwrap_or_else(|e| e.into_inner());
+        self.storage_move_ready()?;
         if self
             .list_ports()?
             .iter()

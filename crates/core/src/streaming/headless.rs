@@ -418,7 +418,9 @@ impl Core {
         )
     }
     pub fn headless_launch(self: &Arc<Self>, id: &str) -> Result<()> {
+        self.storage_move_ready()?;
         let _gate = self.headless_gate.lock().unwrap_or_else(|e| e.into_inner());
+        self.storage_move_ready()?;
         if self.with_db(|db| db.running_session())?.is_some() {
             return Err(err("Close the local game before starting a stream"));
         }

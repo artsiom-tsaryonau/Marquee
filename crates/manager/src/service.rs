@@ -168,7 +168,7 @@ impl Manager {
         conn.busy_timeout(std::time::Duration::from_secs(5))?;
         conn.pragma_update(None, "synchronous", "FULL")?;
         let version: i64 = conn.query_row("PRAGMA user_version", [], |r| r.get(0))?;
-        if version > 4 {
+        if version > 5 {
             return Err(error(
                 "PREPARATION_VERSION",
                 "Manager database is newer than this build",
@@ -320,7 +320,9 @@ impl Manager {
             serde_json::to_vec(&(RECIPE, &source, &hash, &plan))?
         };
         let id = format!("{:x}", Sha256::digest(identity));
-        let destination = self.dir.join("installations").join(&id);
+        let destination =
+            crate::relocation::installation_root(self.dir.parent().expect("manager parent"))?
+                .join(&id);
         let review_token = format!(
             "{:x}",
             Sha256::digest(serde_json::to_vec(&(&id, &destination, &plan))?)
@@ -459,7 +461,14 @@ impl Manager {
             .parent()
             .ok_or_else(|| error("PREPARATION_UNSAFE", "Invalid destination"))?
             .to_path_buf();
-        private_dir(&parent)?;
+        let installation_root =
+            crate::relocation::installation_root(self.dir.parent().expect("manager parent"))?;
+        if fs::canonicalize(&parent)? != installation_root {
+            return Err(error(
+                "PREPARATION_UNSAFE",
+                "Unexpected installation parent",
+            ));
+        }
         let staging = self.staging(job);
         if let Some(receipt) = &job.receipt {
             // Receipt persisted before promotion: a crash on either side of the

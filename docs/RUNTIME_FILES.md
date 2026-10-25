@@ -47,7 +47,7 @@ native app does not require a Vite server.
 | --- | --- |
 | Retained original inputs | `~/Games/Marquee/sources/imported/<platform>/` |
 | Imported ROM collection | `~/Games/Marquee/library/imported-roms/<platform>/` |
-| Manager-prepared installations | `<data>/manager/installations/<receipt ID>/` |
+| Manager-prepared installations | `~/Games/Marquee/library/managed-installations/<receipt ID>/`; `<data>/manager/installations` remains a required compatibility link. |
 | Other existing game files | Some registered games still use `<data>/roms/` or pilot directories; the database paths remain authoritative. |
 | Relocation inventory and recovery | `~/Games/Marquee/.storage/migration.json` |
 
@@ -56,6 +56,10 @@ existing library paths, receipts and launch manifests can still use them.
 They do not represent extra payload copies. Do not remove other pilot folders
 based on their names: some contain the only game data, provenance or configured
 runtime for a feature. See [storage migration](STORAGE_LAYOUT.md).
+The manager's installation location record and recovery journals under
+`<data>/manager/installation-moves/` are also required. Use
+[Storage's reviewed move controls](STORAGE_MANAGER.md#managed-installations)
+instead of renaming installation folders manually.
 
 For an individual game, keep the whole format's dependency set:
 

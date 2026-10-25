@@ -16,6 +16,15 @@ export interface StorageSnapshot {
   collection_root: string | null; bios_inbox: string | null;
   locations: StorageLocation[]; scanning: boolean; measured_at: string | null;
 }
+export interface StorageMovePlan {
+  id: string; stage: string; source: string; destination: string; bytes: number;
+  files: number; receipt_ids: string[]; free_bytes: number | null;
+}
+export interface StorageMoveStatus {
+  running: boolean; action: string | null; error: AppError | null;
+  plan: StorageMovePlan | null; games: {id: string; title: string}[];
+  manager_running: boolean; manager_stopping: boolean;
+}
 
 export interface PurpleStatus {
   installed: boolean;
@@ -430,6 +439,10 @@ export interface YoutubeSource { id:string; title:string; uploader:string; url:s
 export interface YoutubePlaylist { title:string; uploader:string; url:string; tracks:YoutubeSource[]; truncated:boolean; }
 export interface MetadataReview {token:string;provider:string;candidates:{id:number;title:string;system?:string;facts?:{year?:number;genre?:string;players?:number;description?:string}}[];}
 export interface LibraryApi {
+  storageMoveStatus(): Promise<StorageMoveStatus>;
+  storageMoveReview(parent: string): Promise<void>;
+  storageMoveApply(id: string): Promise<void>;
+  storageMoveRollback(id: string): Promise<void>;
   storageSnapshot(): Promise<StorageSnapshot>;
   storageScan(): Promise<void>;
   storageSetFolder(kind: 'collection' | 'bios_inbox', path: string | null): Promise<void>;
