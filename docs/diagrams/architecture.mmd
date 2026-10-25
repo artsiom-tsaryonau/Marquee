@@ -1,8 +1,11 @@
 flowchart LR
-  UI[Desktop and browser] --> Core[Rust core and API]
-  Core --> Manager[Manager preparation jobs]
+  UI[Tauri 2 / Svelte 5 / TypeScript] --> Core[Rust core / SQLite]
+  Quiver[Quiver app-list discovery] --> Core
+  Core --> Manager[Rust manager / librqbit]
   Manager --> Core
-  Core --> Library[Library and metadata]
-  Core --> Local[Local emulator or port]
-  Core --> Private[Headless emulator in Wolf]
-  Private --> Viewer[Streaming viewer]
+  Core --> Library[libretro / TheGamesDB / SteamGridDB]
+  Core --> Local[PCSX2 / RPCS3 / Mesen / other runtimes]
+  Core --> Private[Wolf / Gamescope / XWayland]
+  Private --> Viewer[Moonlight Qt viewer]
+  Core -.-> Alternatives[Sunshine / Apollo planned]
+  Alternatives -.-> Viewer

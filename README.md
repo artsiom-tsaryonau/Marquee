@@ -30,6 +30,54 @@ Epic/GOG installation, portable package export/import and library-wide streaming
 for every runtime remain unfinished. PS4/PS5 tool entries do not establish playable
 game compatibility. See the [roadmap](docs/ROADMAP.md) and [documentation index](docs/README.md).
 
+## Technologies and tools
+
+| Area | Technologies | Role in Marquee |
+| --- | --- | --- |
+| Languages | **Rust**, **TypeScript / JavaScript**, **HTML / CSS**, **SQL**, **Python**, **Bash** | Core/CLI/manager; UI and styling; database schemas; media/build/streaming helpers; shell setup and runtime wrappers |
+| Desktop and web UI | **Tauri 2**, **Svelte 5**, **Vite**, **WebKitGTK** | Native Linux shell and shared browser interface |
+| Data and jobs | **SQLite / rusqlite**, JSON manifests, SHA-256, **librqbit**, UnRAR | Library/job state, verified preparation receipts and torrent transport |
+| Builds and isolation | **Cargo**, **Node.js**, **pnpm**, rootless **Podman** | Application builds, selected source-built runtimes and isolated streaming hosts |
+| Streaming host | **Wolf**, **GStreamer**, **gst-wayland-display**, **PulseAudio** | Private virtual desktops, game audio, video encoding and transport |
+| Graphics bridge | **Wayland**, **Gamescope**, **XWayland**, **SDL**, **Vulkan**, NVIDIA **NVENC** | Native/private display paths, X11 emulator compatibility and hardware-assisted streaming where supported |
+| Streaming client | **Moonlight Qt** | Managed reference viewer: video/audio playback and forwarded keyboard/mouse/controller input; physical-controller acceptance is still pending |
+| Discovery | **Quiver** app-list conventions | Imported discovery data and reviewed native-port recipes. Upstream Quiver uses **C# / .NET / Avalonia**; Marquee does not embed its application |
+| Artwork and facts | **libretro-database / thumbnails**, **TheGamesDB**, **SteamGridDB**, **ScreenScraper** | Cached artwork and metadata, with provider-specific keys, matching and release review |
+| Soundtracks and video | **yt-dlp**, **FFmpeg**, browser/native media playback | YouTube discovery, reviewed import experiments and supported media preparation; durable acquisition coverage remains incomplete |
+| Store ecosystem | **Steam**, **Legendary**, **GOG / gogdl**, **umu-launcher**, **Proton / GE-Proton** | Steam inventory/official-client launch and the store/compatibility integration track. **Lutris / Heroic** are optional, not required backends |
+| Diagrams | Aircloud Creative Studio **ELK / elkjs** | Automatic node placement and edge routing for the architecture SVG |
+
+**Sunshine and Apollo are planned alternative streaming hosts**, not currently
+active Marquee backends. Wolf supplies the implemented Linux private-display
+path; Moonlight is the receiving client. **Jellyfin** is a planned optional media
+connector; Marquee's own hosted media-library direction is tracked separately.
+See [streaming roles](docs/STREAMING.md#project-roles-and-backend-choice),
+[Quiver integration](docs/QUIVER_INTEGRATION.md) and [media hosting](docs/MEDIA_LIBRARY.md).
+
+## Emulators and native runtimes
+
+Catalogue presence, a library launch adapter and a successful game test are
+separate levels of support. The current emulator names and roles are:
+
+| Systems | Emulator | Current role |
+| --- | --- | --- |
+| PlayStation / PlayStation 2 | **DuckStation / PCSX2** | Library launch adapters |
+| PlayStation 3 | **RPCS3** | Verified disc-ISO launch and managed firmware setup; God of War III menu/audio/input accepted |
+| Xbox 360 | **Xenia Canary** | Verified ISO launch; initial native headless adapter |
+| Genesis / Mega Drive | **BlastEm** | Library launch and initial native headless adapter |
+| NES, SNES, GB, GBC, PC Engine | **Mesen** | Library launch adapters; NES/SNES local acceptance recorded |
+| GB / GBC; GBA tool | **mGBA** | Alternative GB/GBC runner and managed source-build tool; no general GBA library adapter yet |
+| Nintendo DS / Nintendo 64 | **melonDS / Rosalie's Mupen GUI (RMG)** | Library launch adapters |
+| Dreamcast / Neo Geo | **Flycast / FinalBurn Neo (FBNeo)** | Library launch adapters; firmware and matching game-set requirements apply |
+| PSP / Wii U / Nintendo 3DS | **PPSSPP / Cemu / Azahar** | Managed tools; library adapters and live acceptance remain separate work |
+| Original Xbox / PS4 / PS5 research | **xemu / shadPS4 / KytyPS5** | Experimental or setup-only tools; not validated playable library integrations |
+
+Managed native-engine recipes include **Shipwright / Ship of Harkinian**,
+**2Ship2Harkinian**, **Zelda 64: Recompiled**, **sm64coopdx**, **Fallout 2 Community
+Edition** and **UZDoom**. Installing an engine does not supply its required original
+game data. See [emulators](docs/EMULATORS.md), [console preparation](docs/CONSOLE_PREPARATION.md)
+and [native-port discovery](docs/QUIVER_INTEGRATION.md).
+
 ## Architecture
 
 ![Marquee architecture: one library with local and private-display launch paths](docs/diagrams/architecture.svg)
