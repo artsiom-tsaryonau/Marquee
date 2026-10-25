@@ -411,3 +411,18 @@ The per-game emulator selector now has one row per runner and a `(default)`
 marker, styled popup, unavailable selection visibility and keyboard navigation.
 Prepared-game registration triggers cover/facts lookup. Desktop and browser
 artwork access now includes the instance-local cache used by CLI preparation.
+
+
+### Native headless launch and README overview (2026-10-25)
+
+- Implemented shared desktop/browser headless status, launch and confirmed stop
+  APIs; library Stream action for Genesis/BlastEm and Xbox 360/Xenia.
+- Added owned rootless host image preparation, immutable adapter-only launch
+  plans, read-only selected media, separate per-game streaming profiles, reconnect
+  and busy/ownership guards. Existing reviewed backend setup/pairing is required.
+- Added Streaming-screen host status and confirmed cleanup for idle/active owned
+  hosts. Other emulator/port adapters, streamed playtime and broader recovery
+  remain open; PS4/PS5 compatibility gates are unchanged.
+- Replaced the outdated README opening with a brief current feature list and an
+  architecture SVG generated with Aircloud Creative Studio's ELK layout engine.
+  Included editable diagram source, layout JSON and regeneration script.

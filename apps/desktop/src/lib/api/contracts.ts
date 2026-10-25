@@ -74,6 +74,12 @@ export interface MediaFile {
   skip_reason: string | null;
 }
 
+export interface HeadlessStatus {
+  supported: boolean; ready: boolean; reason: string | null; busy: boolean;
+  error: AppError | null; host_running: boolean; game_running: boolean;
+  active_edition_id: string | null; app_id: string | null; host_error: string | null;
+}
+
 export interface Runner {
   id: string;
   kind: 'pcsx2' | 'duckstation' | 'emulator' | 'fake';
@@ -355,6 +361,7 @@ export interface StreamingConnection { data_dir: string; socket: string }
 export interface StreamingApp { id: string; title: string; support_hdr: boolean; start_virtual_compositor: boolean; start_audio_server: boolean }
 export interface StreamingSession { session_id: string; app_id: string | null; client_ip: string; video_width: number; video_height: number; video_refresh_rate: number; audio_channel_count: number }
 export interface StreamingState {
+  headless?: HeadlessStatus;
   connection: StreamingConnection;
   host: { apps: StreamingApp[]; clients: { client_id: string }[]; sessions: StreamingSession[] } | null;
   host_error: AppError | null;
@@ -447,6 +454,9 @@ export interface LibraryApi {
   pickMusic(): Promise<string[]>;
   pickMusicCover(): Promise<string | null>;
   musicSetCover(albumId: string, path: string | null): Promise<void>;
+  headlessStatus(editionId?: string): Promise<HeadlessStatus>;
+  headlessLaunch(editionId: string): Promise<void>;
+  headlessStop(): Promise<void>;
   streamingState(): Promise<StreamingState>;
   streamingSaveConnection(connection: StreamingConnection): Promise<void>;
   streamingOpenViewer(appId: string): Promise<void>;

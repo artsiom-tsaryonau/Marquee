@@ -66,6 +66,8 @@ pub struct Core {
     keys: keys::KeyStore,
     pub purple: Arc<purple::Manager>,
     pub source_builds: source_builds::Manager,
+    pub(crate) headless: Mutex<streaming::headless::State>,
+    pub(crate) headless_gate: Mutex<()>,
     pub streaming_controls: Arc<streaming::controls::Manager>,
     pub(crate) transfers: transfer::Transfers,
     pub(crate) preparation: marquee_manager::Client,
@@ -89,6 +91,8 @@ impl Core {
         let db = Db::open(&paths)?;
         let core = Self {
             source_builds: source_builds::Manager::default(),
+            headless: Mutex::new(streaming::headless::State::default()),
+            headless_gate: Mutex::new(()),
             streaming_controls: Arc::new(streaming::controls::Manager::default()),
             preparation: marquee_manager::Client::for_library_owner(&paths.data_dir),
             transfers: transfer::Transfers::new(&paths.data_dir),
@@ -263,6 +267,13 @@ impl Core {
         extra_args: &[String],
         sink: Arc<dyn EventSink>,
     ) -> Result<Session> {
+        let _headless_gate = self.headless_gate.lock().unwrap_or_else(|e| e.into_inner());
+        if self.headless_active()? {
+            return Err(AppError::new(
+                "LAUNCH_BUSY",
+                "End the streamed game before starting a local game",
+            ));
+        }
         self.prepare_ps3_launch(edition_id)?;
         // Hands-off setup: pick up any BIOS dropped into the inbox folder.
         let inbox = self

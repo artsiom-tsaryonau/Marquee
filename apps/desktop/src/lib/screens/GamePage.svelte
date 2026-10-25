@@ -14,9 +14,11 @@
   import Row from '../components/Row.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
   import EmulatorMenu from '../components/EmulatorMenu.svelte';
+  import HeadlessLaunch from '../components/HeadlessLaunch.svelte';
   import CatalogueDetails from '../components/CatalogueDetails.svelte';
   import MetadataSearch from '../components/MetadataSearch.svelte';
   import GameMediaHub from '../components/GameMediaHub.svelte';
+  let headlessActive = $state(false);
   let tab = $state<GameDetailTab>('overview');
 
   const g = $derived(app.current ?? app.hero);
@@ -138,13 +140,14 @@
         {#if g.platform === 'ps2'}<InstallMenu tone="primary" />
         {:else}<button class="btn primary" data-nav onclick={() => app.go('tools')}><Icon name="settings" /> Set up {g.platform === 'ps1' ? 'DuckStation' : g.platform === 'genesis' ? 'BlastEm' : g.platform === 'ds' ? 'melonDS' : g.platform === 'neogeo' ? 'FinalBurn Neo' : 'emulator'}</button>{/if}
       {:else}
-        <button class="btn primary" class:game-play={playLabel === 'Play' || playLabel === 'Open port'} data-nav disabled={app.runnerSelectionBusy || app.runnerSelectionUnconfirmed} onclick={primary}>
+        <button class="btn primary" class:game-play={playLabel === 'Play' || playLabel === 'Open port'} data-nav disabled={app.runnerSelectionBusy || app.runnerSelectionUnconfirmed || headlessActive} onclick={primary}>
           <Icon name={playReady ? 'play' : 'folder'} size={22} /> {playLabel}
         </button>
       {/if}
       {#if offline && !g.wanted && !g.launchPending}
-        <EmulatorMenu runners={runnerChoices} defaultId={app.runnerFor(g.platform)?.id} value={g.runnerOverride} disabled={app.runnerSelectionBusy || !!app.launching || !!app.running} onchange={id => app.chooseGameRunner(g.id, id)} />
+        <EmulatorMenu runners={runnerChoices} defaultId={app.runnerFor(g.platform)?.id} value={g.runnerOverride} disabled={app.runnerSelectionBusy || !!app.launching || !!app.running || headlessActive} onchange={id => app.chooseGameRunner(g.id, id)} />
       {/if}
+      {#if offline && !g.wanted && !g.launchPending}<HeadlessLaunch editionId={g.id} runnerId={g.runnerOverride ?? launchVia} disabled={app.runnerSelectionBusy || app.runnerSelectionUnconfirmed || !!app.running || !!app.launching} onactive={value => headlessActive = value} />{/if}
       {#if g.portStatus === 'update'}
         <button class="btn glass" data-nav onclick={() => port && app.installPort(port)}><Icon name="refresh" /> Update</button>
       {/if}
@@ -257,8 +260,6 @@
 {/if}
 
 <style>
-  @media (max-width: 650px) {
-  }
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .page.music-view { padding-bottom: 0; } .music-view .body { padding-bottom: 0; }
   .library-identifiers { margin-top: 24px; color: var(--text-dim); } .library-identifiers summary { cursor: pointer; padding: 10px 0; }
@@ -280,7 +281,7 @@
   .feature-summary dt { color: var(--text-dim); } .feature-summary dd { margin: 0; color: var(--text-soft); overflow-wrap: anywhere; }
   .genre-tag { display: inline-block; margin-top: 20px; padding: 5px 9px; border-radius: 4px; background: var(--field); color: var(--text-soft); font-size: 11px; }
   .launch-toolbar { margin: 0 var(--gutter) 12px; padding: 18px 20px; display: flex; align-items: center; flex-wrap: wrap; gap: 20px 32px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
-  .launch-toolbar .actions { margin: 0; } .launch-toolbar .play-strip { flex: 1; padding: 0; border: 0; background: transparent; gap: 18px 28px; }
+  .launch-toolbar .actions { margin: 0; } .launch-toolbar .play-strip { flex: 1 1 460px; padding: 0; border: 0; background: transparent; gap: 18px 28px; }
   @media(max-width:850px) { .feature-layout { grid-template-columns: 1fr; } .feature-summary { padding: 4px 0 0; } .summary-cover { display: none; } .feature-summary dl { grid-template-columns: 100px minmax(0,1fr); } }
 
   .play-strip { display: flex; align-items: center; flex-wrap: wrap; gap: 20px 40px; padding: 20px var(--gutter); background: var(--surface); border-block: 1px solid var(--line); }

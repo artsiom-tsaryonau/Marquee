@@ -1,0 +1,8 @@
+flowchart LR
+  UI[Desktop and browser] --> Core[Rust core and API]
+  Core --> Manager[Manager preparation jobs]
+  Manager --> Core
+  Core --> Library[Library and metadata]
+  Core --> Local[Local emulator or port]
+  Core --> Private[Headless emulator in Wolf]
+  Private --> Viewer[Streaming viewer]

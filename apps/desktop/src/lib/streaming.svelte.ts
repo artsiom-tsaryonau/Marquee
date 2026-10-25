@@ -31,10 +31,10 @@ export class StreamingControls {
     await this.refresh();
     if (!this.disposed && error) this.error = error;
   }
-  async confirm(kind: 'end' | 'revoke', id: string) {
+  async confirm(kind: 'end' | 'revoke' | 'headless', id: string) {
     const key = `${kind}:${id}`;
     if (this.busy || this.disposed) return;
     if (this.confirmation !== key) { this.confirmation = key; return; }
-    await this.act(() => kind === 'end' ? this.api.streamingEndGame(id) : this.api.streamingRevoke(id));
+    await this.act(() => kind === 'end' ? this.api.streamingEndGame(id) : kind === 'headless' ? this.api.headlessStop() : this.api.streamingRevoke(id));
   }
 }

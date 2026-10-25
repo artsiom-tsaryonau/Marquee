@@ -150,6 +150,17 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
         "music_remove_track" => {
             out(core.music_remove_track(&text(&args, "album_id")?, &text(&args, "track_id")?)?)
         }
+        "headless_status" => core.headless_status(maybe(&args, "edition_id").as_deref()),
+        "headless_launch" => out(core.headless_launch(&text(&args, "edition_id")?)?),
+        "headless_stop" => {
+            if args.get("confirmed").and_then(Value::as_bool) != Some(true) {
+                return Err(AppError::new(
+                    "STREAMING_CONFIRM",
+                    "Confirm stopping the headless game; unsaved progress can be lost",
+                ));
+            }
+            out(core.headless_stop()?)
+        }
         "streaming_state" => core.streaming_state(),
         "streaming_save_connection" => {
             out(core.streaming_save_connection(serde_json::from_value(args)?)?)

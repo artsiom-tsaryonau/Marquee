@@ -1,0 +1,6 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+COPY library-entrypoint.py library-game.py /opt/marquee-wolf/
+RUN chmod 644 /opt/marquee-wolf/library-entrypoint.py /opt/marquee-wolf/library-game.py
+LABEL io.marquee.integration="library-stream-v1"
+ENTRYPOINT ["python3", "/opt/marquee-wolf/library-entrypoint.py"]

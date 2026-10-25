@@ -45,8 +45,46 @@ pilot-specific game slots with library-owned launch plans: select edition + save
 runner, validate media/firmware, acquire the profile writer lease, start/reuse the
 owned backend, publish one app, open/reconnect the viewer, and reconcile exit.
 Expose Local / Stream beside Play only when the selected runner has an available
-streaming adapter. Existing streaming UI lists host-configured apps today; this
-library-wide orchestration is not implemented by the pilot.
+streaming adapter. The initial library-owned orchestration below now supports BlastEm and Xenia.
+Other runner families remain pending.
+
+## Native library headless mode
+
+Game pages now expose **Stream** for Genesis/BlastEm and Xbox 360/Xenia when the
+selected runner has a reviewed adapter. **Streaming setup** opens the Streaming
+screen when dependencies are missing. The API shared by desktop and browser is
+`headless_status`, `headless_launch` and confirmed `headless_stop`.
+
+The selected streaming folder must already contain the reviewed Wolf identity,
+pairing, reference viewer and pinned Xenia/Sonic base image. Initial backend build
+and pairing remain prerequisites; this cut does not turn an arbitrary fresh host
+into a configured streaming server. Configure that folder and its
+`streaming/wolf/state/runtime/wolf.sock` in Streaming → Advanced connection.
+
+Marquee resolves the edition's saved emulator choice, revalidates the media,
+builds/caches the small library host image, publishes an immutable launch plan,
+starts its owned rootless container, and opens the viewer. It detects the render
+node, preferring NVIDIA where present. Only the selected game file is mounted,
+read-only. The plan names an allowlisted adapter; it cannot supply shell commands,
+executables or arbitrary arguments. Custom local emulator arguments require a
+separately reviewed streaming profile and are refused by this first adapter.
+
+Streaming profiles persist under
+`<streaming folder>/streaming/library/profiles/<library key>/<adapter>/<edition>`.
+They remain separate from local profiles and other games. Closing the viewer
+retains the host game; **Reconnect stream** attaches to it. Changing game or
+emulator while a streamed game is running is refused. Local Play is blocked until
+the streamed game ends. **Stop stream** requires confirmation; the Streaming
+screen also provides **Stop headless host**, including for an idle host.
+
+Container labels and ownership receipts bind the host to one library and launch
+plan. Marquee refuses to adopt/stop another container, refuses unrelated Wolf
+catalogues, and keeps the host configuration/pairing when it retires the old fixed
+Sonic/Vanquish slots. The first replacement saves a configuration backup.
+Reopening Marquee can inspect the existing owned host and reconnect. Streamed
+sessions do not yet contribute library playtime/history, and full session recovery
+is limited to the owned container and its receipt. Saves/checkpoints remain
+emulator- and title-specific; a working transport is not full gameplay acceptance.
 
 ## Xenia acceptance pilot
 
@@ -114,3 +152,20 @@ validation remain separate gates.
 Browser verification confirmed Vanquish's cover actually decoded, its description
 appeared, one default emulator row was present, Escape returned focus to the
 trigger, and the 390 px page had no overflow or JavaScript errors.
+
+## Native launch verification
+
+On the Fedora/RTX 5090 host, the native API prepared its host image, launched the
+registered Vanquish ISO, and the owner confirmed video, audio and keyboard
+controls. Disconnect/reconnect retained Xenia host PID 1315233. A local Play
+request during that session was refused. Confirmed headless stop removed the
+owned host; the next launch switched to the library's Sonic 2/BlastEm entry.
+BlastEm created its private window and the receiver received video/audio packets.
+Its HOME-based configuration and save directories were corrected to the persistent
+per-game profile, with no save-directory error on the final launch. New native
+Sonic gameplay/save acceptance was not claimed from transport logs alone.
+
+Browser verification checked the Stream control, exclusion of another active
+game, owned-host stop control, and the 390 px Streaming page without overflow or
+JavaScript errors. The README diagram was generated through Aircloud's ELK engine,
+checked for box overlaps and rendered for visual inspection.

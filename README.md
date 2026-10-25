@@ -1,20 +1,53 @@
 # Marquee
 
-One console-style launcher for Fedora/Linux for your Steam, Epic, GOG, emulated, and native-port games. Browse one library with a mouse, keyboard, or controller, then choose an edition and a way to run it.
+A Fedora/Linux game library and launcher with managed emulators, native ports,
+game media and private-display streaming. The desktop app and authenticated
+browser UI share one Rust core and library.
 
-**Product direction (2026-10-22):** Marquee is the library and launcher. A hidden local **`marquee-manager`** owns custom downloads, torrents, source artifacts and preparation/install jobs, with progress and review in Marquee. Durable local-archive preparation, torrent history and the browser-job bridge run in that background process and continue after the launcher closes; the launcher registers completed receipts when it reconnects. A second full application is not required. Steam retains its official client; Epic uses Legendary and GOG a direct adapter plus gogdl, coordinated through store-specific contracts. Non-Steam runtime setup uses supported managed umu/Proton recipes. Lutris/Heroic remain optional. See the [manager architecture and implementation plan](docs/MARQUEE_MANAGER.md).
+## Features
 
-**Next implementation order:** remaining torrent/browser live-provider and package gates → console recipes → stores. Direct stores retain Steam → compatibility/Epic → GOG order after that foundation. Read-only [Steam inventory](docs/STORE_INTEGRATION.md#steam-inventory-implementation) already exists and may continue independently. See the [roadmap](docs/ROADMAP.md), [manager gates](docs/MARQUEE_MANAGER.md#implementation-sequence-and-gates), and [store handoff](docs/STORE_INTEGRATION.md).
+- **Unified library:** platform shelves, search, favourites, editions, play history,
+  and a per-game emulator selector with a clear platform default.
+- **Managed emulation:** supported console adapters, pinned runtime installs/source
+  builds, BIOS/firmware setup and separate settings/save folders. PS3 and Xbox 360
+  have direct verified-ISO launch adapters; compatibility remains title-specific.
+- **Downloads and preparation:** background manager jobs for reviewed archives,
+  torrent transport and browser-assisted downloads, with resumable history and
+  verified installation receipts.
+- **Native ports and discovery:** managed port/recomp recipes, local Quiver app-list
+  import and a link to its community catalogue. Required original assets remain
+  part of each recipe's setup.
+- **Artwork and metadata:** cached covers and game facts, provider search with
+  release review, and automatic enrichment after supported imports.
+- **Game media:** linked soundtracks, a music player, image/video collections and
+  reviewed YouTube/yt-dlp workflows.
+- **Headless streaming:** private display/audio through Wolf and a managed viewer.
+  Library Stream launches begin with BlastEm and Xenia; other runners need their
+  own adapters and acceptance. Streamed saves are separate from local profiles.
 
-**Current working tree:** Rust core/CLI, Tauri/Svelte desktop and shared browser surface; PS2/PCSX2, PS1/DuckStation slice, serial covers, session/correction work, five managed native-port recipes, unified-library UI, external launcher shortcuts, and a legacy read-only Lutris bridge. A narrow [Purple for Aion 2](docs/PURPLE.md) integration now automates its umu/GE-Proton setup and launcher opening; actual Purple/Aion 2 Linux compatibility remains unverified. Direct Steam/Epic/GOG integrations and general Windows-app installation are not implemented end to end. Other “Add a Windows app” recipes remain demo-only. Real emulator launch/exit acceptance is tracked in [PS2](docs/PS2.md) and [PS1](docs/PS1.md); demo/fake-runner tests do not close those gates. Existing Lutris cache projection does not count as a direct store connection.
+Steam has read-only inventory and launches through its official client. Direct
+Epic/GOG installation, portable package export/import and library-wide streaming
+for every runtime remain unfinished. PS4/PS5 tool entries do not establish playable
+game compatibility. See the [roadmap](docs/ROADMAP.md) and [documentation index](docs/README.md).
 
-**Emulation and metadata:** PS1/PS2 disc adapters are joined by Nintendo DS/melonDS, Genesis/BlastEm and Neo Geo/FinalBurn Neo library adapters. melonDS, BlastEm, FBNeo and mGBA have pinned local source recipes using rootless Podman. ZIP/7z/RAR [archive intake](docs/INTAKE.md) extracts cartridges/discs and preserves arcade sets. BIOS import/list/removal remains available for PS1/PS2. Live checks reached NFS Underground's PS2 executable, Pokémon Platino's DS intro and Streets of Rage 2's Genesis intro; full controller/save acceptance remains open. The supplied incomplete Neo Geo set is blocked with a diagnostic. See [emulator management](docs/EMULATORS.md).
+## Architecture
 
-Saved Vimm catalogue records retain [field provenance and release identity](docs/CATALOGUE_METADATA.md). Optional [ROM enrichment](docs/ENRICHMENT.md#implemented-artwork-and-facts) supplies covers and game facts from libretro and configured providers. Title-based enrichment is not a verified release mapping, and artwork credit does not establish shared provider IDs. General field overrides and verified cross-provider mappings remain follow-up work.
+![Marquee architecture: one library with local and private-display launch paths](docs/diagrams/architecture.svg)
 
-Documentation navigation: [docs index](docs/README.md). Broader platform/port ideas remain in the [expansion catalogue](docs/EXPANSION_CATALOGUE.md); [Jak/OpenGOAL and edition/run choices](docs/UNIFIED_LIBRARY.md) remain a separate track. Metadata matching and [ScreenScraper/SteamGridDB](docs/ENRICHMENT.md#ps2-metadata-matching-and-cached-artwork) must never gate Play. **Media goal:** `marquee-manager` acquires and prepares supported content from configured authorized sources; Marquee registers validated installation receipts and launches games. Downloaded bytes are not an installation. Today, local archive preparation, torrent transport and the browser-job bridge have saved reviews/jobs/receipts and library registration; remaining live-provider and unsupported-package gates are open. Folder import stays available. See [media acquisition](docs/MARQUEE_MANAGER.md#acquisition-user-flow).
+Marquee owns the library and launch decisions. The hidden `marquee-manager` owns
+supported acquisition/preparation jobs; downloaded files become library entries
+only after validation. Emulator programs, original sources, firmware and writable
+profiles have separate lifecycles. See [storage design](docs/STORAGE_LAYOUT.md)
+and the [portable package proposal](docs/PORTABLE_PACKAGES.md).
 
-The owner has also added **Switch, PS3, PS4, original Xbox and Xbox 360 games**. These are collection requirements, not completed adapters: RPCS3/shadPS4/xemu have tool entries; PS3 has read-only discovery and reviewed firmware setup, but none of the five have Library Play. Their sources are inventoried under ignored `sample_images/`; license/key contents are not imported. See the [console preparation plan](docs/CONSOLE_PREPARATION.md).
+The diagram uses Aircloud Creative Studio's **ELK** auto-layout engine. Its
+[editable source](docs/diagrams/architecture.mmd), [layout data](docs/diagrams/architecture.layout.json)
+and [render script](scripts/render-architecture.ts) are included. To regenerate
+with the sibling Studio checkout and its installed dependencies:
+
+```bash
+../aircloud-creative-studio/node_modules/.bin/tsx scripts/render-architecture.ts
+```
 
 ## Run
 
@@ -23,8 +56,8 @@ The owner has also added **Switch, PS3, PS4, original Xbox and Xbox 360 games**.
 `streaming build`, `runtime-status`, `probe` and `rollback` manage a pinned local
 source build with software/NVIDIA checks and image receipts. ST2 Fedora-to-itself
 passed 2026-10-24 (synthetic stream and Sonic/BlastEm in Wolf's virtual desktop,
-keyboard/mouse, saves, disconnect/reconnect). Hosting UI, an embedded receiver,
-OS window-close/automatic focus return and a second-device gate remain open.
+keyboard/mouse, saves, disconnect/reconnect). Library-owned headless launch is available for BlastEm and Xenia. First-run
+host setup UI, an embedded receiver and a second-device gate remain open.
 See [source reuse, commands and gates](docs/STREAMING.md).
 
 Needs Node 22+, pnpm (`corepack enable pnpm`), and Rust for the desktop/CLI. On Fedora, install WebKit and the other Tauri devel packages first:
@@ -75,7 +108,7 @@ crates/core/    library DB/receipt import, scan, launch/session adapters, comman
 crates/manager/ hidden preparation worker, private socket/client, jobs/receipts and ownership migration
 crates/media/   shared bounded archive/CUE/ISO helpers, catalogue and errors
 crates/cli/     `marquee` diagnostics over the same core
-catalog/        PS2/PS1 system descriptors, ports/ (one JSON per port)
+catalog/        system/emulator/port descriptors, source builds and streaming recipes
 scripts/        setup.sh, run.sh, check.sh, make-icon.py
 docs/           ROADMAP.md, STORE_INTEGRATION.md, PS2.md, PS1.md, UNIFIED_LIBRARY.md, and supporting notes
 ```

@@ -16,7 +16,7 @@ pub struct Connection {
 }
 
 impl Connection {
-    fn validate(&self) -> Result<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         use std::os::unix::ffi::OsStrExt;
         for path in [&self.data_dir, &self.socket] {
             if !path.is_absolute()
@@ -145,6 +145,14 @@ impl Core {
     }
 
     pub fn streaming_save_connection(&self, config: Connection) -> Result<()> {
+        let _gate = self.headless_gate.lock().unwrap_or_else(|e| e.into_inner());
+        let host = self.headless_status(None)?;
+        if host["busy"] == true || host["host_running"] == true {
+            return Err(AppError::new(
+                "STREAMING_BUSY",
+                "Stop the owned headless host before changing its connection",
+            ));
+        }
         config.validate()?;
         let operation = self
             .streaming_controls
@@ -191,7 +199,7 @@ impl Core {
         Ok(
             json!({"connection":config,"host":host,"host_error":host_error,"pending":pending,
             "viewer":viewer,"viewer_error":viewer_error,"receiver_installed":receiver_installed,
-            "receiver_error":receiver_error,"operation":operation.name,"last_error":operation.error}),
+            "receiver_error":receiver_error,"operation":operation.name,"last_error":operation.error,"headless":self.headless_status(None)?}),
         )
     }
 

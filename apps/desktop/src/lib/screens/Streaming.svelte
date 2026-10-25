@@ -36,12 +36,25 @@
   {#if !snapshot}<p aria-live="polite">{controls.busy ? 'Checking streaming…' : 'Streaming status unavailable. Try Refresh.'}</p>
   {:else}
     <section class="glass-panel panel">
+      <h2>Headless library games</h2>
+      <p>Choose Stream beside Play for supported Genesis/BlastEm and Xbox 360/Xenia games. Games render on a private virtual display and keep separate streaming saves. Closing the viewer keeps the game running.</p>
+      {#if snapshot.headless?.busy}<p role="status">Preparing the headless host…</p>{/if}
+      {#if snapshot.headless?.reason}<p class="hint">{snapshot.headless.reason}</p>{/if}
+      {#if snapshot.headless?.error}<p class="error" role="alert">{snapshot.headless.error.message}</p>{/if}
+      {#if snapshot.headless?.host_error}<p class="error" role="alert">{snapshot.headless.host_error}</p>{/if}
+      {#if snapshot.headless?.host_running}
+        <p>{snapshot.headless.game_running ? 'A library game is running on the private display.' : 'The owned headless host is idle.'}</p>
+        <button class="btn glass" data-nav disabled={controls.busy || snapshot.headless.busy} onclick={() => controls.confirm('headless','host')}>{controls.confirmation === 'headless:host' ? 'Confirm stop host and game' : 'Stop headless host'}</button>
+        {#if controls.confirmation === 'headless:host'}<button class="btn glass" data-nav onclick={() => controls.confirmation=''}>Cancel</button>{/if}
+      {/if}
+    </section>
+    <section class="glass-panel panel">
       <h2>{snapshot.host ? 'Local host connected' : 'Local host offline'}</h2>
-      <p>{snapshot.host ? 'Choose a game offered by this host. A connected host does not confirm playback.' : 'Start your configured Wolf host, then refresh. Host installation and startup are still managed outside this screen.'}</p>
+      <p>{snapshot.host ? 'Choose a game offered by this host. A connected host does not confirm playback.' : 'Start your configured Wolf host, then refresh. Supported library games can start the owned headless host from their Stream button. Initial runtime installation and pairing are required.'}</p>
       {#if snapshot.host_error}<p class="hint">{snapshot.host_error.message}</p>{/if}
       <details><summary data-nav>Advanced connection</summary>
         <form onsubmit={(e) => { e.preventDefault(); void controls.act(() => app.api.streamingSaveConnection({ data_dir: folder.trim(), socket: socket.trim() })); }}>
-          <label>Streaming data folder<input data-nav bind:value={folder} disabled={occupied} onchange={() => { socket = `${folder.replace(/\/$/, '')}/streaming/wolf/snapshot/runtime/wolf.sock`; }} /></label>
+          <label>Streaming data folder<input data-nav bind:value={folder} disabled={occupied} onchange={() => { socket = `${folder.replace(/\/$/, '')}/streaming/wolf/state/runtime/wolf.sock`; }} /></label>
           <label>Wolf local API socket<input data-nav bind:value={socket} disabled={occupied} /></label>
           <p class="hint">Use the folder containing your host identity and isolated viewer preferences. Close the viewer before changing this connection.</p>
           <button class="btn glass" data-nav disabled={occupied || !folder || !socket}>Save connection</button>
@@ -80,7 +93,7 @@
       <div class="games">{#each snapshot.host?.apps ?? [] as game (game.id)}
         <article class="glass-panel panel"><h3>{game.title}</h3><button class="btn primary" data-nav disabled={occupied || !snapshot.receiver_installed} onclick={() => { music.pauseForGame(); void controls.act(() => app.api.streamingOpenViewer(game.id)); }}>Open viewer</button></article>
       {:else}<p class="hint">{snapshot.host ? 'No games are configured on this host.' : 'Connect a local host to see its games.'}</p>{/each}</div>
-      <p class="hint">Only configured host games appear here. Library-wide streaming and host setup are next. Physical controller testing awaits a controller.</p>
+      <p class="hint">Library Stream launches publish one selected game on the owned host. Other configured host apps remain available on external hosts. Additional emulator adapters and physical controller testing remain open.</p>
     </section>
     <section class="glass-panel panel"><h2>Host sessions</h2><p class="hint">End game stops its host session and may lose unsaved progress. Use Close viewer to disconnect instead.</p>
       {#each snapshot.host?.sessions ?? [] as session (session.session_id)}
