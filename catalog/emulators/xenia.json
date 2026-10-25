@@ -1,0 +1,15 @@
+{
+  "id": "xenia",
+  "name": "Xenia Canary",
+  "systems": [
+    "xbox360"
+  ],
+  "binary": "AppRun",
+  "config_subdir": "xenia",
+  "requirement": "Experimental native Linux Xbox 360 runtime. Inspect the game archive first. Library import, per-title launch and gameplay validation are pending; installing the runtime does not install a game. No console BIOS required.",
+  "download": {
+    "url": "https://github.com/xenia-canary/xenia-canary/releases/download/451f915/xenia_canary_linux.AppImage",
+    "sha256": "b96b2723b0af55b5c4d837916e12035f172fe9ebbab2e90ba6c64f2f21fd5d8b",
+    "version": "451f915566d57436555c6eb4ee77bb4717eb01de"
+  }
+}

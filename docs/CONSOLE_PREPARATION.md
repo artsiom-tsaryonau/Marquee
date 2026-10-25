@@ -23,7 +23,7 @@ platform identifiers without providing import or launch support.
 | PlayStation 4 / `ps4` | shadPS4 managed install/open, experimental | Package or prepared-folder inspection, title/version relationships, explicit supported install method and per-game launch/validation |
 | PlayStation 5 / `ps5` | KytyPS5 managed install/open, experimental Linux research build | Actual input inspection, pinned runtime/CLI contract, reviewed preparation, library launch and title-specific live acceptance |
 | Original Xbox / `xbox` | xemu managed install/open; BIOS/MCPX/HDD requirements recorded | Firmware/HDD configuration, input format inspection, tested conversion only when needed, library/launch/save adapter |
-| Xbox 360 / `xbox360` | No managed emulator entry found | Select and validate a runner on the target Linux host; content inventory, setup, launch and compatibility evidence |
+| Xbox 360 / `xbox360` | Pinned native Linux Xenia Canary install/open and RAR inspection | Select and validate a runner on the target Linux host; content inventory, setup, launch and compatibility evidence |
 
 This is local code evidence, not a claim about current upstream emulator support.
 Runner selection, package handling and exact supported formats must be verified
@@ -221,3 +221,36 @@ runtime is also installed only in this isolated pilot; PS5 payload extraction an
 launch have not been attempted.
 
 Primary tool: [ShadPKG v2.1.0](https://github.com/seregonwar/ShadPKG/releases/tag/v2.1.0).
+
+
+## Xbox-family inspection and Xenia runtime (2026-10-25)
+
+The shared read-only console inspector now accepts explicit `xbox` and `xbox360`
+RAR inputs. Tools → xemu / Xenia Canary → Content inspection uses the same API;
+CLI: `marquee console-inspect --system xbox360 /absolute/game.iso.rar`.
+ISO members are labelled disc candidates, not validated Xbox images. `default.xbe`
+and `default.xex` are boot candidates when present. Nothing is extracted or added
+to Games by inspection.
+
+Actual header inventories found one 7,825,162,240-byte ISO in the supplied
+Splinter Cell archive and one 7,838,695,424-byte ISO in the Vanquish archive.
+Both inventories completed without extraction. Their inner disc filesystem,
+executable identity and compatibility remain unverified.
+
+Xenia Canary's official native Linux AppImage is pinned at revision
+`451f915566d57436555c6eb4ee77bb4717eb01de`, 18,868,728 bytes, SHA-256
+`b96b2723b0af55b5c4d837916e12035f172fe9ebbab2e90ba6c64f2f21fd5d8b`.
+The catalogue installs this exact artifact. Launch explicitly sets storage,
+content, cache and config paths under Marquee's Xenia tree; custom arguments
+cannot replace those paths or request portable mode. Upstream XDG defaults alone
+would not isolate these files. Updates replace only the program.
+
+This is a managed runtime, not an Xbox 360 library adapter. The next step is a
+reviewed preparation plan for the chosen ISO, bounded XDVDFS/XEX inspection,
+per-title launch/input/save ownership and real Vanquish acceptance. xemu still
+needs MCPX, BIOS and HDD configuration before its Splinter Cell pilot. The current
+Xenia Linux release supersedes older Windows/Wine-only assumptions; upstream
+compatibility must still be checked for the exact game and build.
+
+References: [official pinned release](https://github.com/xenia-canary/xenia-canary/releases/tag/451f915),
+[pinned storage and target contract](https://github.com/xenia-canary/xenia-canary/blob/451f915566d57436555c6eb4ee77bb4717eb01de/src/xenia/app/xenia_main.cc).

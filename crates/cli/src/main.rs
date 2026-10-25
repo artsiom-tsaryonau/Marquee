@@ -98,7 +98,7 @@ enum Command {
     Ps3Inspect {
         path: PathBuf,
     },
-    /// Read-only PS4 package / PS5 archive inventory; never extracts or launches
+    /// Read-only PS4 package / PS5 and Xbox-family archive inventory; never extracts or launches
     ConsoleInspect {
         #[arg(long)]
         system: String,

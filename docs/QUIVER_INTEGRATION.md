@@ -435,3 +435,14 @@ fields. Known recipes can install engines; other entries need supported recipes.
 Native-port engines often need original game data separately. Commercial console
 acquisition stays with reviewed browser/torrent sources and platform preparation,
 not with arbitrary GitHub release execution.
+
+
+## Community catalogue clarification (2026-10-25)
+
+The [Quiver community catalogue](https://quiverlauncher.com/) is a separate hosted
+directory of ports, recompilations and recreations, with links to their project
+releases. It is distinct from a personal `apps.json` list. Marquee's Native games
+and ports page now links to that directory in the browser and states that in-app
+online search is pending. Existing local-list preview/import and reviewed managed
+recipes continue to work; browsing the website does not install a game or imply
+that every listed project has a Marquee recipe. Original game data may be needed.

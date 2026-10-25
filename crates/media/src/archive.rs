@@ -576,6 +576,9 @@ pub fn console_rar_inventory(path: &Path) -> Result<ConsoleInventory> {
                 "eboot.bin" => Some("boot_candidate"),
                 "param.json" => Some("ps5_metadata_candidate"),
                 "param.sfo" => Some("ps4_metadata_candidate"),
+                "default.xbe" => Some("xbox_boot_candidate"),
+                "default.xex" => Some("xbox360_boot_candidate"),
+                _ if ext_of(&rel) == "iso" => Some("disc_image_candidate"),
                 _ if ext_of(&rel) == "pkg" => Some("package_candidate"),
                 _ => None,
             };

@@ -472,7 +472,7 @@ export interface LibraryApi {
   intakeArchive(path: string, deleteSource?: boolean): Promise<IntakeReport>;
   pickArchives(): Promise<string[]>;
   pickConsoleContent(): Promise<string | null>;
-  inspectConsole(path:string, system: 'ps4'|'ps5'): Promise<ConsoleInspection>;
+  inspectConsole(path:string, system: 'ps4'|'ps5'|'xbox'|'xbox360'): Promise<ConsoleInspection>;
   pickPs3Content(): Promise<string | null>;
   pickPs3Firmware(): Promise<string | null>;
   ps3FirmwareStatus(): Promise<Ps3FirmwareStatus>;

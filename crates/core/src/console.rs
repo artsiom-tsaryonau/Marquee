@@ -1,4 +1,4 @@
-//! Read-only PS4 package / PS5 archive inspection. No installation or launch authority.
+//! Read-only console package / archive inspection. No installation or launch authority.
 use crate::{
     error::{AppError, Result},
     ps3,
@@ -135,8 +135,8 @@ fn inspect_pkg(path: &Path, mut file: File, bytes: u64) -> Result<Inspection> {
     })
 }
 pub fn inspect(path: &Path, system: &str) -> Result<Inspection> {
-    if !matches!(system, "ps4" | "ps5") {
-        return Err(invalid("Choose PS4 or PS5 explicitly"));
+    if !matches!(system, "ps4" | "ps5" | "xbox" | "xbox360") {
+        return Err(invalid("Choose PS4, PS5, Xbox or Xbox 360 explicitly"));
     }
     if !path.is_absolute() {
         return Err(invalid("Choose an absolute path on the Marquee computer"));
@@ -178,7 +178,7 @@ pub fn inspect(path: &Path, system: &str) -> Result<Inspection> {
             })
         }
         _ => Err(invalid(
-            "This inspector supports PS4 PKG and PS4/PS5 RAR inputs",
+            "This inspector supports PS4 PKG and PS4/PS5/Xbox/Xbox 360 RAR inputs",
         )),
     }
 }
@@ -245,6 +245,9 @@ mod tests {
         }
         assert!(inspect(&path, "ps5").is_err());
         assert!(inspect(Path::new("relative.pkg"), "ps4").is_err());
+        // Xbox selection must not reinterpret a PlayStation package as installable.
+        assert!(inspect(&path, "xbox").is_err());
+        assert!(inspect(&path, "xbox360").is_err());
     }
     #[test]
     fn malformed_package_tables_and_disagreeing_identity_are_refused() {
@@ -297,11 +300,14 @@ mod tests {
         let path = dir.path().join("game.rar");
         let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/rar");
         fs::copy(fixture.join("regular5.rar"), &path).unwrap();
-        let report = inspect(&path, "ps5").unwrap();
-        assert!(!report.playable);
-        let archive = report.archive.unwrap();
-        assert_eq!(archive.files, 1);
-        assert!(!archive.truncated);
+        for system in ["ps5", "xbox", "xbox360"] {
+            let report = inspect(&path, system).unwrap();
+            assert_eq!(report.system, system);
+            assert!(!report.playable);
+            let archive = report.archive.unwrap();
+            assert_eq!(archive.files, 1);
+            assert!(!archive.truncated);
+        }
         assert!(!dir.path().join("Game.nds").exists());
         for name in ["symlink5.rar", "traversal5.rar", "hardlink5.rar"] {
             fs::copy(fixture.join(name), &path).unwrap();

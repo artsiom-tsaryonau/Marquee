@@ -160,3 +160,22 @@ or changed by these tests.
 
 Primary references: [yt-dlp search extractors](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md),
 [playlist-filtered search](https://github.com/yt-dlp/yt-dlp/issues/1213).
+
+
+## Additional library enrichment (2026-10-25)
+
+The main God of War III entry now links the 22-track **God of War III (Original
+Soundtrack)** playlist returned under SonySoundtracksVEVO. Full playlist inspection
+completed without cookies and without truncation. This is a source-only album:
+no new audio was downloaded or imported, and no local-playback claim is made.
+Vanquish and original Splinter Cell playlist candidates were also found, but are
+not linked to fabricated game entries; their archives still await game adapters.
+Search results included a Vanquish film score and later Splinter Cell games, so
+name-only first-result selection would have attached the wrong soundtrack.
+
+Reviewed TheGamesDB original-release matches filled missing descriptions, genres,
+years and player counts for God of War III (843), PS2 Vice City (4166) and both
+PS1 Metal Gear Solid discs (196). Regional duplicates were inspected explicitly.
+Edition IDs, user titles, playtime and runner overrides were checked unchanged;
+existing covers were retained. Private provider responses and inspection receipts
+remain ignored local artifacts, rather than copied into repository documentation.

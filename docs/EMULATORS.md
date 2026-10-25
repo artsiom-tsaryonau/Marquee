@@ -524,3 +524,28 @@ extract-and-run fallback for Fedora hosts without FUSE 2. The supplied PAL 1.1
 input passed the pinned supported-hash check, generated its assets and reached
 file select in an isolated Marquee launch. Gameplay and persistent native saves
 remain acceptance gates. See [Quiver Q2c](QUIVER_INTEGRATION.md#q2c--ocarina--shipwright-pilot-2026-10-25).
+
+
+## Xbox 360 runtime (2026-10-25)
+
+Tools now offers the pinned official Linux Xenia Canary build. Its own window uses
+explicit managed storage/content/config/cache paths; it does not register a generic
+library runner. Xbox-family archive inspection is available under xemu and Xenia.
+See [console preparation](CONSOLE_PREPARATION.md#xbox-family-inspection-and-xenia-runtime-2026-10-25)
+for the supplied Splinter Cell/Vanquish inventory and the remaining game adapter.
+
+Neo Geo Pocket review found 11 existing `.ngp` inputs, but ares v148 requires
+separate NGP/NGPC BIOS files. No firmware or new playable NGP adapter was added
+in this slice. Its source was reviewed locally at
+`0aafd85789215e84e1e43415c07d4c88461b7899`; runtime work is deferred while the
+Xbox 360 input is prioritized. This is not a claim that all NGP backends need BIOS.
+
+
+Xenia acceptance evidence for this slice: the pinned AppImage installed in both
+an isolated pilot and the main library. An isolated `--help` process probe exited
+0; this establishes execution only, not video, audio, input or game compatibility.
+Browser inspection of the actual Splinter Cell and Vanquish archives passed at
+1274 px and 390 px with no overflow or JS errors; neither inspector exposes Play.
+Unit tests check storage arguments, rejected path overrides, package/platform
+separation and read-only Xbox archive handling. Full checks and the production
+native build passed. No Xbox game payload was extracted or executed.

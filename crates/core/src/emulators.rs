@@ -22,6 +22,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 const CATALOGUE: &[&str] = &[
+    include_str!("../../../catalog/emulators/xenia.json"),
     include_str!("../../../catalog/emulators/blastem.json"),
     include_str!("../../../catalog/emulators/duckstation.json"),
     include_str!("../../../catalog/emulators/pcsx2.json"),
@@ -260,6 +261,24 @@ pub fn clean_args(args: &[String]) -> Result<Vec<String>> {
 
 pub fn set_config(db: &Db, id: &str, args: &[String]) -> Result<Config> {
     let mut args = clean_args(args)?;
+    if id == "xenia"
+        && args.iter().any(|arg| {
+            [
+                "storage_root",
+                "content_root",
+                "cache_root",
+                "config",
+                "portable",
+            ]
+            .iter()
+            .any(|name| arg.trim_start_matches('-').split('=').next() == Some(name))
+        })
+    {
+        return Err(AppError::new(
+            "BAD_REQUEST",
+            "Marquee manages Xenia storage and configuration paths",
+        ));
+    }
     if id == "mgba" {
         let mut count = 0;
         for arg in &mut args {
@@ -428,6 +447,7 @@ pub fn info(
             "mgba" => "Open uses Qt. To launch only the game window, add --marquee-sdl, -f, then an absolute game path as separate arguments. GB/GBC library Play uses Qt with the selected game. SDL is an optional game-only frontend; neither is displayless emulation.",
             "rpcs3" => "Library Play uses --no-gui with a verified base-disc ISO and the managed firmware/save profile. Tools opens RPCS3 configuration separately.",
             "shadps4" => "Experimental. Marquee installs the official Linux SDL build and opens Big Picture mode. No PS4 library adapter or automated firmware flow yet.",
+            "xenia" => "Pinned experimental Linux runtime. Open starts Xenia’s own window; storage, content, config and cache paths stay in Marquee. RAR inspection does not extract or register a game. Xbox 360 library Play is not implemented yet.",
             "kytyps5" => "Experimental research runner. Marquee unpacks the published Linux tarball and opens kyty_launcher. Compatibility and config paths are upstream-defined.",
             _ => "Marquee currently opens this emulator’s own interface. Direct game launch and displayless execution need a separate verified adapter; no generic headless flag is applied.",
         }.into(),
@@ -769,6 +789,18 @@ fn launch_command(
     command.extend(extra_env.iter().cloned());
     command.push(bin.to_string_lossy().into_owned());
     command.extend(args.iter().cloned());
+    if id == "xenia" {
+        // Xenia does not use XDG for these paths. Pin every writable root
+        // explicitly rather than allowing its portable/executable-directory fallback.
+        for (flag, path) in [
+            ("storage_root", root.join("xdg-data")),
+            ("content_root", root.join("xdg-data/content")),
+            ("cache_root", root.join("xdg-cache")),
+            ("config", root.join("xdg-config/xenia-canary.config.toml")),
+        ] {
+            command.push(format!("--{flag}={}", path.display()));
+        }
+    }
     command
 }
 
@@ -993,6 +1025,52 @@ pub fn sync_runners(db: &Db, paths: &Paths) -> Result<()> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn xenia_pins_linux_build_and_keeps_writable_paths_in_managed_data() {
+        let temp = tempfile::tempdir().unwrap();
+        let paths = Paths::resolve(Some(temp.path().join("library with spaces"))).unwrap();
+        let def = find("xenia").unwrap();
+        assert!(
+            def.kind.is_none(),
+            "runtime installation is not a game adapter"
+        );
+        let pin = def.download.unwrap();
+        assert_eq!(
+            pin.sha256,
+            "b96b2723b0af55b5c4d837916e12035f172fe9ebbab2e90ba6c64f2f21fd5d8b"
+        );
+        let args = launch_command(
+            &paths,
+            "xenia",
+            "/usr/bin/env",
+            &[],
+            Path::new("/program/AppRun"),
+            &[],
+        );
+        for (flag, suffix) in [
+            ("storage_root", "xenia/xdg-data"),
+            ("content_root", "xenia/xdg-data/content"),
+            ("cache_root", "xenia/xdg-cache"),
+            ("config", "xenia/xdg-config/xenia-canary.config.toml"),
+        ] {
+            assert!(args.contains(&format!(
+                "--{flag}={}",
+                paths.data_dir.join(suffix).display()
+            )));
+        }
+        let db = Db::open(&paths).unwrap();
+        for flag in [
+            "--storage_root=/tmp/outside",
+            "--content_root",
+            "--cache_root=/",
+            "--config=/tmp/config",
+            "--portable",
+        ] {
+            assert!(set_config(&db, "xenia", &[flag.into()]).is_err());
+        }
+        assert!(set_config(&db, "xenia", &["--gpu=vulkan".into()]).is_ok());
+    }
 
     #[test]
     fn firmware_is_reported_and_filled_from_a_folder_without_overwriting() {

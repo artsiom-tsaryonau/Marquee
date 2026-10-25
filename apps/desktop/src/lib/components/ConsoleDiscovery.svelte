@@ -1,14 +1,15 @@
 <script lang="ts">
  import { app } from '../state.svelte';
+ import { systemLabel } from '../labels';
  import { bytes } from '../format';
  import type { ConsoleInspection } from '../api/contracts';
- let {system}: {system:'ps4'|'ps5'} = $props();
+ let {system}: {system:'ps4'|'ps5'|'xbox'|'xbox360'} = $props();
  let report=$state<ConsoleInspection|null>(null);
  let busy=$state(false);let error=$state('');
  async function inspect(){if(busy)return;busy=true;error='';try{const path=await app.api.pickConsoleContent();if(path){report=null;report=await app.api.inspectConsole(path,system);}}catch(e){error=(e as {message?:string}).message??'Inspection failed';}finally{busy=false;}}
 </script>
 <section class="console-discovery">
- <h3>{system.toUpperCase()} content inspection</h3>
+ <h3>{systemLabel(system)} content inspection</h3>
  <p>Read package metadata or archive headers before preparation.</p>
  <button class="btn glass small" data-nav disabled={busy} onclick={inspect}>{busy?'Inspecting…':'Inspect a file'}</button>
  {#if error}<p class="error" role="alert">{error}</p>{/if}

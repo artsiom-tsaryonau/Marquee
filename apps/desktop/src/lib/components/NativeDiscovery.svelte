@@ -57,8 +57,9 @@
     <h2>More from your app lists</h2><p>These projects are saved for discovery. They need a supported Marquee recipe before downloading or installing here.</p>
     <ul>{#each additional as entry (entry.id)}<li><strong>{entry.display_name}</strong><span>{entry.project ?? entry.provider} · {entry.source}</span><span class="status">{entry.status === 'unsupported' ? 'Unsupported requirements' : 'Needs a managed recipe'}</span></li>{/each}</ul>
   {/if}
+  <a class="btn glass small" data-nav href="https://quiverlauncher.com/" target="_blank" rel="noreferrer">Browse Quiver community catalogue ↗</a>
   <AppListImport />
-  <p class="source-note">This catalogue contains Marquee’s shipped recipes and your reviewed app lists. Online Quiver catalogue search and subscriptions are planned.</p>
+  <p class="source-note">This catalogue contains Marquee’s shipped recipes and your reviewed app lists. For more ports and recompilations, browse the Quiver community catalogue. In-app online search is planned.</p>
 </section>
 <style>
   .save { display:flex; align-items:center; flex-wrap:wrap; gap:10px; } .save span { font-size:11px; color:var(--text-dim); }

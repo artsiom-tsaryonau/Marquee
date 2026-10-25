@@ -176,7 +176,7 @@
       {#if error}<p class="error" role="alert">{error}</p>{/if}
 
       {#if e.id === 'rpcs3'}<Ps3Firmware installed={e.status !== 'not_installed'} /><Ps3Discovery />{/if}
-      {#if e.id === 'shadps4' || e.id === 'kytyps5'}<ConsoleDiscovery system={e.id === 'shadps4' ? 'ps4' : 'ps5'} />{/if}
+      {#if ['shadps4','kytyps5','xemu','xenia'].includes(e.id)}<ConsoleDiscovery system={e.id === 'shadps4' ? 'ps4' : e.id === 'kytyps5' ? 'ps5' : e.id === 'xemu' ? 'xbox' : 'xbox360'} />{/if}
       {#if e.id !== 'rpcs3' && (e.firmware ?? []).length}
         <section>
           <h3>Firmware</h3>

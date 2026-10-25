@@ -366,3 +366,17 @@ PS4/PS5 now have bounded read-only inspectors and Tools/CLI exposure. The suppli
 PS5 Demon's Souls RAR contains a prepared-folder candidate, with 223,257 files and
 87.2 GB declared output. PS4 base/update/DLC identities were read from metadata.
 Preparation, game registration and launch remain separate gates.
+
+
+### 2026-10-25 collection follow-up
+
+- Xenia Canary: official Linux build pinned and managed install/Open available;
+  Xbox-family RAR header inspection exposed under xemu/Xenia. Xbox 360 library
+  import/Play is still open. Next: verify the retained Vanquish ISO and implement
+  its preparation, launch, keyboard mapping and save/relaunch acceptance; see
+  [console preparation](CONSOLE_PREPARATION.md#xbox-family-inspection-and-xenia-runtime-2026-10-25).
+- Quiver: Games discovery now links to the actual hosted community catalogue;
+  local lists and reviewed recipes work. Hosted in-app search is still pending.
+- Main-library enrichment: reviewed missing facts added for God of War III,
+  Vice City and Metal Gear Solid. God of War III has a Sony OST source-only album;
+  no new audio download. [Evidence and remaining media work](YOUTUBE_OST.md#additional-library-enrichment-2026-10-25).
