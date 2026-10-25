@@ -188,7 +188,7 @@ fn ingest_disc(
         .unwrap_or(false);
     // CUE identity depends on companion tracks. Re-read bounded metadata on
     // every scan so restored/replaced tracks cannot leave a stale identity.
-    if unchanged && kind != MediaKind::Ps1Cue {
+    if unchanged && !matches!(kind, MediaKind::Ps1Cue | MediaKind::Xbox360Iso) {
         report.updated += 1;
         return Ok(());
     }
@@ -199,7 +199,20 @@ fn ingest_disc(
     } else {
         None
     };
+    let xbox360 = if kind == MediaKind::Xbox360Iso {
+        Some(marquee_media::xbox360::inspect(path)?)
+    } else {
+        None
+    };
     let identity = match kind {
+        MediaKind::Xbox360Iso => {
+            let m = xbox360.as_ref().unwrap();
+            crate::iso::DiscIdentity {
+                serial: Some(m.title_id.clone()),
+                serial_raw: Some(m.title_id.clone()),
+                region: None,
+            }
+        }
         MediaKind::Ps3Iso => {
             let m = ps3.as_ref().unwrap();
             crate::iso::DiscIdentity {
@@ -323,6 +336,19 @@ pub fn snapshot_media(db: &Db) -> Result<Vec<MediaFile>> {
             let kind = MediaKind::parse(&row.kind).unwrap_or(MediaKind::Iso);
             let mut available = row.path.is_file();
             let mut skip_reason = row.skip_reason;
+            if kind == MediaKind::Xbox360Iso && available {
+                match marquee_media::xbox360::inspect(&row.path) {
+                    Ok(identity) if row.serial.as_deref() == Some(identity.title_id.as_str()) => {}
+                    Ok(_) => {
+                        skip_reason =
+                            Some("Xbox 360 disc identity changed. Rescan before launching.".into());
+                    }
+                    Err(err) => {
+                        available = false;
+                        skip_reason = Some(err.message);
+                    }
+                }
+            }
             if kind == MediaKind::Ps1Cue && available {
                 if let Err(err) = crate::cue::manifest(&row.path) {
                     available = false;

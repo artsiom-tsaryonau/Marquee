@@ -744,6 +744,9 @@ impl Receipt {
         let canonical = fs::canonicalize(root)?;
         for output in &self.files {
             let path = root.join(&output.path);
+            if self.system == "xbox360" {
+                marquee_media::xbox360::inspect(&path)?;
+            }
             if !fs::canonicalize(&path)?.starts_with(&canonical)
                 || fs::symlink_metadata(&path)?.len() != output.size
                 || digest_file(&path)? != output.sha256

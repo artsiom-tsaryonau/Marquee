@@ -279,6 +279,19 @@ fn reviewed(db: &rusqlite::Connection, edition: &str, token: &str, id: u64) -> R
 mod tests {
     use super::*;
     #[test]
+    fn xbox360_fact_search_excludes_same_title_on_other_platforms() {
+        let platform = crate::romfacts::tgdb_platform("xbox360").unwrap();
+        let json = serde_json::json!({"data":{"games":[
+            {"id":1,"game_title":"Vanquish","platform":15,"release_date":"2010-10-19","players":1},
+            {"id":2,"game_title":"Vanquish","platform":12,"players":1}
+        ]}});
+        let candidates = fact_candidates(&json, "xbox360", platform, &Default::default());
+        assert_eq!(candidates.len(), 1);
+        assert_eq!(candidates[0].id, 1);
+        assert_eq!(candidates[0].system.as_deref(), Some("xbox360"));
+    }
+
+    #[test]
     fn facts_are_platform_scoped_and_only_fill_missing_fields() {
         let json = serde_json::json!({"data":{"games":[
             {"id":843,"game_title":"God of War III","platform":12,"release_date":"2010-03-16","overview":"A provider description","players":1},

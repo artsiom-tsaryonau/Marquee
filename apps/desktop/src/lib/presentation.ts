@@ -24,7 +24,7 @@ export function canPlay(game: GameEntry): boolean {
 }
 
 export function emulatorName(game: GameEntry): string {
-  return game.runnerName?.replace(' (Marquee)', '') ?? ({ ps1: 'DuckStation', ps2: 'PCSX2', ps3:'RPCS3', genesis: 'BlastEm', ds: 'melonDS', neogeo: 'FinalBurn Neo' } as Record<string, string>)[game.platform] ?? `${systemLabel(game.platform)} emulator`;
+  return game.runnerName?.replace(' (Marquee)', '') ?? ({ ps1: 'DuckStation', ps2: 'PCSX2', ps3:'RPCS3', xbox360:'Xenia Canary', genesis: 'BlastEm', ds: 'melonDS', neogeo: 'FinalBurn Neo' } as Record<string, string>)[game.platform] ?? `${systemLabel(game.platform)} emulator`;
 }
 
 /** Missing data opens the supported folder fallback, never reinstalls the engine. */

@@ -83,7 +83,7 @@ export const httpApi: LibraryApi = {
     return window.prompt('Absolute PS3UPDAT.PUP path on the Marquee computer (not a browser upload)')?.trim() || null;
   },
   async pickConsoleContent() {
-    return window.prompt('Absolute PS4 PKG or console RAR path on the Marquee computer (not a browser upload)')?.trim() || null;
+    return window.prompt('Absolute PS4 PKG, Xbox 360 ISO or console RAR path on the Marquee computer (not a browser upload)')?.trim() || null;
   },
   async pickPs3Content() {
     return window.prompt('Absolute PS3 content path on the Marquee computer (not a browser upload)')?.trim() || null;

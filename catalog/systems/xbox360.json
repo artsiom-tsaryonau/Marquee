@@ -1,0 +1,6 @@
+{
+  "id": "xbox360", "display_name": "Xbox 360",
+  "supported_extensions": ["iso"], "skipped_extensions": ["xex", "zar", "rar", "zip", "7z"],
+  "runner_kind": "emulator", "emulator": "xenia",
+  "notes": "Verified XDVDFS disc ISO with root default.xex and bounded XEX2 execution identity. Packages, loose executables, updates and DLC are not imported."
+}

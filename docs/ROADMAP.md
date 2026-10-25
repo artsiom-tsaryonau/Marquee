@@ -380,3 +380,18 @@ Preparation, game registration and launch remain separate gates.
 - Main-library enrichment: reviewed missing facts added for God of War III,
   Vice City and Metal Gear Solid. God of War III has a Sony OST source-only album;
   no new audio download. [Evidence and remaining media work](YOUTUBE_OST.md#additional-library-enrichment-2026-10-25).
+
+
+### Xbox 360 library adapter and collection layout follow-up
+
+The verified XDVDFS/XEX2 ISO path now supports manager preparation, idempotent
+registration and Xenia Library Play with compatible-runner selection, managed
+paths, keyboard defaults and an XWayland workaround for the observed white
+Wayland window. Vanquish reached a visible menu with audio, keyboard controls
+and clean exit; gameplay/native-save acceptance remains open. See the
+[current console adapter record](CONSOLE_PREPARATION.md#xbox-360-verified-iso-adapter-2026-10-25).
+
+The [collection storage proposal](STORAGE_LAYOUT.md) separates retained originals,
+versioned firmware, playable installations, replaceable programs and mutable user
+data. A unified artifact registry, configurable roots, receipt-aware relocation
+and dependency-aware cleanup remain planned; no collection migration was performed.

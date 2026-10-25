@@ -9,11 +9,11 @@ import { webToken } from './http';
 
 /** Cartridge/disc systems run by a catalogue emulator (mirrors `catalog/systems/*.json`). */
 const SYSTEM_EMULATOR: Record<string, string> = {
-  ps3: 'rpcs3', genesis: 'blastem', ds: 'melonds', neogeo: 'fbneo', dreamcast: 'flycast', nes: 'mesen', snes: 'mesen', gb: 'mesen', gbc: 'mesen', pce: 'mesen', n64: 'rmg',
+  xbox360: 'xenia', ps3: 'rpcs3', genesis: 'blastem', ds: 'melonds', neogeo: 'fbneo', dreamcast: 'flycast', nes: 'mesen', snes: 'mesen', gb: 'mesen', gbc: 'mesen', pce: 'mesen', n64: 'rmg',
 };
 /** Backend system id -> UI platform id. */
 const PLATFORM: Record<string, GameEntry['platform']> = {
-  ps1: 'ps1', ps2: 'ps2', ps3:'ps3', genesis: 'genesis', ds: 'ds', neogeo: 'neogeo', dreamcast: 'dreamcast', nes: 'nes', snes: 'snes', gb: 'gb', gbc: 'gbc', pce: 'tg16', n64: 'n64',
+  ps1: 'ps1', ps2: 'ps2', ps3:'ps3', xbox360:'xbox360', genesis: 'genesis', ds: 'ds', neogeo: 'neogeo', dreamcast: 'dreamcast', nes: 'nes', snes: 'snes', gb: 'gb', gbc: 'gbc', pce: 'tg16', n64: 'n64',
 };
 
 export function runnerSupports(runner: Runner, system: string): boolean {

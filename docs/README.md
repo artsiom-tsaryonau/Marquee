@@ -50,6 +50,7 @@ and console-recipe gates are open.
 | [UI](UI_UX.md), [desktop rendering](DESKTOP_RENDERING.md) | Current surfaces, readiness presentation and remaining visual/performance gates |
 | [Catalogue metadata](CATALOGUE_METADATA.md) | Provider provenance, release identity and explicit installation links |
 | [Enrichment](ENRICHMENT.md) | Implemented artwork/facts, cache/quota safeguards and future provider research; never gates Play |
+| [Collection storage](STORAGE_LAYOUT.md) | Proposed separation of original sources, firmware, installations and user data; registry-aware relocation and cleanup remain planned |
 | [Cleanup](CLEANUP.md) | Existing storage cleanup and preservation guidance |
 | [Corrections](CORRECTIONS.md) | Dated findings and evidence retained for audits |
 

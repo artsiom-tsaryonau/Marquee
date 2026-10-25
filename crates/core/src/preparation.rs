@@ -521,3 +521,79 @@ mod tests {
         assert!(core.snapshot().unwrap().editions.is_empty());
     }
 }
+
+#[cfg(test)]
+mod xbox360_tests {
+    use super::*;
+    struct Cleanup(std::path::PathBuf);
+    impl Drop for Cleanup {
+        fn drop(&mut self) {
+            let _ = marquee_manager::Client::new(&self.0).stop();
+        }
+    }
+    use std::fs::{self, File};
+    use std::io::Write;
+
+    #[test]
+    fn verified_xbox360_archive_registers_once_and_wrong_platform_keeps_source() {
+        let temp = tempfile::tempdir().unwrap();
+        let data = temp.path().join("library");
+        let _cleanup = Cleanup(data.clone());
+        let path = temp.path().join("Misleading PS2 name.zip");
+        let mut zip = zip::ZipWriter::new(File::create(&path).unwrap());
+        zip.start_file(
+            "Game's $(name).iso",
+            zip::write::SimpleFileOptions::default(),
+        )
+        .unwrap();
+        zip.write_all(&marquee_media::xbox360::test_disc()).unwrap();
+        zip.finish().unwrap();
+        let core = Core::open_isolated(Some(data.clone()), false).unwrap();
+        let wrong = core.inspect_preparation(&path, "ps2").unwrap();
+        let wrong = core
+            .run_preparation(&wrong.id, &wrong.review_token)
+            .unwrap();
+        assert_eq!(wrong.state, State::Failed);
+        assert!(!wrong.destination.exists());
+        assert!(path.exists());
+        assert!(core.snapshot().unwrap().editions.is_empty());
+        let review = core.inspect_preparation(&path, "xbox360").unwrap();
+        let done = core
+            .run_preparation(&review.id, &review.review_token)
+            .unwrap();
+        assert_eq!(done.state, State::Registered, "{:?}", done.error);
+        assert_eq!(done.edition_ids.len(), 1);
+        let snap = core.snapshot().unwrap();
+        assert_eq!(snap.editions[0].system, "xbox360");
+        assert_eq!(snap.editions[0].serial.as_deref(), Some("53450841"));
+        assert_eq!(snap.media[0].kind, crate::model::MediaKind::Xbox360Iso);
+        assert!(snap.media[0].available);
+        assert!(path.exists());
+        // Actual title is revalidated even if an attacker preserves size and mtime.
+        let disc = done.destination.join("Game's $(name).iso");
+        let mut b = fs::read(&disc).unwrap();
+        b[48 * 2048 + 76..48 * 2048 + 80].copy_from_slice(&0x12345678u32.to_be_bytes());
+        fs::write(&disc, b).unwrap();
+        assert!(core.snapshot().unwrap().media[0]
+            .skip_reason
+            .as_deref()
+            .unwrap()
+            .contains("identity changed"));
+        fs::write(&disc, marquee_media::xbox360::test_disc()).unwrap();
+        let ids = done.edition_ids;
+        drop(core);
+        let reopened = Core::open_isolated(Some(data.clone()), false).unwrap();
+        assert_eq!(
+            reopened
+                .preparation_jobs()
+                .unwrap()
+                .iter()
+                .find(|j| j.id == review.id)
+                .unwrap()
+                .edition_ids,
+            ids
+        );
+        assert_eq!(reopened.snapshot().unwrap().editions.len(), 1);
+        let _ = marquee_manager::Client::new(&data).stop();
+    }
+}

@@ -259,8 +259,7 @@ pub fn clean_args(args: &[String]) -> Result<Vec<String>> {
     Ok(cleaned)
 }
 
-pub fn set_config(db: &Db, id: &str, args: &[String]) -> Result<Config> {
-    let mut args = clean_args(args)?;
+pub(crate) fn validate_managed_args(id: &str, args: &[String]) -> Result<()> {
     if id == "xenia"
         && args.iter().any(|arg| {
             [
@@ -269,6 +268,7 @@ pub fn set_config(db: &Db, id: &str, args: &[String]) -> Result<Config> {
                 "cache_root",
                 "config",
                 "portable",
+                "log_file",
             ]
             .iter()
             .any(|name| arg.trim_start_matches('-').split('=').next() == Some(name))
@@ -279,6 +279,12 @@ pub fn set_config(db: &Db, id: &str, args: &[String]) -> Result<Config> {
             "Marquee manages Xenia storage and configuration paths",
         ));
     }
+    Ok(())
+}
+
+pub fn set_config(db: &Db, id: &str, args: &[String]) -> Result<Config> {
+    let mut args = clean_args(args)?;
+    validate_managed_args(id, &args)?;
     if id == "mgba" {
         let mut count = 0;
         for arg in &mut args {
@@ -447,7 +453,7 @@ pub fn info(
             "mgba" => "Open uses Qt. To launch only the game window, add --marquee-sdl, -f, then an absolute game path as separate arguments. GB/GBC library Play uses Qt with the selected game. SDL is an optional game-only frontend; neither is displayless emulation.",
             "rpcs3" => "Library Play uses --no-gui with a verified base-disc ISO and the managed firmware/save profile. Tools opens RPCS3 configuration separately.",
             "shadps4" => "Experimental. Marquee installs the official Linux SDL build and opens Big Picture mode. No PS4 library adapter or automated firmware flow yet.",
-            "xenia" => "Pinned experimental Linux runtime. Open starts Xenia’s own window; storage, content, config and cache paths stay in Marquee. RAR inspection does not extract or register a game. Xbox 360 library Play is not implemented yet.",
+            "xenia" => "Experimental native Linux runner. Library Play starts a verified Xbox 360 ISO directly using Vulkan and keyboard controller emulation. Enter is Start; WASD moves, arrows look, and J/K/U/I are A/B/X/Y. Saves, content, config and cache stay inside Marquee. Game compatibility still requires live validation.",
             "kytyps5" => "Experimental research runner. Marquee unpacks the published Linux tarball and opens kyty_launcher. Compatibility and config paths are upstream-defined.",
             _ => "Marquee currently opens this emulator’s own interface. Direct game launch and displayless execution need a separate verified adapter; no generic headless flag is applied.",
         }.into(),
@@ -797,6 +803,7 @@ fn launch_command(
             ("content_root", root.join("xdg-data/content")),
             ("cache_root", root.join("xdg-cache")),
             ("config", root.join("xdg-config/xenia-canary.config.toml")),
+            ("log_file", root.join("xdg-cache/xenia.log")),
         ] {
             command.push(format!("--{flag}={}", path.display()));
         }
@@ -822,6 +829,7 @@ pub fn open(paths: &Paths, def: &EmulatorDef, installed: &Installed, cfg: &Confi
     } else {
         "env"
     };
+    seed_config(def, &config_home(paths, &def.id));
     let mut open_args: Vec<_> = def
         .open_args
         .iter()
@@ -985,6 +993,11 @@ pub fn sync_runners(db: &Db, paths: &Paths) -> Result<()> {
         if !bin.is_file() {
             continue;
         }
+        if def.id == "xenia" {
+            for name in ["xdg-config", "xdg-data", "xdg-cache"] {
+                fs::create_dir_all(paths.data_dir.join(&def.id).join(name))?;
+            }
+        }
         let env = if Path::new("/usr/bin/env").is_file() {
             "/usr/bin/env"
         } else {
@@ -1027,14 +1040,39 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    fn xenia_keyboard_seed_has_unique_bindings_and_preserves_existing_settings() {
+        let def = find("xenia").unwrap();
+        assert!(def.env.contains(&"GDK_BACKEND=x11".into()));
+        let mut tokens = std::collections::BTreeSet::new();
+        for line in def.seed[0]
+            .contents
+            .lines()
+            .filter(|l| l.starts_with("keybind_"))
+        {
+            let (_, value) = line.split_once('=').unwrap();
+            for token in value.trim().trim_matches('"').split_whitespace() {
+                assert!(tokens.insert(token), "conflicting keyboard token {token}");
+            }
+        }
+        let temp = tempfile::tempdir().unwrap();
+        seed_config(&def, temp.path());
+        let path = temp.path().join("xenia-canary.config.toml");
+        assert!(fs::read_to_string(&path)
+            .unwrap()
+            .contains("keyboard_mode = 1"));
+        fs::write(&path, "# user settings\n[HID]\nkeyboard_mode = 0\n").unwrap();
+        seed_config(&def, temp.path());
+        assert!(fs::read_to_string(&path)
+            .unwrap()
+            .contains("keyboard_mode = 0"));
+    }
+
+    #[test]
     fn xenia_pins_linux_build_and_keeps_writable_paths_in_managed_data() {
         let temp = tempfile::tempdir().unwrap();
         let paths = Paths::resolve(Some(temp.path().join("library with spaces"))).unwrap();
         let def = find("xenia").unwrap();
-        assert!(
-            def.kind.is_none(),
-            "runtime installation is not a game adapter"
-        );
+        assert_eq!(def.kind.as_deref(), Some("emulator"));
         let pin = def.download.unwrap();
         assert_eq!(
             pin.sha256,
@@ -1053,6 +1091,7 @@ mod tests {
             ("content_root", "xenia/xdg-data/content"),
             ("cache_root", "xenia/xdg-cache"),
             ("config", "xenia/xdg-config/xenia-canary.config.toml"),
+            ("log_file", "xenia/xdg-cache/xenia.log"),
         ] {
             assert!(args.contains(&format!(
                 "--{flag}={}",
@@ -1066,6 +1105,7 @@ mod tests {
             "--cache_root=/",
             "--config=/tmp/config",
             "--portable",
+            "--log_file=/tmp/outside",
         ] {
             assert!(set_config(&db, "xenia", &[flag.into()]).is_err());
         }
@@ -1347,6 +1387,7 @@ mod tests {
             kinds,
             [
                 "duckstation",
+                "emulator",
                 "emulator",
                 "emulator",
                 "emulator",

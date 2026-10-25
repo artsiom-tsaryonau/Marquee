@@ -134,7 +134,7 @@
   const systemOptions = [
     { id: 'ps2', label: 'PlayStation 2' }, { id: 'ps1', label: 'PlayStation' }, { id: 'dreamcast', label: 'Dreamcast' },
     { id: 'genesis', label: 'Sega Genesis' }, { id: 'snes', label: 'Super Nintendo' }, { id: 'nes', label: 'NES' },
-    { id: 'n64', label: 'Nintendo 64' }, { id: 'ds', label: 'Nintendo DS' }, { id: 'gbc', label: 'Game Boy Color' },
+    { id: 'n64', label: 'Nintendo 64' }, { id: 'xbox360', label: 'Xbox 360' }, { id: 'ds', label: 'Nintendo DS' }, { id: 'gbc', label: 'Game Boy Color' },
     { id: 'gb', label: 'Game Boy' }, { id: 'pce', label: 'PC Engine / TurboGrafx-16' }, { id: 'neogeo', label: 'Neo Geo' },
   ];
   async function saveGame() {
@@ -146,7 +146,7 @@
   }
   const addTargets: { id: string; label: string }[] = [
     { id: 'ps2', label: 'PlayStation 2' }, { id: 'ps1', label: 'PlayStation' }, { id: 'genesis', label: 'Sega Genesis' },
-    { id: 'ds', label: 'Nintendo DS' }, { id: 'neogeo', label: 'Neo Geo' },
+    { id: 'xbox360', label: 'Xbox 360' }, { id: 'ds', label: 'Nintendo DS' }, { id: 'neogeo', label: 'Neo Geo' },
   ];
   function addFolder(system: string) { addMenu.open = false; void app.addSystemFolder(system); }
   function startAddGame() { addMenu.open = false; adding = true; }

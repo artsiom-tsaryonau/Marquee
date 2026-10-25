@@ -187,6 +187,7 @@ pub(crate) fn tgdb_platform(system: &str) -> Option<u32> {
         "ps1" => 10,
         "ps2" => 11,
         "ps3" => 12,
+        "xbox360" => 15,
         "dreamcast" => 16,
         "genesis" => 18,
         "neogeo" => 24,

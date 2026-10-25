@@ -656,3 +656,12 @@ test('failed selection reloads saved choice; failed confirmation blocks launch u
     assert.equal(app.runnerSelectionUnconfirmed,false);
   } finally {app.api=api;}
 });
+
+test('verified Xbox 360 installations map to Xenia and retain per-game selection', () => {
+  const snap=discSnapshot();
+  snap.editions=[{...snap.editions[0],system:'xbox360',runner_override:'runner.xenia.marquee'}];
+  snap.runners=[{id:'runner.xenia.marquee',kind:'emulator',display_name:'Xenia Canary',systems:['xbox360'],available:true,bios_state:'unverified'}];
+  const game=gamesFromSnapshot(snap)[0];
+  assert.equal(game.platform,'xbox360'); assert.equal(game.runnerName,'Xenia Canary');
+  assert.equal(game.setupState,'unverified'); assert.equal(game.runnerOverride,'runner.xenia.marquee');
+});

@@ -549,3 +549,12 @@ Browser inspection of the actual Splinter Cell and Vanquish archives passed at
 Unit tests check storage arguments, rejected path overrides, package/platform
 separation and read-only Xbox archive handling. Full checks and the production
 native build passed. No Xbox game payload was extracted or executed.
+
+
+### Xbox 360 adapter follow-up
+
+The verified-ISO path now registers Xenia as a library runner. Its descriptor,
+per-game selector, literal target/display flags, first-run keyboard defaults and
+isolated log/save paths are implemented. The earlier runtime-only description is
+historical; [current adapter and live gates](CONSOLE_PREPARATION.md#xbox-360-verified-iso-adapter-2026-10-25)
+are authoritative. Installation or format validation alone is not game acceptance.

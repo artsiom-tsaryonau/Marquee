@@ -58,6 +58,9 @@ pub fn unresolved() -> DiscIdentity {
 /// Read a disc's `SYSTEM.CNF` regardless of rip layout. Works for both PS1
 /// (`BOOT`) and PS2 (`BOOT2`) discs.
 pub fn identify_disc_iso(path: &Path) -> Result<DiscIdentity> {
+    if crate::xbox360::has_partition(path)? {
+        return Err(crate::error::AppError::new("DISC_PLATFORM", "Xbox-family disc detected. Choose Xbox 360 explicitly for XEX2 discs; original Xbox needs xemu preparation."));
+    }
     identify_disc_track(path, 0, None)
 }
 

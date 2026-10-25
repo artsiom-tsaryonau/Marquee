@@ -39,6 +39,11 @@ pub(crate) struct Source {
 
 const SOURCES: &[Source] = &[
     Source {
+        system: "xbox360",
+        thumbs: "Microsoft - Xbox 360",
+        dat: None,
+    },
+    Source {
         system: "genesis",
         thumbs: "Sega - Mega Drive - Genesis",
         dat: Some("Sega - Mega Drive - Genesis"),

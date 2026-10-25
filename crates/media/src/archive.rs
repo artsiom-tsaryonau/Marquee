@@ -503,6 +503,14 @@ impl ArchivePlan {
                     "Extracted output size/type did not match the plan",
                 ));
             }
+            if self.system == "xbox360" {
+                crate::xbox360::inspect(&path)?;
+            } else if matches!(self.system.as_str(), "ps1" | "ps2")
+                && ext_of(&path) == "iso"
+                && crate::xbox360::has_partition(&path)?
+            {
+                return Err(AppError::new("PREPARATION_PLATFORM", "Xbox-family ISO detected. Review this archive as Xbox 360, or use the original Xbox preparation workflow. Source retained."));
+            }
             File::open(path)?.sync_all()?;
         }
         let mut directories = BTreeSet::new();

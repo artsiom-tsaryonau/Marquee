@@ -8,3 +8,5 @@ mod rar;
 pub mod time;
 
 pub mod http;
+
+pub mod xbox360;

@@ -1374,3 +1374,39 @@ fn env_wrapped_runner_becomes_unavailable_when_the_program_is_removed() {
         "RUNNER_MISSING"
     );
 }
+
+#[test]
+fn xenia_launch_uses_literal_target_and_display_mode_without_playstation_flags() {
+    let runner = crate::model::Runner {
+        id: "runner.xenia.marquee".into(),
+        kind: crate::model::RunnerKind::Emulator,
+        display_name: "Xenia Canary".into(),
+        command: vec!["/bin/true".into()],
+        systems: vec!["xbox360".into()],
+        bios_state: crate::model::BiosState::Unverified,
+        bios_hint: None,
+        source: "marquee".into(),
+        available: true,
+    };
+    let path = Path::new("/games/Game's $(not-a-shell).iso");
+    let args = crate::runners::launch_argv(&runner, path, &[], false).unwrap();
+    assert_eq!(
+        args,
+        vec![
+            "/bin/true",
+            "--fullscreen=false",
+            "--target=/games/Game's $(not-a-shell).iso"
+        ]
+    );
+    assert!(crate::runners::compatible(&runner, "xbox360"));
+    assert!(!crate::runners::compatible(&runner, "ps2"));
+    let args = crate::runners::launch_argv(&runner, path, &[], true).unwrap();
+    assert_eq!(args[1], "--fullscreen=true");
+    assert!(crate::runners::launch_argv(
+        &runner,
+        path,
+        &["--storage_root=/tmp/outside".into()],
+        false
+    )
+    .is_err());
+}

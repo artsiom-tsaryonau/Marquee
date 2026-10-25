@@ -18,6 +18,7 @@ pub struct Inspection {
     pub system: String,
     pub kind: String,
     pub bytes: u64,
+    pub xbox360: Option<marquee_media::xbox360::Disc>,
     pub content_id: Option<String>,
     pub content_type: Option<u32>,
     pub content_flags: Option<u32>,
@@ -124,6 +125,7 @@ fn inspect_pkg(path: &Path, mut file: File, bytes: u64) -> Result<Inspection> {
         system: "ps4".into(),
         kind: "package".into(),
         bytes,
+        xbox360: None,
         content_id: Some(content_id),
         content_type: Some(be32(&header, 0x74)),
         content_flags: Some(be32(&header, 0x78)),
@@ -155,6 +157,17 @@ pub fn inspect(path: &Path, system: &str) -> Result<Inspection> {
             .as_str(),
     ) {
         ("ps4", "pkg") => inspect_pkg(path, file, meta.len()),
+        ("xbox360", "iso") => {
+            let disc = marquee_media::xbox360::inspect(path)?;
+            Ok(Inspection {
+                source: path.into(), system: system.into(), kind: "xbox360_disc".into(),
+                bytes: meta.len(), content_id: Some(disc.title_id.clone()),
+                xbox360: Some(disc), content_type: None, content_flags: None,
+                metadata: None, role: "disc".into(), archive: None,
+                diagnostics: vec!["XDVDFS root and XEX2 execution identity verified. No game code was executed; compatibility remains untested.".into()],
+                playable: false,
+            })
+        }
         (_, "rar") => {
             let inventory = archive::console_rar_inventory(path)?;
             let diagnostic = if inventory.truncated {
@@ -167,6 +180,7 @@ pub fn inspect(path: &Path, system: &str) -> Result<Inspection> {
                 system: system.into(),
                 kind: "archive".into(),
                 bytes: meta.len(),
+                xbox360: None,
                 content_id: None,
                 content_type: None,
                 content_flags: None,
@@ -178,7 +192,7 @@ pub fn inspect(path: &Path, system: &str) -> Result<Inspection> {
             })
         }
         _ => Err(invalid(
-            "This inspector supports PS4 PKG and PS4/PS5/Xbox/Xbox 360 RAR inputs",
+            "This inspector supports PS4 PKG, Xbox 360 ISO, and console RAR inputs",
         )),
     }
 }

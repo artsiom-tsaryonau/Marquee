@@ -235,6 +235,7 @@
           <dd>Unknown · no verified report</dd>
         {/if}
       </dl>
+      {#if g.platform === 'xbox360' && offline}<p class="media-credit">Click the game to focus it. Keyboard: Enter starts; WASD moves; arrows look; J/K/U/I are A/B/X/Y; Q/E are triggers and 1/3 are bumpers; Shift+WASD is the D-pad. Alt+F4 closes Xenia. Existing custom mappings are kept.</p>{/if}
       {#if offline || g.lutris || port}<div class="side-actions">
         {#if offline}<button class="btn glass small" data-nav onclick={() => app.go('tools')}><Icon name="settings" size={16} />Emulator settings</button>{/if}
       {#if offline}

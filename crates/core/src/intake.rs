@@ -247,6 +247,13 @@ impl Core {
                 }
             }
             for (_, rel) in &todo {
+                if ext_of(rel) == "iso"
+                    && marquee_media::xbox360::has_partition(&staging.join(rel))?
+                {
+                    return Err(AppError::new("INTAKE_PLATFORM", "Xbox-family ISO detected. Use Downloads and archives with an explicit Xbox 360 review. Source retained."));
+                }
+            }
+            for (_, rel) in &todo {
                 let to = dest_dir.join(rel);
                 if let Some(parent) = to.parent() {
                     fs::create_dir_all(parent)?;

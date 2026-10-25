@@ -2,8 +2,9 @@
 
 Updated 2026-10-25. The owner reports adding **Switch, PS3, PS4, original Xbox and
 Xbox 360 games**. The source tree has now been inventoried read-only using filesystem metadata and
-ZIP headers. Inner formats not inspected remain unknown; no console game, firmware
-or key material was installed or changed.
+ZIP headers, followed by the explicitly authorized preparation pilots below.
+The initial inventory was read-only; later installation and launch evidence is
+recorded per platform.
 
 [Marquee manager](MARQUEE_MANAGER.md) owns preparation jobs; Marquee owns library
 and launch. This document owns the platform backlog. [Emulators](EMULATORS.md)
@@ -12,8 +13,9 @@ records current tool behavior. Do not equate catalogue entries with game adapter
 ## Current repository evidence
 
 The `ps3` descriptor now supports the verified disc-ISO path. The remaining
-`switch`, `ps4`, `ps5`, `xbox` and `xbox360` systems have no accepted library
-import/Play adapter. `metadata.rs` can retain provider
+`switch`, `ps5` and `xbox` systems have no accepted library import/Play adapter.
+Xbox 360 now has a verified ISO adapter with Vanquish menu/input evidence; PS4
+has an experimental adapter whose Shadow of the Colossus pilot remains unplayable. `metadata.rs` can retain provider
 platform identifiers without providing import or launch support.
 
 | Platform / proposed ID | Existing tool entry | Missing before library Play |
@@ -23,7 +25,7 @@ platform identifiers without providing import or launch support.
 | PlayStation 4 / `ps4` | shadPS4 managed install/open, experimental | Package or prepared-folder inspection, title/version relationships, explicit supported install method and per-game launch/validation |
 | PlayStation 5 / `ps5` | KytyPS5 managed install/open, experimental Linux research build | Actual input inspection, pinned runtime/CLI contract, reviewed preparation, library launch and title-specific live acceptance |
 | Original Xbox / `xbox` | xemu managed install/open; BIOS/MCPX/HDD requirements recorded | Firmware/HDD configuration, input format inspection, tested conversion only when needed, library/launch/save adapter |
-| Xbox 360 / `xbox360` | Pinned native Linux Xenia Canary install/open and RAR inspection | Select and validate a runner on the target Linux host; content inventory, setup, launch and compatibility evidence |
+| Xbox 360 / `xbox360` | Pinned Linux Xenia Canary; verified ISO preparation, registration and launch | Vanquish menu, audio, focused keyboard input and clean exit confirmed; gameplay and native save/relaunch remain unverified |
 
 This is local code evidence, not a claim about current upstream emulator support.
 Runner selection, package handling and exact supported formats must be verified
@@ -43,7 +45,7 @@ platforms. Full paths/sizes and ZIP-header summaries are in ignored
 | PS4 | The Last of Us Remastered `.pkg.rar`, about 47.2 GB; separate Shadow of the Colossus `.torrent` metadata | Filename is only a format hint; RAR payload/torrent files not installed or fetched |
 | Switch | Firmware ZIP containing `.nca`; Nightshade ZIP containing `.nsp`; Zelda base ZIP containing `.xci` plus `.url`; separate DLC ZIP containing `.nsp`; two `.keys` files | Containers recorded separately; no base/update/DLC identity or key validity inferred |
 | Xbox | Splinter Cell `.iso.rar`, about 6.3 GB | Inner layout not inspected; requires xemu-specific format/configuration work |
-| Xbox 360 | Vanquish `.iso.rar`, about 6.2 GB | Inner layout not inspected; runner/host/format work remains open |
+| Xbox 360 | Vanquish `.iso.rar`, about 6.2 GB | Retained source; verified XDVDFS ISO prepared and registered in the main library; live menu/input acceptance below |
 
 The small Sonic Genesis ZIP was the M1 real preparation pilot in an isolated
 database. Its source hash was unchanged, and no other collection files were
@@ -254,3 +256,71 @@ compatibility must still be checked for the exact game and build.
 
 References: [official pinned release](https://github.com/xenia-canary/xenia-canary/releases/tag/451f915),
 [pinned storage and target contract](https://github.com/xenia-canary/xenia-canary/blob/451f915566d57436555c6eb4ee77bb4717eb01de/src/xenia/app/xenia_main.cc).
+
+
+## Xbox 360 verified ISO adapter (2026-10-25)
+
+The prior runtime-only slice is superseded for verified XDVDFS ISOs. The shared
+reader checks known partition offsets, both volume markers, bounded root-directory
+links/file ranges, root `default.xex`, XEX2 optional-header bounds and one execution
+identity. Cycles, duplicate execution metadata, non-XEX2 boot files, symlinks and
+invalid title IDs are refused. It reads metadata only; no executable decryption,
+license processing or game execution occurs during inspection.
+
+Manager preparation now accepts an explicitly reviewed Xbox 360 archive. It
+validates the extracted ISO before promotion; receipt verification rechecks the
+format as well as output hashes. Library scanning uses a dedicated `xbox360_iso`
+kind and the verified title ID. Launch and readiness recheck the current identity.
+Legacy PlayStation intake/scanning refuses Xbox-family volume markers instead of
+turning a large Xbox ISO into a PS2 entry. Loose XEX, packages, updates and DLC
+remain outside this adapter.
+
+Library Play selects the managed Xenia runner and passes a literal `--target=`
+argument plus explicit fullscreen/windowed mode. The dropdown beside Play uses
+the existing compatible-runner/override mechanism. Storage, content, config,
+cache and logs stay under the instance's Xenia tree, with path overrides refused.
+First-run defaults select Vulkan and keyboard controller emulation; existing
+configuration is preserved. Enter is Start; WASD moves, arrows look, J/K/U/I are
+A/B/X/Y, Q/E are triggers and 1/3 are bumpers. Native saves are Xenia-owned under
+its title/content hierarchy; state portability is not implied.
+
+Actual retained Vanquish ISO metadata: title `53450841`, media `58359DF4`, version
+field 1, disc 1/1, partition offset 265,879,552, boot XEX 5,230,592 bytes. The
+7,838,695,424-byte ISO was prepared in the isolated pilot through the manager;
+the original RAR is retained. Metadata verification is not gameplay acceptance.
+Live video/audio/input, native save/relaunch and clean-exit evidence remain
+separate gates until observed. Original Xbox/xemu still needs its own firmware,
+HDD and disc adapter; Xbox 360 support does not supply those prerequisites.
+
+Read-only CLI inspection now also accepts
+`marquee console-inspect --system xbox360 /absolute/game.iso`. The inspector never
+labels a game playable by itself. UI content inspection displays title/media IDs
+and disc number, while Add games includes Xbox 360 folders and Downloads and
+archives includes explicit Xbox 360 preparation.
+
+
+Live pilot follow-up: the first native-Wayland attempt produced a white window
+with music. Pinned Xenia GTK source only creates an XCB surface, so its catalogue
+now sets `GDK_BACKEND=x11` to use XWayland on Fedora. The owner then confirmed a
+visible menu with audio and functioning keyboard controls after clicking the game
+to focus it. That is menu/input acceptance, not yet gameplay/save acceptance.
+First-run mappings also move right-stick click to H and reduce triggers to Q/E,
+so they cannot consume the K/I face-button bindings. Existing user configurations
+remain untouched; this fixes new managed profiles, not arbitrary personal setups.
+
+
+The owner closed both isolated attempts normally; each session recorded exit 0.
+The corrected XWayland session ran for 175 seconds. No gameplay or native-save
+acceptance was reported before closing. The normal game page, compatible Xenia
+selector and title/media/disc inspection passed browser checks, including 390 px
+with no overflow or JS errors. Xbox 360 now maps to TheGamesDB platform 15 for
+reviewed facts search and the Microsoft Xbox 360 thumbnail namespace for artwork.
+The provider platform mapping is documented by [TheGamesDB](https://thegamesdb.net/list_games.php?platform_id=15).
+
+
+Main-library rollout completed through the same reviewed manager workflow.
+Vanquish is registered with title ID `53450841`; the library now has 858 editions,
+with the previous 857 entries preserved. Its display title was cleaned and artwork
+refresh completed. Facts search returned two same-title Xbox 360 candidates, so no
+ambiguous provider match was applied. Full checks and the production desktop build
+passed. The next live gate is gameplay, followed by native save and relaunch.

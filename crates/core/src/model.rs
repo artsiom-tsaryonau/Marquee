@@ -44,6 +44,7 @@ pub enum MediaKind {
     /// `.iso` bound to a PS1 root.
     Ps1Iso,
     Ps3Iso,
+    Xbox360Iso,
     /// `.chd` bound to a PS1 root (DuckStation reads CHD directly).
     Ps1Chd,
     /// `.cue` sheet bound to a PS1 root. The sheet names a `.bin` track next to
@@ -60,6 +61,7 @@ impl MediaKind {
             Self::Iso => KIND_PS2_ISO,
             Self::Ps1Iso => KIND_PS1_ISO,
             Self::Ps3Iso => "ps3_iso",
+            Self::Xbox360Iso => "xbox360_iso",
             Self::Ps1Chd => KIND_PS1_CHD,
             Self::Ps1Cue => KIND_PS1_CUE,
             Self::Rom => KIND_ROM,
@@ -71,6 +73,7 @@ impl MediaKind {
             KIND_PS2_ISO => Some(Self::Iso),
             KIND_PS1_ISO => Some(Self::Ps1Iso),
             "ps3_iso" => Some(Self::Ps3Iso),
+            "xbox360_iso" => Some(Self::Xbox360Iso),
             KIND_PS1_CHD => Some(Self::Ps1Chd),
             KIND_PS1_CUE => Some(Self::Ps1Cue),
             KIND_ROM => Some(Self::Rom),
@@ -86,12 +89,13 @@ impl MediaKind {
     /// and importing it separately would double-count one disc.
     pub fn for_system_extension(system: &str, ext: &str) -> Option<Self> {
         match ext.to_ascii_lowercase().as_str() {
+            "iso" if system == "xbox360" => Some(Self::Xbox360Iso),
             "iso" if system == "ps3" => Some(Self::Ps3Iso),
             "iso" if system == SYSTEM_PS1 => Some(Self::Ps1Iso),
             "iso" if system == SYSTEM_PS2 => Some(Self::Iso),
             "chd" if system == SYSTEM_PS1 => Some(Self::Ps1Chd),
             "cue" if system == SYSTEM_PS1 => Some(Self::Ps1Cue),
-            _ if system == "ps3" => None,
+            _ if matches!(system, "ps3" | "xbox360") => None,
             _ if system != SYSTEM_PS1 && system != SYSTEM_PS2 => Some(Self::Rom),
             _ => None,
         }

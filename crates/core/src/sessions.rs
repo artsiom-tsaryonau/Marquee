@@ -80,6 +80,15 @@ pub fn launch(
                     .unwrap_or_else(|| "This media cannot be launched".into()),
             ));
         }
+        if system == "xbox360" {
+            let identity = marquee_media::xbox360::inspect(&media.path)?;
+            if media.serial.as_deref() != Some(identity.title_id.as_str()) {
+                return Err(AppError::new(
+                    "MEDIA_CHANGED",
+                    "Xbox 360 disc identity changed. Rescan before launching.",
+                ));
+            }
+        }
         let runners = runners::snapshot(&db)?;
         // The stored selection is a hint for one emulator family; only honour it
         // when it matches this title's system, so a PS2 pin cannot hijack a PS1

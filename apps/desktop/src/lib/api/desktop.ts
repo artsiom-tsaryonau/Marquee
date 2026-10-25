@@ -45,7 +45,7 @@ export const desktopApi: LibraryApi = {
     return typeof selected === 'string' ? selected : null;
   },
   async pickConsoleContent() {
-    const selected = await open({ directory:false, multiple:false, title:'Inspect console content', filters:[{name:'Console content',extensions:['pkg','rar']}] });
+    const selected = await open({ directory:false, multiple:false, title:'Inspect console content', filters:[{name:'Console content',extensions:['pkg','rar','iso']}] });
     return typeof selected === 'string' ? selected : null;
   },
   async pickPs3Content() {

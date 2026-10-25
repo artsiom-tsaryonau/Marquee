@@ -208,6 +208,9 @@ pub fn launch_argv(
         // The emulator's own catalogue entry says how to start a game; `{rom}`
         // is replaced by the image path as one argument (no shell involved).
         let def = emulator_for_runner(&runner.id);
+        if let Some(d) = &def {
+            crate::emulators::validate_managed_args(&d.id, extra)?;
+        }
         let template = def
             .as_ref()
             .map(|d| d.launch.clone())

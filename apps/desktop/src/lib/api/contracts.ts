@@ -601,6 +601,7 @@ export interface CatalogueSnapshot {
 }
 
 export interface ConsoleInspection {
+ xbox360?: {title_id:string;media_id:string;version:number;disc_number:number;disc_count:number}|null;
  source: string; system: string; kind: string; bytes: number; content_id: string|null; content_type:number|null; content_flags:number|null;
  metadata: {title:string;title_id:string;category:string;app_version:string|null}|null;
  role:string; archive: {entries:number;files:number;unpacked_bytes:number;candidates:{path:string;bytes:number;role:string}[];sample:string[];truncated:boolean}|null;

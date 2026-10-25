@@ -16,6 +16,7 @@
  {#if report}<div aria-live="polite">
   <p class="path">{report.source}</p><p>{bytes(report.bytes)} · {report.kind} · {report.role === 'unknown' ? 'Content role unchecked' : report.role}</p>
   {#if report.metadata}<h4>{report.metadata.title}</h4><p>{report.metadata.title_id} · {report.metadata.app_version??'Version unchecked'} · Category {report.metadata.category}</p>{/if}
+  {#if report.xbox360}<p>Title ID {report.xbox360.title_id} · Media ID {report.xbox360.media_id} · Disc {report.xbox360.disc_number} of {report.xbox360.disc_count}</p>{/if}
   {#if report.content_id}<p class="path">{report.content_id}</p>{/if}
   {#if report.archive}<p>{report.archive.entries.toLocaleString()} headers · {report.archive.files.toLocaleString()} files · {bytes(report.archive.unpacked_bytes)} declared unpacked{report.archive.truncated ? ' · Partial inventory' : ''}</p>
     {#each report.archive.candidates as member}<p class="path">{member.path}<br />{member.role.replaceAll('_',' ')} · {bytes(member.bytes)}</p>{/each}
