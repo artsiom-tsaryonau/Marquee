@@ -88,6 +88,11 @@ only after validation. Emulator programs, original sources, firmware and writabl
 profiles have separate lifecycles. See [storage design](docs/STORAGE_LAYOUT.md)
 and the [portable package proposal](docs/PORTABLE_PACKAGES.md).
 
+The [offline storage relocation tool](docs/STORAGE_LAYOUT.md#offline-relocation-tool)
+moves collection trees onto a chosen root with SHA-256 inventories, interruption
+recovery, rollback and compatibility links for existing library paths. Managed
+emulator profiles and active torrent/streaming storage retain their current paths.
+
 The diagram uses Aircloud Creative Studio's **ELK** auto-layout engine. Its
 [editable source](docs/diagrams/architecture.mmd), [layout data](docs/diagrams/architecture.layout.json)
 and [render script](scripts/render-architecture.ts) are included. To regenerate

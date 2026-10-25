@@ -41,6 +41,17 @@ pub fn add_root(db: &Db, path: &Path, system: &str, label: Option<&str>) -> Resu
         }
         return Ok(existing);
     }
+    // Offline storage relocation retains the registered path as a compatibility
+    // link. Re-adding its physical destination must keep that root and its media
+    // identities rather than scanning the same games under new absolute paths.
+    for existing in snapshot_roots(db)? {
+        if fs::canonicalize(&existing.path).ok().as_ref() == Some(&canonical) {
+            if existing.system != system {
+                return Err(AppError::new("ROOT_SYSTEM_CONFLICT", format!("This folder is already registered as {}. Choose its existing category or a different folder; its games and history were kept.", existing.system)));
+            }
+            return Ok(existing);
+        }
+    }
     let id = Uuid::new_v4().to_string();
     db.upsert_root(&id, &canonical, "folder", &descriptor.id, label)?;
     Ok(LibraryRoot {

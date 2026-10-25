@@ -11,6 +11,7 @@ target/
 # Locally fetched game images (ROMs, disc images) and their unpacked archives.
 # Never committed: copyrighted/third-party media stays on this machine.
 roms/
+/roms
 
 # BIOS dumps and other copyrighted firmware must never be committed
 *.zip
@@ -86,6 +87,7 @@ coverage/
 
 # Local acceptance collection, including console key material; never commit.
 sample_images/
+/sample_images
 
 # Private PS3 licenses and disc keys
 exdata/

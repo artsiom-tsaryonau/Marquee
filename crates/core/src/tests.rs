@@ -68,6 +68,37 @@ fn schema_survives_reopen_and_keeps_overrides() {
 }
 
 #[test]
+fn relocated_root_keeps_games_and_rejects_duplicate_physical_registration() {
+    let dir = tempfile::tempdir().unwrap();
+    let original = dir.path().join("original");
+    let relocated = dir.path().join("relocated");
+    write_iso(
+        &original.join("Shadow.iso"),
+        "BOOT2 = cdrom0:\\SLUS_209.63;1",
+    );
+    let core = Core::open(Some(dir.path().join("data")), true).unwrap();
+    let root = core.add_root("ps2", original.clone(), None).unwrap();
+    core.scan(Some(&root.id), None).unwrap();
+    let edition = core.snapshot().unwrap().editions.remove(0);
+    core.set_favourite(&edition.id, true).unwrap();
+    fs::rename(&original, &relocated).unwrap();
+    std::os::unix::fs::symlink(&relocated, &original).unwrap();
+    let same = core.add_root("ps2", relocated.clone(), None).unwrap();
+    assert_eq!(same.id, root.id);
+    assert_eq!(same.path, original);
+    assert_eq!(
+        core.add_root("ps1", relocated, None).unwrap_err().code,
+        "ROOT_SYSTEM_CONFLICT"
+    );
+    core.scan(Some(&root.id), None).unwrap();
+    let editions = core.snapshot().unwrap().editions;
+    assert_eq!(editions.len(), 1);
+    assert_eq!(editions[0].id, edition.id);
+    assert!(editions[0].favorite);
+    assert!(!editions[0].missing);
+}
+
+#[test]
 fn scan_nested_uppercase_iso_and_counts_skipped_formats() {
     let dir = tempfile::tempdir().unwrap();
     let games = dir.path().join("library");
