@@ -8,6 +8,11 @@ never gate Play, create ownership, or merge releases by name.
 
 ## Implemented artwork and facts
 
+For the owner's current coverage audit and the on-disk locations to preserve,
+see [runtime files and existing-game metadata](RUNTIME_FILES.md#metadata-and-covers-for-existing-games).
+The 2026-10-25 gap-fill refresh added seven covers (14 total) and expanded fact
+records from six to 22 while preserving all 858 game identities and play history.
+
 `Fetch covers`, automatic refresh after scans, and `Core::refresh_artwork` use
 `crates/core/src/romart.rs` and `romfacts.rs`. Covers fill gaps without replacing
 existing covers. Missing keys, provider errors and no-match results are nonfatal.

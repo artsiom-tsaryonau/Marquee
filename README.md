@@ -104,6 +104,10 @@ with the sibling Studio checkout and its installed dependencies:
 
 ## Run
 
+See [runtime files, BIOS locations and safe cleanup](docs/RUNTIME_FILES.md) for
+what the built app needs, where firmware and saves live, and how existing games
+get covers and metadata.
+
 **Native streaming:** Wolf API controls are available through `marquee streaming
 --socket /absolute/path/wolf.sock` (inspect, pending, pair, unpair, stop). Native
 `streaming build`, `runtime-status`, `probe` and `rollback` manage a pinned local
