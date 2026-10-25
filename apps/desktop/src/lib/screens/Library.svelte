@@ -17,6 +17,7 @@
   import InstallMenu from '../components/InstallMenu.svelte';
   import ArchiveImport from '../components/ArchiveImport.svelte';
   import CatalogueImport from '../components/CatalogueImport.svelte';
+  import NativeDiscovery from '../components/NativeDiscovery.svelte';
   import { metadataMatches, playerModeLabel, regionValues, versions, providerScore } from '../metadata';
 
   let { collection = null }: { collection?: 'ps2' | null } = $props();
@@ -44,7 +45,7 @@
     recent: inScope.some((g) => g.lastPlayed),
     playtime: inScope.some((g) => g.playtimeMin > 0),
   });
-  let search: HTMLInputElement;
+  let search = $state<HTMLInputElement>();
   let addMenu: HTMLDetailsElement;
 
   const allSources = $derived([...new Set(inScope.map((g) => g.source))]);
@@ -86,7 +87,7 @@
   function onKey(e: KeyboardEvent) {
     if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && document.activeElement !== search) {
       if (!e.key.trim() || (e.target instanceof HTMLElement && e.target.closest('input, textarea, select, [contenteditable=true]'))) return;
-      search.focus();
+      search?.focus();
     }
   }
   function onSearchKey(e: KeyboardEvent) {
@@ -155,7 +156,7 @@
 
 <div class="library">
   <header class="library-heading">
-    <div><span class="eyebrow">{view.discovery ? 'Catalogue discovery' : 'Your collection'}</span><h1>{collection === 'ps2' ? 'PlayStation 2' : 'Library'}</h1><p>{view.discovery ? 'Imported reference entries. Ownership and local files are not implied.' : 'Your games and saved play options, together.'}</p></div>
+    <div><span class="eyebrow">{view.discovery ? 'Catalogue discovery' : 'Your collection'}</span><h1>{collection === 'ps2' ? 'PlayStation 2' : 'Library'}</h1><p>{view.discovery ? 'Find native projects to install, or explore imported game references.' : 'Your games and saved play options, together.'}</p></div>
     <div class="heading-actions">
       <button class="btn glass small" data-nav onclick={() => app.go('tools')}><Icon name="controller" size={16} /> Tools & launchers</button>
       <details class="add-menu" bind:this={addMenu} bind:open={view.addMenuOpen}>
@@ -174,7 +175,7 @@
   </header>
   <div class="scope" data-nav-row aria-label="Library scope">
     <button class="chip" class:on={!view.discovery} data-nav aria-pressed={!view.discovery} onclick={() => changeScope(false)}>Your library</button>
-    <button class="chip" class:on={view.discovery} data-nav aria-pressed={view.discovery} onclick={() => changeScope(true)}>Catalogue discovery</button>
+    <button class="chip" class:on={view.discovery} data-nav aria-pressed={view.discovery} onclick={() => changeScope(true)}>Discover games</button>
   </div>
   <div class="archive-entry"><button class="btn glass small" data-nav onclick={() => (app.intakeOpen = true)}><Icon name="download" size={16} />{app.intakeBusy ? app.intakeProgress : app.intakeResults.length ? 'Review archive import' : 'Downloads and archives'}</button><span>{app.api.kind === 'desktop' ? 'Import ZIP/7z/RAR files or review companion downloads.' : 'Imports use paths on the Marquee computer.'}</span></div>
   {#if adding}
@@ -189,6 +190,15 @@
       <div class="add-actions"><button class="btn primary small" data-nav type="submit" disabled={savingGame || !draft.title.trim()}>Add game</button><button class="btn glass small" data-nav type="button" onclick={() => (adding = false)}>Cancel</button></div>
     </form>
   {/if}
+  {#if view.discovery}
+    <div class="scope" aria-label="Discovery catalogue">
+      <button class="chip" class:on={view.discoveryKind === 'native'} data-nav aria-pressed={view.discoveryKind === 'native'} onclick={() => view.discoveryKind = 'native'}>Native games & ports</button>
+      <button class="chip" class:on={view.discoveryKind === 'reference'} data-nav aria-pressed={view.discoveryKind === 'reference'} onclick={() => view.discoveryKind = 'reference'}>Game references</button>
+    </div>
+  {/if}
+  {#if view.discovery && view.discoveryKind === 'native'}
+    <NativeDiscovery />
+  {:else}
   <div class="categories" data-nav-row aria-label="Game platforms">
     <button class="chip" class:on={!view.platform} data-nav aria-pressed={!view.platform} onclick={() => view.platform = ''}>All platforms <span>{groupGames(inScope).length}</span></button>
     {#each platforms as p}<button class="chip" class:on={view.platform === p} data-nav aria-pressed={view.platform === p} onclick={() => view.platform = p}><PlatformIcon platform={p} size={22} /><b>{chipLabel(p)}</b> <span>{counts.get(p)}</span></button>{/each}
@@ -282,6 +292,7 @@
   {/if}
   {/if}
   {#if view.discovery}<CatalogueImport />{/if}
+  {/if}
   <ArchiveImport />
 </div>
 

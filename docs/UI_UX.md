@@ -329,3 +329,11 @@ review and explicit import. Imported entries remain discovery metadata; recipe
 mappings name existing Marquee adapters, while new/manual/unsupported entries
 clearly require further work. Re-import reports Already present rather than
 adding duplicate games. No new sidebar destination or launch button is added.
+
+
+Games → Discover games now separates **Native games & ports** from imported
+**Game references**. Native discovery shows the shipped engines, platform icons,
+requirements, saved-project and install/job state. Saving a project does not
+install it; Review & install opens the common port dialog, now mounted globally.
+Unknown imported projects remain visibly unsupported for installation. Online
+provider browsing and subscriptions remain future work.

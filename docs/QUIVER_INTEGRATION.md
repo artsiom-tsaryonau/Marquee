@@ -1,6 +1,6 @@
 # Quiver integration roadmap
 
-Created 2026-10-22; resumed 2026-10-25. **Q0 and Q1 implemented: pinned source/schema review and offline app-list discovery import. Q2a adds a pinned native-engine recipe pilot; durable manager jobs and game acceptance remain open.**
+Created 2026-10-22; resumed 2026-10-25. **Q0 and Q1 implemented: pinned source/schema review and offline app-list discovery import. Q2a/Q2b add pinned native-engine recipes and durable manager installs; native gameplay acceptance remains open. Q1b exposes searchable local project discovery in Games.**
 
 This track supports later native-port and catalogue expansion. It does not
 change the direct-store implementation order in [ROADMAP.md](ROADMAP.md), add a
@@ -408,3 +408,30 @@ runtimes or copy their build scripts into executable app-list metadata.
 Primary release references: [9.3.1 release](https://github.com/HarbourMasters/Shipwright/releases/tag/9.3.1),
 [pinned Linux setup/data-folder contract](https://github.com/HarbourMasters/Shipwright/blob/f0599f96f8d442f26d0fa1c5cedafddacd56633f/README.md),
 [pinned input hashes](https://github.com/HarbourMasters/Shipwright/blob/f0599f96f8d442f26d0fa1c5cedafddacd56633f/docs/supportedHashes.json).
+
+## Q1b — In-app native project discovery (2026-10-25)
+
+The owner clarified that discovery means browsing projects, saving them to a
+collection, then reviewing a download/install. **Games → Discover games → Native
+games & ports** now exposes the six compiled native-engine recipes, with text
+search, original-platform filtering, requirements and current job/install status.
+**Save project** uses the existing reviewed app-list store without downloading,
+installing, creating a playable edition or executing anything. **Review & install**
+opens the shared port dialog; an explicit Install accepts the durable manager job.
+That dialog now lives in the app shell so it opens from Games as well as Tools.
+
+Imported projects without a shipped recipe remain visible as needing integration.
+App-list import is available on the same screen. Saved catalogue references remain
+in **Game references**, separately from installable native projects. The browser
+check covered six cards, Ocarina search, save-without-install, correct recipe
+dialog, desktop/390px layouts and no JS errors/overflow.
+
+This is a local managed catalogue, not full online Quiver catalogue integration.
+The MIT launcher source does not itself bundle the hosted catalogue or imply its
+service can be mirrored. The next discovery increment is an explicit bounded
+online-provider search/detail adapter, reviewed project additions, cached offline
+results and release/integrity provenance. Preserve source attribution and original
+fields. Known recipes can install engines; other entries need supported recipes.
+Native-port engines often need original game data separately. Commercial console
+acquisition stays with reviewed browser/torrent sources and platform preparation,
+not with arbitrary GitHub release execution.

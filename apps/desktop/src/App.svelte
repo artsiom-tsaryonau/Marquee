@@ -11,6 +11,7 @@
   import Logo from './lib/components/Logo.svelte';
   import Artwork from './lib/components/Artwork.svelte';
   import InstallDialog from './lib/components/InstallDialog.svelte';
+  import PortDialog from './lib/components/PortDialog.svelte';
   import Home from './lib/screens/Home.svelte';
   import Library from './lib/screens/Library.svelte';
   import GamePage from './lib/screens/GamePage.svelte';
@@ -183,6 +184,7 @@
 </div>
 
 <MusicPlayer />
+<PortDialog />
 
 {#if app.installToolId}
   <InstallDialog />

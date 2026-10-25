@@ -2,7 +2,6 @@
   import AppListImport from '../components/AppListImport.svelte';
   import type { PortEntry } from '../types';
   import { portAction, portStatusLabel } from '../presentation';
-  import PortDialog from '../components/PortDialog.svelte';
   import { modal } from '../modal';
   import { onMount, tick } from 'svelte';
   import { app } from '../state.svelte';
@@ -309,7 +308,6 @@
   </div>
 
   <EmulatorDialog />
-  <PortDialog />
 
   {#if sourceDialog}
     <div class="modal-wrap" use:modal={() => (sourceDialog = null)} role="dialog" aria-modal="true" aria-label="Source setup" tabindex="-1" onkeydown={(e) => { if (e.key === 'Escape') sourceDialog = null; }} onclick={(e) => { if (e.target === e.currentTarget) sourceDialog = null; }}>
