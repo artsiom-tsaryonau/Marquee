@@ -193,3 +193,31 @@ Runtime source review: shadPS4 v.0.20.0 revision
 game/ELF paths; it is not a universal package installer. Kyty's CLI accepts
 `--game <directory|elf|zar>` and must have its actual profile/save contract checked
 before a library adapter. Do not pass the RAR directly to that CLI.
+
+### Isolated PS4 preparation spike (2026-10-25)
+
+After metadata inspection, the retained CUSA08809 **base only** was prepared in
+an ignored pilot folder with official ShadPKG v2.1.0 `shadpkg-debian`, 3,257,280
+bytes, SHA-256
+`8fb98f60a2bf0d3995b5635c1cb5f92964ceeb25bb0202822fa63ca7aa1cd8ee`.
+The operator test ran it inside bubblewrap with network/PID namespaces, read-only
+system/tool/source mounts and a single writable new output tree. No license
+creation or PSN-bypass action was invoked. Private logs may contain tool internals
+and are not product output or git artifacts.
+
+Extraction exited 0 with 43 regular files, a base-game `eboot.bin` SELF candidate
+and the original package retained. Updates and DLC were not overlaid. Exact tool
+and output records live under ignored `data/manager-pilot/ps4-preparation/`.
+The official verified shadPS4 v.0.20.0 runtime was installed in the separate
+`console-runtime` library; its first boot uses dedicated XDG config/data/cache and
+working directories. A window observation is pending. Neither successful
+extraction nor a running emulator process establishes game compatibility.
+
+This is a preparation/host-contract spike, not yet a durable console installer or
+library Play adapter. Before publication, define stable installation manifests,
+validate prepared metadata/executables, bind updates/DLC explicitly, isolate
+profiles/saves and record actual boot/gameplay/exit results. The KytyPS5 Linux
+runtime is also installed only in this isolated pilot; PS5 payload extraction and
+launch have not been attempted.
+
+Primary tool: [ShadPKG v2.1.0](https://github.com/seregonwar/ShadPKG/releases/tag/v2.1.0).
