@@ -3194,6 +3194,7 @@ name = "marquee-manager"
 version = "0.0.0"
 dependencies = [
  "anyhow",
+ "flate2",
  "libc",
  "marquee-media",
  "marquee-torrent",
@@ -3201,6 +3202,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "tar",
  "tempfile",
  "tiny_http",
  "url",
@@ -3217,8 +3219,10 @@ dependencies = [
  "serde",
  "serde_json",
  "sevenz-rust2",
+ "sha2",
  "tempfile",
  "unrar_sys",
+ "ureq",
  "zip",
 ]
 

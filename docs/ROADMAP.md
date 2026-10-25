@@ -1,6 +1,6 @@
 # Marquee roadmap
 
-Updated 2026-10-24. This document owns product priority and milestone status.
+Updated 2026-10-25. This document owns product priority and milestone status.
 [Marquee manager](MARQUEE_MANAGER.md) owns the acquisition architecture and detailed
 implementation sequence. Dated feature reports do not override these decisions.
 
@@ -325,3 +325,31 @@ installation, executable integrity repair and settings preservation passed.
 This uses the existing foreground installer; durable manager jobs, actual ROM
 setup, native saves and gameplay/relaunch acceptance remain open. No game data
 was downloaded or an engine launched by this installation-only test.
+
+
+## Current owner priority: decomps, PS4 and PS5 (2026-10-25)
+
+1. **Native engines — durable foundation implemented.** Q2b moves shipped port
+   installation into the existing manager: close/reconnect, progress, cancellation,
+   interrupted retry, immutable receipts and user-file preservation tested with
+   pinned 2 Ship. Game-data setup and tracked play remain open. The supplied
+   Ocarina of Time archive is the next candidate for Ship of Harkinian acceptance;
+   verify its ROM revision first, then test gameplay, native save and relaunch.
+2. **PS4 — one supported base-game path.** Audit the installed versus current
+   shadPS4 core/launcher contract, inspect the actual retained input, identify
+   base/update requirements and prerequisites, then implement reviewed preparation,
+   stable saves/configuration and one library launch adapter. The prior PS4 torrent
+   receive test is transport evidence only. Do not label a PKG download playable.
+3. **PS5 — a separate KytyPS5 pilot.** Check the modern `KytyPS5/KytyPS5` Linux
+   build and title-specific requirements; do not substitute the older InoriRus
+   Kyty project's limitations. Add inspection, reviewed preparation and a launch
+   adapter only for an actual supported input, then observe gameplay, saves and
+   clean exit. Compatibility remains title/build-specific.
+4. **Portable installations and streaming.** Start portable transfer with a small
+   accepted installation; reuse preparation/receipt contracts for later ports and
+   consoles. Extend streaming only after each local adapter is accepted.
+
+Upstream direction checked against [shadPS4](https://github.com/shadps4-emu/shadPS4)
+and [KytyPS5](https://github.com/KytyPS5/KytyPS5). Their current documentation
+supports Linux and reports game-specific progress; neither implies that the
+existing Marquee managed-tool entries already provide game import or Play.

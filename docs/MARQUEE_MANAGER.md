@@ -442,3 +442,16 @@ firmware publication without opening `library.db`. Core is the UI/CLI bridge,
 records no false library game readiness and blocks conflicting RPCS3 setup.
 See [PS3 firmware setup](PS3.md#p3-1--firmware-and-runner-readiness-implemented-live-acceptance-recorded-below)
 for review binding, limits, staging, promotion/recovery and live evidence.
+
+## Native-engine jobs (2026-10-25)
+
+Protocol v6 adds native-port start/list/cancel to this same daemon. The library
+passes a shipped recipe ID, never a command or external app-list setup script.
+`native_port_jobs` and append-only `native_port_receipts` live in `jobs.db`;
+accepted engine installs survive UI/CLI exit. One native-engine worker runs at a
+time. Progress snapshots, cooperative cancellation, explicit crash retry and
+drain-on-stop share the existing process/socket authority. Native installation
+never opens the library database. Core verifies receipt output and transactionally
+publishes installed-port settings when it reconnects. Prior successful receipts
+survive failed attempts. Native game-data preparation and tracked play sessions
+remain separate follow-up work. See [Q2b](QUIVER_INTEGRATION.md#q2b--detached-engine-installation-2026-10-25).

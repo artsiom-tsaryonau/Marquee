@@ -380,6 +380,8 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
         "open_launcher" => out(core.open_launcher(&text(&args, "id")?)?),
         "list_ports" => out(core.list_ports()?),
         "check_port_updates" => out(core.check_port_updates()?),
+        "start_port_install" => out(core.start_port_install(&text(&args, "port_id")?)?),
+        "cancel_port_install" => out(core.cancel_port_install(&text(&args, "port_id")?)?),
         "install_port" => out(core.install_port(&text(&args, "port_id")?, sink)?),
         "launch_port" => out(core.launch_port(&text(&args, "port_id")?)?),
         "open_port_folder" => out(core.open_port_folder(&text(&args, "port_id")?)?),

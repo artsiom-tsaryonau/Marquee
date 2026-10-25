@@ -19,12 +19,15 @@
       {#if app.portErrors[port.id]}<p class="error" role="alert">{app.portErrors[port.id]}</p>{/if}
       {#if app.portBusy[port.id]}<p role="status">{app.portBusy[port.id]}</p>{/if}
       <div class="actions">
+        {#if port.id in app.portBusy}<button class="btn glass" data-nav onclick={() => app.cancelPortInstall(port)}>Cancel installation</button>{/if}
+        {#if port.job && ['failed', 'interrupted', 'cancelled'].includes(port.job.state) && port.status !== 'not-installed'}<button class="btn glass" data-nav onclick={() => app.installPort(port)}>Retry engine installation</button>{/if}
         <button class="btn primary" data-nav disabled={port.id in app.portBusy} onclick={() => app.runPortAction(port)}>{port.id in app.portBusy ? 'Working…' : portAction(port).label}</button>
         {#if port.status === 'update'}<button class="btn glass" data-nav disabled={port.id in app.portBusy} onclick={() => app.launchPort(port)}>Open port</button>{/if}
         {#if port.status !== 'not-installed' && portAction(port).operation !== 'folder'}<button class="btn glass" data-nav onclick={() => app.openPortFolder(port)}><Icon name="folder" />Open game files folder</button>{/if}
         <button class="btn glass" data-nav onclick={() => app.loadPorts()}><Icon name="refresh" />Refresh status</button>
       </div>
       <details><summary data-nav>Installation details</summary><dl><dt>Version</dt><dd>{port.status === 'not-installed' ? 'Not installed' : port.version || 'Unknown'}</dd><dt>Upstream</dt><dd>{port.upstream}</dd></dl></details>
+      <p>Accepted engine installations continue when Marquee closes. Cancellation takes effect at the next download or preparation checkpoint; publication finishes once started.</p>
       <p>Installed ports also appear in Library. Saves and settings stay in the port’s managed folder when the engine is updated.</p>
     </div>
   </div>

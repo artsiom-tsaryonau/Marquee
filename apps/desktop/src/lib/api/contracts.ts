@@ -246,6 +246,7 @@ export interface PortInfo {
   latest_version: string | null;
   status: 'not_installed' | 'ready' | 'update';
   folder: string | null;
+  job?: { state: string; message: string; error_code: string | null } | null;
 }
 
 /** One configurable key. The UI never receives the secret itself, only a masked preview. */
@@ -537,6 +538,7 @@ export interface LibraryApi {
   listPorts(): Promise<PortInfo[]>;
   checkPortUpdates(): Promise<PortInfo[]>;
   installPort(portId: string): Promise<PortInfo[]>;
+  cancelPortInstall(portId: string): Promise<PortInfo[]>;
   launchPort(portId: string): Promise<void>;
   openPortFolder(portId: string): Promise<void>;
   listEmulators(): Promise<EmulatorInfo[]>;

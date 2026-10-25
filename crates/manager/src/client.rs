@@ -356,6 +356,20 @@ impl Client {
             false,
         )
     }
+    pub fn native_ports(
+        &self,
+        request: crate::native_ports::Request,
+    ) -> Result<Vec<crate::native_ports::Job>> {
+        let explicit = matches!(request, crate::native_ports::Request::Start { .. });
+        if !explicit && !self.data.join("manager/jobs.db").exists() {
+            return Ok(vec![]);
+        }
+        if !explicit && self.data.join("manager/stopped").exists() {
+            return Ok(vec![]);
+        }
+        self.start_manager()?;
+        self.call(Operation::NativePort { request }, explicit)
+    }
     pub fn ps3_firmware(
         &self,
         request: crate::ps3_firmware::Request,
@@ -378,7 +392,7 @@ impl Client {
         self.call(Operation::Torrent { request }, false)
     }
     pub fn stop(&self) -> Result<Status> {
-        for version in [protocol::VERSION, 4, 3, 2, 1] {
+        for version in [protocol::VERSION, 5, 4, 3, 2, 1] {
             match self.exchange_version(self.connect()?, Operation::Stop, version) {
                 Err(e) if e.code == "MANAGER_VERSION" => continue,
                 result => return result,
@@ -402,7 +416,7 @@ mod tests {
         let socket = client.socket_path().unwrap();
         let listener = UnixListener::bind(&socket).unwrap();
         let server = std::thread::spawn(move || {
-            for version in [protocol::VERSION, 4, 3, 2, 1] {
+            for version in [protocol::VERSION, 5, 4, 3, 2, 1] {
                 let (mut stream, _) = listener.accept().unwrap();
                 let request: Request = protocol::read_frame(&mut stream).unwrap();
                 assert_eq!(request.protocol_version, version);

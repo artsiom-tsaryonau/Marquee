@@ -326,3 +326,40 @@ mark the engine as a complete game installation to close that gate.
 
 Primary references: [pinned source README](https://github.com/2ship2harkinian/2ship2harkinian/blob/8a24047fbce8915993804e7819f4df4fa591551f/README.md),
 [release](https://github.com/2ship2harkinian/2ship2harkinian/releases/tag/5.0.1).
+
+## Q2b — Detached engine installation (2026-10-25)
+
+Native engines now install through the existing private `marquee-manager`
+process. Start returns after a durable checkpoint; closing Marquee leaves the
+accepted worker running. The port dialog restores persisted progress on reconnect,
+allows cancellation and retries interrupted/failed jobs. CLI `ports install`
+waits for that same worker; exiting the CLI does not cancel it.
+
+Protocol v6 accepts only shipped recipe IDs. The manager resolves the release,
+URL, executable and destination itself, and never opens `library.db`. Jobs and
+immutable attempt receipts use additive tables in `manager/jobs.db`. Receipts
+record the compiled recipe hash, release tag, relative executable and output
+SHA-256/size. On reconnect the library owner rechecks the output and publishes
+settings and receipt identity in one transaction. Failed/cancelled retries keep
+the previous successful receipt. Existing pre-manager installs remain usable.
+
+The existing bounded installer/extraction checks moved into the manager without
+loosening checksum rules. A deterministic engine backup and filesystem syncs
+recover the rename window; retry restores the old tree if publication did not
+finish and removes only that recipe's abandoned staging directories. User game
+files/settings are preserved. Download cancellation is checked between chunks;
+extraction cancellation waits for its next phase boundary. Once publication
+starts it finishes. A manager stop drains accepted work and remains stopped until
+explicit restart. A crash marks running jobs **interrupted**; retry downloads
+fresh bytes, rather than claiming HTTP partial-download resume.
+
+Live isolated acceptance passed with pinned 2 Ship 5.0.1: short-lived requester
+exit, completion without any library database, forced manager crash/restart,
+cancellation, retry, preservation of settings and the prior receipt, and eventual
+library publication after explicit manager restart. The engine was not executed.
+Ignored evidence: `data/manager-pilot/quiver-q2b/detached-install-receipt.json`.
+
+This completes engine-job durability, not the full Q2 setup/play gate. Game-data
+inspection/setup, engine execution, native session ownership/playtime, saves and
+relaunch still need their own acceptance. The owner has now supplied an Ocarina
+of Time RAR; inspect its actual ROM revision before selecting a Shipwright recipe.

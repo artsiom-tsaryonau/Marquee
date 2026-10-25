@@ -20,6 +20,7 @@ struct Server {
     manager: Arc<Manager>,
     data: std::path::PathBuf,
     ps3_firmware: crate::ps3_firmware::Host,
+    native_ports: Arc<crate::native_ports::Host>,
     torrents: std::sync::Mutex<Option<Arc<crate::torrent::Host>>>,
     stopping: AtomicBool,
     connections: AtomicUsize,
@@ -70,6 +71,7 @@ impl Server {
         }
         match operation {
             Operation::Hello => json(self.status()),
+            Operation::NativePort { request } => json(self.native_ports.dispatch(request)?),
             Operation::Ps3Firmware { request } => json(self.ps3_firmware.dispatch(request)?),
             Operation::Torrent { request } => self.torrents()?.dispatch(request),
             Operation::Browser { client_id, request } => {
@@ -195,8 +197,11 @@ pub fn run(data: &Path) -> Result<()> {
     let listener = UnixListener::bind(&socket)?;
     fs::set_permissions(&socket, fs::Permissions::from_mode(0o600))?;
     listener.set_nonblocking(true)?;
+    let manager = Arc::new(Manager::new(&data));
+    let native_ports = crate::native_ports::Host::new(&data, manager.clone())?;
     let server = Arc::new(Server {
-        manager: Arc::new(Manager::new(&data)),
+        manager,
+        native_ports,
         ps3_firmware: crate::ps3_firmware::Host::new(&data)?,
         data: data.clone(),
         torrents: std::sync::Mutex::new(None),
@@ -231,6 +236,7 @@ pub fn run(data: &Path) -> Result<()> {
         }
         if server.stopping.load(Ordering::Acquire)
             && !server.manager.active()
+            && !server.native_ports.active()
             && server.connections.load(Ordering::Acquire) == 0
         {
             break;

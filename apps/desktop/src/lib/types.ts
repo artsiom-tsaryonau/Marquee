@@ -110,6 +110,7 @@ export interface Ratings {
 export type PortStatus = 'installed' | 'ready' | 'needs-rom' | 'needs-data' | 'update' | 'not-installed';
 
 export interface PortEntry {
+  job?: { state: string; message: string; error_code: string | null } | null;
   id: string;
   name: string;
   game: string;

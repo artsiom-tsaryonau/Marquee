@@ -6,3 +6,5 @@ pub mod error;
 pub mod iso;
 mod rar;
 pub mod time;
+
+pub mod http;

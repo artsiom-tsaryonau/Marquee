@@ -153,8 +153,12 @@ class AppState {
     }
   }
 
+  private portTimer: ReturnType<typeof setInterval> | undefined;
+  private portPollBusy = false;
   private unlisten: (() => void) | undefined;
   disconnect() {
+    if (this.portTimer) clearInterval(this.portTimer);
+    this.portTimer = undefined;
     this.unlisten?.();
     this.unlisten = undefined;
   }
@@ -678,8 +682,16 @@ class AppState {
   }
 
   private applyPorts(list: PortInfo[]) {
+    this.portBusy = Object.fromEntries(list.filter((p) => p.job?.state === 'installing').map((p) => [p.id, p.job!.message]));
+    for (const p of list) {
+      if (p.job && ['failed', 'interrupted', 'cancelled'].includes(p.job.state)) this.portErrors[p.id] = p.job.message;
+      else delete this.portErrors[p.id];
+    }
+    if (Object.keys(this.portBusy).length) this.portTimer ??= setInterval(() => void this.pollPorts(), 1500);
+    else if (this.portTimer) { clearInterval(this.portTimer); this.portTimer = undefined; }
     this.ports = list.map((p) => ({
       id: p.id,
+      job: p.job,
       name: p.name,
       game: p.game,
       family: p.family,
@@ -937,19 +949,29 @@ class AppState {
     else await this.launchPort(port);
   }
 
+  private async pollPorts() {
+    if (this.portPollBusy) return;
+    this.portPollBusy = true;
+    try { this.applyPorts(await this.api.listPorts()); }
+    catch { /* Keep polling after a temporary manager disconnect. */ }
+    finally { this.portPollBusy = false; }
+  }
   async installPort(port: PortEntry) {
     if (port.id in this.portBusy) return;
     delete this.portErrors[port.id];
     this.portBusy[port.id] = `Installing ${port.name}…`;
     try {
       this.applyPorts(await this.api.installPort(port.id));
-      this.notify(`${port.name} is installed. ${port.requirement}`);
+      this.notify('Engine installation accepted. You can close Marquee while it runs.');
     } catch (err) {
+      delete this.portBusy[port.id];
       this.portErrors[port.id] = (err as { message?: string }).message ?? `Could not install ${port.name}`;
       this.notify(this.portErrors[port.id]);
-    } finally {
-      delete this.portBusy[port.id];
     }
+  }
+  async cancelPortInstall(port: PortEntry) {
+    try { this.applyPorts(await this.api.cancelPortInstall(port.id)); }
+    catch (err) { this.notify((err as { message?: string }).message ?? 'Could not cancel installation'); }
   }
 
   async launchPort(port: PortEntry) {

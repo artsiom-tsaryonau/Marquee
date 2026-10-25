@@ -17,7 +17,9 @@ serde_json.workspace = true
 sha2.workspace = true
 uuid.workspace = true
 url = "2"
+flate2.workspace = true
+tar.workspace = true
+zip.workspace = true
 
 [dev-dependencies]
 tiny_http = "0.12"
-zip.workspace = true

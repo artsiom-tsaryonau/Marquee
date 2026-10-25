@@ -593,3 +593,25 @@ test('legacy Ports navigation opens tagged Games and clears incompatible discove
   assert.equal(app.route,'library');assert.equal(view.sourceFilter,'port');assert.equal(view.discovery,false);
   assert.equal(view.platform,'');assert.equal(view.query,'');assert.equal(view.region,'');assert.equal(view.favOnly,false);assert.equal(view.installedOnly,false);
 });
+
+test('reconnecting restores native install progress without advertising a playable game', async () => {
+  const api=app.api;
+  const pending={id:'shipwright',name:'Ship of Harkinian',game:'Ocarina of Time',family:'Native',platform:'n64',upstream:'HarbourMasters/Shipwright',installed_version:null,latest_version:null,status:'not_installed',requirement:'Supply game data',folder:null,job:{state:'installing',message:'Downloading engine…',error_code:null}};
+  let list=[pending];
+  app.api={...api,listPorts:async()=>list,checkPortUpdates:async()=>list,cancelPortInstall:async()=>{list=[{...pending,job:{state:'cancelled',message:'Engine installation cancelled',error_code:'PORT_CANCELLED'}}];return list;}};
+  try {
+    await app.loadPorts();
+    assert.equal(app.portBusy.shipwright,'Downloading engine…');
+    assert.equal(app.games.some(g=>g.id==='port:shipwright'),false);
+    await app.cancelPortInstall(app.ports[0]);
+    assert.equal(app.portBusy.shipwright,undefined);
+    assert.equal(app.portErrors.shipwright,'Engine installation cancelled');
+    list=[{...pending,installed_version:'pinned',status:'ready',folder:'/managed',job:{state:'installed',message:'Engine installed · game setup unchecked',error_code:null}}];
+    await app.loadPorts();
+    assert.equal(app.portErrors.shipwright,undefined);
+    assert.equal(app.ports[0].status,'installed');
+    assert.equal(app.games.find(g=>g.id==='port:shipwright').portStatus,'installed');
+    const {portStatusLabel}=await import('../src/lib/presentation');
+    assert.match(portStatusLabel(app.ports[0]),/setup unchecked/i);
+  } finally { app.disconnect();app.api=api; }
+});

@@ -424,17 +424,61 @@ impl Core {
 
     /// Catalogue plus install state. Offline: "update" shows only after `check_port_updates`.
     pub fn list_ports(&self) -> Result<Vec<ports::PortInfo>> {
+        let mut jobs = match self
+            .preparation
+            .native_ports(marquee_manager::native_ports::Request::List)
+        {
+            Ok(jobs) => jobs,
+            Err(error)
+                if matches!(
+                    error.code.as_str(),
+                    "MANAGER_OFFLINE" | "MANAGER_BINARY" | "MANAGER_STOPPING"
+                ) =>
+            {
+                vec![]
+            }
+            Err(error) => return Err(error),
+        };
+        for job in &mut jobs {
+            if job.state == "installing" {
+                continue;
+            }
+            if let Some(receipt) = &job.receipt {
+                let key = format!("port.{}.receipt", job.id);
+                if self.with_db(|db| db.get_setting(&key))?.as_deref() != Some(&receipt.attempt_id)
+                {
+                    if let Err(error) =
+                        marquee_manager::native_ports::verify_receipt(&self.paths.data_dir, job)
+                    {
+                        job.state = "failed".into();
+                        job.message = error.message;
+                        job.error_code = Some(error.code);
+                        continue;
+                    }
+                    let installed = serde_json::to_string(&receipt.installed)?;
+                    self.with_db(|db| {
+                        let tx = db.conn.unchecked_transaction()?;
+                        for (name, value) in [
+                            (ports::setting_key(&job.id), installed.as_str()),
+                            (ports::latest_key(&job.id), receipt.installed.tag.as_str()),
+                            (key.clone(), receipt.attempt_id.as_str()),
+                        ] {
+                            tx.execute("INSERT INTO settings(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value", rusqlite::params![name, value])?;
+                        }
+                        tx.commit()?;
+                        Ok(())
+                    })?;
+                }
+            }
+        }
         ports::catalogue()?
             .iter()
             .map(|def| {
                 let installed = self.installed_port(&def.id)?;
                 let latest = self.with_db(|db| db.get_setting(&ports::latest_key(&def.id)))?;
-                Ok(ports::info(
-                    &self.paths,
-                    def,
-                    installed.as_ref(),
-                    latest.as_deref(),
-                ))
+                let mut info = ports::info(&self.paths, def, installed.as_ref(), latest.as_deref());
+                info.job = jobs.iter().find(|j| j.id == def.id).cloned();
+                Ok(info)
             })
             .collect()
     }
@@ -455,49 +499,66 @@ impl Core {
         self.list_ports()
     }
 
-    /// Install a port, or update it to the newest release. User files in the folder are kept.
+    /// Accept work into the detached manager before returning to the UI.
+    pub fn start_port_install(&self, id: &str) -> Result<Vec<ports::PortInfo>> {
+        ports::find(id)?;
+        self.preparation
+            .native_ports(marquee_manager::native_ports::Request::Start { id: id.into() })?;
+        self.list_ports()
+    }
+    pub fn cancel_port_install(&self, id: &str) -> Result<Vec<ports::PortInfo>> {
+        self.preparation
+            .native_ports(marquee_manager::native_ports::Request::Cancel { id: id.into() })?;
+        self.list_ports()
+    }
+    /// CLI compatibility: wait for the detached job. Client exit does not cancel it.
     pub fn install_port(&self, id: &str, sink: Arc<dyn EventSink>) -> Result<Vec<ports::PortInfo>> {
-        let def = ports::find(id)?;
-        {
-            let mut busy = self
-                .installing_ports
-                .lock()
-                .unwrap_or_else(|e| e.into_inner());
-            if !busy.insert(def.id.clone()) {
+        self.start_port_install(id)?;
+        let mut last = String::new();
+        loop {
+            let ports = self.list_ports()?;
+            let job = ports
+                .iter()
+                .find(|p| p.id == id)
+                .and_then(|p| p.job.as_ref())
+                .ok_or_else(|| {
+                    AppError::new(
+                        "MANAGER_OFFLINE",
+                        "Native engine job unavailable; reconnect to the manager",
+                    )
+                })?;
+            if job.message != last {
+                sink.emit(CoreEvent::PortProgress {
+                    port_id: id.into(),
+                    message: job.message.clone(),
+                });
+                last = job.message.clone();
+            }
+            if job.state == "installed" {
+                sink.emit(CoreEvent::LibraryChanged);
+                return Ok(ports);
+            }
+            if job.state != "installing" {
                 return Err(AppError::new(
-                    "INSTALL_BUSY",
-                    format!("{} is already installing", def.name),
+                    job.error_code.as_deref().unwrap_or("PORT_INSTALL"),
+                    &job.message,
                 ));
             }
+            std::thread::sleep(std::time::Duration::from_millis(500));
         }
-        struct Done<'a>(&'a Mutex<std::collections::HashSet<String>>, String);
-        impl Drop for Done<'_> {
-            fn drop(&mut self) {
-                self.0
-                    .lock()
-                    .unwrap_or_else(|e| e.into_inner())
-                    .remove(&self.1);
-            }
-        }
-        let _done = Done(&self.installing_ports, def.id.clone());
-
-        let current = self.installed_port(&def.id)?;
-        let installed = ports::install_latest(
-            &self.paths,
-            &def,
-            current.as_ref().map(|c| c.tag.as_str()),
-            &sink,
-        )?;
-        self.set_setting(
-            &ports::setting_key(&def.id),
-            &serde_json::to_string(&installed)?,
-        )?;
-        self.set_setting(&ports::latest_key(&def.id), &installed.tag)?;
-        sink.emit(CoreEvent::LibraryChanged);
-        self.list_ports()
     }
 
     pub fn launch_port(&self, id: &str) -> Result<()> {
+        if self
+            .list_ports()?
+            .iter()
+            .any(|p| p.id == id && p.job.as_ref().is_some_and(|j| j.state == "installing"))
+        {
+            return Err(AppError::new(
+                "INSTALL_BUSY",
+                "Wait for engine installation to finish",
+            ));
+        }
         let def = ports::find(id)?;
         let installed = self.installed_port(id)?.ok_or_else(|| {
             AppError::new(

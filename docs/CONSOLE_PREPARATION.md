@@ -1,6 +1,6 @@
 # Console collection: inventory and preparation plan
 
-Updated 2026-10-24. The owner reports adding **Switch, PS3, PS4, original Xbox and
+Updated 2026-10-25. The owner reports adding **Switch, PS3, PS4, original Xbox and
 Xbox 360 games**. The source tree has now been inventoried read-only using filesystem metadata and
 ZIP headers. Inner formats not inspected remain unknown; no console game, firmware
 or key material was installed or changed.
@@ -11,9 +11,9 @@ records current tool behavior. Do not equate catalogue entries with game adapter
 
 ## Current repository evidence
 
-As of this pass, `catalog/systems/` has no `switch`, `ps3`, `ps4`, `xbox` or
-`xbox360` descriptors. Registering those roots is therefore not supported by the
-current descriptor-validated library flow. `metadata.rs` can retain provider
+The `ps3` descriptor now supports the verified disc-ISO path. The remaining
+`switch`, `ps4`, `ps5`, `xbox` and `xbox360` systems have no accepted library
+import/Play adapter. `metadata.rs` can retain provider
 platform identifiers without providing import or launch support.
 
 | Platform / proposed ID | Existing tool entry | Missing before library Play |
@@ -21,6 +21,7 @@ platform identifiers without providing import or launch support.
 | Nintendo Switch / `switch` | No managed emulator entry found | Select and validate a runner; content inventory, prerequisites, installation/launch adapter and live evidence |
 | PlayStation 3 / `ps3` | RPCS3 managed install/open, read-only discovery, reviewed manager-owned firmware setup | Verified ISO registration and direct launch implemented; live acceptance, broader package preparation and edition relationships remain |
 | PlayStation 4 / `ps4` | shadPS4 managed install/open, experimental | Package or prepared-folder inspection, title/version relationships, explicit supported install method and per-game launch/validation |
+| PlayStation 5 / `ps5` | KytyPS5 managed install/open, experimental Linux research build | Actual input inspection, pinned runtime/CLI contract, reviewed preparation, library launch and title-specific live acceptance |
 | Original Xbox / `xbox` | xemu managed install/open; BIOS/MCPX/HDD requirements recorded | Firmware/HDD configuration, input format inspection, tested conversion only when needed, library/launch/save adapter |
 | Xbox 360 / `xbox360` | No managed emulator entry found | Select and validate a runner on the target Linux host; content inventory, setup, launch and compatibility evidence |
 
@@ -104,6 +105,7 @@ this host, not console generation. Tool availability alone does not close a gate
 | --- | --- |
 | PS3 | Pin RPCS3 build; distinguish prepared disc folders, packages and installed titles using validated metadata; support one chosen input; install firmware through a tested method, preserve keys/licenses privately; select the real boot target and map saves; reject update-only inputs as base installs |
 | PS4 | Pin shadPS4 build; inspect one actual input; verify the supported package/prepared-directory workflow and base/update requirements; installation creates a receipt only after outputs validate; a title that cannot launch stays explicitly blocked/untested |
+| PS5 | Pin the modern KytyPS5 Linux build, inspect an actual supported input and CLI contract, isolate saves/settings, implement reviewed base-game preparation and observe title-specific gameplay/exit/save acceptance |
 | Original Xbox | Pin xemu build; validate BIOS/MCPX/HDD and write only managed configuration with receipts; determine whether the supplied image is accepted or needs an explicit reviewed conversion; retain original media and user HDD/saves |
 | Switch | Select an available runner after checking target-host and distribution requirements; inspect actual content/title relationships; verify firmware/key configuration without logging secrets; implement one supported base-game path before updates/DLC; no assumed universal package support |
 | Xbox 360 | Select a usable runner/build and target-host execution method; inspect actual disc/folder/package layout; implement one supported base-game path with clear host/runtime limits; define profile/save locations before updates or extra content |
@@ -126,6 +128,6 @@ is approved merely by appearing in an older expansion list.
 - [ ] Verify update/repair rollback and uninstall preserve selected save/HDD/source
   retention rules. An opened emulator window is not a game session.
 
-These gates remain open for all five systems. Existing PS1/PS2 and other platform
+PS3 menu/video/audio/navigation and clean exit passed; its gameplay/native-save gates remain open. The broader gates remain open for the other systems. Existing PS1/PS2 and other platform
 acceptance requirements remain independent. Downloading more games does not
 close any preparation or compatibility gate.
