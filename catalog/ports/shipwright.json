@@ -6,7 +6,16 @@
   "platform": "n64",
   "github": "HarbourMasters/Shipwright",
   "asset_suffix": ".appimage",
-  "asset_excludes": ["mac", "win"],
+  "asset_excludes": [
+    "mac",
+    "win"
+  ],
   "binary": null,
-  "requirement": "Requires compatible The Legend of Zelda: Ocarina of Time game files. Add your ROM to the port folder or use the port’s setup window."
+  "requirement": "Requires a supported Ocarina of Time ROM. Managed engine pinned to 9.3.1; run its setup to generate game data. Saves, settings and generated assets use this installation\u2019s isolated SHIP_HOME folder.",
+  "pinned_release": {
+    "tag": "9.3.1",
+    "asset": "SoH-Dewey-Bravo.appimage",
+    "sha256": "e4bb775c9a0c3629ebac57e4b6ccba6d0b621d71ab201e9105aceef9141ad1f4",
+    "binary_sha256": "e4bb775c9a0c3629ebac57e4b6ccba6d0b621d71ab201e9105aceef9141ad1f4"
+  }
 }

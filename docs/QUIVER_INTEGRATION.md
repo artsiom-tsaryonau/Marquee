@@ -363,3 +363,48 @@ This completes engine-job durability, not the full Q2 setup/play gate. Game-data
 inspection/setup, engine execution, native session ownership/playtime, saves and
 relaunch still need their own acceptance. The owner has now supplied an Ocarina
 of Time RAR; inspect its actual ROM revision before selecting a Shipwright recipe.
+
+## Q2c — Ocarina / Shipwright pilot (2026-10-25)
+
+The owner supplied an Ocarina of Time RAR in the repository root. Marquee's shared
+UnRAR adapter inspected and extracted its single 33,554,432-byte `.z64` into an
+isolated pilot. The ROM header is big-endian N64 and its SHA-1 matches **PAL 1.1**
+in Shipwright 9.3.1's supported-input list. The source archive is retained; no
+retail bytes belong in git.
+
+The shipped Shipwright recipe now pins **9.3.1**, source revision
+`f0599f96f8d442f26d0fa1c5cedafddacd56633f`, asset
+`SoH-Dewey-Bravo.appimage` (32,113,856 bytes), SHA-256
+`e4bb775c9a0c3629ebac57e4b6ccba6d0b621d71ab201e9105aceef9141ad1f4`.
+For this single-file release the download and executable hashes are identical.
+The manager checks the compiled pin, ELF64 architecture and output receipt.
+
+The launch adapter sets the upstream-supported `SHIP_HOME` to the managed port
+folder, so generated `oot.o2r`, settings and native saves stay with this library
+instead of using the host's shared `~/.local/share/soh`. It enables the AppImage
+runtime's extract-and-run fallback because this Fedora host has no FUSE 2.
+These are compiled recipe behaviors, not commands imported from an app list.
+
+The pinned engine was installed through the detached manager, then launched by
+the isolated Marquee web API using the supplied ROM. Upstream setup generated
+`oot.o2r` inside the isolated port folder. The owner confirmed the main menu and
+save-file screen. Gameplay/audio/keyboard and native save persistence are still
+being checked; menu arrival alone does not close the acceptance gate. Main-library
+profiles and saves were not touched. Diagnostic files and generated assets remain
+under ignored `data/manager-pilot/oot-pilot/`.
+
+### The owner's Ocarina source candidates
+
+| Project | Role in Marquee |
+| --- | --- |
+| [Shipwright / Ship of Harkinian](https://github.com/HarbourMasters/Shipwright/tree/f0599f96f8d442f26d0fa1c5cedafddacd56633f) | Selected first native Linux runtime. Has releases, supported-ROM hashes and an explicit data-folder override; the existing managed recipe now uses a verified pin. |
+| [zeldaret/oot](https://github.com/zeldaret/oot) | Original-game decompilation/reconstruction. Its README explicitly says it does not produce a PC port; not a second ready-to-run native engine recipe. |
+| [blawar/ooot](https://github.com/blawar/ooot) | Open Ocarina native-port source with its own ROM/build requirements. Candidate for a separate source-build recipe only after a pinned host/build/runtime audit; not installed or validated in this pilot. |
+
+Shipwright appeared twice in the owner's four links; these are three distinct
+repositories. Do not treat all decompilation repositories as interchangeable
+runtimes or copy their build scripts into executable app-list metadata.
+
+Primary release references: [9.3.1 release](https://github.com/HarbourMasters/Shipwright/releases/tag/9.3.1),
+[pinned Linux setup/data-folder contract](https://github.com/HarbourMasters/Shipwright/blob/f0599f96f8d442f26d0fa1c5cedafddacd56633f/README.md),
+[pinned input hashes](https://github.com/HarbourMasters/Shipwright/blob/f0599f96f8d442f26d0fa1c5cedafddacd56633f/docs/supportedHashes.json).

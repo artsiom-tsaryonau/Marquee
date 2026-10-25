@@ -500,3 +500,12 @@ release/archive/executable pin. Approved local app-list entries can open that
 recipe for review. Installation does not include Majora’s Mask game data or
 prove gameplay. The source alias, integrity tests and remaining manager/setup
 gates are recorded in [Quiver Q2a](QUIVER_INTEGRATION.md#q2a--pinned-2-ship-engine-recipe-2026-10-25).
+
+## Ocarina native-port pilot
+
+Ship of Harkinian is a native port, not an N64 emulator. Its managed recipe pins
+9.3.1 and runs with an installation-local `SHIP_HOME` plus the AppImage
+extract-and-run fallback for Fedora hosts without FUSE 2. The supplied PAL 1.1
+input passed the pinned supported-hash check, generated its assets and reached
+file select in an isolated Marquee launch. Gameplay and persistent native saves
+remain acceptance gates. See [Quiver Q2c](QUIVER_INTEGRATION.md#q2c--ocarina--shipwright-pilot-2026-10-25).

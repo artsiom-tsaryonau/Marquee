@@ -131,3 +131,25 @@ is approved merely by appearing in an older expansion list.
 PS3 menu/video/audio/navigation and clean exit passed; its gameplay/native-save gates remain open. The broader gates remain open for the other systems. Existing PS1/PS2 and other platform
 acceptance requirements remain independent. Downloading more games does not
 close any preparation or compatibility gate.
+
+
+## Next PS4 input after the decomp pilot (2026-10-25)
+
+The retained Shadow of the Colossus torrent payload is already present under the
+ignored `data/manager-pilot/shadow-torrent-20261022/payload/` tree. A read-only
+check found three regular `.pkg` candidates with `7f434e54` package magic:
+
+| Filename role hint (not yet parsed identity) | Bytes |
+| --- | --- |
+| CUSA08809 full/base | 13,567,262,720 |
+| CUSA08809 patch v1.01 | 16,842,752 |
+| CUSA08809 DLC | 131,072 |
+
+No new torrent download is required to start this spike. Header magic and
+filenames do not establish package validity, content IDs, decryption readiness,
+base/update compatibility or emulator support. Next inspect bounded package
+metadata with the pinned shadPS4 core/installer contract; review base and additions
+separately before any extraction or installation. None of these packages was
+installed or launched in this pass. The larger Last of Us RAR remains another
+source candidate. No PS5 game input has been identified in this checked pilot
+collection; KytyPS5 acceptance needs an actual supported input independently.

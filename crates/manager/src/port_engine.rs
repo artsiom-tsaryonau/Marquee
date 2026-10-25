@@ -703,7 +703,9 @@ pub fn launch(data: &Path, def: &PortDef, installed: &InstalledPort) -> Result<(
         .with_context(json!({ "path": bin })));
     }
     let cwd = bin.parent().unwrap_or(&dir).to_path_buf();
-    let mut child = Command::new(&bin)
+    let mut command = Command::new(&bin);
+    configure_launch(&mut command, &dir, def);
+    let mut child = command
         .current_dir(cwd)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -717,6 +719,16 @@ pub fn launch(data: &Path, def: &PortDef, installed: &InstalledPort) -> Result<(
         let _ = child.wait();
     });
     Ok(())
+}
+
+/// Shipwright otherwise writes into the host's shared ~/.local/share/soh profile.
+/// Use its supported override and AppImage runtime fallback on hosts without FUSE 2.
+fn configure_launch(command: &mut Command, dir: &Path, def: &PortDef) {
+    if def.id == "shipwright" {
+        command
+            .env("SHIP_HOME", dir)
+            .env("APPIMAGE_EXTRACT_AND_RUN", "1");
+    }
 }
 
 /// Open the port folder in the file manager so the user can drop in their own files.
@@ -764,6 +776,25 @@ mod tests {
         recover_installation(data.path(), &def).unwrap();
         assert_eq!(fs::read(dest.join("save.dat")).unwrap(), b"precious save");
         assert!(!backup.exists());
+    }
+
+    #[test]
+    fn shipwright_launch_keeps_saves_and_generated_assets_inside_its_library() {
+        let mut command = Command::new("engine");
+        let dir = Path::new("/isolated/library/ports/shipwright");
+        configure_launch(&mut command, dir, &find("shipwright").unwrap());
+        let env: std::collections::BTreeMap<_, _> = command
+            .get_envs()
+            .map(|(k, v)| {
+                (
+                    k.to_string_lossy().into_owned(),
+                    v.unwrap().to_string_lossy().into_owned(),
+                )
+            })
+            .collect();
+        assert_eq!(env["SHIP_HOME"], dir.to_str().unwrap());
+        assert_eq!(env["APPIMAGE_EXTRACT_AND_RUN"], "1");
+        assert!(!env.contains_key("HOME"));
     }
 
     fn release() -> serde_json::Value {
