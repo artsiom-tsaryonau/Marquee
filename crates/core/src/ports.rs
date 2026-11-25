@@ -1,8 +1,8 @@
 //! Library-facing native-port catalogue and launch helpers. Installation belongs to the manager.
 use crate::{paths::Paths, Result};
 pub use marquee_manager::port_engine::{
-    catalogue, find, latest_key, latest_release, pick_asset, setting_key, InstalledPort,
-    PinnedRelease, PortDef, PortInfo,
+    catalogue, find, latest_key, latest_release, pick_asset, setting_key, upstream_tag,
+    InstalledPort, PinnedRelease, PortDef, PortInfo,
 };
 use std::path::PathBuf;
 pub fn port_dir(paths: &Paths, id: &str) -> PathBuf {

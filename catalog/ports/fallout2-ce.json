@@ -8,5 +8,11 @@
   "asset_suffix": "-linux-x64.tar.gz",
   "asset_excludes": [],
   "binary": "fallout2-ce",
-  "requirement": "Requires Fallout 2 game data from your existing installation. Add the required files to the port folder."
+  "requirement": "Requires Fallout 2 game data from your existing installation. Add the required files to the port folder.",
+  "pinned_release": {
+    "tag": "v1.3.0",
+    "asset": "fallout2-ce-linux-x64.tar.gz",
+    "sha256": "6d7fcd57e07bdb135538179b89c28bf386d24408b2f03e67048bd6ed527a0899",
+    "binary_sha256": "d83bf49068505f5311dd8aa2d40ef061c6fc54e910389730199cc5e665c4905c"
+  }
 }

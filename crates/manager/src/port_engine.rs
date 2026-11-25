@@ -114,6 +114,7 @@ pub fn info(
 ) -> PortInfo {
     let status = match (installed, latest) {
         (None, _) => "not_installed",
+        (Some(i), Some(l)) if i.tag != l && def.pinned_release.is_some() => "review",
         (Some(i), Some(l)) if i.tag != l => "update",
         (Some(_), _) => "ready",
     };
@@ -215,27 +216,43 @@ pub fn pick_asset(def: &PortDef, release: &serde_json::Value) -> Result<Release>
             return None;
         }
         let url = a.get("browser_download_url")?.as_str()?.to_string();
+        if !http::github_release_asset(&url, &def.github) {
+            return None;
+        }
         let sha256 = a
             .get("digest")
             .and_then(|d| d.as_str())
             .and_then(|d| d.strip_prefix("sha256:"))
-            .map(|d| d.to_ascii_lowercase());
+            .map(|d| d.to_ascii_lowercase())?;
         Some(Asset {
             name: name.to_string(),
             url,
-            sha256,
+            sha256: Some(sha256),
         })
     });
     let asset = found.ok_or_else(|| {
         AppError::new(
             "NETWORK",
             format!(
-                "{} {tag} has no Linux download matching *{}",
+                "{} {tag} has no checksum-verified Linux download matching *{}",
                 def.name, def.asset_suffix
             ),
         )
     })?;
     Ok(Release { tag, asset })
+}
+
+/// The tag GitHub currently calls latest, without selecting or installing an asset.
+pub fn upstream_tag(def: &PortDef) -> Result<String> {
+    let release = http::get_json(&format!(
+        "https://api.github.com/repos/{}/releases/latest",
+        def.github
+    ))?;
+    release
+        .get("tag_name")
+        .and_then(|value| value.as_str())
+        .map(str::to_string)
+        .ok_or_else(|| AppError::new("NETWORK", "GitHub release has no tag"))
 }
 
 pub fn latest_release(def: &PortDef) -> Result<serde_json::Value> {
@@ -288,8 +305,16 @@ pub fn install_latest(
     let part = stage.path().join("download");
     progress(&format!("Downloading {} {}…", def.name, release.tag))?;
     let mut last = 0u64;
-    let got = http::download_file_checked(
+    let expected = release.asset.sha256.clone().ok_or_else(|| {
+        AppError::new(
+            "PORT_RELEASE",
+            "This release publishes no checksum; the recipe needs a reviewed pin",
+        )
+    })?;
+    http::download_verified(
         &release.asset.url,
+        &expected,
+        &http::UrlRule::GithubRelease(&def.github),
         &part,
         http::PORT_MAX_BYTES,
         Duration::from_secs(900),
@@ -301,21 +326,17 @@ pub fn install_latest(
             progress("")
         },
     )
-    .inspect_err(|_| {
-        let _ = fs::remove_file(&part);
-    })?;
-    match &release.asset.sha256 {
-        Some(expected) if *expected != got => {
-            let _ = fs::remove_file(&part);
-            return Err(AppError::new(
+    .map_err(|error| {
+        if error.code == "CHECKSUM" {
+            AppError::new(
                 "NETWORK",
                 "download checksum did not match the GitHub release digest",
             )
-            .with_context(json!({ "expected": expected, "got": got })));
+            .with_context(json!({ "expected": expected }))
+        } else {
+            error
         }
-        Some(_) => {}
-        None => progress("This release publishes no checksum; continuing over HTTPS.")?,
-    }
+    })?;
 
     let name = release.asset.name.to_ascii_lowercase();
     let result = if name.ends_with(".zip") {
@@ -801,11 +822,16 @@ mod tests {
         json!({
             "tag_name": "v1.2.2",
             "assets": [
-                {"name": "Zelda64Recompiled-v1.2.2-Linux-Flatpak-X64.zip", "browser_download_url": "https://x/flatpak"},
-                {"name": "Zelda64Recompiled-v1.2.2-Linux-ARM64.zip", "browser_download_url": "https://x/arm"},
-                {"name": "Zelda64Recompiled-v1.2.2-Linux-X64.zip", "browser_download_url": "https://x/x64", "digest": "sha256:ABCD"}
+                {"name": "Zelda64Recompiled-v1.2.2-Linux-Flatpak-X64.zip", "browser_download_url": "https://github.com/Zelda64Recomp/Zelda64Recomp/releases/download/v1.2.2/flatpak.zip", "digest": "sha256:11"},
+                {"name": "Zelda64Recompiled-v1.2.2-Linux-ARM64.zip", "browser_download_url": "https://github.com/Zelda64Recomp/Zelda64Recomp/releases/download/v1.2.2/arm.zip", "digest": "sha256:22"},
+                {"name": "Zelda64Recompiled-v1.2.2-Linux-X64.zip", "browser_download_url": "https://github.com/Zelda64Recomp/Zelda64Recomp/releases/download/v1.2.2/Zelda64Recompiled-v1.2.2-Linux-X64.zip", "digest": "sha256:ABCD"}
             ]
         })
+    }
+    fn unpinned(id: &str) -> PortDef {
+        let mut def = find(id).unwrap();
+        def.pinned_release = None;
+        def
     }
 
     #[test]
@@ -820,11 +846,46 @@ mod tests {
 
     #[test]
     fn picks_the_plain_x64_linux_asset() {
-        let def = find("zelda64recomp").unwrap();
+        let def = unpinned("zelda64recomp");
         let picked = pick_asset(&def, &release()).unwrap();
         assert_eq!(picked.tag, "v1.2.2");
-        assert_eq!(picked.asset.url, "https://x/x64");
+        assert!(picked.asset.url.ends_with("Linux-X64.zip"));
         assert_eq!(picked.asset.sha256.as_deref(), Some("abcd"));
+    }
+
+    #[test]
+    fn every_port_recipe_pins_a_reviewed_release() {
+        for def in catalogue().unwrap() {
+            let pin = def.pinned_release.expect(&def.id);
+            assert_eq!(pin.sha256.len(), 64, "{}", def.id);
+            assert!(pin.sha256.bytes().all(|c| c.is_ascii_hexdigit()));
+            assert_eq!(pin.binary_sha256.len(), 64, "{}", def.id);
+            assert!(http::github_release_asset(
+                &format!(
+                    "https://github.com/{}/releases/download/{}/{}",
+                    def.github, pin.tag, pin.asset
+                ),
+                &def.github
+            ));
+        }
+    }
+
+    #[test]
+    fn an_unpinned_release_without_a_digest_is_refused() {
+        let def = unpinned("zelda64recomp");
+        let mut release = release();
+        release["assets"]
+            .as_array_mut()
+            .unwrap()
+            .retain(|asset| asset["name"].as_str().unwrap().contains("Linux-X64.zip"));
+        release["assets"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("digest");
+        match pick_asset(&def, &release) {
+            Err(error) => assert_eq!(error.code, "NETWORK"),
+            Ok(_) => panic!("an unpinned release without a digest was accepted"),
+        }
     }
 
     #[test]
@@ -887,7 +948,7 @@ mod tests {
 
     #[test]
     fn missing_asset_is_a_typed_error() {
-        let def = find("uzdoom").unwrap();
+        let def = unpinned("uzdoom");
         let err = pick_asset(&def, &release()).err().unwrap();
         assert_eq!(err.code, "NETWORK");
     }
@@ -904,7 +965,13 @@ mod tests {
         assert_eq!(info(paths, &def, None, Some("2")).status, "not_installed");
         assert_eq!(info(paths, &def, Some(&inst), None).status, "ready");
         assert_eq!(info(paths, &def, Some(&inst), Some("1")).status, "ready");
-        assert_eq!(info(paths, &def, Some(&inst), Some("2")).status, "update");
+        assert_eq!(info(paths, &def, Some(&inst), Some("2")).status, "review");
+        let mut rolling = def.clone();
+        rolling.pinned_release = None;
+        assert_eq!(
+            info(paths, &rolling, Some(&inst), Some("2")).status,
+            "update"
+        );
     }
 
     #[test]

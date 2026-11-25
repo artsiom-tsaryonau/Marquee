@@ -550,9 +550,18 @@ fn pick(def: &EmulatorDef, release: &serde_json::Value) -> Result<Release> {
     Ok(Release {
         version,
         name: text("name").unwrap_or("emulator.AppImage").to_string(),
-        url: text("browser_download_url")
-            .ok_or_else(|| AppError::new("NETWORK", "download has no URL"))?
-            .to_string(),
+        url: {
+            let url = text("browser_download_url")
+                .ok_or_else(|| AppError::new("NETWORK", "download has no URL"))?
+                .to_string();
+            if !http::github_release_asset(&url, &def.github) {
+                return Err(AppError::new(
+                    "NETWORK",
+                    "release asset URL is not on the recipe repository",
+                ));
+            }
+            url
+        },
         sha256,
     })
 }
@@ -621,8 +630,15 @@ pub fn install(paths: &Paths, def: &EmulatorDef, sink: &Arc<dyn EventSink>) -> R
     ));
     say(sink, &def.id, format!("Downloading {}…", release.name));
     let mut last = 0u64;
-    let got = http::download_file(
+    let rule = if def.download.is_some() {
+        http::UrlRule::Exact(release.url.as_str())
+    } else {
+        http::UrlRule::GithubRelease(def.github.as_str())
+    };
+    http::download_verified(
         &release.url,
+        &release.sha256,
+        &rule,
         &part,
         http::APPIMAGE_MAX_BYTES,
         Duration::from_secs(900),
@@ -631,14 +647,19 @@ pub fn install(paths: &Paths, def: &EmulatorDef, sink: &Arc<dyn EventSink>) -> R
                 last = n;
                 say(sink, &def.id, format!("Downloaded {} MiB…", n / 1_048_576));
             }
+            Ok(())
         },
-    )?;
-    if got != release.sha256 {
-        return Err(AppError::new(
-            "NETWORK",
-            "download did not match its published or pinned checksum",
-        ));
-    }
+    )
+    .map_err(|error| {
+        if error.code == "CHECKSUM" {
+            AppError::new(
+                "NETWORK",
+                "download did not match its published or pinned checksum",
+            )
+        } else {
+            error
+        }
+    })?;
     say(sink, &def.id, "Unpacking…");
     let lower = release.name.to_ascii_lowercase();
     let root = if lower.ends_with(".zip") || lower.ends_with(".tar.gz") || lower.ends_with(".tgz") {
@@ -1193,13 +1214,16 @@ mod tests {
         let release = json!({
             "tag_name": "latest",
             "assets": [
-                {"name": "DuckStation-x64-SSE2.AppImage", "browser_download_url": "u1", "digest": "sha256:aaaa1111bbbb"},
-                {"name": "DuckStation-arm64.AppImage", "browser_download_url": "u2", "digest": "sha256:cccc"},
-                {"name": "DuckStation-x64.AppImage", "browser_download_url": "u3", "digest": "sha256:C5E6F045F6A2"}
+                {"name": "DuckStation-x64-SSE2.AppImage", "browser_download_url": "https://github.com/stenzek/duckstation/releases/download/latest/sse2", "digest": "sha256:aaaa1111bbbb"},
+                {"name": "DuckStation-arm64.AppImage", "browser_download_url": "https://github.com/other/duckstation/releases/download/latest/arm", "digest": "sha256:cccc"},
+                {"name": "DuckStation-x64.AppImage", "browser_download_url": "https://github.com/stenzek/duckstation/releases/download/latest/DuckStation-x64.AppImage", "digest": "sha256:C5E6F045F6A2"}
             ]
         });
         let picked = pick(&def, &release).unwrap();
-        assert_eq!(picked.url, "u3");
+        assert_eq!(
+            picked.url,
+            "https://github.com/stenzek/duckstation/releases/download/latest/DuckStation-x64.AppImage"
+        );
         assert_eq!(picked.sha256, "c5e6f045f6a2");
         assert_eq!(picked.version, "latest-c5e6f045");
     }
@@ -1210,12 +1234,15 @@ mod tests {
         let release = json!({
             "tag_name": "v.0.20.0",
             "assets": [
-                {"name": "shadps4-macos-sdl-0.20.0.zip", "browser_download_url": "u1", "digest": "sha256:aaaa"},
-                {"name": "shadps4-linux-sdl-0.20.0.zip", "browser_download_url": "u2", "digest": "sha256:bbbbccccdddd"}
+                {"name": "shadps4-macos-sdl-0.20.0.zip", "browser_download_url": "https://github.com/shadps4-emu/shadPS4/releases/download/v.0.20.0/mac.zip", "digest": "sha256:aaaa"},
+                {"name": "shadps4-linux-sdl-0.20.0.zip", "browser_download_url": "https://github.com/shadps4-emu/shadPS4/releases/download/v.0.20.0/linux.zip", "digest": "sha256:bbbbccccdddd"}
             ]
         });
         let picked = pick(&def, &release).unwrap();
-        assert_eq!(picked.url, "u2");
+        assert_eq!(
+            picked.url,
+            "https://github.com/shadps4-emu/shadPS4/releases/download/v.0.20.0/linux.zip"
+        );
         assert_eq!(picked.sha256, "bbbbccccdddd");
     }
 

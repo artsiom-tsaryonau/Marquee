@@ -33,6 +33,31 @@ export function forgetWebToken() {
 
 const token = () => webToken() ?? '';
 
+let artKeyValue: string | null = null;
+const artKeyListeners = new Set<() => void>();
+
+/** Cover capability for the browser. Null until `loadArtKey` finishes. Never the API token. */
+export function artKey(): string | null {
+  return artKeyValue;
+}
+
+export function watchArtKey(listener: () => void): () => void {
+  artKeyListeners.add(listener);
+  return () => artKeyListeners.delete(listener);
+}
+
+export function loadArtKey(): Promise<string | null> {
+  if (!webToken()) return Promise.resolve(null);
+  if (artKeyValue) return Promise.resolve(artKeyValue);
+  return request<string>('/api/art_key', { method: 'POST', body: '{}' })
+    .then((key) => {
+      artKeyValue = typeof key === 'string' && !key.includes(token()) ? key : null;
+      for (const listener of artKeyListeners) listener();
+      return artKeyValue;
+    })
+    .catch(() => null);
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {

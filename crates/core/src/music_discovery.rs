@@ -150,13 +150,22 @@ fn helper(data: &Path) -> Result<PathBuf> {
     }
     fs::create_dir_all(&dir)?;
     let staging = tempfile::NamedTempFile::new_in(&dir)?;
-    let hash = crate::http::download_file(
+    crate::http::download_verified(
         &format!("https://github.com/yt-dlp/yt-dlp/releases/download/{VERSION}/yt-dlp_linux"),
-        staging.path(), MAX_HELPER, Duration::from_secs(180), |_| {},
-    ).map_err(|_| error("Could not install the verified YouTube search helper. Check your connection or use browser search."))?;
-    if hash != SHA256 {
-        return Err(error("Downloaded YouTube search helper checksum failed"));
-    }
+        SHA256,
+        &crate::http::UrlRule::GithubRelease("yt-dlp/yt-dlp"),
+        staging.path(),
+        MAX_HELPER,
+        Duration::from_secs(180),
+        |_| Ok(()),
+    )
+    .map_err(|failure| {
+        if failure.code == "CHECKSUM" {
+            error("Downloaded YouTube search helper checksum failed")
+        } else {
+            error("Could not install the verified YouTube search helper. Check your connection or use browser search.")
+        }
+    })?;
     fs::set_permissions(staging.path(), fs::Permissions::from_mode(0o700))?;
     staging
         .persist_noclobber(&path)

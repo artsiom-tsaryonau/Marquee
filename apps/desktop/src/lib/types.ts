@@ -107,7 +107,7 @@ export interface Ratings {
   steamReviews: { percent: number; count: number } | null;
 }
 
-export type PortStatus = 'installed' | 'ready' | 'needs-rom' | 'needs-data' | 'update' | 'not-installed';
+export type PortStatus = 'installed' | 'ready' | 'needs-rom' | 'needs-data' | 'update' | 'review' | 'not-installed';
 
 export interface PortEntry {
   job?: { state: string; message: string; error_code: string | null } | null;

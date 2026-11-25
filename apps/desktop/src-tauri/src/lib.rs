@@ -68,6 +68,7 @@ pub fn run() {
             let data_dir = std::env::var_os("MARQUEE_DATA_DIR").map(PathBuf::from);
             let allow_fake = std::env::var_os("MARQUEE_ALLOW_FAKE").is_some();
             let core = Arc::new(Core::open(data_dir, allow_fake).map_err(Box::new)?);
+            core.start_receipt_publisher();
 
             // CLI preparations may share this library while using its instance-local
             // cache. Grant only artwork trees, never the whole data/home directory.

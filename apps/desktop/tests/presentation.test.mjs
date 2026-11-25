@@ -29,6 +29,7 @@ test('missing port data never dispatches to engine installation', () => {
   }
   assert.equal(portAction({ status: 'not-installed' }).operation, 'install');
   assert.equal(portAction({ status: 'update' }).operation, 'install');
+  assert.equal(portAction({ status: 'review' }).operation, 'launch');
   assert.deepEqual(portAction({ status: 'installed' }), { label: 'Open port', operation: 'launch' });
   assert.deepEqual(portAction({ status: 'ready' }), { label: 'Play', operation: 'launch' });
 });

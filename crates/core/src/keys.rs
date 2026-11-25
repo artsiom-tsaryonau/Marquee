@@ -172,11 +172,7 @@ impl KeyStore {
             if !self.read_env {
                 return None;
             }
-            let cwd = std::env::current_dir().ok()?;
-            cwd.ancestors()
-                .take(6)
-                .map(|dir| dir.join(".env"))
-                .find(|p| p.is_file())
+            implicit_dotenv()
         });
         path.and_then(|p| fs::read_to_string(p).ok())
             .map(|raw| parse_dotenv(&raw))
@@ -283,6 +279,22 @@ impl KeyStore {
     }
 }
 
+/// Release builds do not walk the process directory for `.env`. Debug builds and
+/// a Marquee checkout still do, so local development keeps working. `MARQUEE_ENV_FILE` is separate.
+fn implicit_dotenv() -> Option<PathBuf> {
+    let cwd = std::env::current_dir().ok()?;
+    let checkout = cwd.ancestors().take(6).any(|dir| {
+        dir.join("Cargo.toml").is_file() && dir.join("catalog/ports/shipwright.json").is_file()
+    });
+    if !cfg!(debug_assertions) && !checkout {
+        return None;
+    }
+    cwd.ancestors()
+        .take(6)
+        .map(|dir| dir.join(".env"))
+        .find(|path| path.is_file())
+}
+
 fn preview(value: &str, secret: bool) -> String {
     if !secret {
         return value.to_string();
@@ -361,6 +373,15 @@ mod tests {
         assert_eq!(parsed["C"], "three");
         assert_eq!(parsed["D"], "spaced");
         assert!(!parsed.contains_key("not a pair"));
+    }
+
+    #[test]
+    fn explicit_dotenv_file_is_read() {
+        let (_dir, store) = store(Some("RAWG_API_KEY=explicit-dotenv-key\n"));
+        assert_eq!(
+            store.get("rawg").unwrap().as_deref(),
+            Some("explicit-dotenv-key")
+        );
     }
 
     #[test]

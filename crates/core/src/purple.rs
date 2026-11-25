@@ -510,11 +510,35 @@ fn private_log(path: &Path) -> Result<fs::File> {
     }
     Ok(options.open(path)?)
 }
-fn download(url: &str, sha: &str, path: &Path, max: u64, progress: impl FnMut(u64)) -> Result<()> {
-    let actual = http::download_file(url, path, max, Duration::from_secs(30 * 60), progress)?;
-    if actual != sha {
-        return Err(AppError::new("CHECKSUM", "Download checksum did not match the pinned Purple recipe. No downloaded program was run."));
-    }
+fn download(
+    url: &str,
+    sha: &str,
+    path: &Path,
+    max: u64,
+    mut progress: impl FnMut(u64),
+) -> Result<()> {
+    http::download_verified(
+        url,
+        sha,
+        &http::UrlRule::Exact(url),
+        path,
+        max,
+        Duration::from_secs(30 * 60),
+        |n| {
+            progress(n);
+            Ok(())
+        },
+    )
+    .map_err(|error| {
+        if error.code == "CHECKSUM" {
+            AppError::new(
+                "CHECKSUM",
+                "Download checksum did not match the pinned Purple recipe. No downloaded program was run.",
+            )
+        } else {
+            error
+        }
+    })?;
     Ok(())
 }
 fn extract_helper(tar: &Path, dest: &Path) -> Result<()> {

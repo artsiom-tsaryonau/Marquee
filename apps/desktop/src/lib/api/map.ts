@@ -5,7 +5,8 @@ import { artFromSeed } from '../art';
 import type { GameEntry } from '../types';
 import type { Edition, LibraryRoot, LibrarySnapshot, Runner } from './contracts';
 import { isDesktopRuntime } from './desktop';
-import { webToken } from './http';
+import { catalogDefaultEmulator } from '../runnerChoices';
+import { artKey } from './http';
 
 /** Cartridge/disc systems run by a catalogue emulator (mirrors `catalog/systems/*.json`). */
 const SYSTEM_EMULATOR: Record<string, string> = {
@@ -24,14 +25,14 @@ export function runnerSupports(runner: Runner, system: string): boolean {
   return ['ps1', 'ps2'].includes(system) && (runner.kind === (system === 'ps1' ? 'duckstation' : 'pcsx2') || runner.kind === 'fake');
 }
 
-function pickRunner(snap: Pick<LibrarySnapshot, 'runners' | 'settings'>, system = 'ps2', override?: string | null): Runner | null {
+function pickRunner(snap: Pick<LibrarySnapshot, 'runners' | 'settings' | 'systems'>, system = 'ps2', override?: string | null): Runner | null {
   system = system === 'tg16' ? 'pce' : system;
   const selected = override ?? snap.settings.selected_runner_ids?.[system];
   if (selected) return snap.runners.find(r => r.id === selected && runnerSupports(r, system)) ?? null;
   const legacy = snap.runners.find(r => r.id === snap.settings.selected_runner_id && r.available && runnerSupports(r, system));
   if (legacy) return legacy;
   const compatible = snap.runners.filter(r => runnerSupports(r, system) && r.available);
-  const emulator = SYSTEM_EMULATOR[system];
+  const emulator = catalogDefaultEmulator(snap.systems, system, SYSTEM_EMULATOR);
   return compatible.find(r => emulator ? r.id === `runner.${emulator}.marquee` : r.source === 'marquee') ?? compatible[0] ?? null;
 }
 
@@ -91,10 +92,10 @@ export function coverSrc(path: string | null): string | undefined {
       return undefined;
     }
   }
-  // Browser: covers are served by Marquee itself, by file name, with the token.
-  const token = webToken();
+  // Browser: covers use a directory capability, never the API token.
+  const key = artKey();
   const name = path.split('/').pop();
-  return token && name ? `/art/${encodeURIComponent(name)}?token=${encodeURIComponent(token)}` : undefined;
+  return key && name ? `/art/${encodeURIComponent(name)}?key=${encodeURIComponent(key)}` : undefined;
 }
 
 export function gamesFromSnapshot(snap: LibrarySnapshot): GameEntry[] {

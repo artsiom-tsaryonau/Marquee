@@ -4,7 +4,7 @@ import { httpApi } from './http';
 
 export type { LibraryApi } from './contracts';
 export { isDesktopRuntime } from './desktop';
-export { webToken } from './http';
+export { loadArtKey, webToken } from './http';
 
 /**
  * Same UI, same data, two ways in:

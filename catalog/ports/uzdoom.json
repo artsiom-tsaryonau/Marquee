@@ -8,5 +8,11 @@
   "asset_suffix": "x86_64.appimage",
   "asset_excludes": ["zsync", "mac", "windows"],
   "binary": null,
-  "requirement": "Requires a compatible Doom WAD or Freedoom game data in the port folder."
+  "requirement": "Requires a compatible Doom WAD or Freedoom game data in the port folder.",
+  "pinned_release": {
+    "tag": "5.0.3",
+    "asset": "Linux-UZDoom-Release-x86_64.AppImage",
+    "sha256": "9c5166febc09cbf80c24612a78829037c953f38c4d986e36f8475ddd507e0228",
+    "binary_sha256": "9c5166febc09cbf80c24612a78829037c953f38c4d986e36f8475ddd507e0228"
+  }
 }

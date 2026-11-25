@@ -137,7 +137,37 @@ impl Core {
     pub fn snapshot(&self) -> Result<LibrarySnapshot> {
         let mut snapshot = self.with_db(library::snapshot)?;
         snapshot.settings.torrents = self.torrent_settings()?;
+        snapshot.systems = crate::catalog::all()?
+            .into_iter()
+            .map(|system| crate::model::SystemSummary {
+                id: system.id,
+                display_name: system.display_name,
+                emulator: system.emulator,
+                alternative_emulators: system.alternative_emulators,
+                supported_extensions: system.supported_extensions,
+            })
+            .collect();
         Ok(snapshot)
+    }
+
+    /// Register finished preparation receipts while this process is open, even if no UI is polling.
+    pub fn start_receipt_publisher(self: &Arc<Self>) {
+        let weak = Arc::downgrade(self);
+        std::thread::spawn(move || loop {
+            let Some(core) = weak.upgrade() else {
+                break;
+            };
+            if core
+                .preparation
+                .status()
+                .map(|status| status.running)
+                .unwrap_or(false)
+            {
+                let _ = core.preparation_jobs();
+            }
+            drop(core);
+            std::thread::sleep(std::time::Duration::from_secs(5));
+        });
     }
 
     pub fn health(&self) -> Result<String> {
@@ -513,11 +543,17 @@ impl Core {
             if self.installed_port(&def.id)?.is_none() {
                 continue;
             }
-            let Ok(release) = ports::latest_release(&def).and_then(|r| ports::pick_asset(&def, &r))
-            else {
+            let tag = if def.pinned_release.is_some() {
+                ports::upstream_tag(&def)
+            } else {
+                ports::latest_release(&def)
+                    .and_then(|release| ports::pick_asset(&def, &release))
+                    .map(|release| release.tag)
+            };
+            let Ok(tag) = tag else {
                 continue;
             };
-            self.set_setting(&ports::latest_key(&def.id), &release.tag)?;
+            self.set_setting(&ports::latest_key(&def.id), &tag)?;
         }
         self.list_ports()
     }

@@ -79,12 +79,10 @@
     void app.boot();
     // Receipt publication is independent of the import panel. Manager failures
     // must never prevent the existing library from loading or launching.
-    const stopPreparationPoll = pollWhileActive(async () => {
-      try { await app.api.preparationJobs(); } catch { /* shown in the preparation panel */ }
-    }, () => 5000);
+    const stopPreparationPoll = pollWhileActive(() => app.refreshDownloads(), () => 5000);
     checkStale();
     window.addEventListener('focus', checkStale);
-    // Dev shortcuts: ?route=library&mode=big&theme=light&splash=0&empty=1
+    // Dev shortcuts: ?route=library&mode=big&theme=light&splash=0&motion=0
     const q = new URLSearchParams(location.search);
     const r = q.get('route') as Route | null;
     if (r === 'ports') app.go('ports');
@@ -132,9 +130,9 @@
         <Icon name="sidebar" size={22} />
       </button>
       {#each nav as n (n.route)}
-        <button class="nav" class:on={app.route === n.route} aria-current={app.route === n.route ? 'page' : undefined} title={n.label} data-nav onclick={() => app.go(n.route)}>
+        <button class="nav" class:on={app.route === n.route} aria-current={app.route === n.route ? 'page' : undefined} title={n.route === 'library' && app.downloadCount ? `${n.label}, ${app.downloadCount} downloads` : n.label} data-nav onclick={() => app.go(n.route)}>
           <Icon name={n.icon} size={22} />
-          <span>{n.label}</span>
+          <span>{n.label}{#if n.route === 'library' && app.downloadCount}<span class="nav-count">{app.downloadCount}</span>{/if}</span>
         </button>
       {/each}
     </nav>
@@ -143,7 +141,7 @@
       <div class="brand"><span class="mark">M</span></div>
       <div class="tabs" data-nav-row>
         {#each nav as n (n.route)}
-          <button class="tab" class:on={app.route === n.route} aria-current={app.route === n.route ? 'page' : undefined} data-nav onclick={() => app.go(n.route)}>{n.label}</button>
+          <button class="tab" class:on={app.route === n.route} aria-current={app.route === n.route ? 'page' : undefined} data-nav onclick={() => app.go(n.route)}>{n.label}{#if n.route === 'library' && app.downloadCount} {app.downloadCount}{/if}</button>
         {/each}
       </div>
       <div class="status">
@@ -329,6 +327,7 @@
     opacity: 0;
     transition: opacity 160ms var(--ease);
   }
+  .nav-count { margin-left: 0.45rem; font-variant-numeric: tabular-nums; }
   .side.expanded :is(.nav span, .word) {
     opacity: 1;
     transition: opacity 160ms var(--ease);

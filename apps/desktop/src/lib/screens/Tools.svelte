@@ -203,7 +203,7 @@
         <ToolCard seed={`emulator:${e.id}`} kind="Emulator" title={e.name} subtitle={e.systems.map(labelOf).join(' · ')}
           detail={e.firmware?.some((f) => f.required && !f.present) ? 'Required firmware is missing' : e.integrated ? 'Supports library launch · game setup may be required' : 'Opens separately · library launch not supported'}
           badge={{ text: e.status === 'not_installed' ? 'Not installed' : e.status === 'update' ? 'Update available' : 'Installed', tone: e.status === 'ready' ? 'ok' : e.status === 'update' ? 'warn' : '' }}
-          icon={coverSrc(e.icon)} ready={item.ready} {busy} onopen={() => (app.emulatorDialogId = e.id)}>
+          icon={app.artReady >= 0 ? coverSrc(e.icon) : undefined} ready={item.ready} {busy} onopen={() => (app.emulatorDialogId = e.id)}>
           {#snippet actions()}
             {#if e.status === 'not_installed'}
               <button class="btn primary small" data-nav disabled={!!busy} onclick={() => app.installEmulator(e)}><Icon name="download" size={15} />{busy ? 'Installing…' : 'Install'}</button>

@@ -14,6 +14,7 @@ export function gameStatus(game: GameEntry): { label: string; tone: 'ok' | 'warn
   if (!game.installed || game.portStatus === 'not-installed') return { label: 'Not installed', tone: 'dim' };
   if (game.portStatus === 'installed') return { label: 'Port installed · setup unchecked', tone: 'note' };
   if (game.portStatus === 'update') return { label: 'Update available', tone: 'note' };
+  if (game.portStatus === 'review') return { label: 'Release review needed', tone: 'note' };
   return null;
 }
 
@@ -33,6 +34,7 @@ export function portAction(port: Pick<PortEntry, 'status'>): { label: string; op
     case 'installed': return { label: 'Open port', operation: 'launch' };
     case 'ready': return { label: 'Play', operation: 'launch' };
     case 'update': return { label: 'Update', operation: 'install' };
+    case 'review': return { label: 'Open port', operation: 'launch' };
     case 'needs-rom':
     case 'needs-data': return { label: 'Open game files folder', operation: 'folder' };
     default: return { label: 'Install', operation: 'install' };
@@ -40,5 +42,5 @@ export function portAction(port: Pick<PortEntry, 'status'>): { label: string; op
 }
 
 export function portStatusLabel(port: Pick<PortEntry, 'status'>): string {
-  return { installed:'Installed · setup unchecked', ready:'Ready to play', update:'Update available · setup unchecked', 'needs-rom':'Game files required', 'needs-data':'Game files required', 'not-installed':'Not installed' }[port.status];
+  return { installed:'Installed · setup unchecked', ready:'Ready to play', update:'Update available · setup unchecked', review:'Newer release needs review', 'needs-rom':'Game files required', 'needs-data':'Game files required', 'not-installed':'Not installed' }[port.status];
 }

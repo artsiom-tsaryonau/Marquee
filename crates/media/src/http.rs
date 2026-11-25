@@ -21,6 +21,8 @@ pub fn get_json(url: &str) -> Result<serde_json::Value> {
 }
 
 /// Stream `url` to `dest`, hashing as we go. Returns lowercase sha256 hex.
+/// Does not decide whether the URL or hash is acceptable; callers that install
+/// programs use [`download_verified`].
 pub fn download_file(
     url: &str,
     dest: &Path,
@@ -145,6 +147,92 @@ pub fn get_json_bearer(url: &str, token: &str) -> Result<serde_json::Value> {
     Ok(serde_json::from_slice(&buf)?)
 }
 
+/// Where a verified download is allowed to come from.
+pub enum UrlRule<'a> {
+    /// Any HTTPS URL without credentials or an explicit port.
+    Https,
+    /// `https://github.com/{repo}/releases/download/...`
+    GithubRelease(&'a str),
+    /// One exact URL.
+    Exact(&'a str),
+    /// Test servers on `127.0.0.1` only.
+    #[cfg(test)]
+    Loopback,
+}
+
+pub fn github_release_asset(url: &str, repo: &str) -> bool {
+    let Some(rest) = url.strip_prefix("https://") else {
+        return false;
+    };
+    if rest.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return false;
+    }
+    let Some((host, path)) = rest.split_once('/') else {
+        return false;
+    };
+    if host != "github.com" || host.contains('@') || host.contains(':') {
+        return false;
+    }
+    let parts: Vec<_> = repo.split('/').filter(|part| !part.is_empty()).collect();
+    if parts.len() != 2 || parts.iter().any(|part| part.contains('.')) {
+        return false;
+    }
+    let prefix = format!("{repo}/releases/download/");
+    path.to_ascii_lowercase()
+        .starts_with(&prefix.to_ascii_lowercase())
+        && !path.split('/').any(|part| part == "." || part == "..")
+}
+
+fn allows(rule: &UrlRule<'_>, url: &str) -> bool {
+    match rule {
+        UrlRule::Exact(expected) => url == *expected,
+        UrlRule::GithubRelease(repo) => github_release_asset(url, repo),
+        UrlRule::Https => {
+            let Some(rest) = url.strip_prefix("https://") else {
+                return false;
+            };
+            let host = rest.split('/').next().unwrap_or("");
+            !host.is_empty() && !host.contains('@') && !host.contains(':')
+        }
+        #[cfg(test)]
+        UrlRule::Loopback => url.starts_with("http://127.0.0.1:"),
+    }
+}
+
+/// Download `url` only when it matches `rule`, and only keep it when the SHA-256 matches.
+pub fn download_verified(
+    url: &str,
+    expected_sha256: &str,
+    rule: &UrlRule<'_>,
+    dest: &Path,
+    max_bytes: u64,
+    timeout: Duration,
+    mut on_progress: impl FnMut(u64) -> Result<()>,
+) -> Result<String> {
+    let expected = expected_sha256.to_ascii_lowercase();
+    if expected.len() != 64 || !expected.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(AppError::new(
+            "CHECKSUM",
+            "download has no reviewed SHA-256",
+        ));
+    }
+    if !allows(rule, url) {
+        return Err(AppError::new(
+            "NETWORK",
+            "download URL is outside the recipe's allowed location",
+        ));
+    }
+    let got = download_file_checked(url, dest, max_bytes, timeout, &mut on_progress)?;
+    if got != expected {
+        let _ = std::fs::remove_file(dest);
+        return Err(AppError::new(
+            "CHECKSUM",
+            "download checksum did not match its reviewed or published digest",
+        ));
+    }
+    Ok(got)
+}
+
 /// Download a text file (for example a database list) up to `max_bytes`.
 pub fn get_text_limited(url: &str, max_bytes: u64) -> Result<String> {
     let bytes = read_limited(url, max_bytes, Duration::from_secs(120))?;
@@ -174,6 +262,53 @@ mod tests {
         })
         .unwrap_err();
         assert_eq!(error.code, "PORT_CANCELLED");
+        assert!(!file.exists());
+        worker.join().unwrap();
+    }
+
+    #[test]
+    fn github_release_urls_stay_on_the_named_repository() {
+        let repo = "HarbourMasters/Shipwright";
+        let ok =
+            "https://github.com/HarbourMasters/Shipwright/releases/download/9.3.1/SoH.AppImage";
+        assert!(super::github_release_asset(ok, repo));
+        for rejected in [
+            "http://github.com/HarbourMasters/Shipwright/releases/download/9.3.1/SoH.AppImage",
+            "https://github.com.evil/HarbourMasters/Shipwright/releases/download/9.3.1/SoH.AppImage",
+            "https://user@github.com/HarbourMasters/Shipwright/releases/download/9.3.1/SoH.AppImage",
+            "https://example.invalid/SoH.AppImage",
+            "https://github.com/other/Shipwright/releases/download/9.3.1/SoH.AppImage",
+            "https://github.com/HarbourMasters/Shipwright/releases/download/../secret",
+        ] {
+            assert!(!super::github_release_asset(rejected, repo), "{rejected}");
+        }
+    }
+
+    #[test]
+    fn verified_download_rejects_a_bad_hash_and_removes_the_file() {
+        let server = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/engine", server.local_addr().unwrap());
+        let worker = std::thread::spawn(move || {
+            let (mut stream, _) = server.accept().unwrap();
+            let mut request = [0; 4096];
+            let _ = stream.read(&mut request);
+            let _ = stream.write_all(
+                b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\nabcd",
+            );
+        });
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("engine");
+        let error = download_verified(
+            &url,
+            &"ab".repeat(32),
+            &UrlRule::Loopback,
+            &file,
+            1024,
+            Duration::from_secs(5),
+            |_| Ok(()),
+        )
+        .unwrap_err();
+        assert_eq!(error.code, "CHECKSUM");
         assert!(!file.exists());
         worker.join().unwrap();
     }

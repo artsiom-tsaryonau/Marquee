@@ -115,7 +115,7 @@
 
 {#if emulator}
   {@const e = emulator}
-  {@const icon = coverSrc(e.icon)}
+  {@const icon = app.artReady >= 0 ? coverSrc(e.icon) : undefined}
   <div data-modal-dismiss class="scrim" transition:fade={{ duration: dur }} onclick={() => (app.emulatorDialogId = null)} role="presentation"></div>
   <div class="dialog glass-panel" use:modal={() => (app.emulatorDialogId = null)} role="dialog" aria-modal="true" aria-labelledby="emu-title" transition:fly={{ y: 24, duration: dur }}>
     <div class="banner">

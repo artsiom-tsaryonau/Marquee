@@ -8,5 +8,11 @@
   "asset_suffix": "_linux.zip",
   "asset_excludes": [],
   "binary": "sm64coopdx",
-  "requirement": "Requires a compatible US Super Mario 64 ROM named baserom.us.z64 in the port folder."
+  "requirement": "Requires a compatible US Super Mario 64 ROM named baserom.us.z64 in the port folder.",
+  "pinned_release": {
+    "tag": "v1.5.1",
+    "asset": "sm64coopdx_Linux.zip",
+    "sha256": "4229f82fc4395e78faf192c910ffcfcc1d70f59a558cadf0f63ae548901fa5f5",
+    "binary_sha256": "370860f00c0a26df3ba1a2e2cbaab1a7ebd86255afa445c8ba44f114d424af23"
+  }
 }

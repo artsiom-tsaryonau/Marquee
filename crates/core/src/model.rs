@@ -311,8 +311,22 @@ fn default_display_mode() -> String {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SystemSummary {
+    pub id: String,
+    pub display_name: String,
+    #[serde(default)]
+    pub emulator: Option<String>,
+    #[serde(default)]
+    pub alternative_emulators: Vec<String>,
+    #[serde(default)]
+    pub supported_extensions: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LibrarySnapshot {
     pub catalogue: crate::metadata::CatalogueSnapshot,
+    #[serde(default)]
+    pub systems: Vec<SystemSummary>,
     pub roots: Vec<LibraryRoot>,
     pub editions: Vec<Edition>,
     pub media: Vec<MediaFile>,

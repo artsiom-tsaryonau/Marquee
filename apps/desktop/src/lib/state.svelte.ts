@@ -1,4 +1,5 @@
-import { createApi, type LibraryApi } from './api';
+import { createApi, loadArtKey, type LibraryApi } from './api';
+import { activityCounts } from './downloads';
 import { gamesFromSnapshot, pickRunner, runnerSupports } from './api/map';
 import type { BiosFile, CoreEvent, IntakeResult, TorrentSettings, TransferItem, TransferStatus, EmulatorInfo, KeyInfo, LauncherConfig, LauncherInfo, LutrisConfig, LutrisSnapshot, LibraryRoot, LibrarySnapshot, PortInfo, Runner, ScanReport, Session } from './api/contracts';
 import { nativePortGame, canonicalId } from './unified';
@@ -9,6 +10,7 @@ import { music } from './music.svelte';
 import { musicAccent } from './musicAppearance';
 import { portAction } from './presentation';
 import { describeScan } from './format';
+import { rememberSystems } from './labels';
 import { installOption } from './install';
 import type { GameEntry, PortEntry } from './types';
 
@@ -58,6 +60,12 @@ class AppState {
 
   api: LibraryApi = createApi();
   webUrl = $state<string | null>(null);
+  /** Bumps after the browser cover capability arrives so cover URLs are rebuilt. */
+  artReady = $state(0);
+  downloadActivity = $state({ preparation: 0, torrents: 0, browser: 0 });
+  get downloadCount() {
+    return this.downloadActivity.preparation + this.downloadActivity.torrents + this.downloadActivity.browser;
+  }
   keys = $state<KeyInfo[]>([]);
   emulators = $state<EmulatorInfo[]>([]);
   bios = $state<BiosFile[]>([]);
@@ -149,6 +157,11 @@ class AppState {
       this.applySnapshot(snap);
       await Promise.all([this.loadPorts(), this.loadLaunchers(), this.loadLutris(), this.loadEmulators(), this.loadBios()]);
       this.webUrl = await this.api.webUrl().catch(() => null);
+      if (this.api.kind === 'web') {
+        await loadArtKey();
+        this.artReady++;
+        this.applySnapshot(snap);
+      }
     } catch (err) {
       this.libraryStatus = 'failed';
       this.loadError = err instanceof Error ? err.message : String((err as { message?: string }).message ?? err);
@@ -166,6 +179,7 @@ class AppState {
   }
 
   applySnapshot(snap: LibrarySnapshot) {
+    rememberSystems(snap.systems);
     this.catalogue = snap.catalogue ?? { records: [], systems: [], links: [] };
     this.roots = snap.roots;
     this.runners = snap.runners;
@@ -546,6 +560,20 @@ class AppState {
     return this.transfers?.items.find((i) => i.edition_id === editionId);
   }
 
+  async refreshDownloads() {
+    try {
+      const [jobs, browser, transfers] = await Promise.all([
+        this.api.preparationJobs(),
+        this.api.browserJobs(),
+        this.torrentsOn ? this.api.transferStatus() : Promise.resolve(null),
+      ]);
+      if (transfers) this.transfers = transfers;
+      this.downloadActivity = activityCounts(jobs, transfers?.items ?? [], browser);
+    } catch {
+      // The downloads panel reports its own errors. This refresh only updates the badge.
+    }
+  }
+
   async refreshTransfers() {
     if (!this.torrentsOn) { this.transfers = null; return; }
     try { this.transfers = await this.api.transferStatus(); this.transferError = ''; }
@@ -726,7 +754,9 @@ class AppState {
       requirement:
         p.status === 'update' && p.latest_version
           ? `Update ${p.installed_version} → ${p.latest_version}. ${p.requirement}`
-          : p.requirement,
+          : p.status === 'review' && p.latest_version
+            ? `Upstream ${p.latest_version} needs a reviewed pin. Installed ${p.installed_version}. ${p.requirement}`
+            : p.requirement,
       art: artFromSeed(`port:${p.id}`),
     }));
     this.games = [...this.games.filter((g) => g.source !== 'port'), ...this.ports.filter((p) => p.status !== 'not-installed').map(nativePortGame)];

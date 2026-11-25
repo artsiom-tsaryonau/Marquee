@@ -1087,6 +1087,7 @@ fn run() -> marquee_core::error::Result<()> {
         }
         Command::Run(RunCmd::Web { port, web_dir }) => {
             let assets = marquee_core::server::dir_assets(web_dir);
+            core.start_receipt_publisher();
             let handle = marquee_core::server::start(Arc::clone(&core), Some(assets), port)?;
             println!("Marquee web UI: {}", handle.url());
             println!("Press Ctrl+C to stop.");

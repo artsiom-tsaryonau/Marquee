@@ -133,12 +133,14 @@ pub fn install(data: &Path, cancel: &AtomicBool) -> Result<Installed> {
         .prefix(".install-")
         .tempdir_in(&dir)?;
     let archive = work.path().join("Moonlight.AppImage");
-    let got = http::download_file(
+    let got = http::download_verified(
         &expected.url,
+        &expected.sha256,
+        &http::UrlRule::GithubRelease("moonlight-stream/moonlight-qt"),
         &archive,
         expected.size,
         Duration::from_secs(300),
-        |_| {},
+        |_| Ok(()),
     )?;
     verify(&got, fs::metadata(&archive)?.len(), &expected)?;
     fs::set_permissions(&archive, fs::Permissions::from_mode(0o700))?;

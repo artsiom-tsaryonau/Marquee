@@ -20,4 +20,25 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn a_library_snapshot_lists_every_catalog_system() {
+        let dir = tempfile::tempdir().unwrap();
+        let core = crate::Core::open_isolated(Some(dir.path().join("data")), false).unwrap();
+        let snapshot = core.snapshot().unwrap();
+        let listed: Vec<_> = snapshot
+            .systems
+            .iter()
+            .map(|system| system.id.clone())
+            .collect();
+        for system in all().unwrap() {
+            let summary = snapshot
+                .systems
+                .iter()
+                .find(|item| item.id == system.id)
+                .unwrap_or_else(|| panic!("{} missing from snapshot: {listed:?}", system.id));
+            assert_eq!(summary.display_name, system.display_name);
+            assert_eq!(summary.emulator, system.emulator);
+        }
+    }
 }

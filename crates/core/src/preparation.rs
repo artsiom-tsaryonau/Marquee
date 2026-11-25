@@ -520,6 +520,40 @@ mod tests {
         assert_eq!(jobs[0].error_code.as_deref(), Some("PREPARATION_INVALID"));
         assert!(core.snapshot().unwrap().editions.is_empty());
     }
+
+    #[test]
+    fn publisher_registers_a_finished_archive_without_a_client_poll() {
+        let dir = Data::new();
+        let data = dir.path().join("data");
+        let source = zip(dir.path(), &[("Game.gen", b"publisher cartridge")]);
+        let core = std::sync::Arc::new(open(&data));
+        core.preparation.start_manager().unwrap();
+        let review = core.inspect_preparation(&source, "genesis").unwrap();
+        core.preparation
+            .start_job(&review.id, &review.review_token)
+            .unwrap();
+        core.start_receipt_publisher();
+        let until = Instant::now() + Duration::from_secs(20);
+        loop {
+            let registered = core
+                .preparation
+                .list()
+                .unwrap()
+                .into_iter()
+                .any(|job| job.state == State::Registered);
+            if registered && core.snapshot().unwrap().editions.len() == 1 {
+                break;
+            }
+            assert!(
+                Instant::now() < until,
+                "publisher did not register the prepared archive"
+            );
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        core.preparation_jobs().unwrap();
+        assert_eq!(core.snapshot().unwrap().editions.len(), 1);
+        let _ = core.preparation.stop();
+    }
 }
 
 #[cfg(test)]

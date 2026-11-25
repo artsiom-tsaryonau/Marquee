@@ -218,6 +218,8 @@ export interface TransferItem {
 export interface TransferStatus {
   enabled: boolean;
   seeding: boolean;
+  /** Private device-sharing listener, for example 0.0.0.0:51413. Absent while sharing is off. */
+  private_listen?: string | null;
   items: TransferItem[];
 }
 
@@ -235,8 +237,17 @@ export interface TorrentReview {
   directory: string;
 }
 
+export interface SystemSummary {
+  id: string;
+  display_name: string;
+  emulator?: string | null;
+  alternative_emulators: string[];
+  supported_extensions: string[];
+}
+
 export interface LibrarySnapshot {
   catalogue?: CatalogueSnapshot;
+  systems?: SystemSummary[];
   roots: LibraryRoot[];
   editions: Edition[];
   media: MediaFile[];
@@ -272,7 +283,7 @@ export interface PortInfo {
   requirement: string;
   installed_version: string | null;
   latest_version: string | null;
-  status: 'not_installed' | 'ready' | 'update';
+  status: 'not_installed' | 'ready' | 'update' | 'review';
   folder: string | null;
   job?: { state: string; message: string; error_code: string | null } | null;
 }

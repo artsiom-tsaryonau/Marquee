@@ -1,4 +1,13 @@
-import type { Runner } from './api/contracts';
+import type { Runner, SystemSummary } from './api/contracts';
+
+/** Catalog emulator id, with the old hardcoded table only when a snapshot has no systems. */
+export function catalogDefaultEmulator(
+  systems: Pick<SystemSummary, 'id' | 'emulator'>[] | undefined,
+  system: string,
+  fallback: Record<string, string>,
+): string | undefined {
+  return systems?.find((item) => item.id === system)?.emulator ?? fallback[system];
+}
 
 /** One row per runner. The default row clears a per-game override. */
 export function emulatorChoices(runners: Runner[], defaultId?: string) {

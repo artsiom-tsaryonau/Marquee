@@ -32,10 +32,11 @@ pub fn music_url(state: State<'_, AppState>, track_id: String) -> Result<String>
     state.core.music_open(&track_id)?;
     let mut server = state.music_server.lock().unwrap_or_else(|e| e.into_inner());
     if server.is_none() {
-        *server = Some(marquee_core::server::start(
+        *server = Some(marquee_core::server::start_on(
             Arc::clone(&state.core),
             None,
             None,
+            marquee_core::server::Surface::MediaOnly,
         )?);
     }
     Ok(server
@@ -49,10 +50,11 @@ pub fn media_url(state: State<'_, AppState>, id: String) -> Result<String> {
     state.core.media_open(&id)?;
     let mut server = state.music_server.lock().unwrap_or_else(|e| e.into_inner());
     if server.is_none() {
-        *server = Some(marquee_core::server::start(
+        *server = Some(marquee_core::server::start_on(
             Arc::clone(&state.core),
             None,
             None,
+            marquee_core::server::Surface::MediaOnly,
         )?);
     }
     Ok(server.as_ref().expect("server initialized").media_url(&id))

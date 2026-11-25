@@ -69,6 +69,12 @@ fn media_key(token: &str, id: &str) -> String {
     )
 }
 
+/// One capability for the cover directory. It cannot authorize `/api/`.
+fn art_key(token: &str) -> String {
+    use sha2::{Digest, Sha256};
+    format!("{:x}", Sha256::digest(format!("marquee-art:{token}")))
+}
+
 fn audio_range(value: Option<&str>, size: u64) -> Option<(u64, u64, bool)> {
     if size == 0 {
         return None;
@@ -148,6 +154,17 @@ pub fn load_or_create_token(path: &Path) -> Result<String> {
     if let Ok(existing) = fs::read_to_string(path) {
         let existing = existing.trim().to_string();
         if existing.len() >= 32 {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                if let Ok(meta) = fs::metadata(path) {
+                    if meta.permissions().mode() & 0o077 != 0 {
+                        let mut perms = meta.permissions();
+                        perms.set_mode(0o600);
+                        let _ = fs::set_permissions(path, perms);
+                    }
+                }
+            }
             return Ok(existing);
         }
     }
@@ -203,7 +220,24 @@ fn mime_for(path: &Path) -> &'static str {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Surface {
+    /// Library API, covers, music, media and the browser UI.
+    Full,
+    /// Music and game-media bytes only. The desktop window uses this.
+    MediaOnly,
+}
+
 pub fn start(core: Arc<Core>, assets: Option<Assets>, port: Option<u16>) -> Result<ServerHandle> {
+    start_on(core, assets, port, Surface::Full)
+}
+
+pub fn start_on(
+    core: Arc<Core>,
+    assets: Option<Assets>,
+    port: Option<u16>,
+    surface: Surface,
+) -> Result<ServerHandle> {
     let token = load_or_create_token(&core.paths.data_dir.join("server.token"))?;
     let base = port.unwrap_or(DEFAULT_PORT);
     let mut bound = None;
@@ -226,7 +260,7 @@ pub fn start(core: Arc<Core>, assets: Option<Assets>, port: Option<u16>) -> Resu
             let core = Arc::clone(&core);
             let token = shared_token.clone();
             let assets = assets.clone();
-            thread::spawn(move || handle(&core, &token, port, assets.as_ref(), request));
+            thread::spawn(move || handle(&core, &token, port, assets.as_ref(), surface, request));
         }
     });
     Ok(ServerHandle { addr, token })
@@ -290,14 +324,20 @@ fn host_ok(req: &Request, port: u16) -> bool {
     }
 }
 
-fn authorized(req: &Request, query: &str, token: &str) -> bool {
+fn authorized(req: &Request, token: &str) -> bool {
     let bearer = header_value(req, "Authorization")
         .and_then(|v| v.strip_prefix("Bearer ").map(str::to_string));
-    let supplied = bearer.or_else(|| query_value(query, "token").map(str::to_string));
-    supplied.is_some_and(|t| same(&t, token))
+    bearer.is_some_and(|t| same(&t, token))
 }
 
-fn handle(core: &Arc<Core>, token: &str, port: u16, assets: Option<&Assets>, mut req: Request) {
+fn handle(
+    core: &Arc<Core>,
+    token: &str,
+    port: u16,
+    assets: Option<&Assets>,
+    surface: Surface,
+    mut req: Request,
+) {
     let url = req.url().to_string();
     let (path, query) = url.split_once('?').unwrap_or((url.as_str(), ""));
     let (path, query) = (path.to_string(), query.to_string());
@@ -332,8 +372,12 @@ fn handle(core: &Arc<Core>, token: &str, port: u16, assets: Option<&Assets>, mut
         return serve_music(core, req, id);
     }
 
+    if surface == Surface::MediaOnly {
+        return respond(req, 404, "text/plain", b"not found".to_vec(), true);
+    }
+
     if let Some(cmd) = path.strip_prefix("/api/") {
-        if !authorized(&req, &query, token) {
+        if !authorized(&req, token) {
             return respond_error(
                 req,
                 401,
@@ -376,6 +420,11 @@ fn handle(core: &Arc<Core>, token: &str, port: u16, assets: Option<&Assets>, mut
                 }
             }
         };
+        if cmd == "art_key" {
+            let key = art_key(token);
+            debug_assert!(!key.contains(token));
+            return respond_json(req, 200, &key);
+        }
         if cmd == "media_url" {
             let id = args
                 .get("id")
@@ -415,7 +464,8 @@ fn handle(core: &Arc<Core>, token: &str, port: u16, assets: Option<&Assets>, mut
     }
 
     if let Some(name) = path.strip_prefix("/art/") {
-        if !authorized(&req, &query, token) {
+        let supplied = query_value(&query, "key").unwrap_or_default();
+        if !same(supplied, &art_key(token)) {
             return respond_error(
                 req,
                 401,
@@ -668,8 +718,8 @@ mod tests {
         let response = request(
             h.addr,
             &format!(
-                "GET /art/test.png?token={} HTTP/1.1\r\nHost: {own}\r\nConnection: close\r\n\r\n",
-                h.token
+                "GET /art/test.png?key={} HTTP/1.1\r\nHost: {own}\r\nConnection: close\r\n\r\n",
+                art_key(&h.token)
             ),
         );
         assert!(response.starts_with("HTTP/1.1 200") && response.ends_with("cover-bytes"));
@@ -696,8 +746,8 @@ mod tests {
         let traversal = request(
             h.addr,
             &format!(
-                "GET /art/..%2f..%2flibrary.db?token={} HTTP/1.1\r\nHost: {own}\r\nConnection: close\r\n\r\n",
-                h.token
+                "GET /art/..%2f..%2flibrary.db?key={} HTTP/1.1\r\nHost: {own}\r\nConnection: close\r\n\r\n",
+                art_key(&h.token)
             ),
         );
         assert!(traversal.starts_with("HTTP/1.1 404"));
@@ -714,6 +764,83 @@ mod tests {
         {
             use std::os::unix::fs::PermissionsExt;
             assert_eq!(fs::metadata(&path).unwrap().permissions().mode() & 0o077, 0);
+            let loose = dir.path().join("loose.token");
+            fs::write(&loose, &first).unwrap();
+            fs::set_permissions(&loose, fs::Permissions::from_mode(0o644)).unwrap();
+            assert_eq!(load_or_create_token(&loose).unwrap(), first);
+            assert_eq!(
+                fs::metadata(&loose).unwrap().permissions().mode() & 0o077,
+                0
+            );
         }
+    }
+
+    #[test]
+    fn cover_key_is_not_an_api_token_and_query_tokens_are_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let (core, h) = start_test_server(dir.path());
+        let own = format!("127.0.0.1:{}", h.addr.port());
+        let post = |extra: &str, path: &str| {
+            request(
+                h.addr,
+                &format!(
+                    "POST {path} HTTP/1.1\r\nHost: {own}\r\n{extra}Content-Length: 2\r\nConnection: close\r\n\r\n{{}}"
+                ),
+            )
+        };
+        let key = post(
+            &format!("Authorization: Bearer {}\r\n", h.token),
+            "/api/art_key",
+        );
+        assert!(key.starts_with("HTTP/1.1 200"), "{key}");
+        let body = key.split("\r\n\r\n").nth(1).unwrap();
+        assert!(!body.contains(&h.token));
+        assert!(body.contains(&art_key(&h.token)));
+        assert!(post(
+            &format!("Authorization: Bearer {}\r\n", art_key(&h.token)),
+            "/api/health"
+        )
+        .starts_with("HTTP/1.1 401"));
+        assert!(request(
+            h.addr,
+            &format!(
+                "POST /api/health?token={} HTTP/1.1\r\nHost: {own}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                h.token
+            ),
+        )
+        .starts_with("HTTP/1.1 401"));
+        assert!(request(
+            h.addr,
+            &format!(
+                "GET /art/missing.png?token={} HTTP/1.1\r\nHost: {own}\r\nConnection: close\r\n\r\n",
+                h.token
+            ),
+        )
+        .starts_with("HTTP/1.1 401"));
+        let _ = core;
+    }
+
+    #[test]
+    fn desktop_media_server_does_not_serve_the_library_api() {
+        let dir = tempfile::tempdir().unwrap();
+        let core = Arc::new(Core::open_isolated(Some(dir.path().to_path_buf()), false).unwrap());
+        let h = start_on(Arc::clone(&core), None, Some(48910), Surface::MediaOnly).unwrap();
+        let own = format!("127.0.0.1:{}", h.addr.port());
+        let response = request(
+            h.addr,
+            &format!(
+                "POST /api/health HTTP/1.1\r\nHost: {own}\r\nAuthorization: Bearer {}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                h.token
+            ),
+        );
+        assert!(response.starts_with("HTTP/1.1 404"), "{response}");
+        let art = request(
+            h.addr,
+            &format!(
+                "GET /art/x.png?key={} HTTP/1.1\r\nHost: {own}\r\nConnection: close\r\n\r\n",
+                art_key(&h.token)
+            ),
+        );
+        assert!(art.starts_with("HTTP/1.1 404"), "{art}");
     }
 }

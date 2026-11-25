@@ -89,6 +89,9 @@ pub struct TransferItem {
 pub struct TransferStatus {
     pub enabled: bool,
     pub seeding: bool,
+    /// Address the private engine accepts peers on while sharing is enabled.
+    #[serde(default)]
+    pub private_listen: Option<String>,
     pub items: Vec<TransferItem>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -830,9 +833,17 @@ pub(crate) fn status(core: &Arc<Host>) -> Result<TransferStatus> {
             files_present: None,
         });
     }
+    let private_listen = settings.enabled.then(|| {
+        std::fs::read(inner.state_dir.join("private-listen.json"))
+            .ok()
+            .and_then(|bytes| serde_json::from_slice::<std::net::SocketAddr>(&bytes).ok())
+            .map(|addr| addr.to_string())
+            .unwrap_or_else(|| format!("0.0.0.0:{PORT}"))
+    });
     Ok(TransferStatus {
         enabled: settings.enabled,
         seeding: settings.seeding,
+        private_listen,
         items,
     })
 }

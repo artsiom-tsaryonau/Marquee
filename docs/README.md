@@ -23,6 +23,7 @@ ready games must remain launchable without the manager.
 | [Expansion catalogue](EXPANSION_CATALOGUE.md) | Future platform/port/collection ideas; not implemented capability or a competing work order |
 | [Quiver integration](QUIVER_INTEGRATION.md) | Pinned schema/license review and implemented local app-list discovery; Q2 native recipes next |
 | [Portable packages](PORTABLE_PACKAGES.md) | Proposed manifest/receipt export and import across instances; no package format implemented |
+| [Hardening plan](HARDENING_PLAN.md) | Agent-executable security, trust-boundary and maintenance items with verified baseline, decisions and tracker; does not reorder the roadmap |
 
 The 2026-10-22 manager decision supersedes launcher-owned universal jobs and puts
 the common preparation foundation ahead of completing direct stores. It does
