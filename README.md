@@ -160,7 +160,7 @@ cargo run -p marquee-cli -- --data-dir /tmp/marquee-dev ports install zelda64rec
 
 Dev URL params: `?route=library`, `?mode=big`, `?theme=light`, `?splash=0`, `?motion=0`.
 
-Before pushing, run `scripts/check.sh`. The same portable checks also run in GitHub Actions (`.github/workflows/check.yml`). It formats and tests the Rust core/CLI, compiles the desktop crate (prints `BLOCKED` if WebKit/DBus devel are missing; **fails** if they are present and compile errors), then `pnpm check` / `pnpm test` / `pnpm build`. Frontend-only: `pnpm test` inside `apps/desktop/`.
+Before pushing, run `scripts/check.sh` (there is no hosted CI). It formats and tests the Rust core/CLI, compiles the desktop crate (prints `BLOCKED` if WebKit/DBus devel are missing; **fails** if they are present and compile errors), then `pnpm check` / `pnpm test` / `pnpm build`. Frontend-only: `pnpm test` inside `apps/desktop/`.
 
 ## Layout
 

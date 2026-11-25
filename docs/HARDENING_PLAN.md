@@ -77,7 +77,7 @@ Agents must not decide these. Items that depend on them say so.
 | ID | Question | Decision, 2026-11-25 | Blocks |
 | --- | --- | --- | --- |
 | D1 | Should every downloaded executable be pinned to a reviewed SHA in this repo, or may emulators keep installing upstream latest with a required GitHub digest? | Accepted the recommendation: ports are pinned (H2). Emulators keep latest-with-digest plus the host check (H2b) | H2b scope |
-| D2 | Add hosted CI on GitHub Actions, or keep local `scripts/check.sh` only? | Accepted: `.github/workflows/check.yml` is added. It has not run on GitHub yet | Q1 |
+| D2 | Add hosted CI on GitHub Actions, or keep local `scripts/check.sh` only? | Declined. The owner does not use GitHub Actions. Checks stay in `scripts/check.sh` | Q1 |
 | D3 | Should the desktop's lazy media server stay a full API server, or be media-only? | Accepted: media-only (H4) | H4 |
 
 ## Tracker
@@ -89,7 +89,7 @@ Agents must not decide these. Items that depend on them say so.
 | H2b | Check release asset URL host for emulators and ports | P1 | S | H2, D1 | Done in the working tree |
 | H4 | Media-only lazy server for the desktop | P1 | S | H1, D3 | Done in the working tree |
 | D-1 | Correct README claims (demo, dev params, ports, tests) | P1 | XS | H4 (for the port sentence) | Done in the working tree |
-| Q1 | Hosted CI for the portable check subset | P1 | M | D2 | Done in the working tree; not run on GitHub |
+| Q1 | Hosted CI for the portable check subset | P1 | M | D2 | Cancelled. No GitHub Actions |
 | A1 | Publish receipts from the backend, not from UI polling | P2 | M | — | Done in the working tree |
 | H3 | One verified-download helper for all five call sites | P2 | M | H2, H2b | Done in the working tree |
 | A2 | Systems in the library snapshot; drive UI defaults from the catalog | P2 | M | — | Done in the working tree |
@@ -112,7 +112,7 @@ Local checks that passed: `cargo fmt --all`, `cargo test --workspace --exclude m
 - **A2.** `LibrarySnapshot.systems` comes from `catalog::all()`. `pickRunner` uses that emulator id and keeps `SYSTEM_EMULATOR` only when the snapshot has no systems. `systemLabel` uses catalog display names after the snapshot arrives.
 - **U1.** Games shows a count of preparing, review, interrupted and failed preparation jobs, active transfers, and waiting or downloading browser jobs. The count opens the existing downloads panel.
 - **U2.** Settings shows the private listen address while transfers are enabled. The default remains `0.0.0.0:51413`.
-- **Q1.** Workflow file added. GitHub has not executed it.
+- **Q1.** Cancelled after implementation. The owner does not use GitHub Actions, so no workflow file is kept. Run `scripts/check.sh` locally before pushing.
 - **D-1.** README no longer describes `?demo=1`, invented titles, or a desktop that never opens a port.
 
 ## Waves
@@ -338,6 +338,8 @@ README sentence describes a demo mode. Run the docs checks named in
 [the roadmap](ROADMAP.md#verification-and-handoff) (links, whitespace).
 
 ## Q1 — Hosted CI for the portable check subset
+
+**Status:** Cancelled 2026-11-25. The owner does not use GitHub Actions. Do not add `.github/workflows/`. `scripts/check.sh` remains the check.
 
 **Depends on:** D2.
 
