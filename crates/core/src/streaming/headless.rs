@@ -80,6 +80,36 @@ struct Owner {
 fn err(message: &str) -> AppError {
     AppError::new("HEADLESS", message)
 }
+
+/// What a failed streaming command printed, in words the owner can act on.
+/// A taken port wins over the last line, which Podman words generically.
+fn command_failure(said: &str) -> Option<String> {
+    let lines: Vec<&str> = said
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect();
+    let short = |line: &str| line.chars().take(300).collect::<String>();
+    if let Some(line) = lines
+        .iter()
+        .find(|line| line.to_ascii_lowercase().contains("address already in use"))
+    {
+        // rootlessport: "127.0.0.1:47999:"; pasta: "127.0.0.1/47999:".
+        let port = line
+            .split_whitespace()
+            .filter_map(|word| word.trim_end_matches(':').rsplit_once([':', '/']))
+            .map(|(_, port)| port)
+            .find(|port| !port.is_empty() && port.chars().all(|c| c.is_ascii_digit()));
+        let which = port.map_or("A streaming port".to_string(), |port| {
+            format!("Port {port}")
+        });
+        return Some(format!(
+            "{which} is in use by another program on this computer; close it and try again ({})",
+            short(line)
+        ));
+    }
+    lines.last().map(|line| short(line))
+}
 fn digest(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
@@ -113,12 +143,19 @@ fn write_json(path: &Path, value: &impl Serialize) -> Result<()> {
 }
 fn output(command: &mut Command) -> Result<String> {
     let file = tempfile::NamedTempFile::new()?;
-    run(
+    if let Err(error) = run(
         command,
         file.path(),
         &AtomicBool::new(false),
         Duration::from_secs(15),
-    )?;
+    ) {
+        // These commands have no build log; keep what the program said.
+        let said = fs::read(file.path()).unwrap_or_default();
+        return Err(match command_failure(&String::from_utf8_lossy(&said)) {
+            Some(message) => err(&message),
+            None => error,
+        });
+    }
     let bytes = fs::read(file.path())?;
     if bytes.len() > 65536 {
         return Err(err("Streaming command returned excessive output"));
@@ -1033,6 +1070,28 @@ pub fn recover_stream(core: &Core) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_taken_port_names_the_port_instead_of_a_build_log() {
+        let said =
+            "\nError: rootlessport listen udp 127.0.0.1:47999: bind: address already in use\n";
+        let message = command_failure(said).unwrap();
+        assert!(
+            message.starts_with("Port 47999 is in use by another program"),
+            "{message}"
+        );
+        let pasta = "Error: pasta failed with exit code 1:\nListen failed for HOST UDP port 127.0.0.1/47999: Address already in use\nCouldn't listen on requested ports\n\n";
+        let message = command_failure(pasta).unwrap();
+        assert!(
+            message.starts_with("Port 47999 is in use by another program"),
+            "{message}"
+        );
+        assert_eq!(command_failure("  \n").as_deref(), None);
+        assert_eq!(
+            command_failure("Error: no such image\n").as_deref(),
+            Some("Error: no such image")
+        );
+    }
+
     use super::*;
     #[test]
     fn plans_follow_saved_runner_and_revalidate_identity_without_running_code() {

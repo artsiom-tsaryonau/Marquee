@@ -109,8 +109,8 @@ If UL1 lands before ST3c, swap the numbers here in the same change set.
 | PS5-2 | PS5 preparation and Library Play | Consoles | L | PS5-1 | Open |
 | X360-1 | Xbox 360 save/relaunch acceptance support | Consoles | S | — | Done in code. Live Vanquish save/relaunch unperformed |
 | ST3a | Wolf runtime build/status/probe/rollback in the app | Streaming | M | — | Done 2026-11-26. No host Start button |
-| ST3b | Base image independent of the Xenia pilot | Streaming | M | — | Done 2026-11-26. Live Genesis stream unperformed |
-| ST3c | Streamed playtime | Streaming | M | FD2 | Done 2026-11-26. Live stream playtime unperformed |
+| ST3b | Base image independent of the Xenia pilot | Streaming | M | — | Done 2026-11-26. Live Genesis stream passed 2026-11-26 |
+| ST3c | Streamed playtime | Streaming | M | FD2 | Done 2026-11-26. Live stream playtime passed 2026-11-26 |
 | HL1 | Mesen headless adapter | Streaming | M | ST3b | Open |
 | HL2 | DuckStation and PCSX2 headless adapters | Streaming | M each | HL1 | Open |
 | ST4 | Embedded receiver research spike | Streaming | S | FD7 | Done 2026-11-25. No receiver code |
@@ -673,6 +673,22 @@ Live Xbox 360 save/relaunch was not played. No commit was made in this pass.
 
 - **NP4 (2ship2harkinian).** Majora’s Mask uses the same ROM copy job as
   Shipwright against its published SHA-1 list. Live ROM setup unperformed.
+
+- **Genesis stream live acceptance (ST3b, ST3c).** The pruned Wolf and BlastEm
+  images were rebuilt from their pins (`marquee streaming build`,
+  `marquee emulators build blastem`). Marquee composed the library image on first
+  Stream. The main library ran on a private headless gamescope with Moonlight
+  inside it, and `scripts/headless-drive.py` supplied keyboard input and
+  screenshots. Sonic 2: video through Moonlight, a Moonlight audio stream in
+  PipeWire, and keyboard input. Start opened the Emerald Hill title card, and Right
+  moved Sonic. Closing the viewer left BlastEm running; Stream again reattached to
+  the same process (PID 130), and the game had carried on in between. Stop stream
+  removed the container and left one `ended` row, mode `stream`, 201 s, matching
+  the stream total. Exit code is empty for stopped streams.
+  Found on the way: a desktop `wsdd` held UDP 47999 by chance, so the start
+  failed with "BUILD_FAILED … see the build log". Streaming commands now report
+  what Podman said, and a taken port is named ("Port 47999 is in use by another
+  program"). Wolf's ports are still fixed (ST5).
 
 - **Shipwright live acceptance (NP1, NP3, F2).** A fresh library behind
   headless gamescope, driven by injected keyboard and pointer input. The manager

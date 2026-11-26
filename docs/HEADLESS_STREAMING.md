@@ -87,7 +87,8 @@ Sonic/Vanquish slots. The first replacement saves a configuration backup.
 Reopening Marquee can inspect the existing owned host and reconnect. Streamed
 play records a library session with `mode='stream'` after the game process starts. Marquee observes a file lock in the selected
 streaming profile to checkpoint playtime, detect exit and recover after restart.
-Closing the viewer does not end that row.
+Closing the viewer does not end that row. Genesis passed this live on 2026-11-26
+(video, audio, keyboard, reconnect to the same process, one stream row).
 Ended stream time is credited like local Play and shown as
 `x h (y h streamed)`. A stream left running when Marquee exits is recovered if
 the emulator still holds its lock. Otherwise Marquee credits the last checkpoint.
