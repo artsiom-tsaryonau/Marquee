@@ -23,6 +23,7 @@ use std::time::Duration;
 
 const CATALOGUE: &[&str] = &[
     include_str!("../../../catalog/emulators/xenia.json"),
+    include_str!("../../../catalog/emulators/ymir.json"),
     include_str!("../../../catalog/emulators/blastem.json"),
     include_str!("../../../catalog/emulators/duckstation.json"),
     include_str!("../../../catalog/emulators/pcsx2.json"),
@@ -45,9 +46,12 @@ const CATALOGUE: &[&str] = &[
 /// when it is missing, so the emulator skips its first-run wizard.
 #[derive(Debug, Clone, Deserialize)]
 pub struct SeedFile {
-    /// Relative to the emulator's `XDG_CONFIG_HOME`.
+    /// Relative to the emulator's `XDG_CONFIG_HOME`, or its `XDG_DATA_HOME` when
+    /// `root` is `data` (the sibling `xdg-data` folder).
     pub path: String,
     pub contents: String,
+    #[serde(default)]
+    pub root: Option<String>,
 }
 
 /// Write the entry's seed files under `home` unless they already exist.
@@ -60,7 +64,15 @@ pub fn seed_config(def: &EmulatorDef, home: &Path) {
         if !safe {
             continue;
         }
-        let target = home.join(rel);
+        let base = match seed.root.as_deref() {
+            Some("data") => match home.parent() {
+                Some(parent) => parent.join("xdg-data"),
+                None => continue,
+            },
+            None | Some("config") => home.to_path_buf(),
+            Some(_) => continue,
+        };
+        let target = base.join(rel);
         if target.exists() {
             continue;
         }
@@ -165,7 +177,7 @@ pub struct EmulatorDef {
     pub github: String,
     #[serde(default)]
     pub asset_suffix: String,
-    /// A direct link to an archive (`.AppImage`, `.zip`, `.tar.gz`) with its pinned
+    /// A direct link to an archive (`.AppImage`, `.zip`, `.tar.gz`, `.tar.xz`) with its pinned
     /// SHA-256. Changing the link or checksum in the catalogue file is how an
     /// emulator is updated.
     #[serde(default)]
@@ -662,11 +674,17 @@ pub fn install(paths: &Paths, def: &EmulatorDef, sink: &Arc<dyn EventSink>) -> R
     })?;
     say(sink, &def.id, "Unpacking…");
     let lower = release.name.to_ascii_lowercase();
-    let root = if lower.ends_with(".zip") || lower.ends_with(".tar.gz") || lower.ends_with(".tgz") {
+    let root = if lower.ends_with(".zip")
+        || lower.ends_with(".tar.gz")
+        || lower.ends_with(".tgz")
+        || lower.ends_with(".tar.xz")
+    {
         let out = work.path().join("extracted");
         fs::create_dir_all(&out)?;
         if lower.ends_with(".zip") {
             crate::ports::extract_zip(&part, &out)?;
+        } else if lower.ends_with(".tar.xz") {
+            crate::ports::extract_tar_xz(&part, &out)?;
         } else {
             crate::ports::extract_tar_gz(&part, &out)?;
         }
@@ -1186,9 +1204,19 @@ mod tests {
         def.seed = vec![SeedFile {
             path: "../escape.json".into(),
             contents: "x".into(),
+            root: None,
         }];
         seed_config(&def, &home);
         assert!(!t.path().join("escape.json").exists());
+        // Ymir's profile is in the sibling data folder; its update prompt is marked seen.
+        let ymir = find("ymir").unwrap();
+        let config = t.path().join("ymir/xdg-config");
+        seed_config(&ymir, &config);
+        assert!(t
+            .path()
+            .join("ymir/xdg-data/StrikerX3/Ymir/state/updates/.onboarded")
+            .is_file());
+        assert!(!config.join("StrikerX3").exists());
     }
 
     #[test]
@@ -1309,6 +1337,25 @@ mod tests {
         let latest = latest(&def).unwrap();
         assert_eq!(latest.sha256, pin.sha256);
         assert_eq!(latest.version, pin.version);
+    }
+
+    #[test]
+    fn ymir_always_uses_its_isolated_user_profile_and_takes_saturn_ipl_roms() {
+        let def = find("ymir").unwrap();
+        assert_eq!(def.kind.as_deref(), Some("emulator"));
+        assert_eq!(def.systems, ["saturn"]);
+        // Without -u Ymir asks on first run and "Portable" writes into the cwd.
+        assert_eq!(def.launch, ["-u", "{rom}"]);
+        assert_eq!(def.open_args, ["-u"]);
+        let pin = def.download.as_ref().unwrap();
+        assert!(pin.url.ends_with("ymir-linux-x86_64-AVX2-v0.4.1.tar.xz"));
+        assert_eq!(pin.sha256.len(), 64);
+        let names: Vec<_> = def.firmware.iter().map(|f| f.name.as_str()).collect();
+        assert_eq!(names, ["mpr-17933.bin", "sega_101.bin"]);
+        assert!(def
+            .firmware
+            .iter()
+            .all(|f| f.size == Some(524_288) && f.dir == "StrikerX3/Ymir/roms/ipl"));
     }
 
     #[test]
@@ -1485,6 +1532,7 @@ mod tests {
             kinds,
             [
                 "duckstation",
+                "emulator",
                 "emulator",
                 "emulator",
                 "emulator",

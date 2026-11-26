@@ -1,0 +1,20 @@
+{
+  "id": "saturn",
+  "display_name": "Saturn",
+  "supported_extensions": [
+    "cue",
+    "chd",
+    "ccd",
+    "mds",
+    "iso"
+  ],
+  "skipped_extensions": [
+    "bin",
+    "img",
+    "sub",
+    "mdf"
+  ],
+  "runner_kind": "emulator",
+  "emulator": "ymir",
+  "notes": "Disc images. Import recognises a Saturn disc by its 'SEGA SEGASATURN' header, because .cue, .chd and .iso are shared with PlayStation. Ymir needs a Saturn IPL (BIOS) ROM."
+}

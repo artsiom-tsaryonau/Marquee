@@ -19,5 +19,6 @@ ureq = "2"
 uuid = { version = "1", features = ["v4", "serde"] }
 flate2 = "1"
 tar = "0.4"
+lzma-rust2 = { version = "0.23", default-features = false, features = ["std", "xz"] }
 zip = { version = "2", default-features = false, features = ["deflate"] }
 tiny_http = "0.12"

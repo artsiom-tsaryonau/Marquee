@@ -95,6 +95,7 @@ streamed/controller acceptance.
 | PPSSPP | PSP | Managed lifecycle and standalone opening |
 | RPCS3 | PS3 | Managed lifecycle/standalone opening, [PS3 discovery, reviewed firmware setup and verified ISO registration](PS3.md); direct ISO Library Play implemented; live game acceptance pending |
 | Flycast | Dreamcast | Managed lifecycle and generic disc adapter; live game acceptance separate |
+| Ymir | Sega Saturn | Pinned v0.4.1 and generic disc adapter; needs an owner-dumped IPL; live game acceptance pending (no IPL or disc on this host) |
 | Azahar | Nintendo 3DS | Managed lifecycle and standalone opening |
 | Cemu | Wii U | Managed lifecycle and standalone opening |
 | xemu | Original Xbox | Managed lifecycle and standalone opening |
@@ -200,6 +201,7 @@ Added 2026-10-21. A system with no dedicated runner kind is one file in `catalog
 | Dreamcast | `.cdi .gdi .chd` | Flycast v2.7 | GitHub AppImage, published SHA-256 | `-config window:fullscreen=yes {rom}` |
 | NES, SNES, Game Boy, Game Boy Color, PC Engine | `.nes .fds .unf`, `.smc .sfc .swc .fig`, `.gb`, `.gbc .gb`, `.pce .sgx` | Mesen 2.1.1 | GitHub `Linux_x64.zip`, published SHA-256; single `Mesen` binary | `--fullscreen {rom}`, run with `LC_ALL=C.UTF-8` |
 | Nintendo 64 | `.z64 .n64 .v64` | Rosalie's Mupen GUI v0.9.0 | GitHub AppImage, published SHA-256 | `--fullscreen --quit-after-emulation --nogui {rom}` |
+| Sega Saturn | `.cue .chd .ccd .mds .iso` | Ymir v0.4.1 | GitHub `linux-x86_64-AVX2.tar.xz`, published SHA-256 | `-u [-f] {rom}` |
 
 Verified on this host (2026-10-21): all three installed through `marquee emulators install`, 1,487 images from the local `roms/` folders were scanned into the library (Dreamcast 3, NES 245, SNES 42, GB 26, GBC 1,161, PC Engine 6, N64 4), and one game per emulator was launched with the argument lists above. Flycast (`chroma-circuit`) and RMG (`Kumi-Daiko-Beatoff-64`) stayed running until stopped. **Mesen needed two fixes (2026-10-21).** (1) Its .NET runtime aborts with a C++ `std::bad_cast` on this host (Fedora, ICU libraries) in every code path, even `--help`; `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1` in the entry's `env` fixes it (checked: the process stays up with it and aborts without it). My earlier note that Mesen \"stayed running\" was wrong. (2) With no `settings.json`, Mesen opens a first-run window (storage location, desktop shortcut and icons, default controller mappings) and, when that closes, starts a second copy of itself and exits. Marquee saw the first process end and the game's arguments were lost. The entry now has a `seed` list that writes `Mesen2/settings.json` (`{"Version":"2.1.1","ConfigUpgrade":1}`) only when missing; Mesen reads that as a first run, creates its own defaults (Xbox pad and arrow keys on every port, checked in the file it wrote) and goes straight to the game. A small official icon is fetched at install (`icon_download`, pinned SHA-256) because the zip contains none. Verified: one Mesen process stayed up 15 s through Marquee from a clean folder. **At that time, not verified:** the pictures on screen, input, clean exit and playtime for these systems. The later [Mesen acceptance](MESEN_ACCEPTANCE.md) supersedes those limits only for its two tested titles. Because of that Marquee now treats a normal exit within 10 seconds of launch as a failed start ("the emulator closed itself after Ns without a game being played") instead of a played session; the fake test runner is exempt.
 
@@ -416,6 +418,33 @@ and locally edited wrappers are left alone. Save paths in melonDS's first-run
 config are host paths, also mounted at the same locations in the container, so
 they remain meaningful if the previous verified binary is restored.
 
+
+## Sega Saturn (2026-11-26)
+
+[Ymir](https://github.com/ymir-emu/Ymir) v0.4.1 (GPL-3.0) is pinned as the AVX2
+Linux `.tar.xz` (SHA-256 `53f0b92f…a25f1c`, GitHub's published digest); the
+installer now unpacks `.tar.xz` with the same limits as `.tar.gz`. Mednafen,
+the accuracy reference, is the planned second Saturn runner (pinned source build).
+
+- **Profile.** Game launch and Tools → Open both pass `-u`, so Ymir keeps
+  `Ymir.toml`, backup RAM (`state/bup-int.bin`), save states and its ROM folders in
+  `ymir/xdg-data/StrikerX3/Ymir`. Without `-u` the first run asks Installed or
+  Portable, and Portable writes into the working directory.
+- **Update checks.** A data-root seed writes `state/updates/.onboarded`, so the
+  update prompt never appears; `CheckForUpdates` stays at its default `false`.
+  Marquee manages the version.
+- **BIOS.** Ymir needs an IPL ROM: `mpr-17933.bin` (North America, Europe) or
+  `sega_101.bin` (Japan), 512 KiB. The BIOS inbox copies a correctly named,
+  correctly sized file into `roms/ipl`, where Ymir loads it automatically. Marquee
+  does not download firmware.
+- **Import.** `.cue`, `.iso` and `.chd` are shared with PlayStation. Intake reads the
+  data track's system ID: a disc starting `SEGA SEGASATURN ` moves to the Saturn
+  folder, registered on first use, and re-importing is a no-op. Compressed `.chd`
+  cannot be read, so a Saturn `.chd` needs a Saturn library folder added by hand.
+- **Checked live.** Install through the manager, Tools → Open into the isolated
+  profile with no prompts, and Ymir's own notice pointing at `roms/ipl`. Not
+  checked: booting a disc, input, saves and exit, because this host has no IPL and
+  no Saturn disc.
 
 ## Genesis / Mega Drive
 

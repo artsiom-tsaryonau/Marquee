@@ -27,4 +27,4 @@ pub fn open_folder(paths: &Paths, id: &str) -> Result<()> {
     marquee_manager::port_engine::open_folder(&paths.data_dir, id)
 }
 
-pub use marquee_manager::port_engine::{extract_tar_gz, extract_zip};
+pub use marquee_manager::port_engine::{extract_tar_gz, extract_tar_xz, extract_zip};

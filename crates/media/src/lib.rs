@@ -5,6 +5,7 @@ pub mod cue;
 pub mod error;
 pub mod iso;
 mod rar;
+pub mod saturn;
 pub mod time;
 
 pub mod http;

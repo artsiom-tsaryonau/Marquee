@@ -132,7 +132,7 @@
   let draft = $state({ title: '', system: 'ps2', status: 'wishlist' as 'wishlist' | 'owned' });
   let savingGame = $state(false);
   const systemOptions = [
-    { id: 'ps2', label: 'PlayStation 2' }, { id: 'ps1', label: 'PlayStation' }, { id: 'dreamcast', label: 'Dreamcast' },
+    { id: 'ps2', label: 'PlayStation 2' }, { id: 'ps1', label: 'PlayStation' }, { id: 'dreamcast', label: 'Dreamcast' }, { id: 'saturn', label: 'Sega Saturn' },
     { id: 'genesis', label: 'Sega Genesis' }, { id: 'snes', label: 'Super Nintendo' }, { id: 'nes', label: 'NES' },
     { id: 'n64', label: 'Nintendo 64' }, { id: 'xbox360', label: 'Xbox 360' }, { id: 'ds', label: 'Nintendo DS' }, { id: 'gbc', label: 'Game Boy Color' },
     { id: 'gb', label: 'Game Boy' }, { id: 'pce', label: 'PC Engine / TurboGrafx-16' }, { id: 'neogeo', label: 'Neo Geo' },

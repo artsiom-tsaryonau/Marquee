@@ -1,0 +1,55 @@
+{
+  "id": "ymir",
+  "name": "Ymir",
+  "systems": [
+    "saturn"
+  ],
+  "binary": "ymir-sdl3",
+  "config_subdir": "ymir",
+  "requirement": "Sega Saturn emulator (GPL-3.0). Needs a Saturn IPL (BIOS) ROM you dumped yourself: mpr-17933.bin for North American and European discs, sega_101.bin for Japanese discs. Drop it into the BIOS inbox. Saves, settings and save states stay in Marquee's Ymir folder.",
+  "download": {
+    "url": "https://github.com/ymir-emu/Ymir/releases/download/v0.4.1/ymir-linux-x86_64-AVX2-v0.4.1.tar.xz",
+    "sha256": "53f0b92fe10e1471c5413ae881ff9804049a2c6001594eab31dbf6d0aaa25f1c",
+    "version": "v0.4.1"
+  },
+  "kind": "emulator",
+  "launch": [
+    "-u",
+    "{rom}"
+  ],
+  "open_args": [
+    "-u"
+  ],
+  "seed": [
+    {
+      "path": "StrikerX3/Ymir/state/updates/.onboarded",
+      "contents": "",
+      "root": "data"
+    }
+  ],
+  "fullscreen_args": [
+    "-f"
+  ],
+  "windowed_args": [],
+  "firmware": [
+    {
+      "name": "mpr-17933.bin",
+      "aliases": [
+        "saturn_bios.bin"
+      ],
+      "required": false,
+      "size": 524288,
+      "root": "data",
+      "dir": "StrikerX3/Ymir/roms/ipl",
+      "note": "Saturn IPL v1.00/1.01 for North American and European discs. One IPL matching the disc's region is required."
+    },
+    {
+      "name": "sega_101.bin",
+      "required": false,
+      "size": 524288,
+      "root": "data",
+      "dir": "StrikerX3/Ymir/roms/ipl",
+      "note": "Saturn IPL v1.01 for Japanese discs."
+    }
+  ]
+}

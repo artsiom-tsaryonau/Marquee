@@ -1220,8 +1220,17 @@ pub fn extract_zip(archive: &Path, dest: &Path) -> Result<()> {
 }
 
 pub fn extract_tar_gz(archive: &Path, dest: &Path) -> Result<()> {
-    let gz = flate2::read::GzDecoder::new(File::open(archive)?);
-    let mut tar = tar::Archive::new(gz);
+    extract_tar(flate2::read::GzDecoder::new(File::open(archive)?), dest)
+}
+
+/// Same rules as `.tar.gz`: regular files and folders only, contained, size-capped.
+pub fn extract_tar_xz(archive: &Path, dest: &Path) -> Result<()> {
+    let file = io::BufReader::new(File::open(archive)?);
+    extract_tar(lzma_rust2::XzReader::new(file, true), dest)
+}
+
+fn extract_tar(stream: impl io::Read, dest: &Path) -> Result<()> {
+    let mut tar = tar::Archive::new(stream);
     let mut total = 0u64;
     for entry in tar.entries()? {
         let mut entry = entry?;

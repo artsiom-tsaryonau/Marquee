@@ -36,9 +36,47 @@ pub struct IntakeReport {
     pub source_removed: bool,
 }
 
+/// A published disc whose data track carries the Saturn system ID.
+fn is_saturn(dir: &Path, wanted: &[(Entry, PathBuf)]) -> bool {
+    wanted.iter().any(|(_, rel)| {
+        matches!(ext_of(rel).as_str(), "cue" | "iso")
+            && marquee_media::saturn::identify(&dir.join(rel)).is_some()
+    })
+}
+
+/// Move published files to another system's folder, keeping their layout.
+fn move_published(from: &Path, to: &Path, wanted: &[(Entry, PathBuf)]) -> Result<()> {
+    for (_, rel) in wanted {
+        let target = to.join(rel);
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::rename(from.join(rel), &target)?;
+    }
+    // Drop the now-empty archive folder; never anything that still holds files.
+    for (_, rel) in wanted {
+        let mut dir = rel.parent();
+        while let Some(d) = dir.filter(|d| !d.as_os_str().is_empty()) {
+            let _ = fs::remove_dir(from.join(d));
+            dir = d.parent();
+        }
+    }
+    Ok(())
+}
+
 impl Core {
     /// Folder for a system's library files, creating and registering one when
     /// no root exists yet. Returns the path and whether the system is known.
+    /// An existing, reachable root for a system, without creating one.
+    fn existing_root(&self, system: &str) -> Result<Option<PathBuf>> {
+        Ok(self
+            .snapshot()?
+            .roots
+            .into_iter()
+            .find(|r| r.system == system && r.path.is_dir())
+            .map(|r| r.path))
+    }
+
     pub(crate) fn intake_root(&self, system: &str) -> Result<PathBuf> {
         let snap = self.snapshot()?;
         // A prepared title's folder is receipt-owned, not a general destination
@@ -218,6 +256,31 @@ impl Core {
             })
             .collect();
 
+        // .cue/.iso are guessed as PlayStation; a Saturn disc moved on first import.
+        if system == "ps1" {
+            if let Some(saturn) = self.existing_root("saturn")? {
+                let present = wanted.iter().all(|(e, rel)| {
+                    let path = saturn.join(rel);
+                    fs::metadata(&path).is_ok_and(|m| {
+                        m.len() == e.size
+                            || (ext_of(rel) == "cue" && crate::cue::manifest(&path).is_ok())
+                    })
+                });
+                if present {
+                    return Ok(report(
+                        Outcome::AlreadyPresent,
+                        Some("saturn".into()),
+                        Some(saturn),
+                        wanted
+                            .iter()
+                            .map(|(_, r)| r.display().to_string())
+                            .collect(),
+                        "Everything in this archive is already in the library.".into(),
+                    ));
+                }
+            }
+        }
+
         let need: u64 = wanted.iter().map(|(e, _)| e.size).sum();
         if let Some(free) = free_bytes(&dest_dir) {
             if free < need.saturating_add(FREE_MARGIN) {
@@ -301,6 +364,14 @@ impl Core {
         })();
         let _ = fs::remove_dir_all(&staging);
         result?;
+
+        let (system, dest_dir) = if system == "ps1" && is_saturn(&dest_dir, &wanted) {
+            let saturn = self.intake_root("saturn")?;
+            move_published(&dest_dir, &saturn, &wanted)?;
+            ("saturn".to_string(), saturn)
+        } else {
+            (system, dest_dir)
+        };
 
         let files: Vec<String> = wanted
             .iter()
@@ -505,6 +576,47 @@ mod tests {
             crate::cue::manifest(&imported).unwrap().tracks[1].file,
             "Moto   (Track 2) (site).bin"
         );
+    }
+
+    #[test]
+    fn a_saturn_disc_is_filed_under_saturn_not_playstation() {
+        let tmp = tempfile::tempdir().unwrap();
+        let c = core(&tmp.path().join("data"));
+        let mut track = vec![0u8; 16];
+        let mut id = vec![b' '; 0x100];
+        id[..16].copy_from_slice(b"SEGA SEGASATURN ");
+        id[0x20..0x28].copy_from_slice(b"MK-81088");
+        track.extend(id);
+        track.resize(2352 * 2, 0);
+        let cue =
+            b"FILE \"Nights (Track 1).bin\" BINARY\n  TRACK 01 MODE1/2352\n    INDEX 01 00:00:00\n";
+        let archive = tmp.path().join("Nights.zip");
+        make_zip(
+            &archive,
+            &[("Nights.cue", cue), ("Nights (Track 1).bin", &track)],
+        );
+        let report = c.intake_archive(&archive, false).unwrap();
+        assert_eq!(report.outcome, Outcome::Imported);
+        assert_eq!(report.system.as_deref(), Some("saturn"));
+        let dest = report.dest.unwrap();
+        assert!(dest.ends_with("saturn"));
+        assert!(dest.join("Nights/Nights.cue").is_file());
+        let ps1 = c.existing_root("ps1").unwrap();
+        assert!(ps1.is_none_or(|dir| !dir.join("Nights").exists()));
+        let roots = c.snapshot().unwrap().roots;
+        assert!(roots.iter().any(|r| r.system == "saturn" && r.path == dest));
+        let again = c.intake_archive(&archive, false).unwrap();
+        assert_eq!(again.outcome, Outcome::AlreadyPresent);
+        assert_eq!(again.system.as_deref(), Some("saturn"));
+
+        let ps1_archive = tmp.path().join("Other.zip");
+        let ps1_cue = b"FILE \"Other.bin\" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n";
+        make_zip(
+            &ps1_archive,
+            &[("Other.cue", ps1_cue), ("Other.bin", &[0u8; 4704])],
+        );
+        let other = c.intake_archive(&ps1_archive, false).unwrap();
+        assert_eq!(other.system.as_deref(), Some("ps1"));
     }
 
     #[test]
