@@ -688,6 +688,7 @@ mod tests {
         prepare(dir.path()).unwrap();
         let text = fs::read_to_string(&ini).unwrap();
         assert!(text.contains("SetupWizardIncomplete = false"));
+        assert!(text.contains("[AutoUpdater]\nCheckAtStartup = false"));
         assert!(text.contains("Renderer = Software"));
     }
     #[test]

@@ -28,6 +28,106 @@ pub fn normalized_import(path: &Path) -> Result<Option<Vec<u8>>> {
     Ok(changed.then_some(bytes))
 }
 
+/// Some providers rename the track files but not the sheet: the sheet asks for
+/// `Game (En,Fr) (Track 1).bin` while the folder holds `Game (Track 1) (site).bin`.
+/// Point each FILE whose name is missing at the one sibling `.bin` carrying the
+/// same `(Track N)` (or the only `.bin`, for a one-file sheet). Anything
+/// ambiguous or unmatched leaves the sheet unchanged. Returns the new bytes.
+pub fn repair_track_files(path: &Path) -> Result<Option<Vec<u8>>> {
+    let text = match std::fs::read(path) {
+        Ok(bytes) if bytes.len() as u64 <= CUE_MAX_BYTES => {
+            String::from_utf8_lossy(&bytes).into_owned()
+        }
+        Ok(_) => return Err(AppError::new("INTAKE_FORMAT", "CUE sheet exceeds 1 MiB")),
+        Err(error) => return Err(error.into()),
+    };
+    let Some(dir) = path.parent() else {
+        return Ok(None);
+    };
+    let bins: Vec<String> = std::fs::read_dir(dir)?
+        .flatten()
+        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_file()))
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .filter(|name| name.to_ascii_lowercase().ends_with(".bin"))
+        .collect();
+    // Each FILE line with the track number that follows it.
+    let lines: Vec<&str> = text.split_inclusive('\n').collect();
+    let mut files: Vec<(usize, String, Option<u32>)> = Vec::new();
+    for (index, raw) in lines.iter().enumerate() {
+        let line = raw.trim();
+        let (keyword, rest) = line.split_once(char::is_whitespace).unwrap_or((line, ""));
+        if keyword.eq_ignore_ascii_case("FILE") {
+            files.push((index, file_field(rest), None));
+        } else if keyword.eq_ignore_ascii_case("TRACK") {
+            if let Some(last) = files.last_mut().filter(|file| file.2.is_none()) {
+                last.2 = rest.split_whitespace().next().and_then(|n| n.parse().ok());
+            }
+        }
+    }
+    let exists = |name: &str| track_path(path, name).is_some_and(|p| p.is_file());
+    if files.is_empty() || files.iter().all(|(_, name, _)| exists(name)) {
+        return Ok(None);
+    }
+    let mut out = lines
+        .iter()
+        .map(|line| line.to_string())
+        .collect::<Vec<_>>();
+    let mut used: Vec<String> = files
+        .iter()
+        .filter(|(_, name, _)| exists(name))
+        .map(|(_, name, _)| name.clone())
+        .collect();
+    for (index, name, track) in &files {
+        if exists(name) {
+            continue;
+        }
+        let candidates: Vec<&String> = match track {
+            _ if files.len() == 1 && bins.len() == 1 => bins.iter().collect(),
+            Some(number) => bins
+                .iter()
+                .filter(|bin| track_number(bin) == Some(*number))
+                .collect(),
+            None => Vec::new(),
+        };
+        let [found] = candidates.as_slice() else {
+            return Ok(None);
+        };
+        if used.contains(found) || found.contains('"') {
+            return Ok(None);
+        }
+        used.push((*found).clone());
+        let original = lines[*index];
+        let indent = &original[..original.len() - original.trim_start().len()];
+        let ending = &original[original.trim_end_matches(['\r', '\n']).len()..];
+        let after = original.trim().get(4..).unwrap_or("").trim_start();
+        let kind = if let Some(inner) = after.strip_prefix('"') {
+            inner.split_once('"').map_or("", |(_, rest)| rest.trim())
+        } else {
+            after
+                .split_once(char::is_whitespace)
+                .map_or("", |(_, rest)| rest.trim())
+        };
+        let kind = if kind.is_empty() { "BINARY" } else { kind };
+        out[*index] = format!("{indent}FILE \"{found}\" {kind}{ending}");
+    }
+    Ok(Some(out.concat().into_bytes()))
+}
+
+/// `Game (Track 03) (site).bin` → 3.
+fn track_number(name: &str) -> Option<u32> {
+    let lower = name.to_ascii_lowercase();
+    let start = lower.find("(track ")? + "(track ".len();
+    let digits: String = lower[start..]
+        .chars()
+        .take_while(char::is_ascii_digit)
+        .collect();
+    if lower[start + digits.len()..].starts_with(')') {
+        digits.parse().ok()
+    } else {
+        None
+    }
+}
+
 fn normalize_file_quotes(bytes: &mut [u8]) -> Result<bool> {
     let mut changed = false;
     for line in bytes.split_mut(|b| *b == b'\n') {
@@ -288,6 +388,34 @@ pub fn identify_cue(cue_path: &Path) -> Result<crate::iso::DiscIdentity> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn renamed_tracks_are_matched_by_number_and_ambiguity_changes_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let cue = dir.path().join("g.cue");
+        std::fs::write(
+            &cue,
+            "FILE \"G (En) (Track 1).bin\" BINARY\nTRACK 01 MODE2/2352\nINDEX 01 00:00:00\nFILE \"G (En) (Track 10).bin\" BINARY\nTRACK 10 AUDIO\nINDEX 01 00:00:00\n",
+        )
+        .unwrap();
+        std::fs::write(dir.path().join("G (Track 1) (x).bin"), b"d").unwrap();
+        std::fs::write(dir.path().join("G (Track 10) (x).bin"), b"a").unwrap();
+        let fixed = String::from_utf8(repair_track_files(&cue).unwrap().unwrap()).unwrap();
+        assert!(fixed.contains("FILE \"G (Track 1) (x).bin\" BINARY\n"));
+        assert!(fixed.contains("FILE \"G (Track 10) (x).bin\" BINARY\n"));
+        std::fs::write(&cue, &fixed).unwrap();
+        assert_eq!(repair_track_files(&cue).unwrap(), None);
+        // Two candidates for one track: leave the sheet alone.
+        std::fs::write(
+            &cue,
+            "FILE \"G (En) (Track 1).bin\" BINARY\nTRACK 01 MODE2/2352\n",
+        )
+        .unwrap();
+        std::fs::write(dir.path().join("G (Track 1) (y).bin"), b"d").unwrap();
+        assert_eq!(repair_track_files(&cue).unwrap(), None);
+        assert_eq!(track_number("G (Track 03) (x).bin"), Some(3));
+        assert_eq!(track_number("G (Track 3a).bin"), None);
+    }
 
     const MGS_DISC_1: &str = "FILE \"Metal Gear Solid (USA) (Disc 1) (Rev 1).bin\" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n";
 

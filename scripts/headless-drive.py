@@ -16,10 +16,10 @@ that does not exist and forcing X11 keeps every window inside Gamescope.
 Commands (DISPLAY must name that XWayland):
 
     windows                 list top-level windows
-    shot OUT.png            save the largest mapped window
+    shot OUT.png [NAME]     save the largest mapped window, or the one whose title contains NAME
     key KEYSYM [MS] [N]     press an X keysym (x, space, Return, Up) via XTest
     click X Y | move X Y    pointer in window coordinates via Gamescope's libei socket
-    close                   ask the largest window to close (WM_DELETE_WINDOW)
+    close [NAME]            ask the largest window (or the one titled NAME) to close
 
 XTest key events reach X clients here; XTest pointer events do not, so pointer
 input goes through Gamescope's EIS socket, whose absolute coordinates are those
@@ -57,18 +57,20 @@ def windows(disp):
     return out
 
 
-def largest(disp):
+def largest(disp, name=None):
     found = [w for w in windows(disp) if w[4] and w[2] >= 160 and w[3] >= 120]
+    if name:
+        found = [w for w in found if name.lower() in str(w[1] or "").lower()]
     if not found:
         sys.exit("No mapped window")
     return max(found, key=lambda w: w[2] * w[3])
 
 
-def shot(disp, path):
+def shot(disp, path, title=None):
     from Xlib import X
     from PIL import Image
 
-    window, name, width, height, _ = largest(disp)
+    window, name, width, height, _ = largest(disp, title)
     raw = window.get_image(0, 0, width, height, X.ZPixmap, 0xFFFFFFFF)
     Image.frombytes("RGBX", (width, height), raw.data, "raw", "BGRX").convert("RGB").save(path)
     print("saved", path, width, height, name)
@@ -94,10 +96,10 @@ def key(disp, keysym, hold_ms=100, repeat=1):
     print("key", keysym, "x", repeat)
 
 
-def close(disp):
+def close(disp, title=None):
     from Xlib import X, protocol
 
-    window, name = largest(disp)[:2]
+    window, name = largest(disp, title)[:2]
     protocols = disp.intern_atom("WM_PROTOCOLS")
     delete = disp.intern_atom("WM_DELETE_WINDOW")
     window.send_event(
@@ -226,11 +228,11 @@ def main(argv):
         for window, name, width, height, mapped in windows(disp):
             print(hex(window.id), repr(name), width, height, "mapped" if mapped else "")
     elif command == "shot":
-        shot(disp, args[0])
+        shot(disp, args[0], args[1] if len(args) > 1 else None)
     elif command == "key":
         key(disp, args[0], *(int(value) for value in args[1:3]))
     elif command == "close":
-        close(disp)
+        close(disp, args[0] if args else None)
     else:
         sys.exit(f"Unknown command {command}")
 

@@ -237,9 +237,13 @@ impl Core {
             .iter()
             .filter(|(e, rel)| {
                 let path = dest_dir.join(rel);
-                fs::metadata(&path).map_or(true, |m| m.len() != e.size)
-                    || (ext_of(rel) == "cue"
-                        && !matches!(crate::cue::normalized_import(&path), Ok(None)))
+                let is_cue = ext_of(rel) == "cue";
+                // A repaired sheet differs in size from the archive copy but resolves.
+                fs::metadata(&path).map_or(true, |m| {
+                    m.len() != e.size && !(is_cue && crate::cue::manifest(&path).is_ok())
+                }) || (is_cue
+                    && (!matches!(crate::cue::normalized_import(&path), Ok(None))
+                        || !matches!(crate::cue::repair_track_files(&path), Ok(None))))
             })
             .collect();
         if pending.is_empty() {
@@ -283,6 +287,15 @@ impl Core {
                     fs::create_dir_all(parent)?;
                 }
                 fs::rename(staging.join(rel), &to)?;
+            }
+            // Track files are all in place now; point sheets at renamed tracks.
+            for (_, rel) in &wanted {
+                if ext_of(rel) == "cue" {
+                    let path = dest_dir.join(rel);
+                    if let Some(bytes) = crate::cue::repair_track_files(&path)? {
+                        fs::write(path, bytes)?;
+                    }
+                }
             }
             Ok(())
         })();
@@ -458,6 +471,40 @@ mod tests {
             Outcome::AlreadyPresent
         );
         assert!(archive.exists());
+    }
+
+    #[test]
+    fn a_sheet_naming_renamed_tracks_is_pointed_at_them_once() {
+        let tmp = tempfile::tempdir().unwrap();
+        let c = core(&tmp.path().join("data"));
+        let archive = tmp.path().join("Moto.zip");
+        let cue = b"FILE \"Moto (En,Fr) (Track 1).bin\" BINARY\r\n  TRACK 01 MODE2/2352\r\n    INDEX 01 00:00:00\r\nFILE \"Moto (En,Fr) (Track 2).bin\" BINARY\r\n  TRACK 02 AUDIO\r\n    INDEX 01 00:00:00\r\n";
+        make_zip(
+            &archive,
+            &[
+                ("Moto/Moto (site).cue", cue),
+                ("Moto/Moto   (Track 1) (site).bin", b"data"),
+                ("Moto/Moto   (Track 2) (site).bin", b"audio"),
+            ],
+        );
+        let report = c.intake_archive(&archive, false).unwrap();
+        assert_eq!(report.outcome, Outcome::Imported);
+        let imported = report.dest.unwrap().join("Moto/Moto (site).cue");
+        let sheet = crate::cue::manifest(&imported).unwrap();
+        assert_eq!(sheet.tracks[0].file, "Moto   (Track 1) (site).bin");
+        assert_eq!(sheet.tracks[1].file, "Moto   (Track 2) (site).bin");
+        assert!(String::from_utf8(fs::read(&imported).unwrap())
+            .unwrap()
+            .contains("\r\n  TRACK 01"));
+        let again = c.intake_archive(&archive, false).unwrap();
+        assert_eq!(again.outcome, Outcome::AlreadyPresent);
+        // A copy imported before this repair: the archive's sheet, unchanged.
+        fs::write(&imported, cue).unwrap();
+        c.intake_archive(&archive, false).unwrap();
+        assert_eq!(
+            crate::cue::manifest(&imported).unwrap().tracks[1].file,
+            "Moto   (Track 2) (site).bin"
+        );
     }
 
     #[test]

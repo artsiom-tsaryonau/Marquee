@@ -397,7 +397,8 @@ fn ensure_pcsx2_controls(text: &str) -> String {
 
 /// Make DuckStation's first run silent: it fills every other setting with its
 /// own defaults, so Marquee only writes the keys it owns. BIOS is found by
-/// DuckStation itself from `duckstation/bios`.
+/// DuckStation itself from `duckstation/bios`. Marquee installs and updates the
+/// emulator, so DuckStation's own updater must not offer to replace it at launch.
 pub fn seed_duckstation(xdg_config: &Path) -> Result<()> {
     let ini = xdg_config.join("duckstation").join("settings.ini");
     let text = if ini.is_file() {
@@ -406,6 +407,7 @@ pub fn seed_duckstation(xdg_config: &Path) -> Result<()> {
         String::new()
     };
     let updated = set_ini_value(&text, "Main", "SetupWizardIncomplete", "false");
+    let updated = set_ini_value(&updated, "AutoUpdater", "CheckAtStartup", "false");
     if updated != text {
         let parent = ini.parent().unwrap_or(xdg_config);
         fs::create_dir_all(parent)?;
@@ -667,7 +669,7 @@ mod tests {
         let ini = t.path().join("duckstation/settings.ini");
         assert_eq!(
             fs::read_to_string(&ini).unwrap(),
-            "\n[Main]\nSetupWizardIncomplete = false\n".trim_start_matches('\n')
+            "[Main]\nSetupWizardIncomplete = false\n\n[AutoUpdater]\nCheckAtStartup = false\n"
         );
         fs::write(&ini, "[Main]\nSetupWizardIncomplete = true\nA = 1\n").unwrap();
         seed_duckstation(t.path()).unwrap();
