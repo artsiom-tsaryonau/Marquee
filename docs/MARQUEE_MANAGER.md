@@ -379,7 +379,7 @@ existing Play/import usable.
 | M6 — Other managed setup and stores | Route emulator/port/runtime setup through manager incrementally; use shared jobs for supported Epic/GOG work | Existing isolation/rollback/saves preserved; official Steam remains a delegated client flow; truthful capability/progress and backend ownership |
 
 M3 transport ownership and cutover are implemented. The manager hosts the existing
-adapter, private/public engines, durable history and settings, and checkpoints
+adapter, LAN-only peer filtering, durable history and settings, and checkpoints
 eligible jobs every second without a connected UI. Migration requires the library
 lease, retains an exact private backup and original payload paths, and retires
 older embedded writers before the daemon can restore jobs. Pause/Stop/settings
@@ -455,3 +455,12 @@ never opens the library database. Core verifies receipt output and transactional
 publishes installed-port settings when it reconnects. Prior successful receipts
 survive failed attempts. Native game-data preparation and tracked play sessions
 remain separate follow-up work. See [Q2b](QUIVER_INTEGRATION.md#q2b--detached-engine-installation-2026-10-25).
+
+## LAN-only transfers (2026-11-26)
+
+Protocol v7 requires the local transfer policy in both the manager and engine.
+Public discovery/proxy settings cannot be enabled; legacy settings are inert.
+The private listener and incoming/outgoing peer allowlist exclude public addresses.
+Old public jobs retain files and history without automatic networking; explicit
+resume requires saved local receive peers and converts the job to the LAN engine.
+See [local transfers](TORRENTS.md) for UI, migration and verification details.

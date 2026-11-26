@@ -1,5 +1,5 @@
 const PREPARING = new Set(['preparing', 'awaiting_review', 'interrupted', 'failed']);
-const TRANSFERRING = new Set(['preparing', 'checking', 'downloading', 'starting', 'sharing']);
+const TRANSFERRING = new Set(['preparing', 'checking', 'downloading', 'starting', 'sharing', 'error', 'source_missing']);
 const BROWSER = new Set(['waiting', 'downloading']);
 
 /** Counts work the Games navigation should surface. Registered and completed jobs are quiet. */

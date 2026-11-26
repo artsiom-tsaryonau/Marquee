@@ -686,3 +686,24 @@ test('artwork refresh updates the page and releases busy state even without even
     await app.refreshArtwork('disc-a');assert.equal(calls,2);
   } finally {app.api=api;app.fetchingArt=false;}
 });
+
+
+test('device link failures persist and concurrent submissions queue only once', async () => {
+  const api = app.api, settings = app.runnerSettings;
+  let finish, calls = 0;
+  try {
+    app.runnerSettings = {...settings, torrents:{enabled:true,seeding:false,upload_kbps:0,download_kbps:0}};
+    app.api = {...api, transferGet:async()=>{ throw new Error('A local device address is required'); }};
+    assert.equal(await app.getFromLink('magnet:?xt=bad'), false);
+    assert.match(app.transferLinkError, /local device/);
+    app.api = {...api, transferGet:()=>{ calls++; return new Promise(resolve => finish = resolve); }, transferStatus:async()=>({enabled:true,seeding:false,items:[]})};
+    const first = app.getFromLink('  device-link  ');
+    assert.equal(app.transferLinkBusy, true);
+    assert.equal(await app.getFromLink('device-link'), false);
+    assert.equal(calls, 1);
+    finish();
+    assert.equal(await first, true);
+    assert.equal(app.transferLinkError, '');
+    assert.equal(app.transferLinkBusy, false);
+  } finally { app.api = api; app.runnerSettings = settings; app.transferLinkError = ''; app.transferLinkBusy = false; }
+});

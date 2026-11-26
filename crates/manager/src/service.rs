@@ -516,7 +516,7 @@ impl Manager {
                 .map(|f| {
                     Ok(Output {
                         path: f.path.clone(),
-                        size: f.size,
+                        size: fs::metadata(staging.join(&f.path))?.len(),
                         sha256: digest_file(&staging.join(&f.path))?,
                     })
                 })
@@ -1067,6 +1067,54 @@ mod tests {
                 .edition_ids,
             ack.edition_ids
         );
+    }
+
+    #[test]
+    fn renamed_cue_tracks_prepare_with_verified_repaired_output_sizes() {
+        let dir = tempfile::tempdir().unwrap();
+        let manager = manager(dir.path());
+        let cue = b"FILE \"Disc (En,Fr) (Track 1).bin\" BINARY\r\nTRACK 01 MODE2/2352\r\nINDEX 01 00:00:00\r\nFILE \"Disc (En,Fr) (Track 2).bin\" BINARY\r\nTRACK 02 AUDIO\r\nINDEX 01 00:00:00\r\n";
+        let source = zip(
+            dir.path(),
+            "disc.zip",
+            &[
+                ("Disc/Disc.cue", cue),
+                ("Disc/Disc (Track 1) (site).bin", &[1; 2352]),
+                ("Disc/Disc (Track 2) (site).bin", &[2; 2352]),
+            ],
+        );
+        let review = manager.inspect(&source, "ps1").unwrap();
+        let done = manager.execute(&review.id, &review.review_token).unwrap();
+        assert_eq!(done.state, State::AwaitingLibrary, "{:?}", done.error);
+        let receipt = done.receipt.as_ref().unwrap();
+        receipt.verify(&done.destination).unwrap();
+        let output = receipt
+            .files
+            .iter()
+            .find(|file| file.path == Path::new("Disc/Disc.cue"))
+            .unwrap();
+        assert_ne!(output.size, cue.len() as u64);
+        let imported = done.destination.join(&output.path);
+        let sheet = marquee_media::cue::manifest(&imported).unwrap();
+        assert_eq!(sheet.tracks[0].file, "Disc (Track 1) (site).bin");
+        assert_eq!(sheet.tracks[1].file, "Disc (Track 2) (site).bin");
+        assert!(fs::read_to_string(imported)
+            .unwrap()
+            .contains("\r\nTRACK 01"));
+        // Recovery uses the repaired receipt even after the archive is removed.
+        let fingerprint = receipt.fingerprint().unwrap();
+        fs::remove_file(&source).unwrap();
+        let restarted = Manager::new(manager.dir.parent().unwrap());
+        let recovered = restarted.execute(&review.id, &review.review_token).unwrap();
+        assert_eq!(
+            recovered.receipt.as_ref().unwrap().fingerprint().unwrap(),
+            fingerprint
+        );
+        recovered
+            .receipt
+            .unwrap()
+            .verify(&done.destination)
+            .unwrap();
     }
 
     #[test]

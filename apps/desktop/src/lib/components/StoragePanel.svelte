@@ -24,6 +24,15 @@
   let disposed = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
 
+  function scopeName(scope: string) {
+    const [kind, id] = scope.split(':');
+    const name = kind === 'port' ? app.ports.find(port => port.id === id)?.name
+      : app.emulators.find(emulator => emulator.id === id)?.name;
+    const known: Record<string,string> = { pcsx2:'PCSX2', duckstation:'DuckStation', blastem:'BlastEm', mesen:'Mesen', rpcs3:'RPCS3', shipwright:'Ship of Harkinian', soh:'Ship of Harkinian', 'sm64coopdx':'Super Mario 64 co-op' };
+    return `${name ?? known[id] ?? (id ?? scope).replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} · ${kind === 'port' ? 'game saves' : 'emulator profile'}`;
+  }
+  const localDate = (value: string) => { const date = new Date(value); return Number.isNaN(date.getTime()) ? value : date.toLocaleString(); };
+
   async function refresh() {
     if (loading || disposed) return;
     loading = true;
@@ -115,13 +124,13 @@
       <div class="destination">
         <div>
           <h3>Save snapshots</h3>
-          <p>Emulator profiles and port saves are copied before an update. Restoring replaces those files and keeps the current ones as a new snapshot. The newest five copies are kept for each game.</p>
+          <p>Emulator profiles and port saves are copied before an update. Restoring replaces those files and keeps the current ones as a new snapshot. The newest five copies are kept for each emulator profile or native port.</p>
           {#if saves.length === 0}<p>No snapshots yet.</p>{/if}
         </div>
       </div>
       {#each saves as save (save.scope + save.id)}
         <div class="destination">
-          <div><h3>{save.scope}</h3><code>{save.created_at} · {save.files} files · {bytes(save.bytes)}</code></div>
+          <div><h3>{scopeName(save.scope)}</h3><p><time datetime={save.created_at}>{localDate(save.created_at)}</time> · {save.files} files · {bytes(save.bytes)}</p></div>
           <div class="actions">
             <button class="btn glass small" data-nav disabled={busy} onclick={() => saveAction('restore', save.scope, save.id)}>{confirming === `restore:${save.scope}:${save.id}` ? 'Confirm restore' : 'Restore'}</button>
             <button class="btn glass small" data-nav disabled={busy} onclick={() => saveAction('delete', save.scope, save.id)}>{confirming === `delete:${save.scope}:${save.id}` ? 'Confirm delete' : 'Delete'}</button>

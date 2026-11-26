@@ -90,6 +90,7 @@ const REGION_TAG = /^(usa|europe|japan|world|asia|australia|brazil|canada|china|
 export function cleanTitle(title: string): string {
   const name = title
     .replace(/^\d{1,5}\s+-\s+/, '')
+    .replace(/\s*\((?:www\.)?(?:axekin\.com|vimm\.net)\)/gi, '')
     .replace(/\s*\[[^\]]*\]/g, '')
     .replace(/\s*\(\s*\)/g, '')
     .replace(/\s*\(([^)]*)\)/g, (whole, inner: string) => (TAG.test(inner.trim()) ? '' : whole))

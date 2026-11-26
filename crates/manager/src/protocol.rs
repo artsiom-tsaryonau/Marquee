@@ -12,7 +12,8 @@ use std::path::PathBuf;
 // v4 preserves torrent artifact provenance in preparation reviews/receipts.
 // v5 adds manager-owned isolated PS3 firmware setup.
 // v6 adds detached native-engine jobs.
-pub const VERSION: u32 = 6;
+// v7 enforces LAN-only transfer policy. Old workers must be drained before use.
+pub const VERSION: u32 = 7;
 pub const MAX_FRAME: usize = 32 * 1024 * 1024;
 
 #[derive(Debug, Serialize, Deserialize)]

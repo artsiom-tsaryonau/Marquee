@@ -290,7 +290,7 @@ mod torrent_tests {
         )
         .is_err());
         let settings = crate::torrent::read_settings(data).unwrap();
-        assert!(settings.enabled && settings.trackers && !settings.dht && !settings.seeding);
+        assert!(settings.enabled && !settings.trackers && !settings.dht && !settings.seeding);
         assert_eq!((settings.upload_kbps, settings.download_kbps), (432, 123));
         // Subsequent starts never overwrite manager authority with stale SQLite.
         db.execute(

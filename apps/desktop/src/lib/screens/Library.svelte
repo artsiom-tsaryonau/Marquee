@@ -15,7 +15,6 @@
   import GhostCover from '../components/GhostCover.svelte';
   import Icon from '../components/Icon.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
-  import ArchiveImport from '../components/ArchiveImport.svelte';
   import CatalogueImport from '../components/CatalogueImport.svelte';
   import NativeDiscovery from '../components/NativeDiscovery.svelte';
   import { metadataMatches, playerModeLabel, regionValues, versions, providerScore } from '../metadata';
@@ -131,12 +130,7 @@
   let adding = $state(false);
   let draft = $state({ title: '', system: 'ps2', status: 'wishlist' as 'wishlist' | 'owned' });
   let savingGame = $state(false);
-  const systemOptions = [
-    { id: 'ps2', label: 'PlayStation 2' }, { id: 'ps1', label: 'PlayStation' }, { id: 'dreamcast', label: 'Dreamcast' }, { id: 'saturn', label: 'Sega Saturn' },
-    { id: 'genesis', label: 'Sega Genesis' }, { id: 'snes', label: 'Super Nintendo' }, { id: 'nes', label: 'NES' },
-    { id: 'n64', label: 'Nintendo 64' }, { id: 'xbox360', label: 'Xbox 360' }, { id: 'ds', label: 'Nintendo DS' }, { id: 'gbc', label: 'Game Boy Color' },
-    { id: 'gb', label: 'Game Boy' }, { id: 'pce', label: 'PC Engine / TurboGrafx-16' }, { id: 'neogeo', label: 'Neo Geo' },
-  ];
+  const systemOptions = $derived(app.systems.map(s => ({ id:s.id, label:s.display_name })));
   async function saveGame() {
     if (!draft.title.trim() || savingGame) return;
     savingGame = true;
@@ -144,10 +138,7 @@
     savingGame = false;
     if (id) { draft.title = ''; adding = false; view.noFiles = true; }
   }
-  const addTargets: { id: string; label: string }[] = [
-    { id: 'ps2', label: 'PlayStation 2' }, { id: 'ps1', label: 'PlayStation' }, { id: 'genesis', label: 'Sega Genesis' },
-    { id: 'xbox360', label: 'Xbox 360' }, { id: 'ds', label: 'Nintendo DS' }, { id: 'neogeo', label: 'Neo Geo' },
-  ];
+  const addTargets = $derived(app.systems.filter(s => s.supported_extensions.length).map(s => ({ id:s.id, label:s.display_name })));
   function addFolder(system: string) { addMenu.open = false; void app.addSystemFolder(system); }
   function startAddGame() { addMenu.open = false; adding = true; }
 </script>
@@ -164,8 +155,9 @@
         <div class="add-list glass-panel" role="menu" aria-label="Add a folder of games">
           <span class="add-hint">Pick the system, then the folder that holds its games.</span>
           {#each addTargets as t (t.id)}<button class="add-item" role="menuitem" data-nav onclick={() => addFolder(t.id)}>{t.label}</button>{/each}
-          <button class="add-item" role="menuitem" data-nav onclick={() => { addMenu.open = false; app.intakeOpen = true; }}>Import ZIP/7z/RAR archives…</button>
+          <button class="add-item" role="menuitem" data-nav onclick={() => { addMenu.open = false; app.intakeOpen = true; }}>Downloads and archives{app.downloadCount ? ` · ${app.downloadCount} to review` : ''}</button>
           <button class="add-item" role="menuitem" data-nav onclick={() => app.go('tools')}>Set up a native port…</button>
+          <button class="add-item" role="menuitem" data-nav onclick={() => { addMenu.open = false; changeScope(!view.discovery); }}>{view.discovery ? 'Your library' : 'Discover games'}</button>
           <hr />
           <span class="add-hint">Don't have the files yet?</span>
           <button class="add-item" role="menuitem" data-nav onclick={startAddGame}>Add a game without files…</button>
@@ -177,7 +169,7 @@
     <button class="chip" class:on={!view.discovery} data-nav aria-pressed={!view.discovery} onclick={() => changeScope(false)}>Your library</button>
     <button class="chip" class:on={view.discovery} data-nav aria-pressed={view.discovery} onclick={() => changeScope(true)}>Discover games</button>
   </div>
-  <div class="archive-entry"><button class="btn glass small" data-nav onclick={() => (app.intakeOpen = true)}><Icon name="download" size={16} />{app.intakeBusy ? app.intakeProgress : app.downloadCount ? `${app.downloadCount} downloads in progress` : app.intakeResults.length ? 'Review archive import' : 'Downloads and archives'}</button><span>{app.downloadCount ? 'Open to review preparation, torrents and companion downloads.' : app.api.kind === 'desktop' ? 'Import ZIP/7z/RAR files or review companion downloads.' : 'Imports use paths on the Marquee computer.'}</span></div>
+  <div class="archive-entry"><button class="btn glass small" data-nav onclick={() => (app.intakeOpen = true)}><Icon name="download" size={16} />{app.intakeBusy ? app.intakeProgress : app.downloadCount ? `${app.downloadCount} downloads to review` : app.intakeResults.length ? 'Review archive import' : 'Downloads and archives'}</button><span>{app.downloadCount ? 'Open to review preparation, torrents and companion downloads.' : app.api.kind === 'desktop' ? 'Import ZIP/7z/RAR files or review companion downloads.' : 'Imports use paths on the Marquee computer.'}</span></div>
   {#if adding}
     <form class="add-game glass-panel" onsubmit={(e) => { e.preventDefault(); void saveGame(); }}>
       <strong>Add a game without files</strong>
@@ -203,7 +195,7 @@
     <button class="chip" class:on={!view.platform} data-nav aria-pressed={!view.platform} onclick={() => view.platform = ''}>All platforms <span>{groupGames(inScope).length}</span></button>
     {#each platforms as p}<button class="chip" class:on={view.platform === p} data-nav aria-pressed={view.platform === p} onclick={() => view.platform = p}><PlatformIcon platform={p} size={22} /><b>{chipLabel(p)}</b> <span>{counts.get(p)}</span></button>{/each}
   </div>
-  <div class="bar glass-panel">
+  <div class="bar glass-panel" class:expanded={view.filtersOpen}>
     <label class="search">
       <Icon name="search" size={18} />
       <input bind:this={search} bind:value={view.query} onkeydown={onSearchKey} data-nav aria-label="Search games" placeholder={view.discovery ? 'Search catalogue…' : 'Search your library…'} spellcheck="false" />
@@ -214,7 +206,7 @@
       <button class="chip" class:on={view.installedOnly} data-nav aria-pressed={view.installedOnly} onclick={() => (view.installedOnly = !view.installedOnly)}>Installed</button>
       <button class="chip" class:on={view.noFiles} data-nav aria-pressed={view.noFiles} onclick={() => (view.noFiles = !view.noFiles)} title="Wishlist and games whose files are not here">Without files{#if noFilesCount} <span>{noFilesCount}</span>{/if}</button>
       <button class="chip" class:on={view.favOnly} data-nav aria-pressed={view.favOnly} onclick={() => (view.favOnly = !view.favOnly)}><Icon name="star" size={14} filled={view.favOnly} /> Favourites</button>
-      <button class="chip" class:on={secondaryActive > 0} data-nav aria-expanded={view.filtersOpen} aria-controls="more-filters" onclick={() => (view.filtersOpen = !view.filtersOpen)}>Filters{#if secondaryActive}<span class="badge">{secondaryActive}</span>{/if}</button>
+      <button class="chip filter-toggle" class:on={secondaryActive > 0} data-nav aria-expanded={view.filtersOpen} aria-controls="more-filters" onclick={() => (view.filtersOpen = !view.filtersOpen)}>Filters{#if secondaryActive}<span class="badge">{secondaryActive}</span>{/if}</button>
       <select class="ui-select" bind:value={app.libraryLayout} data-nav aria-label="Library layout"><option value="platform">Layout: Platform shelves</option><option value="grid">Layout: Grid</option></select>
       <select class="ui-select" bind:value={view.sort} data-nav aria-label="Sort by">
         <option value="title">Sort: A → Z</option>
@@ -255,7 +247,7 @@
   {:else if !shown.length && !view.query && inScope.length === 0}
     <div class="empty-banner actions">
       <p>{view.discovery ? 'No catalogue entries imported yet. Import a saved catalogue below.' : 'Add a folder of game files to build your library. Supported emulators can be installed in Tools.'}</p>
-      {#if !view.discovery}{#each addTargets as t (t.id)}<button class="btn {t.id === 'ps2' ? 'primary' : 'glass'}" data-nav onclick={() => app.addSystemFolder(t.id)}>{t.label}</button>{/each}
+      {#if !view.discovery}<button class="btn primary" data-nav onclick={() => { addMenu.open = true; addMenu.querySelector('summary')?.focus(); }}>Add a game folder</button>
       <InstallMenu />{/if}
       {#if app.lastScan?.skipped_unsupported}
         <p>Skipped {app.lastScan.skipped_unsupported} companion or unsupported files. PS1 accepts ISO, CHD and CUE sets; PS2 accepts ISO.</p>
@@ -293,10 +285,28 @@
   {/if}
   {#if view.discovery}<CatalogueImport />{/if}
   {/if}
-  <ArchiveImport />
 </div>
 
 <style>
+  :global(:root[data-mode='big']) .library { padding-top:12px; }
+  :global(:root[data-mode='big']) .library-heading { margin:0 0 12px; }
+  :global(:root[data-mode='big']) .library-heading p,
+  :global(:root[data-mode='big']) .eyebrow,
+  :global(:root[data-mode='big']) .heading-actions > button,
+  :global(:root[data-mode='big']) .scope[aria-label='Library scope'],
+  :global(:root[data-mode='big']) .archive-entry,
+  :global(:root[data-mode='big']) .results,
+  :global(:root[data-mode='big']) .archive-entry > span { display:none; }
+  :global(:root[data-mode='big']) .archive-entry { margin-bottom:12px; }
+  :global(:root[data-mode='big']) .categories { flex-wrap:nowrap; overflow-x:auto; padding-bottom:4px; margin-bottom:10px; }
+  :global(:root[data-mode='big']) .categories > button { flex-shrink:0; }
+  :global(:root[data-mode='big']) .bar { padding:8px; gap:8px; }
+  :global(:root[data-mode='big']) .bar .chips { flex-wrap:nowrap; overflow-x:auto; max-width:100%; padding-bottom:4px; }
+  :global(:root[data-mode='big']) .bar .chips > * { flex-shrink:0; }
+  :global(:root[data-mode='big']) .bar:not(.expanded) .chips { display:contents; }
+  :global(:root[data-mode='big']) .bar:not(.expanded) .chips > :not(.filter-toggle) { display:none; }
+  :global(:root[data-mode='big']) .bar { margin-bottom:12px; }
+  @media(max-height:800px) { :global(:root[data-mode='big']) .library { --cover-w:180px; } }
   .platform-shelves { margin-inline: calc(-1 * var(--gutter)); }
   .archive-entry { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-bottom:20px; }
   .archive-entry span { font-size:13px; color:var(--text-dim); }
@@ -309,7 +319,7 @@
   .add-menu { position:relative; }
   .add-menu summary { list-style:none; display:inline-flex; align-items:center; gap:6px; cursor:pointer; }
   .add-menu summary::-webkit-details-marker { display:none; }
-  .add-list { position:absolute; right:0; top:calc(100% + 8px); z-index:30; display:grid; gap:2px; min-width:230px; padding:8px; border-radius:14px; background:#16131f; border:1px solid var(--line); box-shadow:0 18px 40px -12px rgb(0 0 0 / .8); }
+  .add-list { position:absolute; right:0; top:calc(100% + 8px); z-index:30; display:grid; gap:2px; min-width:230px; max-width:calc(100vw - 32px); max-height:70vh; overflow:auto; padding:8px; border-radius:14px; background:var(--surface-strong); border:1px solid var(--line); box-shadow:0 18px 40px -12px rgb(0 0 0 / .8); }
   .add-list hr { border:0; border-top:1px solid var(--line); margin:6px 0; width:100%; }
   .add-game { display:grid; gap:10px; padding:16px; border-radius:16px; margin-bottom:18px; }
   .add-game p { margin:0; font-size:13px; color:var(--text-soft); line-height:1.5; }

@@ -275,7 +275,7 @@ enum TorrentCmd {
         #[arg(long)]
         system: String,
     },
-    /// Set opt-in discovery for imported torrents (private device shares are unaffected)
+    /// Legacy settings reset; public discovery is no longer supported
     Discovery {
         #[arg(long, action = clap::ArgAction::Set)]
         trackers: bool,
@@ -305,8 +305,7 @@ enum TorrentCmd {
         upload: u32,
         download: u32,
     },
-    /// Send public torrents through a loopback SOCKS5 proxy (e.g. socks5://127.0.0.1:1080 from
-    /// platform-generic-scripts torrent-vpn); nothing else leaves the machine. --off removes it
+    /// Clear a legacy proxy setting with --off; transfers are LAN-only
     Proxy {
         #[arg(required_unless_present = "off")]
         url: Option<String>,
@@ -1212,12 +1211,7 @@ fn torrent(
             let mut t = settings()?;
             t.proxy = url;
             save(t.clone())?;
-            match &t.proxy {
-                Some(proxy) => {
-                    println!("public torrents use {proxy}; nothing else leaves the machine")
-                }
-                None => println!("public torrents connect directly"),
-            }
+            println!("local-network transfers only; public discovery is disabled");
         }
         TorrentCmd::Limits { upload, download } => {
             let mut t = settings()?;

@@ -11,6 +11,7 @@
   let torrentDownloads = $state<TorrentDownload[]>([]);
   let torrentSystems = $state<Record<string,string>>({});
   let browserJobs = $state<BrowserJob[]>([]);
+  let fileLimits = $state<Record<string,number>>({});
   let browserSystems = $state<Record<string, string>>({});
   let inspecting = $state(false);
   let error = $state('');
@@ -162,7 +163,7 @@
     <article>
       <h4>{download.name}</h4>
       {#if download.error}<p class="error">{download.error}</p>{/if}
-      {#each download.files.slice(0, 50) as file (file.path)}
+      {#each download.files.slice(0, fileLimits[download.info_hash] ?? 50) as file (file.path)}
         {@const linked = jobs.find(job => job.id === file.preparation_id)}
         <p class="path">{file.path} · {size(file.size)}</p>
         {#if linked}<p>Linked preparation · {systemLabel(linked.plan.system)} · {labels[linked.state]}</p>
@@ -179,7 +180,7 @@
           <button class="btn glass small" data-nav disabled={inspecting || app.intakeBusy || !download.available || !torrentSystems[`${download.info_hash}/${file.path}`]} onclick={() => inspectTorrent(download, file.path)}>{inspecting ? 'Verifying and inspecting…' : 'Inspect torrent archive'}</button>
         {/if}
       {/each}
-      {#if download.files.length > 50}<p>Showing the first 50 files. Use the CLI to review another archive.</p>{/if}
+      {#if download.files.length > (fileLimits[download.info_hash] ?? 50)}<button class="btn glass small" data-nav onclick={() => fileLimits[download.info_hash] = (fileLimits[download.info_hash] ?? 50) + 50}>Show more files · {Math.min(fileLimits[download.info_hash] ?? 50, download.files.length)} of {download.files.length}</button>{/if}
     </article>
   {/each}
   {#if jobs.length}<h3>Preparation history · {jobs.length}</h3>{/if}

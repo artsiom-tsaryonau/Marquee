@@ -369,7 +369,7 @@ impl Core {
         if marquee_manager::torrent::adopted(&self.paths.data_dir)? {
             marquee_manager::torrent::read_settings(&self.paths.data_dir)
         } else {
-            Ok(self.with_db(|db| db.load_settings())?.torrents)
+            Ok(self.with_db(|db| db.load_settings())?.torrents.local_only())
         }
     }
 
@@ -634,6 +634,7 @@ impl Core {
     /// placed (setup receipt outputs) and engine-generated asset archives stay live:
     /// they are large, recreatable, and an older `.o2r` does not match a newer engine.
     fn snapshot_exclude(&self, scope: &str) -> Result<Vec<String>> {
+        snapshots::recover(&self.paths, scope)?;
         let Some(id) = scope.strip_prefix("port:") else {
             return Ok(Vec::new());
         };

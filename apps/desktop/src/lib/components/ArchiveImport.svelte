@@ -5,6 +5,7 @@
   import { systemLabel } from '../labels';
   import Icon from './Icon.svelte';
   import PreparationJobs from './PreparationJobs.svelte';
+  import LocalTransfers from './LocalTransfers.svelte';
   let draft = $state('');
   let error = $state('');
   let listening = true;
@@ -36,8 +37,9 @@
 {#if app.intakeOpen}
   <div class="scrim" data-modal-dismiss role="presentation" onclick={() => (app.intakeOpen = false)}></div>
   <div class="dialog glass-panel" role="dialog" aria-modal="true" aria-labelledby="archive-title" use:modal={() => (app.intakeOpen = false)}>
-    <header><div><h2 id="archive-title">Downloads and game archives</h2><p>Track companion downloads, review ZIP, 7z and RAR archives, and prepare their game files for your library.</p></div><button class="btn glass small" data-nav aria-label="Close archive import" onclick={() => (app.intakeOpen = false)}><Icon name="x" /></button></header>
+    <header><div><h2 id="archive-title">Downloads and game archives</h2><p>Manage local transfers and companion downloads, then review and prepare game archives for your library.</p></div><button class="btn glass small" data-nav aria-label="Close archive import" onclick={() => (app.intakeOpen = false)}><Icon name="x" /></button></header>
     <div class="body">
+      <LocalTransfers />
       {#if app.api.kind === 'desktop'}<p>Choose archives or drop them onto Library. Review the selection before importing.</p>{:else}<p>Enter paths on the computer running Marquee. Browser uploads and files on another computer are not supported.</p>{/if}
       <form onsubmit={(event) => { event.preventDefault(); addPaths(); }}>
         <label>Archive paths · one per line<textarea data-nav rows="3" placeholder="/home/you/Downloads/Game.zip" bind:value={draft} disabled={app.intakeBusy}></textarea></label>

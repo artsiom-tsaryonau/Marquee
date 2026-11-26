@@ -395,7 +395,7 @@ impl Client {
         self.call(Operation::Torrent { request }, false)
     }
     pub fn stop(&self) -> Result<Status> {
-        for version in [protocol::VERSION, 5, 4, 3, 2, 1] {
+        for version in [protocol::VERSION, 6, 5, 4, 3, 2, 1] {
             match self.exchange_version(self.connect()?, Operation::Stop, version) {
                 Err(e) if e.code == "MANAGER_VERSION" => continue,
                 result => return result,
@@ -419,7 +419,7 @@ mod tests {
         let socket = client.socket_path().unwrap();
         let listener = UnixListener::bind(&socket).unwrap();
         let server = std::thread::spawn(move || {
-            for version in [protocol::VERSION, 5, 4, 3, 2, 1] {
+            for version in [protocol::VERSION, 6, 5, 4, 3, 2, 1] {
                 let (mut stream, _) = listener.accept().unwrap();
                 let request: Request = protocol::read_frame(&mut stream).unwrap();
                 assert_eq!(request.protocol_version, version);

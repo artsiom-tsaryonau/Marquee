@@ -95,7 +95,13 @@ pub fn list(paths: &Paths) -> Result<Vec<Info>> {
 
 pub fn create(paths: &Paths, scope: &str, exclude: &[String]) -> Result<Option<Info>> {
     let scope = parse(scope)?;
-    let entries = collect(paths, &scope, exclude)?;
+    let _lease = operation(paths, &scope)?;
+    recover_scope(paths, &scope)?;
+    create_snapshot(paths, &scope, exclude)
+}
+
+fn create_snapshot(paths: &Paths, scope: &Scope, exclude: &[String]) -> Result<Option<Info>> {
+    let entries = collect(paths, scope, exclude)?;
     if entries.is_empty() {
         return Ok(None);
     }
@@ -122,15 +128,17 @@ pub fn create(paths: &Paths, scope: &str, exclude: &[String]) -> Result<Option<I
 pub fn restore(paths: &Paths, scope: &str, id: &str, exclude: &[String]) -> Result<Info> {
     let scope = parse(scope)?;
     validate_id(id)?;
+    let _lease = operation(paths, &scope)?;
+    recover_scope(paths, &scope)?;
     let dir = scope_dir(&paths.data_dir, &scope.label);
     let archive = dir.join(format!("{id}.tar.gz"));
     if !archive.is_file() {
         return Err(AppError::new("SNAPSHOT_MISSING", "That snapshot is gone"));
     }
     let manifest = read_manifest(&dir, id)?;
+    let requested = read_info(&paths.data_dir.join("backups"), &scope.label, id)?;
     let saved = tempfile::NamedTempFile::new_in(&paths.data_dir)?;
     fs::copy(&archive, saved.path())?;
-    let pre = create(paths, &scope.label, exclude)?;
     if manifest.scope != scope.label {
         return Err(AppError::new(
             "SNAPSHOT",
@@ -139,17 +147,15 @@ pub fn restore(paths: &Paths, scope: &str, id: &str, exclude: &[String]) -> Resu
     }
     let staging = tempfile::tempdir_in(&paths.data_dir)?;
     extract(saved.path(), staging.path(), &manifest)?;
+    let pre = create_snapshot(paths, &scope, exclude)?;
     swap(paths, &scope, staging.path(), &manifest, exclude)?;
-    Ok(pre.unwrap_or(read_info(
-        &paths.data_dir.join("backups"),
-        &scope.label,
-        id,
-    )?))
+    Ok(pre.unwrap_or(requested))
 }
 
 pub fn delete(paths: &Paths, scope: &str, id: &str) -> Result<()> {
     let scope = parse(scope)?;
     validate_id(id)?;
+    let _lease = operation(paths, &scope)?;
     let dir = scope_dir(&paths.data_dir, &scope.label);
     for name in [format!("{id}.tar.gz"), format!("{id}.json")] {
         let path = dir.join(name);
@@ -196,6 +202,69 @@ fn validate_id(id: &str) -> Result<()> {
 
 fn scope_dir(data: &Path, label: &str) -> PathBuf {
     data.join("backups").join(label.replace(':', "-"))
+}
+
+fn operation(paths: &Paths, scope: &Scope) -> Result<crate::instance::InstanceLock> {
+    crate::instance::InstanceLock::acquire(
+        &scope_dir(&paths.data_dir, &scope.label).join("operation.lock"),
+    )
+}
+
+/// Recover before callers inspect receipts and generated files for exclusions.
+pub(crate) fn recover(paths: &Paths, scope: &str) -> Result<()> {
+    let scope = parse(scope)?;
+    let _lease = operation(paths, &scope)?;
+    recover_scope(paths, &scope)
+}
+
+fn recover_scope(paths: &Paths, scope: &Scope) -> Result<()> {
+    match scope.kind {
+        ScopeKind::Port => recover_tree(&paths.data_dir.join("ports").join(&scope.id)),
+        ScopeKind::Emulator => {
+            for name in ["xdg-data", "xdg-config"] {
+                recover_tree(&paths.data_dir.join(&scope.id).join(name))?;
+            }
+            Ok(())
+        }
+    }
+}
+
+fn aside_path(live: &Path) -> PathBuf {
+    live.with_file_name(format!(
+        ".{}.snapshot-aside",
+        live.file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("scope")
+    ))
+}
+
+fn recover_tree(live: &Path) -> Result<()> {
+    let aside = aside_path(live);
+    match fs::symlink_metadata(&aside) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.into()),
+        Ok(meta) if meta.is_dir() => {}
+        Ok(_) => {
+            return Err(AppError::new(
+                "SNAPSHOT",
+                "Snapshot recovery path is not a directory",
+            ))
+        }
+    }
+    match fs::symlink_metadata(live) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => fs::rename(&aside, live)?,
+        Err(error) => return Err(error.into()),
+        // Both folders exist only after the new tree was published.
+        Ok(meta) if meta.is_dir() => fs::remove_dir_all(&aside)?,
+        Ok(_) => {
+            return Err(AppError::new(
+                "SNAPSHOT",
+                "Snapshot live path is not a directory",
+            ))
+        }
+    }
+    File::open(live.parent().unwrap())?.sync_all()?;
+    Ok(())
 }
 
 fn collect(paths: &Paths, scope: &Scope, exclude: &[String]) -> Result<Vec<Entry>> {
@@ -480,16 +549,12 @@ fn replace_tree(live: &Path, staged: &Path) -> Result<()> {
     if let Some(parent) = live.parent() {
         fs::create_dir_all(parent)?;
     }
-    let aside = live.with_file_name(format!(
-        ".{}.snapshot-aside",
-        live.file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("scope")
-    ));
-    let _ = fs::remove_dir_all(&aside);
+    recover_tree(live)?;
+    let aside = aside_path(live);
     let had_live = live.exists();
     if had_live {
         fs::rename(live, &aside)?;
+        File::open(live.parent().unwrap())?.sync_all()?;
     }
     if let Err(error) = fs::rename(staged, live) {
         if had_live {
@@ -497,7 +562,11 @@ fn replace_tree(live: &Path, staged: &Path) -> Result<()> {
         }
         return Err(error.into());
     }
-    let _ = fs::remove_dir_all(aside);
+    File::open(live.parent().unwrap())?.sync_all()?;
+    if had_live {
+        fs::remove_dir_all(aside)?;
+        File::open(live.parent().unwrap())?.sync_all()?;
+    }
     Ok(())
 }
 
@@ -552,6 +621,8 @@ mod tests {
         )
         .unwrap();
         fs::write(paths.data_dir.join("outside.txt"), b"changed-outside").unwrap();
+        let config = paths.data_dir.join("pcsx2/xdg-config");
+        fs::rename(&config, aside_path(&config)).unwrap();
         restore(&paths, "emulator:pcsx2", &info.id, &[]).unwrap();
         assert_eq!(
             fs::read(paths.data_dir.join("pcsx2/xdg-config/settings.ini")).unwrap(),
@@ -592,13 +663,18 @@ mod tests {
         let listed = list(&paths).unwrap();
         assert_eq!(listed.len(), 5);
         assert!(!listed.iter().any(|info| info.id == ids[0]));
-        let newest = ids.last().unwrap();
+        let oldest = &ids[1];
         fs::write(paths.data_dir.join("pcsx2/xdg-config/settings.ini"), b"now").unwrap();
-        let pre = restore(&paths, "emulator:pcsx2", newest, &[]).unwrap();
+        let pre = restore(&paths, "emulator:pcsx2", oldest, &[]).unwrap();
         assert!(list(&paths).unwrap().iter().any(|info| info.id == pre.id));
         assert_eq!(
             fs::read(paths.data_dir.join("pcsx2/xdg-config/settings.ini")).unwrap(),
-            b"n=5"
+            b"n=1"
+        );
+        restore(&paths, "emulator:pcsx2", &pre.id, &[]).unwrap();
+        assert_eq!(
+            fs::read(paths.data_dir.join("pcsx2/xdg-config/settings.ini")).unwrap(),
+            b"now"
         );
     }
 
@@ -650,6 +726,9 @@ mod tests {
         fs::write(port.join("game.z64"), b"rom").unwrap();
         fs::write(port.join("oot.o2r"), b"assets-v1").unwrap();
         fs::write(port.join("Save/file1.sav"), b"save-v1").unwrap();
+        fs::write(port.join("engine"), b"engine-v1").unwrap();
+        core.with_db(|db| db.set_setting("port.shipwright", r#"{"tag":"fixture","bin":"engine"}"#))
+            .unwrap();
         fs::write(
             port.join(".marquee-setup.json"),
             br#"{"recipe":"shipwright","rom_sha1":null,"rom_sha256":"x","outputs":[{"path":"game.z64","sha256":"x","bytes":3}],"note":""}"#,
@@ -662,12 +741,28 @@ mod tests {
         assert_eq!(info.files, 1);
         fs::write(port.join("oot.o2r"), b"assets-v2").unwrap();
         fs::write(port.join("Save/file1.sav"), b"save-v2").unwrap();
-        core.restore_save_snapshot("port:shipwright", &info.id)
+        fs::write(port.join("engine"), b"engine-v2").unwrap();
+        // A prior restore stopped after moving the live directory aside.
+        fs::rename(&port, aside_path(&port)).unwrap();
+        let pre = core
+            .restore_save_snapshot("port:shipwright", &info.id)
             .unwrap();
         assert_eq!(fs::read(port.join("Save/file1.sav")).unwrap(), b"save-v1");
         assert_eq!(fs::read(port.join("oot.o2r")).unwrap(), b"assets-v2");
         assert_eq!(fs::read(port.join("game.z64")).unwrap(), b"rom");
         assert!(port.join(".marquee-setup.json").is_file());
+        assert_eq!(fs::read(port.join("engine")).unwrap(), b"engine-v2");
+        assert!(!aside_path(&port).exists());
+        core.restore_save_snapshot("port:shipwright", &pre.id)
+            .unwrap();
+        assert_eq!(fs::read(port.join("Save/file1.sav")).unwrap(), b"save-v2");
+        // A crash after publication leaves both directories. Keep the published tree.
+        let aside = aside_path(&port);
+        fs::create_dir(&aside).unwrap();
+        fs::write(aside.join("engine"), b"stale-engine").unwrap();
+        core.create_save_snapshot("port:shipwright").unwrap();
+        assert_eq!(fs::read(port.join("engine")).unwrap(), b"engine-v2");
+        assert!(!aside.exists());
     }
 
     #[test]

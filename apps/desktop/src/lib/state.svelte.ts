@@ -35,6 +35,9 @@ function save(key: string, value: unknown) {
 }
 
 class AppState {
+  systems = $state<import('./api/contracts').SystemSummary[]>([]);
+  transferLinkError = $state('');
+  transferLinkBusy = $state(false);
   catalogue = $state<import('./api/contracts').CatalogueSnapshot>({ records: [], systems: [], links: [] });
   catalogueBusy = $state(false);
   catalogueError = $state<string | null>(null);
@@ -179,6 +182,7 @@ class AppState {
   }
 
   applySnapshot(snap: LibrarySnapshot) {
+    this.systems = snap.systems ?? [];
     rememberSystems(snap.systems);
     this.catalogue = snap.catalogue ?? { records: [], systems: [], links: [] };
     this.roots = snap.roots;
@@ -614,13 +618,17 @@ class AppState {
   }
 
   async getFromLink(link: string) {
+    if (this.transferLinkBusy) return false;
+    this.transferLinkBusy = true;
+    this.transferLinkError = '';
     try {
       await this.api.transferGet(link.trim());
-      this.notify('Download queued. Progress is under Settings → Torrents and devices.');
       await this.refreshTransfers();
+      return true;
     } catch (err) {
-      this.notify((err as { message?: string }).message ?? 'Could not fetch that game');
-    }
+      this.transferLinkError = (err as { message?: string }).message ?? 'Could not fetch from that device';
+      return false;
+    } finally { this.transferLinkBusy = false; }
   }
 
   async stopTransfer(item: TransferItem) {

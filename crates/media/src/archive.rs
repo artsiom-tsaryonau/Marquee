@@ -484,15 +484,6 @@ impl ArchivePlan {
                 })
                 .collect::<Result<Vec<_>>>()?;
             extract(source, kind, &wanted, staging)?;
-            for file in &self.files {
-                let path = staging.join(&file.path);
-                if ext_of(&path) == "cue" {
-                    if let Some(bytes) = crate::cue::normalized_import(&path)? {
-                        fs::write(&path, bytes)?;
-                    }
-                    crate::cue::manifest(&path)?;
-                }
-            }
         }
         for file in &self.files {
             let path = staging.join(&file.path);
@@ -502,6 +493,17 @@ impl ArchivePlan {
                     "PREPARATION_INVALID",
                     "Extracted output size/type did not match the plan",
                 ));
+            }
+            // Verify the archive bytes before applying reviewed CUE repairs.
+            // The repaired sheet can have a different length from its source.
+            if !self.keep_archive && ext_of(&path) == "cue" {
+                if let Some(bytes) = crate::cue::normalized_import(&path)? {
+                    fs::write(&path, bytes)?;
+                }
+                if let Some(bytes) = crate::cue::repair_track_files(&path)? {
+                    fs::write(&path, bytes)?;
+                }
+                crate::cue::manifest(&path)?;
             }
             if self.system == "xbox360" {
                 crate::xbox360::inspect(&path)?;

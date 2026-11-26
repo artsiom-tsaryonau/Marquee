@@ -1,44 +1,16 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { transferLine, bytes } from '../format';
   import { app } from '../state.svelte';
-  import type { KeyInfo, TorrentReview } from '../api/contracts';
+  import type { KeyInfo } from '../api/contracts';
   import Icon from '../components/Icon.svelte';
   import InstallMenu from '../components/InstallMenu.svelte';
   import { musicAccents } from '../musicAppearance';
   import StoragePanel from '../components/StoragePanel.svelte';
 
-  const categories = [['appearance', 'Appearance'], ['games', 'Games and controls'], ['library', 'Library locations'], ['storage', 'Storage'], ['providers', 'Artwork and API keys'], ['devices', 'Torrents and devices']] as const;
+  const categories = [['appearance', 'Appearance'], ['games', 'Games and controls'], ['library', 'Library locations'], ['storage', 'Storage'], ['providers', 'Artwork and API keys'], ['devices', 'Local sharing']] as const;
   let category = $state<string>('appearance');
   let drafts = $state<Record<string, string>>({});
-  let link = $state('');
-  let torrentPath = $state('');
-  let torrentReview = $state<TorrentReview | null>(null);
-  let torrentBusy = $state(false);
-  let torrentError = $state('');
-  let peers = $state('');
-  $effect(() => { if (app.torrentsOn) return app.watchTransfers(); });
   onMount(() => void app.loadKeys());
-
-  async function reviewTorrent() {
-    torrentBusy = true; torrentError = ''; torrentReview = null;
-    try {
-      const path = await app.api.pickTorrent();
-      if (path) { torrentPath = path; torrentReview = await app.api.transferReview(path); }
-    } catch (err) { torrentError = (err as Error).message; }
-    finally { torrentBusy = false; }
-  }
-
-  async function downloadTorrent() {
-    if (!torrentReview || torrentBusy) return;
-    torrentBusy = true; torrentError = '';
-    try {
-      await app.api.transferAddFile(torrentPath, torrentReview.review_token, peers.split(/[,\s]+/).filter(Boolean));
-      torrentReview = null; peers = '';
-      await app.refreshTransfers();
-    } catch (err) { torrentError = (err as Error).message; }
-    finally { torrentBusy = false; }
-  }
 
   const sourceLabel = (k: KeyInfo) =>
     ({
@@ -65,23 +37,24 @@
     <div class="settings-content">
   {#if category === 'storage'}<StoragePanel />{/if}
 
-  {#each [{ id: 'ps1', name: 'PlayStation', emulator: 'DuckStation', kind: 'duckstation' }, { id: 'ps2', name: 'PlayStation 2', emulator: 'PCSX2', kind: 'pcsx2' }] as system}
+  {#each app.systems.filter(system => system.supported_extensions.length) as entry}
+    {@const system = { id:entry.id, name:entry.display_name, emulator:entry.emulator ?? 'Emulator', kind:entry.id === 'ps1' ? 'duckstation' : entry.id === 'ps2' ? 'pcsx2' : 'emulator' }}
     {@const runner = app.runnerFor(system.id)}
-    {@const choices = app.runners.filter((r) => r.kind === system.kind)}
+    {@const choices = app.runnersFor(system.id)}
     <section class="glass-panel" hidden={category !== 'library'}>
       <h2>{system.name}</h2>
-      <div class="item"><div><strong>Disc folders</strong>
+      <div class="item"><div><strong>Game folders</strong>
         {#each app.roots.filter((r) => r.system === system.id) as root}<span>{root.path} · {root.status}</span>{:else}<span>No folder selected</span>{/each}
-        <span>{app.games.filter((g) => g.source === 'rom' && g.platform === system.id).length} games found · {system.id === 'ps1' ? 'ISO, CHD, CUE with its tracks' : 'ISO'}</span>
+        <span>{app.games.filter((g) => g.source === 'rom' && g.platform === system.id).length} games found · {entry.supported_extensions.join(', ')}</span>
       </div><button class="btn glass small" data-nav onclick={() => app.addSystemFolder(system.id)}><Icon name="folder" size={16} /> Add folder</button></div>
-      <div class="item"><div><strong>{system.emulator}</strong><span>{runner ? `${runner.display_name} · ${runner.bios_state === 'launch_tested' ? 'previously started' : runner.bios_state === 'unverified' ? 'firmware not yet checked' : runner.bios_state === 'missing' ? 'firmware required' : runner.bios_state}` : 'No available emulator detected'}</span>
+      <div class="item"><div><strong>{runner?.display_name ?? system.emulator}</strong><span>{runner ? `${runner.display_name} · ${runner.bios_state === 'launch_tested' ? 'previously started' : runner.bios_state === 'unverified' ? 'firmware not yet checked' : runner.bios_state === 'missing' ? 'firmware required' : runner.bios_state}` : 'No available emulator detected'}</span>
         {#if runner?.bios_hint}<span>{runner.bios_hint}</span>{/if}
         {#if system.id === 'ps2' && app.installingPcsx2}<span>{app.installProgress || 'Installing…'}</span>{/if}
         {#if !runner && system.id === 'ps1'}<span>Install DuckStation from Tools; Marquee downloads and configures it for you.</span>{/if}
       </div><div class="row-actions">
         {#if system.id === 'ps2'}<InstallMenu tone="primary" size="small" />{:else if !runner}<button class="btn glass small" data-nav onclick={() => app.go('tools')}>Set up in Tools</button>{/if}
       </div></div>
-      {#if choices.length > 1}<div class="item"><div><strong>Default emulator</strong><span>Saved independently for {system.name}</span></div><select data-nav aria-label={`${system.name} default emulator`} value={runner?.id || ''} onchange={(e) => app.chooseRunner(e.currentTarget.value)}>{#each choices as choice}<option value={choice.id} disabled={!choice.available}>{choice.display_name}{choice.available ? '' : ' · unavailable'}</option>{/each}</select></div>{/if}
+      {#if choices.length > 1}<div class="item"><div><strong>Default emulator</strong><span>Saved independently for {system.name}</span></div><select data-nav aria-label={`${system.name} default emulator`} value={app.runnerSettings.selected_runner_ids?.[system.id] ?? runner?.id ?? ''} onchange={(e) => app.chooseSystemRunner(system.id, e.currentTarget.value)}>{#each choices as choice}<option value={choice.id} disabled={!choice.available}>{choice.display_name}{choice.available ? '' : ' · unavailable'}</option>{/each}</select></div>{/if}
     </section>
   {/each}
   <section class="glass-panel" hidden={category !== 'games'}>
@@ -103,7 +76,7 @@
     <h2>Disc library maintenance</h2>
     <div class="item"><div><strong>Last import</strong><span>{app.lastScan ? `${app.lastScan.added} added · ${app.lastScan.skipped_unsupported} companion or unsupported files` : 'No scan results available in this session'}</span></div><button class="btn glass small" data-nav onclick={() => app.rescan()} disabled={app.scanning}>{app.scanning ? 'Scanning…' : 'Rescan folders'}</button></div>
     <div class="item"><div><strong>Emulator detection</strong><span>Refresh after installing or moving an emulator.</span></div><button class="btn glass small" data-nav onclick={() => app.refreshRunners()}>Refresh emulators</button></div>
-    <div class="item"><div><strong>Box art</strong><span>Looks up PS1 and PS2 covers by disc serial. Missing artwork never blocks Play.</span></div><button class="btn glass small" data-nav onclick={() => app.refreshArtwork()} disabled={app.fetchingArt || !app.games.length}>{app.fetchingArt ? 'Fetching…' : 'Fetch covers'}</button></div>
+    <div class="item"><div><strong>Box art</strong><span>Looks up covers for supported platforms. Missing artwork never blocks Play.</span></div><button class="btn glass small" data-nav onclick={() => app.refreshArtwork()} disabled={app.fetchingArt || !app.games.length}>{app.fetchingArt ? 'Fetching…' : 'Fetch covers'}</button></div>
   </section>
 
   <section class="glass-panel" hidden={category !== 'providers'}>
@@ -153,22 +126,20 @@
   </section>
 
   <section class="glass-panel" hidden={category !== 'devices'}>
-    <h2>Torrents and device transfers</h2>
+    <h2>Local network sharing</h2>
     <div class="item">
       <div>
-        <strong>Enable BitTorrent transfers</strong>
-        <span>Off by default. Private device links use direct peers. Torrent files and public magnets use only the discovery options you enable below.</span>
+        <strong>Enable local transfers</strong>
+        <span>Move games between your devices using BitTorrent on a private local network. Public peers, trackers, DHT and router port forwarding are disabled.</span>
       </div>
-      <label class="pin-choice"><input type="checkbox" data-nav aria-label="Enable BitTorrent transfers" disabled={app.torrentSettingsBusy} checked={app.torrentSettings.enabled} onchange={(e) => app.setTorrents({ enabled: e.currentTarget.checked })} /> {app.torrentSettings.enabled ? 'On' : 'Off'}</label>
+      <label class="pin-choice"><input type="checkbox" data-nav aria-label="Enable local transfers" disabled={app.torrentSettingsBusy} checked={app.torrentSettings.enabled} onchange={(e) => app.setTorrents({ enabled: e.currentTarget.checked })} /> {app.torrentSettings.enabled ? 'On' : 'Off'}</label>
     </div>
     {#if app.torrentSettings.enabled}
-      <div class="item"><div><strong>Private sharing address</strong><span>Other devices on this network can connect when they have a share link. Discovery stays off until you enable trackers or DHT for public torrents. {app.transfers?.private_listen ?? '0.0.0.0:51413'}</span></div></div>
-      <div class="item"><div><strong>Tracker discovery for torrent downloads</strong><span>Contact trackers listed in imported torrents or public magnets. Your address is visible to those trackers and peers. Private device shares stay separate.</span></div><label class="pin-choice"><input type="checkbox" data-nav aria-label="Tracker discovery" disabled={app.torrentSettingsBusy} checked={!!app.torrentSettings.trackers} onchange={(e) => app.setTorrents({ trackers:e.currentTarget.checked })} /> Trackers</label></div>
-      <div class="item"><div><strong>DHT discovery for public torrents</strong><span>Find peers through the public DHT network. Disabled for private device shares and torrents marked private.</span></div><label class="pin-choice"><input type="checkbox" data-nav aria-label="DHT discovery" disabled={app.torrentSettingsBusy} checked={!!app.torrentSettings.dht} onchange={(e) => app.setTorrents({ dht:e.currentTarget.checked })} /> DHT</label></div>
+      <div class="item"><div><strong>Local transfers and downloads</strong><span>Receive from another device, review archives and manage progress in one place.</span></div><button class="btn glass small" data-nav onclick={() => (app.intakeOpen = true)}>Open downloads</button></div>
       <div class="item">
         <div>
           <strong>Allow uploads and seeding</strong>
-          <span>Applies to private sharing and public torrents. Turn off to receive only. Original downloaded files are required to seed their torrent.</span>
+          <span>Share with devices on your private network. Turn off to receive only. Keep downloaded originals if you want to share them onward.</span>
         </div>
         <label class="pin-choice"><input type="checkbox" data-nav aria-label="Allow uploads and seeding" disabled={app.torrentSettingsBusy} checked={app.torrentSettings.seeding} onchange={(e) => app.setTorrents({ seeding: e.currentTarget.checked })} /> {app.torrentSettings.seeding ? 'Allowed' : 'Receive only'}</label>
       </div>
@@ -185,40 +156,6 @@
         </select>
       </div>
       <div class="item"><div><strong>Download speed limit</strong><span>Applies to all downloads.</span></div><select data-nav aria-label="Download speed limit" disabled={app.torrentSettingsBusy} value={String(app.torrentSettings.download_kbps)} onchange={(e) => app.setTorrents({ download_kbps:Number(e.currentTarget.value) })}><option value="0">No limit</option><option value="1024">1 MB/s</option><option value="5120">5 MB/s</option><option value="20480">20 MB/s</option></select></div>
-      <div class="item"><div><strong>Import a torrent file</strong><span>Review filenames, size and destination before starting. Downloading packages does not install a game. Files stay separate from existing installations.</span></div><button class="btn glass small torrent-choose" data-nav disabled={torrentBusy} onclick={reviewTorrent}>Choose .torrent…</button></div>
-      {#if torrentError}<p role="alert">{torrentError}</p>{/if}
-      {#if torrentReview}
-        <div class="item torrent-review"><div><strong>{torrentReview.name}</strong><span>{torrentReview.files.length} files · {bytes(torrentReview.total)} · {torrentReview.tracker_count} trackers · {torrentReview.private ? 'Private torrent' : 'Public torrent'}</span><span>Save to: {torrentReview.directory}</span><span>All listed files will download. No installation or executable launch is performed.</span><details><summary data-nav>Review files</summary><ul class="torrent-files">{#each torrentReview.files.slice(0, 50) as file}<li>{file.path} · {bytes(file.size)}{#if torrentReview.preparation_files?.find(f => f.path === file.path)?.reason}<span>{torrentReview.preparation_files.find(f => f.path === file.path)?.reason}</span>{/if}</li>{/each}</ul>{#if torrentReview.files.length > 50}<p>Showing the first 50 files.</p>{/if}</details><label>Direct peers (optional)<input class="transfer-input" data-nav aria-label="Torrent direct peers" placeholder="192.168.1.20:51413" bind:value={peers} /></label></div><div class="row-actions"><button class="btn primary small" data-nav disabled={torrentBusy} onclick={downloadTorrent}>{torrentBusy ? 'Starting…' : 'Download files'}</button><button class="btn glass small" data-nav disabled={torrentBusy} onclick={() => { torrentReview = null; torrentError = ''; }}>Cancel</button></div></div>
-      {/if}
-      <div class="item">
-        <div>
-          <strong>Add a magnet or device link</strong>
-          <span>Paste a magnet link or use Share → Copy link on your other Marquee device. Public magnets need tracker or DHT discovery.</span>
-        </div>
-        <form class="row-actions" onsubmit={(e) => { e.preventDefault(); if (link.trim()) { void app.getFromLink(link); link = ''; } }}>
-          <input class="transfer-input" data-nav type="text" placeholder="magnet:?xt=…" aria-label="Game link" bind:value={link} />
-          <button class="btn glass small" data-nav type="submit" disabled={!link.trim()}>Get</button>
-        </form>
-      </div>
-      {#if app.transferError}<p role="alert">{app.transferError}</p>{/if}
-      {#each app.transfers?.items ?? [] as t (t.info_hash || t.name)}
-        <div class="item">
-          <div>
-            <strong>{t.name}</strong>
-            <span>{t.kind === 'get' ? 'Download' : 'Share'} · {transferLine(t)}</span>
-            {#if t.directory}<span>Files: {t.directory}</span>{/if}
-            {#if t.error && t.state !== 'error'}<span role="alert">{t.error}</span>{/if}
-            {#if t.state === 'downloading' && t.total}<progress max={t.total} value={t.downloaded} aria-label="Download progress"></progress>{/if}
-          </div>
-          <div class="row-actions">
-            {#if t.link}<button class="btn glass small" data-nav onclick={() => app.copyTransferLink(t)}>Copy link</button>{/if}
-            {#if t.info_hash}<button class="btn glass small" data-nav onclick={() => app.pauseTransfer(t, !['paused','error','source_missing'].includes(t.state))}>{t.state === 'error' ? 'Retry' : ['paused','source_missing'].includes(t.state) ? 'Resume' : 'Pause'}</button>{/if}
-            {#if t.info_hash}<button class="btn glass small" data-nav onclick={() => app.stopTransfer(t)}>Stop</button>{/if}
-          </div>
-        </div>
-      {:else}
-        <div class="item"><div><span>Nothing shared or received yet.</span></div></div>
-      {/each}
     {/if}
   </section>
 
@@ -325,7 +262,8 @@
     padding: 18px 20px;
     display: grid;
     gap: 4px;
-    justify-items: start;
+    justify-items: stretch;
+    min-width: 0;
   }
   h2 {
     margin: 0 0 8px;
@@ -343,15 +281,22 @@
     padding: 10px 0;
     border-bottom: 1px solid var(--line);
   }
+  .item > select { max-width: 100%; min-width: 0; }
+  @media(max-width:1100px) { .item { align-items: flex-start; flex-direction: column; } .item > select { width:100%; } }
   .item:last-of-type {
     border-bottom: 0;
   }
   .row-actions {
+    flex-wrap: wrap;
+    max-width: 100%;
     display: flex;
     gap: 8px;
     flex: none;
   }
   .item > div:first-child {
+    min-width: 0;
+    flex: 1;
+    overflow-wrap: anywhere;
     display: grid;
     gap: 2px;
   }
@@ -461,8 +406,4 @@
     padding: 6px 10px;
     border-radius: 8px;
   }
-  .torrent-choose { white-space: nowrap; flex-shrink: 0; }
-  .torrent-review { align-items: flex-start; }
-  .torrent-files { max-height: 14rem; overflow: auto; overflow-wrap: anywhere; padding-left: 1.2rem; }
-  .transfer-input { min-width: 0; max-width: 100%; border: 1px solid var(--border); background: var(--field); color: var(--text); padding: 8px 10px; border-radius: 8px; font: inherit; }
 </style>

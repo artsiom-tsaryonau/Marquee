@@ -97,9 +97,9 @@ If UL1 lands before ST3c, swap the numbers here in the same change set.
 
 | ID | Item | Track | Size | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
-| NP1 | Port play sessions and playtime | Ports | M | FD1 | Done 2026-11-26. Live Shipwright play passed 2026-11-26 |
+| NP1 | Port play sessions and playtime | Ports | M | FD1 | Closed 2026-11-26. Implementation and live Shipwright play accepted |
 | NP2 | Port data readiness (`needs-rom` / `needs-data`) | Ports | S | — | Done 2026-11-25 |
-| NP3 | Shipwright game-data setup job | Ports | M | NP2 | Done 2026-11-26. Live ROM setup, save and restore passed 2026-11-26 |
+| NP3 | Shipwright game-data setup job | Ports | M | NP2 | Closed 2026-11-26. Live ROM setup, native save, relaunch and restore accepted |
 | NP4 | Data setup for the other five ports, one per change set | Ports | S each | NP2 | 2ship2harkinian and sm64coopdx done 2026-11-26 (live ROM setup needs an owner dump). Zelda64Recomp, Fallout 2, UZDoom open |
 | NP5 | Port release review screen and re-pin script | Ports | S | FD3 | Done 2026-11-25 |
 | PS4-1 | shadPS4 launch contract and runner | Consoles | S | — | Done 2026-11-26. Live title boot unperformed |
@@ -720,3 +720,61 @@ Live Xbox 360 save/relaunch was not played. No commit was made in this pass.
   - port session history returns `ended_at` and `exit_code`.
   A physical controller and listening to the audio were not checked; the
   `soh.elf` stream was running in PipeWire.
+
+### 2026-11-26 follow-up audit
+
+NP1 and NP3 are closed for Shipwright 9.3.1 with the accepted PAL 1.1 input.
+The retained acceptance library contains four ended sessions, all exit code 0,
+lasting 686, 61, 70 and 39 seconds. Gameplay screenshots and the saved File 1
+are present. Its current bytes match the retained restore snapshot. The full
+repository check script passed on commit `927af96`.
+
+Audio listening and physical-controller testing remain unverified.
+The audit found two F2 snapshot follow-ups, reproduced
+with isolated fixtures through its public create/restore functions.
+
+- Restoring the oldest of five snapshots restores its save bytes, then returns
+  an IO error. The automatic pre-restore snapshot prunes the selected manifest,
+  and the eager fallback in `restore` reads that removed manifest even when a
+  pre-restore snapshot exists. Fixed by retaining the requested snapshot info
+  before pruning and returning the pre-restore info when available.
+- If restore stops after renaming the live port directory to
+  `.shipwright.snapshot-aside`, a retry deletes that directory before recovering
+  its excluded engine and game data. Fixed by recovering the interrupted rename
+  before reading exclusions or collecting files. Scope operations are serialized
+  and directory renames are synced. Regression tests preserve the engine, game
+  data, setup receipt and pre-restore save through a retry.
+
+These follow-ups apply to shared backup recovery. Shipwright's recorded normal
+setup, playtime, native-save and relaunch acceptance is complete.
+
+The reviewed archive preparation path now applies renamed-track CUE repairs
+before validating the sheet. It verifies extracted source sizes before repairs,
+then records the actual repaired output sizes and hashes in its receipt.
+A manager regression test covers changed sheet lengths and receipt recovery
+after source removal.
+
+### UX and local-sharing audit fixes — 2026-11-26
+
+The transfer scope is private local networks. Public discovery and proxy settings
+are unsupported, public peers are rejected, and the local listener plus mandatory
+incoming/outgoing peer filtering enforce this in the engine. Old settings cannot
+restart public networking; older public jobs retain their history and files offline.
+Explicit resume accepts only saved local receive peers. See [local transfers](TORRENTS.md).
+
+Downloads now combines device links, reviewed torrent files, active controls and
+archive preparation. Failed links retain their input and an inline error; transfer
+rates and connected-device counts are visible. Errors and missing sources remain
+in the navigation activity count. Long file lists offer Show more.
+
+Light surfaces and Add games contrast, narrow Settings layouts, catalogue-driven
+folder import, Big Screen browsing density, provider suffixes in display titles
+and readable snapshot labels/dates are corrected. At 1280×720 the initial game
+cards and titles are visible; secondary filters remain available on demand.
+
+Headless acceptance in isolated libraries covered widths 390/768/1024/1440,
+light theme and Big Screen, persistent link errors, public-peer rejection, a real
+local download with pause/resume, exact SHA-256 equality, reviewed archive
+preparation and one registered Genesis edition. A 61-file UI fixture verified
+access beyond the old 50-file limit; modal focus trapping/restoration also passed.
+Synthetic archive acceptance verifies delivery and registration, not playability.

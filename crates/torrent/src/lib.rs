@@ -2,12 +2,13 @@
 //! the user's own devices. Embeds `librqbit` behind a small synchronous API so
 //! `marquee-core` stays free of async code.
 //!
-//! Defaults are conservative: no DHT, no trackers, no local-network discovery
-//! and no UPnP. Peers are reached only through addresses the caller supplies
-//! (or a tracker the caller explicitly configures when creating a torrent).
+//! Transfers are confined to private, link-local and loopback addresses. DHT,
+//! trackers, automatic discovery and UPnP are disabled. Both incoming and
+//! outgoing peer connections pass the mandatory local address filter.
 //! Nothing here fetches games from third parties.
 
-use std::net::SocketAddr;
+use std::io::Write;
+use std::net::{IpAddr, SocketAddr};
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -16,8 +17,8 @@ use std::time::Duration;
 use anyhow::{anyhow, Context, Result};
 use librqbit::limits::LimitsConfig;
 use librqbit::{
-    AddTorrent, AddTorrentOptions, AddTorrentResponse, ConnectionOptions, CreateTorrentOptions,
-    ListenerMode, ListenerOptions, ManagedTorrent, Session, SessionOptions, TorrentStatsState,
+    AddTorrent, AddTorrentOptions, AddTorrentResponse, CreateTorrentOptions, ListenerMode,
+    ListenerOptions, ManagedTorrent, Session, SessionOptions, TorrentStatsState,
 };
 use tokio::runtime::Runtime;
 
@@ -30,18 +31,16 @@ pub struct Config {
     pub download_dir: PathBuf,
     /// Address to accept peers on. Port 0 picks a free one.
     pub listen: SocketAddr,
-    /// Public DHT. Off by default; the library is private.
+    /// Legacy field: enabling public DHT is rejected.
     pub dht: bool,
-    /// Tracker announces. Off by default.
+    /// Legacy field: enabling tracker announces is rejected.
     pub trackers: bool,
     /// Serve pieces to others. Turn off for download-only.
     pub seeding: bool,
     /// Bytes per second; None is unlimited.
     pub upload_bps: Option<u32>,
     pub download_bps: Option<u32>,
-    /// `socks5://127.0.0.1:1080`: every peer and HTTP tracker connection goes through this
-    /// loopback SOCKS5 proxy (e.g. a VPN container) and nothing else leaves the machine. See
-    /// [`Engine::start`].
+    /// Legacy field: proxies are rejected for LAN-only transfers.
     pub proxy: Option<String>,
 }
 
@@ -49,7 +48,7 @@ impl Config {
     pub fn private(download_dir: impl Into<PathBuf>) -> Self {
         Config {
             download_dir: download_dir.into(),
-            listen: "0.0.0.0:0".parse().unwrap(),
+            listen: "127.0.0.1:0".parse().unwrap(),
             dht: false,
             trackers: false,
             seeding: true,
@@ -58,32 +57,6 @@ impl Config {
             proxy: None,
         }
     }
-}
-
-/// Accept only a loopback `socks5://host:port` proxy: a proxied session is bound to the loopback
-/// interface, so a remote proxy could not be reached anyway.
-pub fn check_proxy(url: &str) -> Result<()> {
-    let parsed = url::Url::parse(url).context("invalid proxy URL")?;
-    if parsed.scheme() != "socks5" {
-        return Err(anyhow!("the torrent proxy must be socks5://host:port"));
-    }
-    let loopback = match parsed.host() {
-        // Non-special schemes keep IP literals as domain strings.
-        Some(url::Host::Domain(d)) => {
-            d == "localhost"
-                || d.parse::<std::net::IpAddr>()
-                    .is_ok_and(|ip| ip.is_loopback())
-        }
-        Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
-        Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
-        None => false,
-    };
-    if !loopback || parsed.port().is_none() {
-        return Err(anyhow!(
-            "the torrent proxy must be on this machine, e.g. socks5://127.0.0.1:1080"
-        ));
-    }
-    Ok(())
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -105,7 +78,31 @@ pub struct Progress {
     pub total: u64,
     pub uploaded: u64,
     pub finished: bool,
+    pub download_bps: u64,
+    pub upload_bps: u64,
+    pub peers: usize,
 }
+
+/// Only addresses confined to this computer or a private/link-local network.
+pub fn is_local_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(ip) => ip.is_private() || ip.is_loopback() || ip.is_link_local(),
+        IpAddr::V6(ip) => ip.to_ipv4_mapped().map_or_else(
+            || ip.is_loopback() || ip.is_unique_local() || ip.is_unicast_link_local(),
+            |ip| is_local_ip(IpAddr::V4(ip)),
+        ),
+    }
+}
+
+pub fn check_local_peer(peer: SocketAddr) -> Result<()> {
+    anyhow::ensure!(peer.port() != 0 && is_local_ip(peer.ip()),
+        "Transfers are local-network only; use a private or link-local device IP and a nonzero port");
+    Ok(())
+}
+
+// librqbit applies this list to both inbound and outbound peers, including PEX.
+// Load from a local file so constructing a session never fetches network policy.
+const LOCAL_PEERS: &str = "loopback:127.0.0.0-127.255.255.255\nprivate:10.0.0.0-10.255.255.255\nprivate:172.16.0.0-172.31.255.255\nprivate:192.168.0.0-192.168.255.255\nlinklocal:169.254.0.0-169.254.255.255\nloopback6:::1-::1\nprivate6:fc00::-fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff\nlinklocal6:fe80::-febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff\nmapped:::ffff:127.0.0.0-::ffff:127.255.255.255\nmapped:::ffff:10.0.0.0-::ffff:10.255.255.255\nmapped:::ffff:172.16.0.0-::ffff:172.31.255.255\nmapped:::ffff:192.168.0.0-::ffff:192.168.255.255\nmapped:::ffff:169.254.0.0-::ffff:169.254.255.255\n";
 
 /// A created torrent: the `.torrent` bytes plus its identity.
 #[derive(Clone, Debug)]
@@ -196,6 +193,16 @@ fn nz(v: Option<u32>) -> Option<NonZeroU32> {
 
 impl Engine {
     pub fn start(cfg: &Config) -> Result<Engine> {
+        anyhow::ensure!(
+            !cfg.dht && !cfg.trackers && cfg.proxy.is_none(),
+            "Marquee transfers are local-network only; DHT, trackers and proxies are unsupported"
+        );
+        anyhow::ensure!(
+            is_local_ip(cfg.listen.ip()),
+            "The transfer listener must use a local-network address"
+        );
+        let mut allowlist = tempfile::NamedTempFile::new()?;
+        allowlist.write_all(LOCAL_PEERS.as_bytes())?;
         let rt = tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .enable_all()
@@ -204,12 +211,13 @@ impl Engine {
             .context("starting the torrent runtime")?;
         std::fs::create_dir_all(&cfg.download_dir)?;
         let mut opts = SessionOptions {
-            dht: if cfg.dht {
-                Some(Default::default())
-            } else {
-                None
-            },
-            disable_trackers: !cfg.trackers,
+            dht: None,
+            disable_trackers: true,
+            allowlist_url: Some(
+                url::Url::from_file_path(allowlist.path())
+                    .map_err(|_| anyhow!("Invalid local peer policy path"))?
+                    .into(),
+            ),
             disable_local_service_discovery: true,
             disable_upload: !cfg.seeding,
             ipv4_only: cfg.listen.is_ipv4(),
@@ -226,20 +234,6 @@ impl Engine {
             ipv4_only: cfg.listen.is_ipv4(),
             ..Default::default()
         });
-        if let Some(proxy) = &cfg.proxy {
-            check_proxy(proxy)?;
-            // Peers and HTTP trackers go through the proxy. librqbit sends DHT, UDP trackers and
-            // uTP directly, so the whole session is also bound to the loopback interface: anything
-            // that does not use the proxy cannot leave the machine (fails closed if the VPN is down).
-            opts.connect = Some(ConnectionOptions {
-                proxy_url: Some(proxy.clone()),
-                ..Default::default()
-            });
-            opts.bind_device_name = Some("lo".into());
-            opts.dht = None;
-            // Inbound peers would arrive on the real interface, not through the tunnel.
-            opts.listen = None;
-        }
         let dir = cfg.download_dir.clone();
         let session = rt
             .block_on(Session::new_with_opts(dir, opts))
@@ -311,13 +305,10 @@ impl Engine {
         )
     }
 
-    /// Download from a `.torrent` file's bytes, a magnet link or an http(s) URL,
+    /// Download from local `.torrent` bytes or a device magnet link,
     /// into `into`, connecting to `peers` directly.
     pub fn download(&self, source: Source, into: &Path, peers: Vec<SocketAddr>) -> Result<usize> {
-        let add = match source {
-            Source::TorrentBytes(b) => AddTorrent::TorrentFileBytes(b.into()),
-            Source::Link(l) => AddTorrent::Url(l.into()),
-        };
+        let (add, peers) = local_source(source, peers)?;
         self.add(add, into, peers, false)
     }
 
@@ -328,13 +319,7 @@ impl Engine {
         into: &Path,
         peers: Vec<SocketAddr>,
     ) -> Result<usize> {
-        let add = match source {
-            Source::TorrentBytes(bytes) => {
-                inspect(&bytes)?;
-                AddTorrent::TorrentFileBytes(bytes.into())
-            }
-            Source::Link(link) => AddTorrent::Url(link.into()),
-        };
+        let (add, peers) = local_source(source, peers)?;
         self.add(add, into, peers, true)
     }
 
@@ -402,6 +387,18 @@ impl Engine {
             total: s.total_bytes,
             uploaded: s.uploaded_bytes,
             finished: s.finished,
+            download_bps: s
+                .live
+                .as_ref()
+                .map_or(0, |live| live.download_speed.as_bytes()),
+            upload_bps: s
+                .live
+                .as_ref()
+                .map_or(0, |live| live.upload_speed.as_bytes()),
+            peers: s
+                .live
+                .as_ref()
+                .map_or(0, |live| live.snapshot.peer_stats.live as usize),
         })
     }
 
@@ -458,8 +455,46 @@ impl Engine {
 
 pub enum Source {
     TorrentBytes(Vec<u8>),
-    /// A `magnet:` link or an http(s) URL to a `.torrent`.
+    /// A device `magnet:` link with local peers; HTTP URLs are rejected.
     Link(String),
+}
+
+fn local_source(
+    source: Source,
+    mut peers: Vec<SocketAddr>,
+) -> Result<(AddTorrent<'static>, Vec<SocketAddr>)> {
+    let add = match source {
+        Source::TorrentBytes(bytes) => {
+            inspect(&bytes)?;
+            AddTorrent::TorrentFileBytes(bytes.into())
+        }
+        Source::Link(link) => {
+            let source = url::Url::parse(&link)?;
+            anyhow::ensure!(
+                source.scheme() == "magnet",
+                "Use a local torrent file or device magnet link"
+            );
+            let mut local = url::Url::parse("magnet:?")?;
+            for (key, value) in source.query_pairs() {
+                match key.as_ref() {
+                    "xt" | "dn" => {
+                        local.query_pairs_mut().append_pair(&key, &value);
+                    }
+                    "x.pe" => peers.push(value.parse()?),
+                    _ => {} // No tracker, web-source or metadata URL is forwarded.
+                }
+            }
+            AddTorrent::Url(local.to_string().into())
+        }
+    };
+    anyhow::ensure!(
+        !peers.is_empty(),
+        "A local device peer is required; public discovery is disabled"
+    );
+    for &peer in &peers {
+        check_local_peer(peer)?;
+    }
+    Ok((add, peers))
 }
 
 /// Recheck the pieces intersecting one file, including bytes in neighboring
@@ -551,4 +586,41 @@ pub fn verify_file(
         "Incomplete torrent piece verification"
     );
     Ok(format!("{:x}", selected_digest.finalize()))
+}
+
+#[cfg(test)]
+mod network_policy_tests {
+    use super::*;
+
+    #[test]
+    fn session_filters_incoming_and_discovered_outgoing_peer_addresses() {
+        let temp = tempfile::tempdir().unwrap();
+        let mut config = Config::private(temp.path());
+        config.listen = "127.0.0.1:0".parse().unwrap();
+        let engine = Engine::start(&config).unwrap();
+        let list = engine
+            .session
+            .allowlist
+            .as_ref()
+            .expect("mandatory local peer filter");
+        for address in [
+            "127.0.0.1",
+            "10.255.255.255",
+            "172.31.255.255",
+            "192.168.1.1",
+            "169.254.1.1",
+            "::1",
+            "fd12::1",
+            "fe80::1",
+            "::ffff:192.168.1.1",
+            "8.8.8.8",
+            "172.32.0.1",
+            "2001:4860::1",
+            "::ffff:8.8.8.8",
+        ] {
+            let ip = address.parse().unwrap();
+            assert_eq!(list.has(ip), is_local_ip(ip), "{address}");
+        }
+        engine.shutdown();
+    }
 }

@@ -21,9 +21,9 @@ test('catalog systems choose the default emulator', () => {
 test('download activity ignores finished work', () => {
   const counts = activityCounts(
     [{ state: 'preparing' }, { state: 'registered' }, { state: 'failed' }],
-    [{ state: 'downloading' }, { state: 'complete' }],
+    [{ state: 'downloading' }, { state: 'complete' }, { state: 'error' }, { state: 'source_missing' }],
     [{ state: 'waiting' }, { state: 'completed' }],
   );
-  assert.deepEqual(counts, { preparation: 2, torrents: 1, browser: 1 });
-  assert.equal(counts.preparation + counts.torrents + counts.browser, 4);
+  assert.deepEqual(counts, { preparation: 2, torrents: 3, browser: 1 });
+  assert.equal(counts.preparation + counts.torrents + counts.browser, 6);
 });

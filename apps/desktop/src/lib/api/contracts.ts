@@ -203,13 +203,16 @@ export interface TorrentSettings {
   /** KiB/s, 0 = unlimited. */
   upload_kbps: number;
   download_kbps: number;
-  /** Loopback SOCKS5 proxy for public torrents (e.g. a VPN container); null = direct. */
+  /** Legacy field; LAN-only transfers require null. */
   proxy?: string | null;
 }
 
 export interface TransferItem {
   info_hash: string;
   name: string;
+  download_bps?: number;
+  upload_bps?: number;
+  peers?: number;
   kind: 'share' | 'get';
   edition_id: string | null;
   state: 'preparing' | 'checking' | 'downloading' | 'sharing' | 'seeding' | 'source_missing' | 'complete' | 'paused' | 'error' | 'starting';

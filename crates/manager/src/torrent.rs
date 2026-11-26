@@ -1,5 +1,5 @@
-//! Durable BitTorrent transfers. Private device shares and public discovery
-//! use separate engines. Downloads remain in owned per-transfer folders; an
+//! Durable LAN-only BitTorrent transfers. Discovery is disabled and peers
+//! must have private, link-local or loopback addresses. Downloads remain in owned per-transfer folders; an
 //! engine/package download never establishes installation or play readiness.
 use crate::{AppError, Result};
 use marquee_torrent::{Config, Engine, Source, State};
@@ -84,6 +84,12 @@ pub struct TransferItem {
     pub public: bool,
     pub files_present: Option<bool>,
     pub publication: Option<CompletedRoot>,
+    #[serde(default)]
+    pub download_bps: u64,
+    #[serde(default)]
+    pub upload_bps: u64,
+    #[serde(default)]
+    pub peers: usize,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransferStatus {
@@ -195,25 +201,42 @@ fn decode(s: &str) -> Result<String> {
     String::from_utf8(out).map_err(|_| bad())
 }
 
-fn local_host() -> String {
-    if let Ok(h) = std::env::var("MARQUEE_TORRENT_HOST") {
-        if !h.trim().is_empty() {
-            return h.trim().to_string();
-        }
+fn local_host() -> std::net::IpAddr {
+    if let Some(ip) = std::env::var("MARQUEE_TORRENT_HOST")
+        .ok()
+        .and_then(|host| host.trim().parse().ok())
+        .filter(|ip| marquee_torrent::is_local_ip(*ip))
+    {
+        return ip;
     }
+    // UDP connect selects an interface without sending packets. Never advertise
+    // a globally routed address even on a host with a public interface.
     std::net::UdpSocket::bind("0.0.0.0:0")
-        .and_then(|s| {
-            s.connect("192.0.2.1:9")?;
-            s.local_addr()
+        .and_then(|socket| {
+            socket.connect("192.0.2.1:9")?;
+            socket.local_addr()
         })
-        .map(|a| a.ip().to_string())
-        .unwrap_or_else(|_| "127.0.0.1".into())
+        .map(|address| address.ip())
+        .ok()
+        .filter(|ip| marquee_torrent::is_local_ip(*ip))
+        .unwrap_or_else(|| "127.0.0.1".parse().unwrap())
+}
+
+fn local_peers(peers: &[SocketAddr]) -> Result<()> {
+    if peers.is_empty() {
+        return Err(AppError::new("TORRENT_LOCAL_PEER", "A local device address is required. Copy its Marquee share link or enter its private IP and port."));
+    }
+    for &peer in peers {
+        marquee_torrent::check_local_peer(peer)
+            .map_err(|e| AppError::new("TORRENT_LAN_ONLY", e.to_string()))?;
+    }
+    Ok(())
 }
 
 fn make_link(hash: &str, name: &str, system: Option<&str>, peer: Option<&str>) -> String {
     let mut l = format!("magnet:?xt=urn:btih:{hash}&dn={}", encode(name));
     if let Some(p) = peer {
-        l.push_str(&format!("&x.pe={p}"));
+        l.push_str(&format!("&x.pe={}", p.replace('%', "%25")));
     }
     if let Some(s) = system {
         l.push_str(&format!("&x.mq={}", encode(s)));
@@ -256,9 +279,10 @@ fn parse_link(link: &str) -> Result<Link> {
             "x.mq" => system = Some(v),
             "x.pe" => {
                 let peer: SocketAddr = v.parse().map_err(|_| bad())?;
-                if peer.port() == 0 || peer.ip().is_unspecified() || peers.len() >= 50 {
+                if peers.len() >= 50 {
                     return Err(bad());
                 }
+                local_peers(&[peer])?;
                 if !peers.contains(&peer) {
                     peers.push(peer);
                 }
@@ -572,7 +596,7 @@ impl Inner {
     }
     fn config(&self, settings: &TorrentSettings, public: bool) -> Result<Config> {
         let mut cfg = Config::private(self.dir.join("incoming"));
-        cfg.listen = SocketAddr::from(([0, 0, 0, 0], if public { 0 } else { PORT }));
+        cfg.listen = SocketAddr::new(local_host(), if public { 0 } else { PORT });
         if !public {
             let listen_file = self.state_dir.join("private-listen.json");
             match std::fs::read(&listen_file) {
@@ -582,13 +606,16 @@ impl Inner {
             }
         }
         cfg.seeding = settings.seeding;
-        cfg.trackers = public && settings.trackers;
-        cfg.dht = public && settings.dht;
+        cfg.trackers = false;
+        cfg.dht = false;
         cfg.upload_bps =
             (settings.upload_kbps > 0).then(|| settings.upload_kbps.saturating_mul(1024));
         cfg.download_bps =
             (settings.download_kbps > 0).then(|| settings.download_kbps.saturating_mul(1024));
-        cfg.proxy = if public { settings.proxy.clone() } else { None };
+        cfg.proxy = None;
+        if cfg.listen.ip().is_unspecified() {
+            cfg.listen.set_ip(local_host());
+        }
         Ok(cfg)
     }
     fn engine(&self, settings: &TorrentSettings, public: bool, epoch: u64) -> Result<Arc<Engine>> {
@@ -639,7 +666,13 @@ impl Inner {
                 if entry.kind == "get" && entry.complete && !inner.files_present(&entry) {
                     return Err(AppError::new("TORRENT_SOURCE_MISSING", "Downloaded source files are missing. Record retained; Resume to download them again"));
                 }
-                let engine = inner.engine(&settings, entry.public, epoch)?;
+                if entry.public {
+                    return Err(AppError::new("TORRENT_LAN_ONLY", "This older public transfer is offline. Files are kept. Resume requires a saved local device address."));
+                }
+                if entry.kind == "get" {
+                    local_peers(&entry.peers)?;
+                }
+                let engine = inner.engine(&settings, false, epoch)?;
                 let id = if entry.kind == "share" {
                     engine
                         .seed(metadata(&inner.torrent_file(&entry.info_hash))?, &entry.dir)
@@ -703,9 +736,14 @@ impl Inner {
     }
 }
 fn peer_string(engine: &Engine) -> Option<String> {
-    engine
-        .listen_addr()
-        .map(|a| format!("{}:{}", local_host(), a.port()))
+    engine.listen_addr().map(|address| {
+        let ip = if address.ip().is_unspecified() {
+            local_host()
+        } else {
+            address.ip()
+        };
+        SocketAddr::new(ip, address.port()).to_string()
+    })
 }
 
 pub(crate) fn status(core: &Arc<Host>) -> Result<TransferStatus> {
@@ -808,6 +846,9 @@ pub(crate) fn status(core: &Arc<Host>) -> Result<TransferStatus> {
             directory: entry.dir,
             public: entry.public,
             files_present,
+            download_bps: p.map_or(0, |p| p.download_bps),
+            upload_bps: p.map_or(0, |p| p.upload_bps),
+            peers: p.map_or(0, |p| p.peers),
         });
     }
     for job in inner.jobs.lock().unwrap_or_else(|e| e.into_inner()).iter() {
@@ -831,15 +872,15 @@ pub(crate) fn status(core: &Arc<Host>) -> Result<TransferStatus> {
             directory: PathBuf::new(),
             public: false,
             files_present: None,
+            download_bps: 0,
+            upload_bps: 0,
+            peers: 0,
         });
     }
-    let private_listen = settings.enabled.then(|| {
-        std::fs::read(inner.state_dir.join("private-listen.json"))
-            .ok()
-            .and_then(|bytes| serde_json::from_slice::<std::net::SocketAddr>(&bytes).ok())
-            .map(|addr| addr.to_string())
-            .unwrap_or_else(|| format!("0.0.0.0:{PORT}"))
-    });
+    let private_listen = engines
+        .get(&false)
+        .and_then(|engine| engine.listen_addr())
+        .map(|address| address.to_string());
     Ok(TransferStatus {
         enabled: settings.enabled,
         seeding: settings.seeding,
@@ -1000,13 +1041,7 @@ fn get_at(core: &Arc<Host>, link: &str, destination: Option<PathBuf>) -> Result<
         return Err(off());
     }
     let parsed = parse_link(link)?;
-    let public = parsed.peers.is_empty();
-    if public && !settings.trackers && !settings.dht {
-        return Err(AppError::new(
-            "TORRENT_DISCOVERY",
-            "This magnet has no direct peer. Enable trackers or DHT in Torrent settings",
-        ));
-    }
+    local_peers(&parsed.peers)?;
     enqueue(
         core,
         Entry {
@@ -1031,13 +1066,9 @@ fn get_at(core: &Arc<Host>, link: &str, destination: Option<PathBuf>) -> Result<
             downloaded: 0,
             uploaded: 0,
             owned: true,
-            public,
+            public: false,
             paused: false,
-            source: Some(if public {
-                link.trim().to_string()
-            } else {
-                format!("magnet:?xt=urn:btih:{}", parsed.hash)
-            }),
+            source: Some(format!("magnet:?xt=urn:btih:{}", parsed.hash)),
         },
     )
 }
@@ -1103,22 +1134,7 @@ fn add_file_at(
             "This torrent is already listed; use Resume or Retry",
         ));
     }
-    if peers.is_empty() && !settings.trackers && (!settings.dht || manifest.private) {
-        return Err(AppError::new(
-            "TORRENT_DISCOVERY",
-            "Enable tracker discovery (or DHT for a non-private torrent), or provide a direct peer",
-        ));
-    }
-    if peers.is_empty()
-        && settings.trackers
-        && manifest.tracker_count == 0
-        && (!settings.dht || manifest.private)
-    {
-        return Err(AppError::new(
-            "TORRENT_DISCOVERY",
-            "This torrent has no trackers; provide a peer or enable DHT for non-private torrents",
-        ));
-    }
+    local_peers(&peers)?;
     atomic_write(
         &core.transfers.inner.torrent_file(&manifest.info_hash),
         &bytes,
@@ -1143,7 +1159,7 @@ fn add_file_at(
             downloaded: 0,
             uploaded: 0,
             owned: true,
-            public: true,
+            public: false,
             paused: false,
             source: None,
         },
@@ -1156,11 +1172,26 @@ fn pause(core: &Arc<Host>, hash: &str, paused: bool) -> Result<()> {
         return Err(off());
     }
     let inner = &core.transfers.inner;
+    if !paused {
+        if let Some(entry) = inner.load()?.iter().find(|entry| entry.info_hash == hash) {
+            if entry.kind == "get" {
+                local_peers(&entry.peers)?;
+            }
+        }
+    }
     let mut recheck = false;
     let found = inner
         .update(|entries| {
             entries.iter_mut().find(|e| e.info_hash == hash).map(|e| {
                 e.paused = paused;
+                if !paused && e.public {
+                    // Explicit resume can convert an older job only after its
+                    // saved peers pass the LAN policy. Cached metadata is kept.
+                    e.public = false;
+                    if e.kind == "get" {
+                        e.source = Some(format!("magnet:?xt=urn:btih:{}", e.info_hash));
+                    }
+                }
                 if !paused && e.complete && !inner.files_present(e) {
                     e.complete = false;
                     e.scanned = false;
@@ -1267,12 +1298,12 @@ pub struct ShareRequest {
 }
 
 /// Device-to-device library transfer over BitTorrent. Off by default; when on
-/// it stays private (no public DHT or trackers) unless the user adds peers.
+/// it stays on private networks with direct peers and no public discovery.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct TorrentSettings {
     pub enabled: bool,
-    /// Public discovery is opt-in and never used for private device shares.
+    /// Legacy fields: public discovery cannot be enabled.
     pub trackers: bool,
     pub dht: bool,
     /// Serve pieces to your other devices. Off means download-only.
@@ -1280,9 +1311,18 @@ pub struct TorrentSettings {
     /// KiB/s; 0 is unlimited.
     pub upload_kbps: u32,
     pub download_kbps: u32,
-    /// Loopback SOCKS5 proxy for public torrents (e.g. a VPN container): `socks5://127.0.0.1:1080`.
-    /// Private device shares never use it.
+    /// Legacy field: ignored on load and rejected when set.
     pub proxy: Option<String>,
+}
+
+impl TorrentSettings {
+    /// Old persisted discovery settings never reactivate public networking.
+    pub fn local_only(mut self) -> Self {
+        self.trackers = false;
+        self.dht = false;
+        self.proxy = None;
+        self
+    }
 }
 
 impl Default for TorrentSettings {
@@ -1327,9 +1367,8 @@ impl Host {
         read_settings(&self.data)
     }
     pub fn set_torrent_settings(&self, settings: &TorrentSettings) -> Result<()> {
-        if let Some(proxy) = &settings.proxy {
-            marquee_torrent::check_proxy(proxy)
-                .map_err(|e| AppError::new("TORRENT_PROXY", e.to_string()))?;
+        if settings.trackers || settings.dht || settings.proxy.is_some() {
+            return Err(AppError::new("TORRENT_LAN_ONLY", "Transfers are local-network only. Public trackers, DHT and proxies are unsupported."));
         }
         let _control = self.control()?;
         self.transfers.checkpoint()?;
@@ -1435,6 +1474,32 @@ mod tests {
             bytes,
         )
     }
+    #[test]
+    fn legacy_public_history_stays_offline_and_files_remain_preparable() {
+        let (_temp, host, manager, hash, path, bytes) = completed_archive();
+        host.transfers
+            .inner
+            .update(|entries| entries[0].paused = false)
+            .unwrap();
+        wait(&host, |status| {
+            status.items.iter().any(|item| item.state == "error")
+        });
+        assert!(host.transfers.inner.engines.lock().unwrap().is_empty());
+        assert_eq!(
+            pause(&host, &hash, false).unwrap_err().code,
+            "TORRENT_LOCAL_PEER"
+        );
+        assert!(host.transfers.inner.load().unwrap()[0].public);
+        let downloads = manager.torrent_downloads(&host).unwrap();
+        assert_eq!(
+            std::fs::read(downloads[0].directory.join(&path)).unwrap(),
+            bytes
+        );
+        assert!(manager
+            .inspect_torrent(&host, &hash, &path, "genesis")
+            .is_ok());
+    }
+
     #[test]
     fn torrent_review_binds_source_once_and_receipt_survives_source_removal() {
         let (_temp, host, manager, hash, path, _bytes) = completed_archive();
@@ -1590,34 +1655,66 @@ mod tests {
     }
 
     #[test]
-    fn proxy_applies_to_public_torrents_only_and_must_be_loopback() {
-        let tmp = tempfile::tempdir().unwrap();
-        let host = open(tmp.path());
-        let remote = TorrentSettings {
-            proxy: Some("socks5://10.0.0.5:1080".into()),
-            ..TorrentSettings::default()
-        };
-        let err = host.set_torrent_settings(&remote).unwrap_err();
-        assert!(err.to_string().contains("this machine"), "{err}");
-        let settings = TorrentSettings {
-            proxy: Some("socks5://127.0.0.1:1080".into()),
-            ..TorrentSettings::default()
-        };
-        host.set_torrent_settings(&settings).unwrap();
-        assert_eq!(host.torrent_settings().unwrap().proxy, settings.proxy);
-        let config = |public| {
-            host.transfers
-                .inner
-                .config(&settings, public)
-                .unwrap()
-                .proxy
-        };
-        assert_eq!(config(true), settings.proxy);
-        assert_eq!(
-            config(false),
-            None,
-            "private device shares never use the proxy"
+    fn public_settings_are_refused_and_legacy_settings_are_inert() {
+        let temp = tempfile::tempdir().unwrap();
+        let host = open(temp.path());
+        for settings in [
+            TorrentSettings {
+                trackers: true,
+                ..Default::default()
+            },
+            TorrentSettings {
+                dht: true,
+                ..Default::default()
+            },
+            TorrentSettings {
+                proxy: Some("socks5://127.0.0.1:1080".into()),
+                ..Default::default()
+            },
+        ] {
+            assert_eq!(
+                host.set_torrent_settings(&settings).unwrap_err().code,
+                "TORRENT_LAN_ONLY"
+            );
+        }
+        atomic_write(
+            &temp.path().join("manager/torrents/settings.json"),
+            &serde_json::to_vec(&TorrentSettings {
+                enabled: true,
+                trackers: true,
+                dht: true,
+                proxy: Some("socks5://127.0.0.1:1080".into()),
+                ..Default::default()
+            })
+            .unwrap(),
+        )
+        .unwrap();
+        let settings = host.torrent_settings().unwrap();
+        assert!(
+            settings.enabled && !settings.trackers && !settings.dht && settings.proxy.is_none()
         );
+        for public in [false, true] {
+            let config = host.transfers.inner.config(&settings, public).unwrap();
+            assert!(!config.trackers && !config.dht && config.proxy.is_none());
+        }
+        let hash = "4927b4f8762d3727d8be7d48e754485c7f091436";
+        assert_eq!(
+            get(&host, &format!("magnet:?xt=urn:btih:{hash}"))
+                .unwrap_err()
+                .code,
+            "TORRENT_LOCAL_PEER"
+        );
+        assert_eq!(
+            get(
+                &host,
+                &format!("magnet:?xt=urn:btih:{hash}&x.pe=8.8.8.8:51413")
+            )
+            .unwrap_err()
+            .code,
+            "TORRENT_LAN_ONLY"
+        );
+        assert!(host.transfers.inner.load().unwrap().is_empty());
+        assert!(host.transfers.inner.engines.lock().unwrap().is_empty());
     }
 
     fn open(dir: &Path) -> Arc<Host> {
@@ -1788,8 +1885,6 @@ mod tests {
         assert!(host
             .set_torrent_settings(&TorrentSettings {
                 enabled: true,
-                trackers: true,
-                dht: true,
                 ..Default::default()
             })
             .is_err());
@@ -1797,7 +1892,7 @@ mod tests {
     }
 
     #[test]
-    fn reviewed_file_download_uses_tracker_and_retains_history_after_source_deletion() {
+    fn reviewed_file_download_ignores_tracker_and_retains_history_after_source_deletion() {
         use std::sync::atomic::{AtomicBool, AtomicUsize};
         let temp = tempfile::tempdir().unwrap();
         let source_dir = temp.path().join("source");
@@ -1850,7 +1945,7 @@ mod tests {
             add_file(&receiver, &torrent, &reviewed.review_token, vec![])
                 .unwrap_err()
                 .code,
-            "TORRENT_DISCOVERY"
+            "TORRENT_LOCAL_PEER"
         );
         assert_eq!(
             requests.load(Ordering::SeqCst),
@@ -1858,7 +1953,7 @@ mod tests {
             "offline review must not announce to a tracker"
         );
         let mut settings = receiver.torrent_settings().unwrap();
-        settings.trackers = true;
+        settings.trackers = false;
         settings.seeding = false;
         settings.download_kbps = 1024;
         receiver.set_torrent_settings(&settings).unwrap();
@@ -1872,7 +1967,7 @@ mod tests {
             "TORRENT_REVIEW_CHANGED"
         );
         std::fs::write(&torrent, &made.bytes).unwrap();
-        add_file(&receiver, &torrent, &reviewed.review_token, vec![]).unwrap();
+        add_file(&receiver, &torrent, &reviewed.review_token, vec![peer]).unwrap();
         let partial = wait(&receiver, |s| {
             s.items
                 .iter()
@@ -1891,7 +1986,11 @@ mod tests {
         receiver.set_torrent_settings(&settings).unwrap();
         pause(&receiver, &made.info_hash, false).unwrap();
         wait(&receiver, |s| s.items.iter().any(|i| i.state == "complete"));
-        assert!(requests.load(Ordering::SeqCst) > 0);
+        assert_eq!(
+            requests.load(Ordering::SeqCst),
+            0,
+            "LAN transfers must never contact embedded trackers"
+        );
         let cached = receiver.transfers.inner.torrent_file(&made.info_hash);
         let original_metadata = std::fs::read(&cached).unwrap();
         let fresh = create(&receiver, &source, None, false).unwrap();
@@ -2135,7 +2234,7 @@ pub fn read_settings(data: &Path) -> Result<TorrentSettings> {
     }
     let mut bytes = Vec::new();
     file.take(65537).read_to_end(&mut bytes)?;
-    Ok(serde_json::from_slice(&bytes)?)
+    Ok(serde_json::from_slice::<TorrentSettings>(&bytes)?.local_only())
 }
 pub fn adopted(data: &Path) -> Result<bool> {
     crate::migration::torrents_owned(data)
@@ -2169,6 +2268,17 @@ pub(crate) fn create(
         }
         let inner = &host.transfers.inner;
         if let Some(listen) = listen {
+            let listen = if listen.ip().is_unspecified() {
+                SocketAddr::new(local_host(), listen.port())
+            } else {
+                listen
+            };
+            if !listen.ip().is_unspecified() && !marquee_torrent::is_local_ip(listen.ip()) {
+                return Err(AppError::new(
+                    "TORRENT_LAN_ONLY",
+                    "The listener must use a local-network address",
+                ));
+            }
             if let Some(engine) = inner
                 .engines
                 .lock()

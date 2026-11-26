@@ -12,7 +12,7 @@ browser UI share one Rust core and library.
   builds, BIOS/firmware setup and separate settings/save folders. PS3 and Xbox 360
   have direct verified-ISO launch adapters; compatibility remains title-specific.
 - **Downloads and preparation:** background manager jobs for reviewed archives,
-  torrent transport and browser-assisted downloads, with resumable history and
+  LAN-only torrent transport and browser-assisted downloads, with resumable history and
   verified installation receipts.
 - **Native ports and discovery:** managed port/recomp recipes, local Quiver app-list
   import and a link to its community catalogue. Required original assets remain
