@@ -388,8 +388,8 @@ These are compiled recipe behaviors, not commands imported from an app list.
 The pinned engine was installed through the detached manager, then launched by
 the isolated Marquee web API using the supplied ROM. Upstream setup generated
 `oot.o2r` inside the isolated port folder. The owner confirmed the main menu and
-save-file screen. Gameplay/audio/keyboard and native save persistence are still
-being checked; menu arrival alone does not close the acceptance gate. Main-library
+save-file screen. On 2026-11-26 an isolated run passed gameplay, keyboard input,
+native save, relaunch and snapshot restore; see the 2026-11-26 Shipwright entry in the [feature plan](FEATURE_PLAN.md). Main-library
 profiles and saves were not touched. Diagnostic files and generated assets remain
 under ignored `data/manager-pilot/oot-pilot/`.
 

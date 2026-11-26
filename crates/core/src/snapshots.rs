@@ -321,6 +321,13 @@ fn write_archive(data: &Path, dir: &Path, id: &str, manifest: &Manifest) -> Resu
             Kind::File => {
                 let source = live_root(data, manifest)?.join(&entry.path);
                 let mut input = File::open(&source)?;
+                let modified = input
+                    .metadata()?
+                    .modified()
+                    .ok()
+                    .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+                    .map_or(0, |since| since.as_secs());
+                header.set_mtime(modified);
                 header.set_entry_type(tar::EntryType::Regular);
                 header.set_size(entry.size);
                 header.set_cksum();
@@ -443,7 +450,17 @@ fn swap(
         }
         ScopeKind::Port => {
             let live = paths.data_dir.join("ports").join(&scope.id);
-            for skipped in exclude {
+            // Snapshots never hold Marquee's own receipts, so keep the live ones.
+            let mut carried: Vec<String> = exclude.to_vec();
+            if let Ok(items) = fs::read_dir(&live) {
+                for item in items.flatten() {
+                    let name = item.file_name().to_string_lossy().into_owned();
+                    if name.starts_with(".marquee-") {
+                        carried.push(name);
+                    }
+                }
+            }
+            for skipped in &carried {
                 let source = live.join(skipped);
                 if source.is_file() {
                     let dest = staging.join(skipped);
@@ -593,11 +610,16 @@ mod tests {
         fs::create_dir_all(&port).unwrap();
         fs::write(port.join("SoH.AppImage"), b"engine-v1").unwrap();
         fs::write(port.join("save.dat"), b"save-v1").unwrap();
+        let saved_at = fs::metadata(port.join("save.dat"))
+            .unwrap()
+            .modified()
+            .unwrap();
         let info = create(&paths, "port:shipwright", &["SoH.AppImage".into()])
             .unwrap()
             .unwrap();
         fs::write(port.join("SoH.AppImage"), b"engine-v2").unwrap();
         fs::write(port.join("save.dat"), b"save-v2").unwrap();
+        fs::write(port.join(".marquee-setup.json"), b"receipt").unwrap();
         restore(
             &paths,
             "port:shipwright",
@@ -607,6 +629,45 @@ mod tests {
         .unwrap();
         assert_eq!(fs::read(port.join("save.dat")).unwrap(), b"save-v1");
         assert_eq!(fs::read(port.join("SoH.AppImage")).unwrap(), b"engine-v2");
+        assert_eq!(
+            fs::read(port.join(".marquee-setup.json")).unwrap(),
+            b"receipt"
+        );
+        let restored_at = fs::metadata(port.join("save.dat"))
+            .unwrap()
+            .modified()
+            .unwrap();
+        let seconds = |time: SystemTime| time.duration_since(UNIX_EPOCH).unwrap().as_secs();
+        assert_eq!(seconds(restored_at), seconds(saved_at));
+    }
+
+    #[test]
+    fn a_port_snapshot_leaves_out_placed_game_data_and_generated_assets() {
+        let temp = tempfile::tempdir().unwrap();
+        let core = crate::Core::open_isolated(Some(temp.path().join("data")), true).unwrap();
+        let port = core.paths.data_dir.join("ports/shipwright");
+        fs::create_dir_all(port.join("Save")).unwrap();
+        fs::write(port.join("game.z64"), b"rom").unwrap();
+        fs::write(port.join("oot.o2r"), b"assets-v1").unwrap();
+        fs::write(port.join("Save/file1.sav"), b"save-v1").unwrap();
+        fs::write(
+            port.join(".marquee-setup.json"),
+            br#"{"recipe":"shipwright","rom_sha1":null,"rom_sha256":"x","outputs":[{"path":"game.z64","sha256":"x","bytes":3}],"note":""}"#,
+        )
+        .unwrap();
+        let info = core
+            .create_save_snapshot("port:shipwright")
+            .unwrap()
+            .unwrap();
+        assert_eq!(info.files, 1);
+        fs::write(port.join("oot.o2r"), b"assets-v2").unwrap();
+        fs::write(port.join("Save/file1.sav"), b"save-v2").unwrap();
+        core.restore_save_snapshot("port:shipwright", &info.id)
+            .unwrap();
+        assert_eq!(fs::read(port.join("Save/file1.sav")).unwrap(), b"save-v1");
+        assert_eq!(fs::read(port.join("oot.o2r")).unwrap(), b"assets-v2");
+        assert_eq!(fs::read(port.join("game.z64")).unwrap(), b"rom");
+        assert!(port.join(".marquee-setup.json").is_file());
     }
 
     #[test]

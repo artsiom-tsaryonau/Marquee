@@ -250,6 +250,8 @@ struct Row {
     id: String,
     port_id: String,
     started_at: String,
+    ended_at: Option<String>,
+    exit_code: Option<i32>,
     duration_seconds: Option<i64>,
     state: String,
     error: Option<String>,
@@ -299,7 +301,7 @@ fn finish(
 
 fn running_rows(conn: &Connection) -> Result<Vec<Row>> {
     let mut statement = conn.prepare(
-        "SELECT id, port_id, started_at, duration_seconds, state, error, process_identity
+        "SELECT id, port_id, started_at, duration_seconds, state, error, process_identity, ended_at, exit_code
          FROM port_sessions WHERE state = 'running'",
     )?;
     let rows = statement.query_map([], row_from)?;
@@ -308,7 +310,7 @@ fn running_rows(conn: &Connection) -> Result<Vec<Row>> {
 
 fn list_conn(conn: &Connection, port_id: Option<&str>) -> Result<Vec<Row>> {
     let mut statement = conn.prepare(
-        "SELECT id, port_id, started_at, duration_seconds, state, error, process_identity
+        "SELECT id, port_id, started_at, duration_seconds, state, error, process_identity, ended_at, exit_code
          FROM port_sessions
          WHERE (?1 IS NULL OR port_id = ?1)
          ORDER BY started_at DESC",
@@ -326,11 +328,14 @@ fn row_from(row: &rusqlite::Row<'_>) -> rusqlite::Result<Row> {
         state: row.get(4)?,
         error: row.get(5)?,
         process_identity: row.get(6)?,
+        ended_at: row.get(7)?,
+        exit_code: row.get(8)?,
     })
 }
 
 fn to_session(row: Row) -> Session {
-    session_event(
+    let (ended_at, exit_code) = (row.ended_at.clone(), row.exit_code);
+    let mut session = session_event(
         &row.id,
         &row.port_id,
         &row.started_at,
@@ -341,7 +346,10 @@ fn to_session(row: Row) -> Session {
             _ => SessionState::Failed,
         },
         row.error,
-    )
+    );
+    session.ended_at = ended_at;
+    session.exit_code = exit_code;
+    session
 }
 
 fn session_event(
@@ -451,7 +459,10 @@ mod tests {
             let (seconds, count) = played(&core);
             if count == 1 {
                 assert!(seconds >= 10, "{seconds}");
-                assert!(history_for(&core, "shipwright").unwrap().week_seconds >= 10);
+                let history = history_for(&core, "shipwright").unwrap();
+                assert!(history.week_seconds >= 10);
+                assert!(history.sessions[0].ended_at.is_some());
+                assert_eq!(history.sessions[0].exit_code, Some(0));
                 return;
             }
             thread::sleep(std::time::Duration::from_millis(250));

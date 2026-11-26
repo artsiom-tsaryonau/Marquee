@@ -97,9 +97,9 @@ If UL1 lands before ST3c, swap the numbers here in the same change set.
 
 | ID | Item | Track | Size | Depends on | Status |
 | --- | --- | --- | --- | --- | --- |
-| NP1 | Port play sessions and playtime | Ports | M | FD1 | Done 2026-11-26. Live Shipwright play unperformed |
+| NP1 | Port play sessions and playtime | Ports | M | FD1 | Done 2026-11-26. Live Shipwright play passed 2026-11-26 |
 | NP2 | Port data readiness (`needs-rom` / `needs-data`) | Ports | S | — | Done 2026-11-25 |
-| NP3 | Shipwright game-data setup job | Ports | M | NP2 | Done 2026-11-26. Live ROM setup unperformed |
+| NP3 | Shipwright game-data setup job | Ports | M | NP2 | Done 2026-11-26. Live ROM setup, save and restore passed 2026-11-26 |
 | NP4 | Data setup for the other five ports, one per change set | Ports | S each | NP2 | 2ship2harkinian done 2026-11-26. Zelda64Recomp, sm64coopdx, Fallout 2, UZDoom open |
 | NP5 | Port release review screen and re-pin script | Ports | S | FD3 | Done 2026-11-25 |
 | PS4-1 | shadPS4 launch contract and runner | Consoles | S | — | Done 2026-11-26. Live title boot unperformed |
@@ -673,3 +673,22 @@ Live Xbox 360 save/relaunch was not played. No commit was made in this pass.
 
 - **NP4 (2ship2harkinian).** Majora’s Mask uses the same ROM copy job as
   Shipwright against its published SHA-1 list. Live ROM setup unperformed.
+
+- **Shipwright live acceptance (NP1, NP3, F2).** A fresh library behind
+  headless gamescope, driven by injected keyboard and pointer input. The manager
+  installed pinned 9.3.1, the setup job placed the PAL 1.1 ROM, and on first
+  launch Shipwright's own dialogs generated `oot.o2r` (three clicks; the setup
+  job cannot do this). File 1 was created, played and saved in-game, then the game
+  was quit, relaunched and the file loaded. A snapshot was taken, File 1 was erased
+  in-game, and the restore brought it back byte-for-byte. Restore while running was
+  refused. Four launches gave four `ended` rows with exit 0, and the week total
+  matched. The first row includes the minutes spent in the asset dialogs.
+  Fixes from the run:
+  - port snapshots leave out the placed ROM (receipt outputs) and generated
+    `.o2r`/`.otr`, so they drop from 53 MB to about 4 KB, and an old snapshot cannot put
+    a previous engine's assets back;
+  - restore keeps `.marquee-setup.json` and other `.marquee-*` files;
+  - restored files keep their original mtime instead of 1970;
+  - port session history returns `ended_at` and `exit_code`.
+  A physical controller and listening to the audio were not checked; the
+  `soh.elf` stream was running in PipeWire.

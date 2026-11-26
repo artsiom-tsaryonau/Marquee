@@ -334,8 +334,8 @@ was downloaded or an engine launched by this installation-only test.
    interrupted retry, immutable receipts and user-file preservation tested with
    pinned 2 Ship. Game-data setup and tracked play remain open. The supplied
    Ocarina of Time archive is PAL 1.1 and matches the pinned Shipwright 9.3.1
-   supported list. Manager installation, isolated asset setup and menu/file-select
-   arrival passed; gameplay, native save and relaunch remain under acceptance.
+   supported list. Manager installation, ROM setup, gameplay, native save,
+   relaunch and snapshot restore passed live on 2026-11-26 (headless, injected input).
 2. **PS4 — one supported base-game path.** Audit the installed versus current
    shadPS4 core/launcher contract, inspect the actual retained input, identify
    base/update requirements and prerequisites, then implement reviewed preparation,

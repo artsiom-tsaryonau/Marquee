@@ -581,9 +581,10 @@ impl Core {
     /// Accept work into the detached manager before returning to the UI.
     pub fn start_port_install(&self, id: &str) -> Result<Vec<ports::PortInfo>> {
         ports::find(id)?;
-        self.snapshot_idle(&format!("port:{id}"))?;
-        if let Some(installed) = self.installed_port(id)? {
-            snapshots::create(&self.paths, &format!("port:{id}"), &[installed.bin])?;
+        let scope = format!("port:{id}");
+        self.snapshot_idle(&scope)?;
+        if self.installed_port(id)?.is_some() {
+            snapshots::create(&self.paths, &scope, &self.snapshot_exclude(&scope)?)?;
         }
         self.preparation
             .native_ports(marquee_manager::native_ports::Request::Start { id: id.into() })?;
@@ -629,12 +630,38 @@ impl Core {
         snapshots::delete(&self.paths, scope, id)
     }
 
+    /// A port snapshot holds saves and settings. The engine, the game data Marquee
+    /// placed (setup receipt outputs) and engine-generated asset archives stay live:
+    /// they are large, recreatable, and an older `.o2r` does not match a newer engine.
     fn snapshot_exclude(&self, scope: &str) -> Result<Vec<String>> {
-        Ok(scope
-            .strip_prefix("port:")
-            .and_then(|id| self.installed_port(id).ok().flatten())
-            .map(|installed| vec![installed.bin])
-            .unwrap_or_default())
+        let Some(id) = scope.strip_prefix("port:") else {
+            return Ok(Vec::new());
+        };
+        let mut exclude = Vec::new();
+        if let Some(installed) = self.installed_port(id)? {
+            exclude.push(installed.bin);
+        }
+        let dir = marquee_manager::port_engine::port_dir(&self.paths.data_dir, id);
+        if let Some(receipt) = std::fs::read(dir.join(".marquee-setup.json"))
+            .ok()
+            .and_then(|raw| {
+                serde_json::from_slice::<marquee_manager::port_engine::SetupReceipt>(&raw).ok()
+            })
+        {
+            exclude.extend(receipt.outputs.into_iter().map(|output| output.path));
+        }
+        if let Ok(items) = std::fs::read_dir(&dir) {
+            for item in items.flatten() {
+                let name = item.file_name().to_string_lossy().into_owned();
+                let generated = std::path::Path::new(&name).extension().is_some_and(|ext| {
+                    ext.eq_ignore_ascii_case("o2r") || ext.eq_ignore_ascii_case("otr")
+                });
+                if generated && item.file_type().is_ok_and(|kind| kind.is_file()) {
+                    exclude.push(name);
+                }
+            }
+        }
+        Ok(exclude)
     }
 
     fn snapshot_idle(&self, scope: &str) -> Result<()> {
