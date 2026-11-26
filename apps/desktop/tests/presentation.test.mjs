@@ -27,6 +27,10 @@ test('missing port data never dispatches to engine installation', () => {
     assert.equal(portAction({ status }).operation, 'folder');
     assert.match(portAction({ status }).label, /folder/);
   }
+  for (const id of ['shipwright', '2ship2harkinian', 'sm64coopdx']) {
+    assert.deepEqual(portAction({ id, status: 'needs-rom' }), { label: 'Choose ROM', operation: 'setup' });
+  }
+  assert.equal(portAction({ id: 'uzdoom', status: 'needs-rom' }).operation, 'folder');
   assert.equal(portAction({ status: 'not-installed' }).operation, 'install');
   assert.equal(portAction({ status: 'update' }).operation, 'install');
   assert.equal(portAction({ status: 'review' }).operation, 'launch');

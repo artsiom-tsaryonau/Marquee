@@ -35,7 +35,7 @@ export function portAction(port: Pick<PortEntry, 'id' | 'status'>): { label: str
     case 'ready': return { label: 'Play', operation: 'launch' };
     case 'update': return { label: 'Update', operation: 'install' };
     case 'review': return { label: 'Open port', operation: 'launch' };
-    case 'needs-rom': return ['shipwright', '2ship2harkinian'].includes(port.id)
+    case 'needs-rom': return ['shipwright', '2ship2harkinian', 'sm64coopdx'].includes(port.id)
       ? { label: 'Choose ROM', operation: 'setup' }
       : { label: 'Open game files folder', operation: 'folder' };
     case 'needs-data': return { label: 'Open game files folder', operation: 'folder' };

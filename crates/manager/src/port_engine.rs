@@ -409,7 +409,7 @@ pub struct SetupOutput {
 }
 
 pub fn setup_available(id: &str) -> bool {
-    matches!(id, "shipwright" | "2ship2harkinian")
+    matches!(id, "shipwright" | "2ship2harkinian" | "sm64coopdx")
 }
 
 /// Copy a verified ROM into the port folder. Never moves the original. Shipwright
@@ -446,7 +446,7 @@ pub fn place_rom(
         ));
     }
     let (sha1, sha256, bytes) = digest_file(source, meta.len())?;
-    if !rom_accepted(def, &sha1, &sha256) {
+    let Some(accepted) = accepted_file(def, &sha1, &sha256) else {
         return Err(AppError::new(
             "PORT_ROM_UNKNOWN",
             format!(
@@ -454,11 +454,14 @@ pub fn place_rom(
                 accepted_hash_count(def)
             ),
         ));
-    }
+    };
     let dest_dir = port_dir(data, &def.id);
     fs::create_dir_all(&dest_dir)?;
-    let name = safe_rom_name(source, def);
-    let (dest, present) = rom_destination(&dest_dir, &name, bytes, &sha256)?;
+    let (dest, present) = match fixed_rom_name(&accepted) {
+        // The port reads one exact name (sm64coopdx: baserom.us.z64).
+        Some(name) => fixed_destination(&dest_dir, name, bytes, &sha256)?,
+        None => rom_destination(&dest_dir, &safe_rom_name(source, def), bytes, &sha256)?,
+    };
     if !present {
         let mut partial = tempfile::NamedTempFile::new_in(&dest_dir)?;
         copy_rom(source, partial.as_file_mut(), bytes, checkpoint)?;
@@ -486,7 +489,11 @@ pub fn place_rom(
             sha256,
             bytes,
         }],
-        note: "ROM placed, first launch will generate assets".into(),
+        note: if def.id == "sm64coopdx" {
+            "ROM placed; the game reads it from this folder at launch".into()
+        } else {
+            "ROM placed, first launch will generate assets".into()
+        },
     };
     let path = dest_dir.join(".marquee-setup.json");
     let mut receipt_file = tempfile::NamedTempFile::new_in(&dest_dir)?;
@@ -525,22 +532,50 @@ fn digest_file(path: &Path, expected: u64) -> Result<(String, String, u64)> {
     ))
 }
 
-fn rom_accepted(def: &PortDef, sha1: &str, sha256: &str) -> bool {
-    let Some(spec) = &def.data else {
-        return false;
-    };
+/// The published data entry this dump matches, if any.
+fn accepted_file(def: &PortDef, sha1: &str, sha256: &str) -> Option<PortDataFile> {
+    let spec = def.data.as_ref()?;
     let files: Vec<&PortDataFile> = if spec.any_of.is_empty() {
         spec.files.iter().collect()
     } else {
         spec.any_of.iter().flatten().collect()
     };
-    files.iter().any(|file| {
-        file.sha1.iter().any(|hash| hash.eq_ignore_ascii_case(sha1))
-            || file
-                .sha256
-                .iter()
-                .any(|hash| hash.eq_ignore_ascii_case(sha256))
-    })
+    files
+        .into_iter()
+        .find(|file| {
+            file.sha1.iter().any(|hash| hash.eq_ignore_ascii_case(sha1))
+                || file
+                    .sha256
+                    .iter()
+                    .any(|hash| hash.eq_ignore_ascii_case(sha256))
+        })
+        .cloned()
+}
+
+/// A plain file name the catalogue requires, or None when any name will do.
+fn fixed_rom_name(file: &PortDataFile) -> Option<&str> {
+    let name = file.path.as_str();
+    (!name.is_empty() && !name.starts_with('.') && !name.contains(['/', '\\', '\0']))
+        .then_some(name)
+}
+
+/// The required name is used as is. A different file already there is the
+/// owner's, so it is reported rather than replaced.
+fn fixed_destination(dir: &Path, name: &str, bytes: u64, digest: &str) -> Result<(PathBuf, bool)> {
+    let path = dir.join(name);
+    match fs::symlink_metadata(&path) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok((path, false)),
+        Err(error) => Err(error.into()),
+        Ok(meta)
+            if meta.is_file() && meta.len() == bytes && digest_file(&path, bytes)?.1 == digest =>
+        {
+            Ok((path, true))
+        }
+        Ok(_) => Err(AppError::new(
+            "PORT_ROM",
+            format!("{name} in the port folder is a different file; move it out and try again"),
+        )),
+    }
 }
 
 fn accepted_hash_count(def: &PortDef) -> usize {
@@ -1244,11 +1279,16 @@ pub fn launch(
 
 /// Shipwright otherwise writes into the host's shared ~/.local/share/soh profile.
 /// Use its supported override and AppImage runtime fallback on hosts without FUSE 2.
+/// sm64coopdx otherwise uses ~/.local/share/sm64coopdx and copies the ROM there;
+/// `--savepath` keeps its saves, config and ROM lookup in the port folder.
 fn configure_launch(command: &mut Command, dir: &Path, def: &PortDef) {
     if def.id == "shipwright" {
         command
             .env("SHIP_HOME", dir)
             .env("APPIMAGE_EXTRACT_AND_RUN", "1");
+    }
+    if def.id == "sm64coopdx" {
+        command.arg("--savepath").arg(dir);
     }
 }
 
@@ -1316,6 +1356,18 @@ mod tests {
         assert_eq!(env["SHIP_HOME"], dir.to_str().unwrap());
         assert_eq!(env["APPIMAGE_EXTRACT_AND_RUN"], "1");
         assert!(!env.contains_key("HOME"));
+    }
+
+    #[test]
+    fn sm64coopdx_launch_keeps_saves_and_its_rom_lookup_inside_its_library() {
+        let mut command = Command::new("engine");
+        let dir = Path::new("/isolated/library/ports/sm64coopdx");
+        configure_launch(&mut command, dir, &find("sm64coopdx").unwrap());
+        let args: Vec<_> = command
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(args, ["--savepath", dir.to_str().unwrap()]);
     }
 
     fn release() -> serde_json::Value {
@@ -1821,6 +1873,43 @@ mod correction_tests {
             fs::read(port_dir(data.path(), "2ship2harkinian").join("ZELOOTMM.z64")).unwrap(),
             bytes
         );
+    }
+
+    #[test]
+    fn setup_names_the_rom_baserom_for_sm64coopdx_and_never_replaces_another_file() {
+        let data = tempfile::tempdir().unwrap();
+        let src_dir = tempfile::tempdir().unwrap();
+        let bytes = b"synthetic sm64 dump";
+        let source = src_dir.path().join("Super Mario 64 (USA).z64");
+        fs::write(&source, bytes).unwrap();
+        let mut def = find("sm64coopdx").unwrap();
+        def.data = Some(PortData {
+            kind: "rom".into(),
+            source: "test".into(),
+            files: vec![PortDataFile {
+                path: "baserom.us.z64".into(),
+                sha1: vec![format!("{:x}", Sha1::digest(bytes))],
+                sha256: vec![],
+            }],
+            any_of: vec![],
+        });
+        let dir = port_dir(data.path(), "sm64coopdx");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("baserom.us.z64"), b"someone else's file").unwrap();
+        let refused = place_rom(data.path(), &def, &source, &mut |_| Ok(())).unwrap_err();
+        assert_eq!(refused.code, "PORT_ROM");
+        assert_eq!(
+            fs::read(dir.join("baserom.us.z64")).unwrap(),
+            b"someone else's file"
+        );
+        fs::remove_file(dir.join("baserom.us.z64")).unwrap();
+        let receipt = place_rom(data.path(), &def, &source, &mut |_| Ok(())).unwrap();
+        assert_eq!(receipt.outputs[0].path, "baserom.us.z64");
+        assert_eq!(fs::read(dir.join("baserom.us.z64")).unwrap(), bytes);
+        assert_eq!(fs::read(&source).unwrap(), bytes);
+        let retried = place_rom(data.path(), &def, &source, &mut |_| Ok(())).unwrap();
+        assert_eq!(retried.outputs[0].path, "baserom.us.z64");
+        assert_eq!(game_data_status(&dir, &def), "ready");
     }
 
     #[test]

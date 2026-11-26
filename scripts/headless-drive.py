@@ -6,7 +6,12 @@ Start Gamescope first, then point Marquee (or any launcher) at its XWayland:
     env -u DISPLAY -u WAYLAND_DISPLAY gamescope --backend headless \\
         -W 1280 -H 720 -w 1280 -h 720 -- sleep infinity
     # its log names the display: "Starting Xwayland on :N"
-    env -u WAYLAND_DISPLAY DISPLAY=:N target/debug/marquee --data-dir DIR run web
+    env WAYLAND_DISPLAY=marquee-no-wayland SDL_VIDEODRIVER=x11 GDK_BACKEND=x11 \\
+        DISPLAY=:N target/debug/marquee --data-dir DIR run web
+
+Do not just unset WAYLAND_DISPLAY: libwayland then falls back to wayland-0, and a
+Wayland-first game (sm64coopdx) opens on the physical desktop. Naming a socket
+that does not exist and forcing X11 keeps every window inside Gamescope.
 
 Commands (DISPLAY must name that XWayland):
 

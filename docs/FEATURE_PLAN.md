@@ -100,7 +100,7 @@ If UL1 lands before ST3c, swap the numbers here in the same change set.
 | NP1 | Port play sessions and playtime | Ports | M | FD1 | Done 2026-11-26. Live Shipwright play passed 2026-11-26 |
 | NP2 | Port data readiness (`needs-rom` / `needs-data`) | Ports | S | — | Done 2026-11-25 |
 | NP3 | Shipwright game-data setup job | Ports | M | NP2 | Done 2026-11-26. Live ROM setup, save and restore passed 2026-11-26 |
-| NP4 | Data setup for the other five ports, one per change set | Ports | S each | NP2 | 2ship2harkinian done 2026-11-26. Zelda64Recomp, sm64coopdx, Fallout 2, UZDoom open |
+| NP4 | Data setup for the other five ports, one per change set | Ports | S each | NP2 | 2ship2harkinian and sm64coopdx done 2026-11-26 (live ROM setup needs an owner dump). Zelda64Recomp, Fallout 2, UZDoom open |
 | NP5 | Port release review screen and re-pin script | Ports | S | FD3 | Done 2026-11-25 |
 | PS4-1 | shadPS4 launch contract and runner | Consoles | S | — | Done 2026-11-26. Live title boot unperformed |
 | PS4-2 | PS4 base-game preparation recipe | Consoles | L | PS4-1 | Open |
@@ -670,6 +670,16 @@ Live Xbox 360 save/relaunch was not played. No commit was made in this pass.
   matching dump into the port folder (original untouched), writes
   `.marquee-setup.json`, and records that first launch generates assets.
   Unknown dumps are refused. Live ROM setup was not performed.
+
+- **NP4 (sm64coopdx).** Choose ROM copies a dump that matches the published US
+  SHA-1 to `baserom.us.z64`, the name upstream expects, and never replaces a
+  different file already using that name. Launch passes `--savepath <port folder>`.
+  Upstream v1.5.1 otherwise writes saves and config to `~/.local/share/sm64coopdx`
+  and copies the ROM there; with the port folder it finds the placed ROM and makes
+  no second copy. Live check on a fresh library: the pinned v1.5.1 installed,
+  status was `needs-rom`, a homebrew N64 file was refused, and launch wrote its
+  config only to the port folder. No US dump was available, so ROM setup, play,
+  save and relaunch are unperformed.
 
 - **NP4 (2ship2harkinian).** Majora’s Mask uses the same ROM copy job as
   Shipwright against its published SHA-1 list. Live ROM setup unperformed.
