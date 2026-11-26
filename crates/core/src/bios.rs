@@ -185,8 +185,26 @@ fn safe_name(path: &Path) -> Option<String> {
 }
 
 /// Copy every recognisable BIOS found under `source` (a folder or one file)
-/// into Marquee's store. Anything unrecognised is left alone and not copied.
+/// into Marquee's store, plus firmware a catalogue emulator names (Saturn IPL,
+/// Dreamcast boot ROM, xemu files). Anything unrecognised is left alone.
 pub fn import(paths: &Paths, source: &Path) -> Result<ImportReport> {
+    let mut report = import_console_bios(paths, source)?;
+    let before = report.added.len();
+    if source.is_dir() {
+        add_firmware(paths, source, &mut report);
+    } else if let (Ok(tmp), Some(name)) = (tempfile::tempdir(), source.file_name()) {
+        if fs::copy(source, tmp.path().join(name)).is_ok() {
+            add_firmware(paths, tmp.path(), &mut report);
+        }
+    }
+    // Firmware files were first counted as unrecognised PS1/PS2 images.
+    let firmware = (report.added.len() - before) as u32;
+    report.ignored = report.ignored.saturating_sub(firmware);
+    Ok(report)
+}
+
+/// PS1 and PS2 BIOS images only.
+fn import_console_bios(paths: &Paths, source: &Path) -> Result<ImportReport> {
     let mut files = Vec::new();
     if source.is_file() {
         files.push(source.to_path_buf());
@@ -449,7 +467,7 @@ pub fn import_inbox(paths: &Paths, extra: Option<&str>) -> ImportReport {
             continue;
         }
         let mut reports = Vec::new();
-        reports.push(import(paths, &dir));
+        reports.push(import_console_bios(paths, &dir));
         add_firmware(paths, &dir, &mut total);
         let mut zips = Vec::new();
         collect_files(&dir, 2, &mut zips);
@@ -463,7 +481,7 @@ pub fn import_inbox(paths: &Paths, extra: Option<&str>) -> ImportReport {
                     .and_then(|f| zip::ZipArchive::new(f).ok())
                     .is_some_and(|mut z| z.extract(tmp.path()).is_ok());
                 if ok {
-                    reports.push(import(paths, tmp.path()));
+                    reports.push(import_console_bios(paths, tmp.path()));
                     add_firmware(paths, tmp.path(), &mut total);
                 }
             }
@@ -660,6 +678,26 @@ mod tests {
         let kept = fs::read_to_string(&ini).unwrap();
         assert!(kept.contains("Cross = Keyboard/Space") && !kept.contains("Cross = Keyboard/K"));
         assert_eq!(kept.matches("[Pad1]").count(), 1);
+    }
+
+    #[test]
+    fn explicit_import_also_places_emulator_firmware() {
+        let t = tempfile::tempdir().unwrap();
+        let paths = Paths::resolve(Some(t.path().join("data"))).unwrap();
+        let pack = t.path().join("pack");
+        fs::create_dir_all(&pack).unwrap();
+        fs::write(pack.join("dc_boot.bin"), vec![0u8; 2_097_152]).unwrap();
+        let report = import(&paths, &pack).unwrap();
+        assert_eq!(report.added.len(), 1);
+        assert_eq!(report.added[0].system, "firmware");
+        assert_eq!(report.ignored, 0);
+        assert!(paths
+            .data_dir
+            .join("flycast/xdg-data/flycast/dc_boot.bin")
+            .is_file());
+        // One file works too, and a second import adds nothing.
+        let again = import(&paths, &pack.join("dc_boot.bin")).unwrap();
+        assert!(again.added.is_empty());
     }
 
     #[test]

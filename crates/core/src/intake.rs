@@ -310,6 +310,22 @@ impl Core {
             })
             .collect();
         if pending.is_empty() {
+            // An earlier import (or one that stopped before the move) left a
+            // Saturn disc among PlayStation files: move it now.
+            if system == "ps1" && is_saturn(&dest_dir, &wanted) {
+                let saturn = self.intake_root("saturn")?;
+                move_published(&dest_dir, &saturn, &wanted)?;
+                return Ok(report(
+                    Outcome::Imported,
+                    Some("saturn".into()),
+                    Some(saturn),
+                    wanted
+                        .iter()
+                        .map(|(_, r)| r.display().to_string())
+                        .collect(),
+                    "Moved this Saturn disc out of the PlayStation folder.".into(),
+                ));
+            }
             return Ok(report(
                 Outcome::AlreadyPresent,
                 Some(system),
@@ -608,6 +624,13 @@ mod tests {
         let again = c.intake_archive(&archive, false).unwrap();
         assert_eq!(again.outcome, Outcome::AlreadyPresent);
         assert_eq!(again.system.as_deref(), Some("saturn"));
+        // A copy stranded in the PlayStation folder is moved on the next import.
+        let ps1 = c.intake_root("ps1").unwrap();
+        fs::rename(dest.join("Nights"), ps1.join("Nights")).unwrap();
+        let moved = c.intake_archive(&archive, false).unwrap();
+        assert_eq!(moved.system.as_deref(), Some("saturn"));
+        assert!(dest.join("Nights/Nights.cue").is_file());
+        assert!(!ps1.join("Nights").exists());
 
         let ps1_archive = tmp.path().join("Other.zip");
         let ps1_cue = b"FILE \"Other.bin\" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n";

@@ -95,7 +95,7 @@ streamed/controller acceptance.
 | PPSSPP | PSP | Managed lifecycle and standalone opening |
 | RPCS3 | PS3 | Managed lifecycle/standalone opening, [PS3 discovery, reviewed firmware setup and verified ISO registration](PS3.md); direct ISO Library Play implemented; live game acceptance pending |
 | Flycast | Dreamcast | Managed lifecycle and generic disc adapter; live game acceptance separate |
-| Ymir | Sega Saturn | Pinned v0.4.1 and generic disc adapter; needs an owner-dumped IPL; live game acceptance pending (no IPL or disc on this host) |
+| Ymir | Sega Saturn | Pinned v0.4.1 and generic disc adapter; owner IPL imported by hash; UEFA Euro 96 boots, takes input, persists console settings and exits cleanly |
 | Azahar | Nintendo 3DS | Managed lifecycle and standalone opening |
 | Cemu | Wii U | Managed lifecycle and standalone opening |
 | xemu | Original Xbox | Managed lifecycle and standalone opening |
@@ -433,18 +433,29 @@ the accuracy reference, is the planned second Saturn runner (pinned source build
 - **Update checks.** A data-root seed writes `state/updates/.onboarded`, so the
   update prompt never appears; `CheckForUpdates` stays at its default `false`.
   Marquee manages the version.
-- **BIOS.** Ymir needs an IPL ROM: `mpr-17933.bin` (North America, Europe) or
-  `sega_101.bin` (Japan), 512 KiB. The BIOS inbox copies a correctly named,
-  correctly sized file into `roms/ipl`, where Ymir loads it automatically. Marquee
-  does not download firmware.
+- **BIOS.** Ymir needs an IPL ROM: `mpr-17933.bin` (North America, Europe),
+  `sega_101.bin` or `sega_100.bin` (Japan), 512 KiB. Firmware entries can list
+  known-good SHA-256s, so `SAT_1.00-(U+E).bin` is recognised by content and stored
+  as `mpr-17933.bin`. `marquee bios import` now places emulator firmware as well as
+  PS1/PS2 BIOS (before, only the inbox did). Marquee does not download firmware.
 - **Import.** `.cue`, `.iso` and `.chd` are shared with PlayStation. Intake reads the
   data track's system ID: a disc starting `SEGA SEGASATURN ` moves to the Saturn
   folder, registered on first use, and re-importing is a no-op. Compressed `.chd`
   cannot be read, so a Saturn `.chd` needs a Saturn library folder added by hand.
-- **Checked live.** Install through the manager, Tools → Open into the isolated
-  profile with no prompts, and Ymir's own notice pointing at `roms/ipl`. Not
-  checked: booting a disc, input, saves and exit, because this host has no IPL and
-  no Saturn disc.
+- **Checked live (2026-11-26).** Install through the manager; Tools → Open into the
+  isolated profile with no prompts. The owner's three IPL dumps were imported by
+  hash. UEFA Euro 96 - England (MK-81180, Europe) imported as a CUE/BIN disc, was
+  moved out of the PlayStation folder, and booted from Library Play: the Saturn BIOS
+  set-up screens, the Saturn logo, the game's language menu and keyboard input
+  (J/K/L = A/B/C, F = Start, WASD). A Ymir audio stream was running. Closing the
+  window ended the session (179 s, exit 0). On relaunch the BIOS skipped its set-up
+  screens: language and clock persist in `state/smpc-us_eu.bin` in the isolated
+  profile. Not checked: in-game backup RAM saves.
+- **Collection folder after a reboot.** Intake had refused to create the Saturn folder
+  with "collection folder is unavailable or has changed": btrfs had given the same
+  directory a new device number (42 → 54). The identity now also records the
+  filesystem id from `statvfs`, compares filesystem id plus inode, and upgrades an
+  older stored identity whose inode matches.
 
 ## Genesis / Mega Drive
 

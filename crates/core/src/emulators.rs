@@ -120,6 +120,10 @@ pub struct FirmwareDef {
     /// Exact size in bytes, when the emulator checks one.
     #[serde(default)]
     pub size: Option<u64>,
+    /// Known-good dumps. A file of the right size with one of these SHA-256s is
+    /// accepted under any name and stored as `name`.
+    #[serde(default)]
+    pub sha256: Vec<String>,
     /// `config` or `data`: which isolated XDG folder holds the file.
     #[serde(default = "default_root")]
     pub root: String,
@@ -912,6 +916,30 @@ fn firmware_dir(paths: &Paths, def: &EmulatorDef, fw: &FirmwareDef) -> PathBuf {
     root.join(&fw.dir)
 }
 
+/// A file named like the entry, or else one whose bytes are a listed dump.
+fn pick_firmware<'a>(fw: &FirmwareDef, files: &'a [PathBuf]) -> Option<&'a PathBuf> {
+    let sized = |p: &&PathBuf| {
+        fw.size
+            .is_none_or(|s| fs::metadata(p).is_ok_and(|m| m.len() == s))
+    };
+    let named = files.iter().filter(sized).find(|p| {
+        p.file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|n| name_matches(fw, n))
+    });
+    // Hashing is reserved for exact-size files of entries that list dumps.
+    named.or_else(|| {
+        files.iter().filter(sized).find(|p| {
+            fw.size.is_some()
+                && !fw.sha256.is_empty()
+                && fs::read(p).is_ok_and(|bytes| {
+                    let digest = hex_sha256(&bytes);
+                    fw.sha256.iter().any(|h| h.eq_ignore_ascii_case(&digest))
+                })
+        })
+    })
+}
+
 fn name_matches(fw: &FirmwareDef, file: &str) -> bool {
     std::iter::once(&fw.name)
         .chain(fw.aliases.iter())
@@ -966,14 +994,7 @@ pub fn import_firmware(paths: &Paths, source: &Path) -> Vec<String> {
     let mut added = Vec::new();
     for def in &defs {
         for fw in &def.firmware {
-            let Some(src) = files.iter().find(|p| {
-                p.file_name()
-                    .and_then(|n| n.to_str())
-                    .is_some_and(|n| name_matches(fw, n))
-                    && fw
-                        .size
-                        .is_none_or(|s| fs::metadata(p).is_ok_and(|m| m.len() == s))
-            }) else {
+            let Some(src) = pick_firmware(fw, &files) else {
                 continue;
             };
             let dir = firmware_dir(paths, def, fw);
@@ -1340,6 +1361,24 @@ mod tests {
     }
 
     #[test]
+    fn firmware_is_recognised_by_its_dump_hash_under_any_name() {
+        let t = tempfile::tempdir().unwrap();
+        let dump = t.path().join("SAT_1.00-(U+E).bin");
+        fs::write(&dump, [7u8; 16]).unwrap();
+        let wrong = t.path().join("other.bin");
+        fs::write(&wrong, [8u8; 16]).unwrap();
+        let mut fw: FirmwareDef = serde_json::from_value(serde_json::json!({
+            "name": "mpr-17933.bin", "size": 16, "dir": "ipl",
+            "sha256": [hex_sha256(&[7u8; 16])]
+        }))
+        .unwrap();
+        let files = vec![wrong.clone(), dump.clone()];
+        assert_eq!(pick_firmware(&fw, &files), Some(&dump));
+        fw.sha256.clear();
+        assert_eq!(pick_firmware(&fw, &files), None);
+    }
+
+    #[test]
     fn ymir_always_uses_its_isolated_user_profile_and_takes_saturn_ipl_roms() {
         let def = find("ymir").unwrap();
         assert_eq!(def.kind.as_deref(), Some("emulator"));
@@ -1351,7 +1390,8 @@ mod tests {
         assert!(pin.url.ends_with("ymir-linux-x86_64-AVX2-v0.4.1.tar.xz"));
         assert_eq!(pin.sha256.len(), 64);
         let names: Vec<_> = def.firmware.iter().map(|f| f.name.as_str()).collect();
-        assert_eq!(names, ["mpr-17933.bin", "sega_101.bin"]);
+        assert_eq!(names, ["mpr-17933.bin", "sega_101.bin", "sega_100.bin"]);
+        assert!(def.firmware.iter().all(|f| f.sha256.len() == 1));
         assert!(def
             .firmware
             .iter()

@@ -39,6 +39,9 @@
       ],
       "required": false,
       "size": 524288,
+      "sha256": [
+        "96e106f740ab448cf89f0dd49dfbac7fe5391cb6bd6e14ad5e3061c13330266f"
+      ],
       "root": "data",
       "dir": "StrikerX3/Ymir/roms/ipl",
       "note": "Saturn IPL v1.00/1.01 for North American and European discs. One IPL matching the disc's region is required."
@@ -47,9 +50,23 @@
       "name": "sega_101.bin",
       "required": false,
       "size": 524288,
+      "sha256": [
+        "dcfef4b99605f872b6c3b6d05c045385cdea3d1b702906a0ed930df7bcb7deac"
+      ],
       "root": "data",
       "dir": "StrikerX3/Ymir/roms/ipl",
       "note": "Saturn IPL v1.01 for Japanese discs."
+    },
+    {
+      "name": "sega_100.bin",
+      "required": false,
+      "size": 524288,
+      "sha256": [
+        "ae4058627bb5db9be6d8d83c6be95a4aa981acc8a89042e517e73317886c8bc2"
+      ],
+      "root": "data",
+      "dir": "StrikerX3/Ymir/roms/ipl",
+      "note": "Saturn IPL v1.00 for Japanese discs; an alternative to sega_101.bin."
     }
   ]
 }

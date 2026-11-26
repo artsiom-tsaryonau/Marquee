@@ -12,17 +12,43 @@ const COLLECTION: &str = "storage.collection_root";
 const COLLECTION_IDENTITY: &str = "storage.collection_identity";
 const MAX_ENTRIES: u64 = 250_000;
 
-#[derive(Serialize, Deserialize, PartialEq, Eq)]
+/// Which directory the collection is. `device` alone is not stable: btrfs gives
+/// each subvolume an anonymous device number that can change after a reboot.
+/// `fsid` (statvfs) comes from the filesystem UUID and survives remounts.
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 struct DirectoryIdentity {
     device: u64,
     inode: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    fsid: Option<u64>,
 }
 fn directory_identity(path: &Path) -> Result<DirectoryIdentity> {
     let meta = fs::metadata(path)?;
     Ok(DirectoryIdentity {
         device: meta.dev(),
         inode: meta.ino(),
+        fsid: filesystem_id(path),
     })
+}
+fn filesystem_id(path: &Path) -> Option<u64> {
+    use std::os::unix::ffi::OsStrExt;
+    let c = std::ffi::CString::new(path.as_os_str().as_bytes()).ok()?;
+    // SAFETY: `c` is a valid NUL-terminated path and `s` is a plain C struct.
+    let mut s: libc::statvfs = unsafe { std::mem::zeroed() };
+    if unsafe { libc::statvfs(c.as_ptr(), &mut s) } != 0 {
+        return None;
+    }
+    Some(s.f_fsid as u64).filter(|id| *id != 0)
+}
+/// The same directory: same inode on the same filesystem. An identity stored
+/// before `fsid` was recorded matches on the inode alone, once, and is upgraded.
+fn same_directory(expected: &DirectoryIdentity, actual: &DirectoryIdentity) -> bool {
+    expected.inode == actual.inode
+        && match (expected.fsid, actual.fsid) {
+            (Some(a), Some(b)) => a == b,
+            (None, _) => true,
+            (Some(_), None) => expected.device == actual.device,
+        }
 }
 
 #[derive(Clone, Default, Serialize)]
@@ -148,11 +174,20 @@ impl Core {
         };
         let expected =
             identity.and_then(|value| serde_json::from_str::<DirectoryIdentity>(&value).ok());
-        if !root.is_dir()
-            || directory_identity(&root).ok().as_ref() != expected.as_ref()
-            || expected.is_none()
-        {
+        let actual = root
+            .is_dir()
+            .then(|| directory_identity(&root).ok())
+            .flatten();
+        let (Some(expected), Some(actual)) = (expected, actual) else {
             return Err(AppError::new("STORAGE_OFFLINE", "The collection folder is unavailable or has changed. Reconnect its disk or choose the folder again in Storage settings."));
+        };
+        if !same_directory(&expected, &actual) {
+            return Err(AppError::new("STORAGE_OFFLINE", "The collection folder is unavailable or has changed. Reconnect its disk or choose the folder again in Storage settings."));
+        }
+        if expected != actual {
+            // Record the current device number and the stable filesystem id.
+            let value = serde_json::to_string(&actual)?;
+            self.with_db(|db| db.set_setting(COLLECTION_IDENTITY, &value))?;
         }
         Ok(Some(root))
     }
@@ -381,6 +416,33 @@ impl Core {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_remount_that_changes_the_device_number_keeps_the_same_collection() {
+        let stored = |device, fsid| DirectoryIdentity {
+            device,
+            inode: 7,
+            fsid,
+        };
+        // btrfs after a reboot: new anonymous device number, same filesystem.
+        assert!(same_directory(&stored(42, Some(9)), &stored(54, Some(9))));
+        // Stored before fsid existed: inode alone, then upgraded by the caller.
+        assert!(same_directory(&stored(42, None), &stored(54, Some(9))));
+        // A different filesystem or directory is still refused.
+        assert!(!same_directory(&stored(42, Some(9)), &stored(42, Some(8))));
+        let other = DirectoryIdentity {
+            device: 42,
+            inode: 8,
+            fsid: Some(9),
+        };
+        assert!(!same_directory(&stored(42, Some(9)), &other));
+        let dir = tempfile::tempdir().unwrap();
+        let id = directory_identity(dir.path()).unwrap();
+        assert!(same_directory(
+            &id,
+            &directory_identity(dir.path()).unwrap()
+        ));
+    }
     #[test]
     fn usage_resolves_compatibility_root_but_never_walks_nested_links() {
         let temp = tempfile::tempdir().unwrap();
