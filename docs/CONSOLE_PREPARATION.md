@@ -15,7 +15,7 @@ records current tool behavior. Do not equate catalogue entries with game adapter
 The `ps3` descriptor now supports the verified disc-ISO path. The remaining
 `switch`, `ps5` and `xbox` systems have no accepted library import/Play adapter.
 Xbox 360 now has a verified ISO adapter with Vanquish menu/input evidence; PS4
-has an experimental adapter whose Shadow of the Colossus pilot remains unplayable. `metadata.rs` can retain provider
+has an experimental adapter whose Shadow of the Colossus pilot is not playable: shadPS4 reaches menus only (compatibility list #502, v0.21.0). `metadata.rs` can retain provider
 platform identifiers without providing import or launch support.
 
 | Platform / proposed ID | Existing tool entry | Missing before library Play |

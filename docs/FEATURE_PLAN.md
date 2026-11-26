@@ -333,7 +333,9 @@ Updates/DLC are recorded as separate inputs and not overlaid in this item.
 disagree; synthetic package fixture for inspection; job cancel and restart.
 
 **Acceptance.** CUSA08809 base prepares into a managed installation.
-Shadow of the Colossus is recorded as unplayable in shadPS4, so playability
+Shadow of the Colossus (CUSA08809) is "Menus" on Linux in shadPS4's compatibility
+list ([#502](https://github.com/shadps4-compatibility/shadps4-game-compatibility/issues/502),
+still so on v0.21.0 as of 2026-11-26), so playability
 needs a different owner title.
 
 ## PS4-3 — PS4 system descriptor and Library Play

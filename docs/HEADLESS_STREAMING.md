@@ -37,7 +37,7 @@ pass. Keep normal Play available throughout the rollout.
 | Flycast, melonDS, RMG and FinalBurn Neo | Package each actual runtime, required BIOS and its input configuration | Pending |
 | Shipwright and other native ports/recomps | Runtime-specific SDL/display route and original/generated assets; no engine-only images claiming playable games | Pending |
 | xemu / Xbox | Configure and validate BIOS/MCPX/mutable HDD and disc adapter first | No library Play adapter yet |
-| shadPS4 / PS4 | Title-specific local compatibility first, then private-display packaging | Shadow of the Colossus remains unplayable; streaming cannot fix missing emulation |
+| shadPS4 / PS4 | Title-specific local compatibility first, then private-display packaging | Shadow of the Colossus reaches menus only in shadPS4 (compatibility list #502, v0.21.0); streaming cannot fix missing emulation |
 | PS5 research runtimes | Actual supported game/runtime contract first | No validated library launch or streaming adapter |
 
 After the X11 bridge is accepted, migrate Mesen and the Qt runners. Then replace
