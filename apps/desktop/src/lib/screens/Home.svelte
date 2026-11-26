@@ -21,6 +21,10 @@
   const recentlyAdded = $derived(unique([...personal].sort((a, b) => b.addedAt.localeCompare(a.addedAt))).slice(0, 12));
   const favorites = $derived(unique(personal.filter((g) => g.favorite)));
   const wanted = $derived(unique(personal.filter((g) => g.wanted)));
+  let weekSeconds = $state(0);
+  $effect(() => {
+    void app.api.playSummary?.().then((summary) => { weekSeconds = summary.week_seconds; }).catch(() => {});
+  });
   const stats = $derived([
     { n: unique(personal).length, label: 'games in your library' },
     { n: unique(personal.filter((g) => g.lastPlayed || g.playtimeMin)).length, label: 'played' },
@@ -145,6 +149,7 @@
     <nav class="strip" aria-label="Library overview">
       <div class="stats">
         {#each stats as s (s.label)}<span><b>{s.n.toLocaleString()}</b> {s.label}</span>{/each}
+        {#if weekSeconds >= 60}<span><b>{hours(weekSeconds / 60)}</b> this week</span>{/if}
       </div>
       <div class="plats" data-nav-row>
         {#each topPlatforms as [p, n] (p)}<button class="chip" data-nav onclick={() => browse(p)}><PlatformIcon platform={p} size={22} />{platformLabel[p]} <span>{n}</span></button>{/each}

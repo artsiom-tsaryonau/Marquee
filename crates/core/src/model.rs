@@ -268,6 +268,9 @@ pub struct Session {
     pub exit_code: Option<i32>,
     pub state: SessionState,
     pub error: Option<String>,
+    /// Set when this row is a native-port session rather than a library edition.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub port_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

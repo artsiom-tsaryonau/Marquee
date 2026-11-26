@@ -118,6 +118,10 @@ export interface PortEntry {
   platform: Platform;
   upstream: string;
   version: string;
+  installedVersion?: string | null;
+  latestVersion?: string | null;
+  playtimeSeconds?: number;
+  lastPlayed?: string | null;
   status: PortStatus;
   requirement: string;
   art: Art;

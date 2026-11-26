@@ -709,6 +709,7 @@ pub fn install(paths: &Paths, def: &EmulatorDef, sink: &Arc<dyn EventSink>) -> R
     } else {
         unpack_appimage(&part, work.path(), &def.binary)?
     };
+    crate::snapshots::create(paths, &format!("emulator:{}", def.id), &[])?;
     let current = prefix.join("current");
     let old = prefix.join(format!(".old-{}", uuid::Uuid::new_v4()));
     let had_previous = current.exists();

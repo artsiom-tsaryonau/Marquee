@@ -18,6 +18,8 @@
   import CatalogueDetails from '../components/CatalogueDetails.svelte';
   import MetadataSearch from '../components/MetadataSearch.svelte';
   import GameMediaHub from '../components/GameMediaHub.svelte';
+  import PlayHistory from '../components/PlayHistory.svelte';
+  import XeniaSaves from '../components/XeniaSaves.svelte';
   let headlessActive = $state(false);
   let tab = $state<GameDetailTab>('overview');
 
@@ -157,7 +159,7 @@
     </div>
   {#if app.runnerSelectionBusy}<span class="selection-status" role="status">Saving emulator…</span>{:else if app.runnerSelectionUnconfirmed}<span class="selection-status" role="status">Select the emulator again to confirm it before playing.</span>{/if}
   <div class="play-strip" aria-label="Game activity">
-    <div><span><small><Icon name="clock" size={14} />PLAYTIME</small><strong>{g.source === 'catalogue' || port ? 'Not tracked' : g.playtimeMin ? hours(g.playtimeMin) : 'Not played yet'}</strong></span></div>
+    <div><span><small><Icon name="clock" size={14} />PLAYTIME</small><strong>{g.source === 'catalogue' ? 'Not tracked' : g.playtimeMin ? hours(g.playtimeMin) : 'Not played yet'}</strong></span></div>
     <div><span><small><Icon name="clock" size={14} />LAST PLAYED</small><strong>{g.lastPlayed ? ago(g.lastPlayed) : '—'}</strong></span></div>
     <div><span><small><Icon name="controller" size={14} />PLAY WITH</small><strong>{launchVia}</strong></span></div>
   </div>
@@ -191,6 +193,8 @@
         </section>
         {#if g.lutris}<h3>Managed by Lutris</h3><p class="about">Lutris manages installation and compatibility settings. Refresh its connection in Tools after installing or playing.</p>{/if}
         {#if port}<h3>Requirements</h3><ul class="reqs glass-panel"><li>{port.name}{port.version ? ` · ${port.version}` : ''} · {port.status === 'not-installed' ? 'Not installed' : 'Installed'}</li><li>{port.requirement}</li></ul>{/if}
+        {#if g.source === 'port' && port}<PlayHistory portId={port.id} />{:else if g.source !== 'catalogue'}<PlayHistory editionId={g.id} />{/if}
+        {#if g.platform === 'xbox360' && offline}<XeniaSaves editionId={g.id} />{/if}
       {/if}
     </div>
     <aside class="facts glass-panel" aria-label="Installation and identification">

@@ -8,7 +8,15 @@
   "asset_suffix": "-linux-x64.zip",
   "asset_excludes": ["flatpak"],
   "binary": "Zelda64Recompiled",
-  "requirement": "Requires a compatible US release of The Legend of Zelda: Majora’s Mask. Add your ROM to the port folder or use the port’s setup window.",
+  "requirement": "Requires the US Majora's Mask ROM (the revision Zelda64Recomp documents) in this folder.",
+  "data": {
+    "kind": "rom",
+    "source": "https://github.com/Zelda64Recomp/Zelda64Recomp/blob/dev/BUILDING.md",
+    "files": [{
+      "path": "",
+      "sha1": ["d6133ace5afaa0882cf214cf88daba39e266c078"]
+    }]
+  },
   "pinned_release": {
     "tag": "v1.2.2",
     "asset": "Zelda64Recompiled-v1.2.2-Linux-X64.zip",

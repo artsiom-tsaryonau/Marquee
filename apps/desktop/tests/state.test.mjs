@@ -428,13 +428,13 @@ test('Home never promotes catalogue discoveries to the personal default hero', (
   assert.equal(app.defaultHero(), null);
 });
 
-test('installed port engines retain unchecked game-data state after refresh', async () => {
+test('a backend ready port stays ready after refresh', async () => {
   const api = app.api;
   try {
     app.api = { ...api, listPorts: async () => [{ id: 'shipwright', name: 'Ship of Harkinian', game: 'Ocarina of Time', family: 'Native', platform: 'n64', upstream: 'HarbourMasters/Shipwright', installed_version: '1', latest_version: null, status: 'ready', requirement: 'Supply your data', folder: '/test' }], checkPortUpdates: async () => app.api.listPorts() };
     await app.loadPorts();
-    assert.equal(app.ports[0].status, 'installed');
-    assert.equal(app.games.find((g) => g.id === 'port:shipwright').portStatus, 'installed');
+    assert.equal(app.ports[0].status, 'ready');
+    assert.equal(app.games.find((g) => g.id === 'port:shipwright').portStatus, 'ready');
   } finally { app.api = api; }
 });
 
@@ -596,7 +596,7 @@ test('legacy Ports navigation opens tagged Games and clears incompatible discove
   assert.equal(view.platform,'');assert.equal(view.query,'');assert.equal(view.region,'');assert.equal(view.favOnly,false);assert.equal(view.installedOnly,false);
 });
 
-test('reconnecting restores native install progress without advertising a playable game', async () => {
+test('reconnecting restores native install progress and keeps a ready port playable', async () => {
   const api=app.api;
   const pending={id:'shipwright',name:'Ship of Harkinian',game:'Ocarina of Time',family:'Native',platform:'n64',upstream:'HarbourMasters/Shipwright',installed_version:null,latest_version:null,status:'not_installed',requirement:'Supply game data',folder:null,job:{state:'installing',message:'Downloading engine…',error_code:null}};
   let list=[pending];
@@ -611,10 +611,10 @@ test('reconnecting restores native install progress without advertising a playab
     list=[{...pending,installed_version:'pinned',status:'ready',folder:'/managed',job:{state:'installed',message:'Engine installed · game setup unchecked',error_code:null}}];
     await app.loadPorts();
     assert.equal(app.portErrors.shipwright,undefined);
-    assert.equal(app.ports[0].status,'installed');
-    assert.equal(app.games.find(g=>g.id==='port:shipwright').portStatus,'installed');
+    assert.equal(app.ports[0].status,'ready');
+    assert.equal(app.games.find(g=>g.id==='port:shipwright').portStatus,'ready');
     const {portStatusLabel}=await import('../src/lib/presentation');
-    assert.match(portStatusLabel(app.ports[0]),/setup unchecked/i);
+    assert.match(portStatusLabel(app.ports[0]),/Ready to play/);
   } finally { app.disconnect();app.api=api; }
 });
 

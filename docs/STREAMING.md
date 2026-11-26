@@ -365,6 +365,24 @@ removes dynamic API/error/query logs and pairing secrets from the managed build,
 in addition to Marquee's response projection. Broader support-bundle review
 remains open. Keep the command-capable API on a protected local socket.
 
+## ST4 — Embedded receiver decision (2026-11-25)
+
+The recommended default is accepted: this is a research record, not an
+implementation. Moonlight already opens the stream in its own window, paired
+and supervised by Marquee. Replacing that with a picture inside the Marquee
+window means writing a Moonlight-compatible client.
+
+| Option | What it takes | Why it is a poor next step |
+| --- | --- | --- |
+| Native client on moonlight-common-c | A Rust or C video, audio and input pipeline, plus a Wayland surface | The client core is GPL-3.0. A linked receiver pulls that license over the player. Wayland has no portable “give me a texture” path; the surface has to be a real window or a carefully shared dmabuf. |
+| Tauri window hosting that native surface | The same client, drawn in a child of the desktop shell | Tauri’s webview does not decode the stream. The native surface still owns focus, keyboard grab and fullscreen, which is the part the current Moonlight window already solved. |
+| WebRTC bridge inside the page | A translator from Wolf’s protocol to a browser decoder | Wolf does not speak WebRTC. The bridge would be a second protocol, and the page would still not own the low-latency input path. |
+
+Keep the owned Moonlight window. Revisit an embedded receiver only when a
+Wayland surface can be hosted without taking GPL-3.0 across the desktop shell,
+and when it beats the current window on latency and focus. No receiver code
+belongs in this decision.
+
 ## Source reuse and replacements
 
 Wolf's main source is MIT. Sunshine, Apollo and Moonlight's core are GPL-3.0;

@@ -16,7 +16,11 @@ pub fn info(
 ) -> PortInfo {
     marquee_manager::port_engine::info(&paths.data_dir, def, installed, latest)
 }
-pub fn launch(paths: &Paths, def: &PortDef, installed: &InstalledPort) -> Result<()> {
+pub fn launch(
+    paths: &Paths,
+    def: &PortDef,
+    installed: &InstalledPort,
+) -> Result<std::process::Child> {
     marquee_manager::port_engine::launch(&paths.data_dir, def, installed)
 }
 pub fn open_folder(paths: &Paths, id: &str) -> Result<()> {

@@ -8,7 +8,19 @@
   "asset_suffix": "x86_64.appimage",
   "asset_excludes": ["zsync", "mac", "windows"],
   "binary": null,
-  "requirement": "Requires a compatible Doom WAD or Freedoom game data in the port folder.",
+  "requirement": "Requires a Doom or Freedoom IWAD in this folder. Freedoom 0.13.0 is checked by its published SHA-256; retail IWADs are accepted by name.",
+  "data": {
+    "kind": "data",
+    "source": "https://github.com/freedoom/freedoom/releases/tag/v0.13.0",
+    "any_of": [
+      [{ "path": "freedoom1.wad", "sha256": ["7323bcc168c5a45ff10749b339960e98314740a734c30d4b9f3337001f9e703d"] }],
+      [{ "path": "freedoom2.wad", "sha256": ["a8772e088847032510d97ba2312406a6998f21cbab44d4ff10696faa9c0ecd4b"] }],
+      [{ "path": "doom.wad" }],
+      [{ "path": "doom2.wad" }],
+      [{ "path": "tnt.wad" }],
+      [{ "path": "plutonia.wad" }]
+    ]
+  },
   "pinned_release": {
     "tag": "5.0.3",
     "asset": "Linux-UZDoom-Release-x86_64.AppImage",

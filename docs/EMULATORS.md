@@ -525,12 +525,30 @@ input passed the pinned supported-hash check, generated its assets and reached
 file select in an isolated Marquee launch. Gameplay and persistent native saves
 remain acceptance gates. See [Quiver Q2c](QUIVER_INTEGRATION.md#q2c--ocarina--shipwright-pilot-2026-10-25).
 
+### Reviewing a newer port release
+
+Port pins are compiled into Marquee from `catalog/ports/*.json`. When an
+installed pin is behind upstream, the port shows **Newer release needs review**
+and does not offer Update. A maintainer reviews the release, then runs:
+
+```bash
+python3 scripts/repin-port.py shipwright 9.4.0
+```
+
+That downloads the one Linux asset selected by the recipe, checks a published
+digest when GitHub provides one, checks that the executable is an x86-64 ELF,
+and writes `sha256` plus `binary_sha256`. Read the diff, then rebuild. There is
+no setting that overrides a pin at runtime.
+
 
 ## Xbox 360 runtime (2026-10-25)
 
 Tools now offers the pinned official Linux Xenia Canary build. Its own window uses
-explicit managed storage/content/config/cache paths; it does not register a generic
-library runner. Xbox-family archive inspection is available under xemu and Xenia.
+explicit managed storage/content/config/cache paths. The verified ISO path also
+registers Xenia as the Xbox 360 library runner; the earlier note that it did not
+is historical. Xbox-family archive inspection is available under xemu and Xenia.
+An Xbox 360 game page lists matching folders under `xenia/xdg-data/content` so a
+save can be confirmed after relaunch.
 See [console preparation](CONSOLE_PREPARATION.md#xbox-family-inspection-and-xenia-runtime-2026-10-25)
 for the supplied Splinter Cell/Vanquish inventory and the remaining game adapter.
 

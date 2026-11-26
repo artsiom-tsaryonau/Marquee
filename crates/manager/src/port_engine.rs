@@ -9,6 +9,7 @@ use crate::{AppError, Result};
 use marquee_media::http;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use sha1::Sha1;
 use sha2::{Digest, Sha256};
 use std::fs::{self, File};
 use std::io::{self, Read};
@@ -45,6 +46,35 @@ pub struct PortDef {
     pub requirement: String,
     #[serde(default)]
     pub pinned_release: Option<PinnedRelease>,
+    /// Known game files. Absent only for tests that isolate engine-tag logic.
+    #[serde(default)]
+    pub data: Option<PortData>,
+}
+
+/// Files a port needs before it can be called ready. Hashes are the ones the
+/// port project publishes; an empty hash list means the file only has to exist.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PortData {
+    /// `rom` or `data`.
+    pub kind: String,
+    pub source: String,
+    #[serde(default)]
+    pub files: Vec<PortDataFile>,
+    /// Any one of these sets is enough. When this is non-empty, `files` is ignored.
+    #[serde(default)]
+    pub any_of: Vec<Vec<PortDataFile>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct PortDataFile {
+    /// Path relative to the port folder. A trailing slash is a directory.
+    /// Empty means any regular file directly in the folder.
+    #[serde(default)]
+    pub path: String,
+    #[serde(default)]
+    pub sha256: Vec<String>,
+    #[serde(default)]
+    pub sha1: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,10 +104,16 @@ pub struct PortInfo {
     pub requirement: String,
     pub installed_version: Option<String>,
     pub latest_version: Option<String>,
-    /// `not_installed`, `ready` or `update`.
+    /// `not_installed`, `ready`, `needs-rom`, `needs-data`, `review` or `update`.
     pub status: String,
     pub folder: Option<PathBuf>,
     pub job: Option<crate::native_ports::Job>,
+    #[serde(default)]
+    pub playtime_seconds: i64,
+    #[serde(default)]
+    pub play_count: i64,
+    #[serde(default)]
+    pub last_played_at: Option<String>,
 }
 
 pub fn catalogue() -> Result<Vec<PortDef>> {
@@ -112,11 +148,22 @@ pub fn info(
     installed: Option<&InstalledPort>,
     latest: Option<&str>,
 ) -> PortInfo {
-    let status = match (installed, latest) {
+    let engine = match (installed, latest) {
         (None, _) => "not_installed",
         (Some(i), Some(l)) if i.tag != l && def.pinned_release.is_some() => "review",
         (Some(i), Some(l)) if i.tag != l => "update",
         (Some(_), _) => "ready",
+    };
+    // Missing game files outrank a newer upstream tag: there is nothing to review until data is present.
+    let status = if installed.is_none() {
+        engine
+    } else {
+        let data_state = game_data_status(&port_dir(data, &def.id), def);
+        if data_state == "ready" {
+            engine
+        } else {
+            data_state
+        }
     };
     PortInfo {
         job: None,
@@ -131,6 +178,214 @@ pub fn info(
         latest_version: latest.map(str::to_string),
         status: status.into(),
         folder: installed.map(|_| port_dir(data, &def.id)),
+        playtime_seconds: 0,
+        play_count: 0,
+        last_played_at: None,
+    }
+}
+
+fn game_data_status(dir: &Path, def: &PortDef) -> &'static str {
+    let Some(spec) = &def.data else {
+        return "ready";
+    };
+    let missing = if spec.kind == "data" {
+        "needs-data"
+    } else {
+        "needs-rom"
+    };
+    let sets: Vec<&[PortDataFile]> = if spec.any_of.is_empty() {
+        vec![spec.files.as_slice()]
+    } else {
+        spec.any_of.iter().map(Vec::as_slice).collect()
+    };
+    if sets.iter().all(|set| set.is_empty()) {
+        return missing;
+    }
+    let mut cache = HashCache::load(dir);
+    let ready = sets.iter().any(|set| {
+        set.iter()
+            .all(|file| file_matches(dir, def, file, &mut cache))
+    });
+    cache.store(dir);
+    if ready {
+        "ready"
+    } else {
+        missing
+    }
+}
+
+fn file_matches(dir: &Path, def: &PortDef, file: &PortDataFile, cache: &mut HashCache) -> bool {
+    if file.path.ends_with('/') {
+        let rel = file.path.trim_end_matches('/');
+        return relative_file(dir, rel).is_some_and(|path| path.is_dir() && inside(dir, &path));
+    }
+    if file.path.is_empty() {
+        let Ok(entries) = fs::read_dir(dir) else {
+            return false;
+        };
+        return entries.flatten().any(|entry| {
+            let path = entry.path();
+            scan_candidate(def, &path)
+                && path.is_file()
+                && inside(dir, &path)
+                && hashes_match(&path, file, cache)
+        });
+    }
+    let Some(path) = relative_file(dir, &file.path) else {
+        return false;
+    };
+    path.is_file() && inside(dir, &path) && hashes_match(&path, file, cache)
+}
+
+fn scan_candidate(def: &PortDef, path: &Path) -> bool {
+    let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+        return false;
+    };
+    if name.starts_with('.') {
+        return false;
+    }
+    if def.binary.as_deref() == Some(name) {
+        return false;
+    }
+    def.pinned_release.as_ref().map(|pin| pin.asset.as_str()) != Some(name)
+}
+
+fn relative_file(dir: &Path, rel: &str) -> Option<PathBuf> {
+    let path = Path::new(rel);
+    if rel.is_empty()
+        || !path.is_relative()
+        || path
+            .components()
+            .any(|c| !matches!(c, std::path::Component::Normal(_)))
+    {
+        return None;
+    }
+    Some(dir.join(path))
+}
+
+fn inside(root: &Path, path: &Path) -> bool {
+    let Ok(root) = root.canonicalize() else {
+        return false;
+    };
+    let Ok(path) = path.canonicalize() else {
+        return false;
+    };
+    path.starts_with(root)
+}
+
+fn hashes_match(path: &Path, file: &PortDataFile, cache: &mut HashCache) -> bool {
+    if file.sha1.is_empty() && file.sha256.is_empty() {
+        return true;
+    }
+    let Some((sha1, sha256)) = cache.hashes(path, !file.sha1.is_empty(), !file.sha256.is_empty())
+    else {
+        return false;
+    };
+    let sha1_ok = sha1.is_some_and(|hash| {
+        file.sha1
+            .iter()
+            .any(|expected| expected.eq_ignore_ascii_case(&hash))
+    });
+    let sha256_ok = sha256.is_some_and(|hash| {
+        file.sha256
+            .iter()
+            .any(|expected| expected.eq_ignore_ascii_case(&hash))
+    });
+    sha1_ok || sha256_ok
+}
+
+#[derive(Default, Serialize, Deserialize)]
+struct HashCache {
+    files: Vec<HashEntry>,
+    #[serde(skip)]
+    dirty: bool,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+struct HashEntry {
+    name: String,
+    len: u64,
+    mtime: u64,
+    sha1: Option<String>,
+    sha256: Option<String>,
+}
+
+impl HashCache {
+    fn load(dir: &Path) -> Self {
+        fs::read(dir.join(".marquee-data-cache.json"))
+            .ok()
+            .and_then(|raw| serde_json::from_slice(&raw).ok())
+            .unwrap_or_default()
+    }
+
+    fn store(&self, dir: &Path) {
+        if !self.dirty {
+            return;
+        }
+        let Ok(raw) = serde_json::to_vec(self) else {
+            return;
+        };
+        let path = dir.join(".marquee-data-cache.json");
+        let tmp = dir.join(".marquee-data-cache.json.tmp");
+        if fs::write(&tmp, raw).is_ok() {
+            let _ = fs::rename(tmp, path);
+        }
+    }
+
+    fn hashes(
+        &mut self,
+        path: &Path,
+        want_sha1: bool,
+        want_sha256: bool,
+    ) -> Option<(Option<String>, Option<String>)> {
+        let meta = fs::symlink_metadata(path).ok()?;
+        if !meta.file_type().is_file() || meta.len() > 1024 * 1024 * 1024 {
+            return None;
+        }
+        let name = path.file_name()?.to_str()?.to_string();
+        let mtime = meta
+            .modified()
+            .ok()?
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()?
+            .as_secs();
+        if let Some(hit) = self.files.iter().find(|entry| {
+            entry.name == name
+                && entry.len == meta.len()
+                && entry.mtime == mtime
+                && (!want_sha1 || entry.sha1.is_some())
+                && (!want_sha256 || entry.sha256.is_some())
+        }) {
+            return Some((hit.sha1.clone(), hit.sha256.clone()));
+        }
+        let mut sha1 = Sha1::new();
+        let mut sha256 = Sha256::new();
+        let mut input = File::open(path).ok()?;
+        let mut buf = [0u8; 1024 * 1024];
+        loop {
+            let n = input.read(&mut buf).ok()?;
+            if n == 0 {
+                break;
+            }
+            if want_sha1 {
+                sha1.update(&buf[..n]);
+            }
+            if want_sha256 {
+                sha256.update(&buf[..n]);
+            }
+        }
+        let entry = HashEntry {
+            name,
+            len: meta.len(),
+            mtime,
+            sha1: want_sha1.then(|| format!("{:x}", sha1.finalize())),
+            sha256: want_sha256.then(|| format!("{:x}", sha256.finalize())),
+        };
+        let result = (entry.sha1.clone(), entry.sha256.clone());
+        self.files.retain(|old| old.name != entry.name);
+        self.files.push(entry);
+        self.dirty = true;
+        Some(result)
     }
 }
 
@@ -713,7 +968,12 @@ pub fn extract_tar_gz(archive: &Path, dest: &Path) -> Result<()> {
 }
 
 /// Start the port from its own folder (many ports read data beside the binary).
-pub fn launch(data: &Path, def: &PortDef, installed: &InstalledPort) -> Result<()> {
+/// The caller owns the child so the session can be recorded.
+pub fn launch(
+    data: &Path,
+    def: &PortDef,
+    installed: &InstalledPort,
+) -> Result<std::process::Child> {
     let dir = port_dir(data, &def.id);
     let bin = dir.join(&installed.bin);
     if !bin.is_file() {
@@ -726,7 +986,7 @@ pub fn launch(data: &Path, def: &PortDef, installed: &InstalledPort) -> Result<(
     let cwd = bin.parent().unwrap_or(&dir).to_path_buf();
     let mut command = Command::new(&bin);
     configure_launch(&mut command, &dir, def);
-    let mut child = command
+    command
         .current_dir(cwd)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
@@ -734,12 +994,7 @@ pub fn launch(data: &Path, def: &PortDef, installed: &InstalledPort) -> Result<(
         .spawn()
         .map_err(|err| {
             AppError::new("SPAWN_FAILED", err.to_string()).with_context(json!({ "path": bin }))
-        })?;
-    // Reap the child so it never lingers as a zombie.
-    std::thread::spawn(move || {
-        let _ = child.wait();
-    });
-    Ok(())
+        })
 }
 
 /// Shipwright otherwise writes into the host's shared ~/.local/share/soh profile.
@@ -854,6 +1109,121 @@ mod tests {
     }
 
     #[test]
+    fn every_port_declares_where_its_game_data_comes_from() {
+        for def in catalogue().unwrap() {
+            let data = def.data.expect(&def.id);
+            assert!(data.kind == "rom" || data.kind == "data", "{}", def.id);
+            assert!(data.source.starts_with("https://"), "{}", def.id);
+            assert!(
+                !data.files.is_empty() || data.any_of.iter().any(|set| !set.is_empty()),
+                "{}",
+                def.id
+            );
+        }
+    }
+
+    #[test]
+    fn installed_port_without_matching_game_data_is_not_ready() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut def = find("sm64coopdx").unwrap();
+        def.data.as_mut().unwrap().files[0].sha1 =
+            vec![format!("{:x}", Sha1::digest(b"owned-rom"))];
+        def.data.as_mut().unwrap().files[0].sha256.clear();
+        let installed = InstalledPort {
+            tag: def.pinned_release.as_ref().unwrap().tag.clone(),
+            bin: "sm64coopdx".into(),
+        };
+        let folder = port_dir(dir.path(), &def.id);
+        fs::create_dir_all(&folder).unwrap();
+        assert_eq!(
+            info(dir.path(), &def, Some(&installed), Some(&installed.tag)).status,
+            "needs-rom"
+        );
+        fs::write(folder.join("baserom.us.z64"), b"wrong").unwrap();
+        assert_eq!(
+            info(dir.path(), &def, Some(&installed), Some("9.9.9")).status,
+            "needs-rom"
+        );
+        fs::write(folder.join("baserom.us.z64"), b"owned-rom").unwrap();
+        assert_eq!(
+            info(dir.path(), &def, Some(&installed), Some(&installed.tag)).status,
+            "ready"
+        );
+        assert_eq!(
+            info(dir.path(), &def, Some(&installed), Some("9.9.9")).status,
+            "review"
+        );
+    }
+
+    #[test]
+    fn presence_only_data_and_scanned_roms_match_without_leaving_the_port_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut def = find("fallout2-ce").unwrap();
+        def.data = Some(PortData {
+            kind: "data".into(),
+            source: "https://example.invalid/data".into(),
+            files: vec![
+                PortDataFile {
+                    path: "master.dat".into(),
+                    ..PortDataFile::default()
+                },
+                PortDataFile {
+                    path: "data/".into(),
+                    ..PortDataFile::default()
+                },
+            ],
+            any_of: vec![],
+        });
+        let installed = InstalledPort {
+            tag: "v1".into(),
+            bin: "fallout2-ce".into(),
+        };
+        let folder = port_dir(dir.path(), &def.id);
+        fs::create_dir_all(folder.join("data")).unwrap();
+        assert_eq!(
+            info(dir.path(), &def, Some(&installed), None).status,
+            "needs-data"
+        );
+        fs::write(folder.join("master.dat"), b"game").unwrap();
+        assert_eq!(
+            info(dir.path(), &def, Some(&installed), None).status,
+            "ready"
+        );
+
+        let mut scanned = find("shipwright").unwrap();
+        let digest = format!("{:x}", Sha1::digest(b"ocarina"));
+        scanned.data = Some(PortData {
+            kind: "rom".into(),
+            source: "https://example.invalid/rom".into(),
+            files: vec![],
+            any_of: vec![vec![PortDataFile {
+                path: String::new(),
+                sha1: vec![digest],
+                sha256: vec![],
+            }]],
+        });
+        let ship = port_dir(dir.path(), &scanned.id);
+        fs::create_dir_all(&ship).unwrap();
+        let outside = dir.path().join("outside.z64");
+        fs::write(&outside, b"ocarina").unwrap();
+        std::os::unix::fs::symlink(&outside, ship.join("linked.z64")).unwrap();
+        let installed = InstalledPort {
+            tag: "9.3.1".into(),
+            bin: "SoH.appimage".into(),
+        };
+        assert_eq!(
+            info(dir.path(), &scanned, Some(&installed), None).status,
+            "needs-rom",
+            "a symlink to a file outside the port folder is not game data"
+        );
+        fs::write(ship.join("oot.z64"), b"ocarina").unwrap();
+        assert_eq!(
+            info(dir.path(), &scanned, Some(&installed), None).status,
+            "ready"
+        );
+    }
+
+    #[test]
     fn every_port_recipe_pins_a_reviewed_release() {
         for def in catalogue().unwrap() {
             let pin = def.pinned_release.expect(&def.id);
@@ -957,7 +1327,8 @@ mod tests {
     fn status_reflects_installed_and_latest() {
         let dir = tempfile::tempdir().unwrap();
         let paths = dir.path();
-        let def = find("shipwright").unwrap();
+        let mut def = find("shipwright").unwrap();
+        def.data = None;
         let inst = InstalledPort {
             tag: "1".into(),
             bin: "x".into(),

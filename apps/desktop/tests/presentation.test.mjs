@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { canPlay, gameStatus, portAction, emulatorName } from '../src/lib/presentation';
+import { canPlay, gameStatus, portAction, portReviewNote, emulatorName } from '../src/lib/presentation';
 
 const game = (overrides = {}) => ({ source: 'rom', platform: 'ps2', installed: true, ...overrides });
 
@@ -30,6 +30,9 @@ test('missing port data never dispatches to engine installation', () => {
   assert.equal(portAction({ status: 'not-installed' }).operation, 'install');
   assert.equal(portAction({ status: 'update' }).operation, 'install');
   assert.equal(portAction({ status: 'review' }).operation, 'launch');
+  assert.match(portReviewNote({ status: 'review', installedVersion: '9.3.1', latestVersion: '9.4.0', upstream: 'HarbourMasters/Shipwright' }), /Installed 9\.3\.1, upstream 9\.4\.0/);
+  assert.match(portReviewNote({ status: 'review', installedVersion: '9.3.1', latestVersion: '9.4.0', upstream: 'HarbourMasters/Shipwright' }), /Marquee update must review/);
+  assert.equal(portReviewNote({ status: 'ready', installedVersion: '9.3.1', latestVersion: '9.3.1', upstream: 'HarbourMasters/Shipwright' }), null);
   assert.deepEqual(portAction({ status: 'installed' }), { label: 'Open port', operation: 'launch' });
   assert.deepEqual(portAction({ status: 'ready' }), { label: 'Play', operation: 'launch' });
 });

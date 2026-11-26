@@ -209,7 +209,7 @@ class AppState {
     if (event.type === 'launchers_changed') void this.loadLaunchers();
     if (event.type === 'scan_finished') this.lastScan = event.report;
     if (event.type === 'session_started') {
-      const game = this.games.find((g) => g.id === event.session.edition_id);
+      const game = this.games.find((g) => g.id === (event.session.port_id ? `port:${event.session.port_id}` : event.session.edition_id));
       this.launching = null;
       this.running = game ?? this.running;
     }
@@ -218,9 +218,10 @@ class AppState {
       this.launching = null;
       this.running = null;
       this.overlayDismissed = false;
+      if (ended.port_id) void this.loadPorts();
       void this.api.snapshot().then((snap) => {
         this.applySnapshot(snap);
-        const game = this.games.find((g) => g.id === ended.edition_id);
+        const game = this.games.find((g) => g.id === (ended.port_id ? `port:${ended.port_id}` : ended.edition_id));
         if (game) {
           this.gameId = game.id;
           this.heroId = game.id;
@@ -750,7 +751,11 @@ class AppState {
       platform: p.platform as PortEntry['platform'],
       upstream: p.upstream,
       version: p.installed_version ?? p.latest_version ?? '',
-      status: p.status === 'not_installed' ? 'not-installed' : p.status === 'ready' ? 'installed' : p.status,
+      status: p.status === 'not_installed' ? 'not-installed' : p.status,
+      installedVersion: p.installed_version,
+      latestVersion: p.latest_version,
+      playtimeSeconds: p.playtime_seconds ?? 0,
+      lastPlayed: p.last_played_at,
       requirement:
         p.status === 'update' && p.latest_version
           ? `Update ${p.installed_version} → ${p.latest_version}. ${p.requirement}`

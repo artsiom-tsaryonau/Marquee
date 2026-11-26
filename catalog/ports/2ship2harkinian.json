@@ -8,7 +8,18 @@
   "asset_suffix": "-Linux.zip",
   "asset_excludes": [],
   "binary": "2ship.appimage",
-  "requirement": "Requires a supported Majora's Mask ROM beside 2ship.appimage; open the port to complete its own setup. Installing the engine does not include game data. Managed release is pinned to 5.0.1.",
+  "requirement": "Requires a supported Majora's Mask ROM in this folder, beside 2ship.appimage. Open the port to finish its own setup. Managed release is pinned to 5.0.1.",
+  "data": {
+    "kind": "rom",
+    "source": "https://github.com/HarbourMasters/2ship2harkinian/blob/develop/docs/supportedHashes.json",
+    "any_of": [[{
+      "path": "",
+      "sha1": [
+        "d6133ace5afaa0882cf214cf88daba39e266c078",
+        "9743aa026e9269b339eb0e3044cd5830a440c1fd"
+      ]
+    }]]
+  },
   "pinned_release": {
     "tag": "5.0.1",
     "asset": "2Ship-Battler-Bravo-Linux.zip",

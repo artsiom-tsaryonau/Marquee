@@ -8,7 +8,16 @@
   "asset_suffix": "-linux-x64.tar.gz",
   "asset_excludes": [],
   "binary": "fallout2-ce",
-  "requirement": "Requires Fallout 2 game data from your existing installation. Add the required files to the port folder.",
+  "requirement": "Requires Fallout 2's master.dat, critter.dat and data folder from an installation you own. File hashes are not checked because patches and mods change them.",
+  "data": {
+    "kind": "data",
+    "source": "https://github.com/alexbatalov/fallout2-ce#readme",
+    "files": [
+      { "path": "master.dat" },
+      { "path": "critter.dat" },
+      { "path": "data/" }
+    ]
+  },
   "pinned_release": {
     "tag": "v1.3.0",
     "asset": "fallout2-ce-linux-x64.tar.gz",

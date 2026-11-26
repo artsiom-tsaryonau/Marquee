@@ -12,6 +12,13 @@ export interface StorageLocation {
   resolved: string | null; exists: boolean; free_bytes: number | null;
   usage: StorageUsage | null; note: string;
 }
+export interface SaveSnapshot {
+  id: string;
+  scope: string;
+  created_at: string;
+  bytes: number;
+  files: number;
+}
 export interface StorageSnapshot {
   collection_root: string | null; bios_inbox: string | null;
   locations: StorageLocation[]; scanning: boolean; measured_at: string | null;
@@ -124,6 +131,7 @@ export interface Session {
   exit_code: number | null;
   state: 'running' | 'ended' | 'failed';
   error: string | null;
+  port_id?: string | null;
 }
 
 export interface SkipCount {
@@ -273,6 +281,18 @@ export type CoreEvent =
   | { type: 'port_progress'; port_id: string; message: string }
   | { type: 'artwork_finished'; fetched: number; skipped: number; failed: number };
 
+export interface GameHistory {
+  sessions: Session[];
+  week_seconds: number;
+}
+export interface PlaySummary {
+  week_seconds: number;
+}
+export interface XeniaSaves {
+  title_id: string | null;
+  folders: { relative: string; modified_at: string }[];
+}
+
 export interface PortInfo {
   id: string;
   name: string;
@@ -283,7 +303,10 @@ export interface PortInfo {
   requirement: string;
   installed_version: string | null;
   latest_version: string | null;
-  status: 'not_installed' | 'ready' | 'update' | 'review';
+  status: 'not_installed' | 'ready' | 'needs-rom' | 'needs-data' | 'update' | 'review';
+  playtime_seconds?: number;
+  play_count?: number;
+  last_played_at?: string | null;
   folder: string | null;
   job?: { state: string; message: string; error_code: string | null } | null;
 }
@@ -455,6 +478,10 @@ export interface LibraryApi {
   storageMoveApply(id: string): Promise<void>;
   storageMoveRollback(id: string): Promise<void>;
   storageSnapshot(): Promise<StorageSnapshot>;
+  saveSnapshots(): Promise<SaveSnapshot[]>;
+  createSaveSnapshot(scope: string): Promise<SaveSnapshot | null>;
+  restoreSaveSnapshot(scope: string, id: string): Promise<SaveSnapshot>;
+  deleteSaveSnapshot(scope: string, id: string): Promise<void>;
   storageScan(): Promise<void>;
   storageSetFolder(kind: 'collection' | 'bios_inbox', path: string | null): Promise<void>;
   storageOpen(id: string): Promise<void>;
@@ -588,11 +615,15 @@ export interface LibraryApi {
   cancelPurple(): Promise<PurpleStatus>;
   openPurple(): Promise<void>;
   pickExecutable(): Promise<string | null>;
+  gameSessions(editionId: string): Promise<GameHistory>;
+  playSummary(): Promise<PlaySummary>;
+  xeniaSaves(editionId: string): Promise<XeniaSaves>;
   listPorts(): Promise<PortInfo[]>;
   checkPortUpdates(): Promise<PortInfo[]>;
   installPort(portId: string): Promise<PortInfo[]>;
   cancelPortInstall(portId: string): Promise<PortInfo[]>;
   launchPort(portId: string): Promise<void>;
+  portSessions(portId: string): Promise<GameHistory>;
   openPortFolder(portId: string): Promise<void>;
   listEmulators(): Promise<EmulatorInfo[]>;
   checkEmulatorUpdates(): Promise<EmulatorInfo[]>;

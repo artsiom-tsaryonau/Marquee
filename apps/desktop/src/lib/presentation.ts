@@ -41,6 +41,14 @@ export function portAction(port: Pick<PortEntry, 'status'>): { label: string; op
   }
 }
 
+/** Shown when an installed pin is behind upstream. Installing stays blocked until a Marquee build reviews the release. */
+export function portReviewNote(port: Pick<PortEntry, 'status' | 'installedVersion' | 'latestVersion' | 'upstream'>): string | null {
+  if (port.status !== 'review') return null;
+  const installed = port.installedVersion || 'unknown';
+  const latest = port.latestVersion || 'unknown';
+  return `Installed ${installed}, upstream ${latest}. A Marquee update must review this release before it can be installed. https://github.com/${port.upstream}/releases`;
+}
+
 export function portStatusLabel(port: Pick<PortEntry, 'status'>): string {
   return { installed:'Installed · setup unchecked', ready:'Ready to play', update:'Update available · setup unchecked', review:'Newer release needs review', 'needs-rom':'Game files required', 'needs-data':'Game files required', 'not-installed':'Not installed' }[port.status];
 }

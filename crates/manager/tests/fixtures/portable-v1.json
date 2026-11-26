@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "platform": "ps2",
+  "title_id": "SLUS-20312",
+  "edition": "original",
+  "role": "base",
+  "files": [
+    {
+      "path": "game.iso",
+      "size": 12,
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "recipe": "ps2-iso",
+  "recipe_version": "1",
+  "output_receipt": {
+    "id": "receipt-demo",
+    "recipe": "ps2-iso",
+    "source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "system": "ps2",
+    "destination": "library/managed/demo",
+    "files": [
+      {
+        "path": "game.iso",
+        "size": 12,
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "content_verified": true
+  },
+  "runtime": {
+    "id": "pcsx2",
+    "version": "2.4.0",
+    "os": "linux",
+    "cpu": "x86_64",
+    "launch_recipe_id": "runner.pcsx2.marquee"
+  },
+  "settings": ["display_mode"]
+}

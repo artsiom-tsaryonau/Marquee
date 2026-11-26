@@ -10,6 +10,7 @@ pub mod desktop_rendering;
 pub mod emulators;
 pub mod error;
 pub mod game_media;
+pub mod history;
 pub mod http;
 pub mod hub;
 pub mod instance;
@@ -27,6 +28,7 @@ mod music_discovery;
 mod music_metadata;
 pub mod neogeo;
 pub mod paths;
+pub mod port_sessions;
 pub mod ports;
 pub mod preparation;
 pub mod profiles;
@@ -38,6 +40,7 @@ pub mod romfacts;
 pub mod runners;
 pub mod server;
 pub mod sessions;
+pub mod snapshots;
 pub mod source_builds;
 pub mod steam;
 pub mod storage;
@@ -45,8 +48,17 @@ mod storage_moves;
 pub mod streaming;
 pub mod transfer;
 pub mod wanted;
+pub mod xenia_saves;
 
 use crate::db::Db;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+pub(crate) fn unix_now() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_secs() as i64)
+        .unwrap_or(0)
+}
 use crate::error::{AppError, Result};
 use crate::instance::InstanceLock;
 use crate::model::{
@@ -54,6 +66,7 @@ use crate::model::{
 };
 use crate::paths::Paths;
 use crate::sessions::EventSink;
+use rusqlite::OptionalExtension;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -117,6 +130,7 @@ impl Core {
             core.events.clone(),
             core._lock.clone(),
         )?;
+        port_sessions::recover(&core.db, core.events.clone())?;
         core.refresh_runners()?;
         if let Ok(t) = core.torrent_settings() {
             if t.enabled && !core.paths.data_dir.join("manager/stopped").exists() {
@@ -531,6 +545,11 @@ impl Core {
                 let latest = self.with_db(|db| db.get_setting(&ports::latest_key(&def.id)))?;
                 let mut info = ports::info(&self.paths, def, installed.as_ref(), latest.as_deref());
                 info.job = jobs.iter().find(|j| j.id == def.id).cloned();
+                let (seconds, count, last) =
+                    self.with_db(|db| port_sessions::totals(&db.conn, &def.id))?;
+                info.playtime_seconds = seconds;
+                info.play_count = count;
+                info.last_played_at = last;
                 Ok(info)
             })
             .collect()
@@ -561,9 +580,72 @@ impl Core {
     /// Accept work into the detached manager before returning to the UI.
     pub fn start_port_install(&self, id: &str) -> Result<Vec<ports::PortInfo>> {
         ports::find(id)?;
+        if let Some(installed) = self.installed_port(id)? {
+            snapshots::create(&self.paths, &format!("port:{id}"), &[installed.bin])?;
+        }
         self.preparation
             .native_ports(marquee_manager::native_ports::Request::Start { id: id.into() })?;
         self.list_ports()
+    }
+
+    pub fn save_snapshots(&self) -> Result<Vec<snapshots::Info>> {
+        snapshots::list(&self.paths)
+    }
+
+    pub fn create_save_snapshot(&self, scope: &str) -> Result<Option<snapshots::Info>> {
+        snapshots::create(&self.paths, scope, &self.snapshot_exclude(scope)?)
+    }
+
+    pub fn restore_save_snapshot(&self, scope: &str, id: &str) -> Result<snapshots::Info> {
+        self.snapshot_idle(scope)?;
+        snapshots::restore(&self.paths, scope, id, &self.snapshot_exclude(scope)?)
+    }
+
+    pub fn delete_save_snapshot(&self, scope: &str, id: &str) -> Result<()> {
+        snapshots::delete(&self.paths, scope, id)
+    }
+
+    fn snapshot_exclude(&self, scope: &str) -> Result<Vec<String>> {
+        Ok(scope
+            .strip_prefix("port:")
+            .and_then(|id| self.installed_port(id).ok().flatten())
+            .map(|installed| vec![installed.bin])
+            .unwrap_or_default())
+    }
+
+    fn snapshot_idle(&self, scope: &str) -> Result<()> {
+        let busy = || {
+            Err(AppError::new(
+                "LAUNCH_BUSY",
+                "Close the running game before restoring saves",
+            ))
+        };
+        if let Some(id) = scope.strip_prefix("emulator:") {
+            let runner = format!("runner.{id}.marquee");
+            let running = self.with_db(|db| {
+                Ok(db
+                    .conn
+                    .query_row(
+                        "SELECT 1 FROM sessions WHERE state = 'running' AND runner_id = ?1 LIMIT 1",
+                        [runner],
+                        |_| Ok(1),
+                    )
+                    .optional()?
+                    .is_some())
+            })?;
+            if running {
+                return busy();
+            }
+        }
+        if let Some(id) = scope.strip_prefix("port:") {
+            if self.with_db(|db| port_sessions::is_running(&db.conn, id))? {
+                return busy();
+            }
+        }
+        if self.headless_active()? {
+            return busy();
+        }
+        Ok(())
     }
     pub fn cancel_port_install(&self, id: &str) -> Result<Vec<ports::PortInfo>> {
         self.preparation
@@ -608,27 +690,11 @@ impl Core {
     }
 
     pub fn launch_port(&self, id: &str) -> Result<()> {
-        self.storage_move_ready()?;
-        let _storage_gate = self.headless_gate.lock().unwrap_or_else(|e| e.into_inner());
-        self.storage_move_ready()?;
-        if self
-            .list_ports()?
-            .iter()
-            .any(|p| p.id == id && p.job.as_ref().is_some_and(|j| j.state == "installing"))
-        {
-            return Err(AppError::new(
-                "INSTALL_BUSY",
-                "Wait for engine installation to finish",
-            ));
-        }
-        let def = ports::find(id)?;
-        let installed = self.installed_port(id)?.ok_or_else(|| {
-            AppError::new(
-                "PORT_NOT_INSTALLED",
-                format!("{} is not installed", def.name),
-            )
-        })?;
-        ports::launch(&self.paths, &def, &installed)
+        port_sessions::launch(self, id)
+    }
+
+    pub fn port_history(&self, port_id: &str) -> Result<history::GameHistory> {
+        port_sessions::history_for(self, port_id)
     }
 
     pub fn open_port_folder(&self, id: &str) -> Result<()> {
@@ -639,6 +705,54 @@ impl Core {
     pub fn open_setup(&self, runner_id: &str) -> Result<()> {
         let home = self.paths.pcsx2_xdg_config();
         self.with_db(|db| runners::open_setup(db, runner_id, Some(&home)))
+    }
+
+    pub fn game_sessions(&self, edition_id: &str) -> Result<history::GameHistory> {
+        let sessions = self.with_db(crate::sessions::list)?;
+        let now = unix_now();
+        Ok(history::for_edition(
+            &sessions,
+            edition_id,
+            now,
+            history::local_offset_secs(now),
+        ))
+    }
+
+    pub fn play_summary(&self) -> Result<history::PlaySummary> {
+        let sessions = self.with_db(crate::sessions::list)?;
+        let now = unix_now();
+        Ok(history::summary(
+            &sessions,
+            now,
+            history::local_offset_secs(now),
+        ))
+    }
+
+    pub fn xenia_saves(&self, edition_id: &str) -> Result<xenia_saves::Report> {
+        let (system, serial) = self.with_db(|db| {
+            let edition = db
+                .edition_by_id(edition_id)?
+                .ok_or_else(|| AppError::new("NOT_FOUND", "No installation with that id"))?;
+            let serial = db.list_media()?.into_iter().find_map(|media| {
+                (media.edition_id == edition_id)
+                    .then_some(media.serial)
+                    .flatten()
+            });
+            Ok((edition.system, serial))
+        })?;
+        if system != "xbox360" {
+            return Err(AppError::new(
+                "BAD_REQUEST",
+                "Save folders are listed for Xbox 360 games",
+            ));
+        }
+        let Some(title) = serial else {
+            return Ok(xenia_saves::Report {
+                title_id: None,
+                folders: Vec::new(),
+            });
+        };
+        xenia_saves::list(&self.paths.data_dir.join("xenia/xdg-data/content"), &title)
     }
 
     pub fn inspect_steam(&self) -> steam::Inventory {

@@ -184,6 +184,7 @@ impl Db {
         crate::game_media::ensure_tables(&self.conn)?;
         crate::metadata_search::ensure_tables(&self.conn)?;
         crate::app_lists::ensure_tables(&self.conn)?;
+        crate::port_sessions::ensure_table(&self.conn)?;
         if version > SCHEMA_VERSION {
             return Err(crate::error::AppError::new(
                 "DB",

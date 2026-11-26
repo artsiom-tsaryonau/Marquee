@@ -421,7 +421,9 @@ impl Core {
         self.storage_move_ready()?;
         let _gate = self.headless_gate.lock().unwrap_or_else(|e| e.into_inner());
         self.storage_move_ready()?;
-        if self.with_db(|db| db.running_session())?.is_some() {
+        if self.with_db(|db| db.running_session())?.is_some()
+            || self.with_db(|db| crate::port_sessions::has_running(&db.conn))?
+        {
             return Err(err("Close the local game before starting a stream"));
         }
         let plan = self.headless_plan(id)?;

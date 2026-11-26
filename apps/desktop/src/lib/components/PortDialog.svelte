@@ -1,7 +1,7 @@
 <script lang="ts">
   import { app } from '../state.svelte';
   import { modal } from '../modal';
-  import { portAction, portStatusLabel } from '../presentation';
+  import { portAction, portReviewNote, portStatusLabel } from '../presentation';
   import { platformLabel } from '../labels';
   import Artwork from './Artwork.svelte';
   import Icon from './Icon.svelte';
@@ -15,7 +15,8 @@
     <div class="body">
       <p class="status">{portStatusLabel(port)}</p>
       <h3>Game files and setup</h3><p>{port.requirement}</p>
-      <p>Installing a port installs its engine. Original game files are separate. Marquee has no complete game-data validator for these ports; opening the port may enter its own setup window.</p>
+      {#if portReviewNote(port)}<p>{portReviewNote(port)}</p>{/if}
+      <p>Installing a port installs its engine. Original game files stay in this folder, and Play appears only after those files match the port’s published check.</p>
       {#if app.portErrors[port.id]}<p class="error" role="alert">{app.portErrors[port.id]}</p>{/if}
       {#if app.portBusy[port.id]}<p role="status">{app.portBusy[port.id]}</p>{/if}
       <div class="actions">

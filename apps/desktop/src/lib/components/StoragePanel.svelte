@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { app } from '../state.svelte';
   import { asError } from '../api/core';
-  import type { StorageSnapshot } from '../api/contracts';
+  import type { SaveSnapshot, StorageSnapshot } from '../api/contracts';
   import { bytes } from '../format';
   import Icon from './Icon.svelte';
   import StorageMove from './StorageMove.svelte';
@@ -14,6 +14,8 @@
     ['streaming', 'Streaming'],
   ] as const;
   let snapshot = $state<StorageSnapshot | null>(null);
+  let saves = $state<SaveSnapshot[]>([]);
+  let confirming = $state('');
   let filter = $state('all');
   let busy = $state(false);
   let loading = $state(false);
@@ -30,6 +32,7 @@
       const result = await app.api.storageSnapshot();
       if (disposed) return;
       snapshot = result;
+      saves = await app.api.saveSnapshots();
       if (result.scanning) timer = setTimeout(() => void refresh(), 800);
     } catch (e) { if (!disposed) error = asError(e).message; }
     finally { if (!disposed) loading = false; }
@@ -58,6 +61,22 @@
     error = '';
     try { await app.api.storageOpen(id); }
     catch (e) { if (!disposed) error = asError(e).message; }
+  }
+  async function saveAction(kind: 'create' | 'restore' | 'delete', scope: string, id = '') {
+    if (busy) return;
+    const key = `${kind}:${scope}:${id}`;
+    if (kind !== 'create' && confirming !== key) { confirming = key; return; }
+    confirming = '';
+    busy = true; error = ''; notice = '';
+    try {
+      if (kind === 'create') await app.api.createSaveSnapshot(scope);
+      else if (kind === 'restore') await app.api.restoreSaveSnapshot(scope, id);
+      else await app.api.deleteSaveSnapshot(scope, id);
+      if (disposed) return;
+      notice = kind === 'restore' ? 'Saves restored. The previous files were kept as a new snapshot.' : 'Save snapshots updated.';
+      await refresh();
+    } catch (e) { if (!disposed) error = asError(e).message; }
+    finally { if (!disposed) busy = false; }
   }
   onMount(() => {
     void refresh();
@@ -92,6 +111,24 @@
       </div>
     </section>
     <StorageMove onchange={() => void refresh()} />
+    <section class="glass-panel destinations" aria-label="Save snapshots">
+      <div class="destination">
+        <div>
+          <h3>Save snapshots</h3>
+          <p>Emulator profiles and port saves are copied before an update. Restoring replaces those files and keeps the current ones as a new snapshot. The newest five copies are kept for each game.</p>
+          {#if saves.length === 0}<p>No snapshots yet.</p>{/if}
+        </div>
+      </div>
+      {#each saves as save (save.scope + save.id)}
+        <div class="destination">
+          <div><h3>{save.scope}</h3><code>{save.created_at} · {save.files} files · {bytes(save.bytes)}</code></div>
+          <div class="actions">
+            <button class="btn glass small" data-nav disabled={busy} onclick={() => saveAction('restore', save.scope, save.id)}>{confirming === `restore:${save.scope}:${save.id}` ? 'Confirm restore' : 'Restore'}</button>
+            <button class="btn glass small" data-nav disabled={busy} onclick={() => saveAction('delete', save.scope, save.id)}>{confirming === `delete:${save.scope}:${save.id}` ? 'Confirm delete' : 'Delete'}</button>
+          </div>
+        </div>
+      {/each}
+    </section>
     <nav class="filters" aria-label="Storage categories">
       <button data-nav class:on={filter === 'all'} aria-pressed={filter === 'all'} onclick={() => filter = 'all'}>All locations</button>
       {#each groups as [id, label]}<button data-nav class:on={filter === id} aria-pressed={filter === id} onclick={() => filter = id}>{label}</button>{/each}

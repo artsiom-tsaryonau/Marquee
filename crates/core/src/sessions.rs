@@ -37,6 +37,7 @@ fn row_to_session(row: SessionRow) -> Result<Session> {
             _ => SessionState::Ended,
         },
         error: row.error,
+        port_id: None,
     })
 }
 
@@ -50,7 +51,7 @@ pub fn launch(
 ) -> Result<Session> {
     let (session, argv, runner_kind, isolate) = {
         let db = db.lock().unwrap_or_else(|e| e.into_inner());
-        if db.running_session()?.is_some() {
+        if db.running_session()?.is_some() || crate::port_sessions::has_running(&db.conn)? {
             return Err(AppError::new("LAUNCH_BUSY", "a game is already running"));
         }
         let edition = db
@@ -120,6 +121,7 @@ pub fn launch(
             exit_code: None,
             state: SessionState::Running,
             error: None,
+            port_id: None,
         };
         let isolate = runners::uses_marquee_prefix(&runner);
         // Pair the game with a BIOS of its own region. Best effort: no match,
@@ -257,57 +259,25 @@ fn wait_and_finish(
     _edition_id: String,
     _runner_id: String,
     runner_kind: RunnerKind,
-    mut child: std::process::Child,
+    child: std::process::Child,
     identity: Option<ProcessIdentity>,
     _lease: Arc<crate::instance::InstanceLock>,
 ) {
-    let start = Instant::now();
-    let status = loop {
-        match child.try_wait() {
-            Ok(Some(status)) => break Ok(status),
-            Err(err) => break Err(err),
-            Ok(None) => {
-                let seconds = identity
-                    .as_ref()
-                    .map(|p| p.elapsed())
-                    .unwrap_or(start.elapsed().as_secs() as i64);
-                let _ = db
-                    .lock()
-                    .unwrap_or_else(|e| e.into_inner())
-                    .checkpoint_session(&session_id, seconds);
-                thread::sleep(Duration::from_millis(250));
-            }
-        }
-    };
-    let duration = identity
-        .as_ref()
-        .map(|p| p.elapsed())
-        .unwrap_or(start.elapsed().as_secs() as i64);
-    let (exit_code, state, error) = match status {
-        Ok(st) => {
-            let code = st.code();
-            if st.success() && runner_kind != RunnerKind::Fake && duration < EARLY_EXIT_SECS {
-                // A clean exit this soon means the emulator quit by itself before
-                // anything could be played (wrong config, unsupported file, no window).
-                (
-                    code,
-                    "failed",
-                    Some(format!(
-                        "the emulator closed itself after {duration}s without a game being played"
-                    )),
-                )
-            } else if st.success() {
-                (code, "ended", None)
-            } else {
-                (
-                    code,
-                    "failed",
-                    Some(format!("process exited with {code:?}")),
-                )
-            }
-        }
-        Err(err) => (None, "failed", Some(err.to_string())),
-    };
+    let watched = watch_child(
+        child,
+        identity.as_ref(),
+        runner_kind != RunnerKind::Fake,
+        |seconds| {
+            let _ = db
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .checkpoint_session(&session_id, seconds);
+        },
+    );
+    let duration = watched.duration;
+    let exit_code = watched.exit_code;
+    let state = watched.state;
+    let error = watched.error;
 
     {
         let guard = db.lock().unwrap_or_else(|e| e.into_inner());
@@ -338,10 +308,73 @@ fn wait_and_finish(
 /// A normal exit sooner than this after launch is a failed start, not a played session.
 const EARLY_EXIT_SECS: i64 = 10;
 
+pub(crate) struct WatchedExit {
+    pub duration: i64,
+    pub exit_code: Option<i32>,
+    pub state: &'static str,
+    pub error: Option<String>,
+}
+
+/// Wait for a game process, checkpointing its runtime. A clean exit before
+/// `EARLY_EXIT_SECS` is a failed start when `early_failure` is set.
+pub(crate) fn watch_child(
+    mut child: std::process::Child,
+    identity: Option<&ProcessIdentity>,
+    early_failure: bool,
+    mut checkpoint: impl FnMut(i64),
+) -> WatchedExit {
+    let start = Instant::now();
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break Ok(status),
+            Err(err) => break Err(err),
+            Ok(None) => {
+                let seconds = identity
+                    .map(ProcessIdentity::elapsed)
+                    .unwrap_or(start.elapsed().as_secs() as i64);
+                checkpoint(seconds);
+                thread::sleep(Duration::from_millis(250));
+            }
+        }
+    };
+    let duration = identity
+        .map(ProcessIdentity::elapsed)
+        .unwrap_or(start.elapsed().as_secs() as i64);
+    let (exit_code, state, error) = match status {
+        Ok(st) => {
+            let code = st.code();
+            if st.success() && early_failure && duration < EARLY_EXIT_SECS {
+                (
+                    code,
+                    "failed",
+                    Some(format!(
+                        "the program closed itself after {duration}s without a game being played"
+                    )),
+                )
+            } else if st.success() {
+                (code, "ended", None)
+            } else {
+                (
+                    code,
+                    "failed",
+                    Some(format!("process exited with {code:?}")),
+                )
+            }
+        }
+        Err(err) => (None, "failed", Some(err.to_string())),
+    };
+    WatchedExit {
+        duration,
+        exit_code,
+        state,
+        error,
+    }
+}
+
 // Linux process identity includes the boot and kernel start time, so a reused PID
 // can never be mistaken for the emulator. Uptime excludes suspend just like Instant.
 #[derive(serde::Serialize, serde::Deserialize)]
-struct ProcessIdentity {
+pub(crate) struct ProcessIdentity {
     pid: u32,
     boot: String,
     ticks: String,
@@ -359,7 +392,7 @@ fn uptime() -> Option<f64> {
     Some(time.tv_sec as f64 + time.tv_nsec as f64 / 1_000_000_000.0)
 }
 impl ProcessIdentity {
-    fn read(pid: u32) -> Option<Self> {
+    pub(crate) fn read(pid: u32) -> Option<Self> {
         let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
         let fields: Vec<_> = stat.rsplit_once(')')?.1.split_whitespace().collect();
         if fields.first() == Some(&"Z") {
@@ -372,10 +405,10 @@ impl ProcessIdentity {
             began: uptime()?,
         })
     }
-    fn alive(&self) -> bool {
+    pub(crate) fn alive(&self) -> bool {
         Self::read(self.pid).is_some_and(|p| p.boot == self.boot && p.ticks == self.ticks)
     }
-    fn elapsed(&self) -> i64 {
+    pub(crate) fn elapsed(&self) -> i64 {
         uptime()
             .map(|now| (now - self.began).max(0.0) as i64)
             .unwrap_or(0)

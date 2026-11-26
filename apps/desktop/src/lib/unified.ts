@@ -43,7 +43,7 @@ export function enrichIdentity(game: GameEntry): GameEntry {
 export function nativePortGame(port: PortEntry): GameEntry {
   return enrichIdentity({ id: `port:${port.id}`, title: port.id === 'opengoal' ? 'Jak and Daxter: The Precursor Legacy' : port.game,
     tagline: `${port.name} · ${port.requirement}`, platform: 'pc-linux', source: 'port', installed: port.status !== 'not-installed',
-    genre: port.family, year: 0, playtimeMin: 0, lastPlayed: null, addedAt: '', favorite: false,
+    genre: port.family, year: 0, playtimeMin: (port.playtimeSeconds ?? 0) / 60, lastPlayed: port.lastPlayed ?? null, addedAt: '', favorite: false,
     ratings: { critic: null, criticCount: 0, user: null, steamReviews: null }, timeToBeat: null, achievements: null,
     portStatus: port.status, art: artFromSeed(`port:${port.id}`), launchMethod: 'native',
   });
