@@ -131,6 +131,7 @@ impl Core {
             core._lock.clone(),
         )?;
         port_sessions::recover(&core.db, core.events.clone())?;
+        streaming::headless::recover_stream(&core)?;
         core.refresh_runners()?;
         if let Ok(t) = core.torrent_settings() {
             if t.enabled && !core.paths.data_dir.join("manager/stopped").exists() {
@@ -586,6 +587,28 @@ impl Core {
         }
         self.preparation
             .native_ports(marquee_manager::native_ports::Request::Start { id: id.into() })?;
+        self.list_ports()
+    }
+
+    pub fn start_port_setup(&self, id: &str, source: PathBuf) -> Result<Vec<ports::PortInfo>> {
+        ports::find(id)?;
+        if !marquee_manager::port_engine::setup_available(id) {
+            return Err(AppError::new(
+                "PORT_SETUP",
+                "This port's game-data setup is not available yet",
+            ));
+        }
+        if self.with_db(|db| port_sessions::is_running(&db.conn, id))? {
+            return Err(AppError::new(
+                "LAUNCH_BUSY",
+                "Close the running game before changing its files",
+            ));
+        }
+        self.preparation
+            .native_ports(marquee_manager::native_ports::Request::Setup {
+                id: id.into(),
+                source,
+            })?;
         self.list_ports()
     }
 

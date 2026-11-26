@@ -81,6 +81,7 @@ pub fn history_for(core: &Core, port_id: &str) -> Result<GameHistory> {
     Ok(GameHistory {
         sessions,
         week_seconds,
+        stream_seconds: 0,
     })
 }
 
@@ -362,6 +363,7 @@ fn session_event(
         state,
         error,
         port_id: Some(port_id.to_string()),
+        mode: "local".into(),
     }
 }
 

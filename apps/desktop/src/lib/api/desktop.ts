@@ -44,6 +44,10 @@ export const desktopApi: LibraryApi = {
     const selected = await open({ directory: false, multiple: false, title: 'Choose PS3 firmware package', filters: [{name: 'PS3 firmware package', extensions: ['pup']}] });
     return typeof selected === 'string' ? selected : null;
   },
+  async pickPortRom() {
+    const selected = await open({ directory: false, multiple: false, title: 'Choose a Nintendo 64 ROM', filters: [{ name: 'Nintendo 64 ROM', extensions: ['z64', 'n64', 'v64', 'rom'] }] });
+    return typeof selected === 'string' ? selected : null;
+  },
   async pickConsoleContent() {
     const selected = await open({ directory:false, multiple:false, title:'Inspect console content', filters:[{name:'Console content',extensions:['pkg','rar','iso']}] });
     return typeof selected === 'string' ? selected : null;

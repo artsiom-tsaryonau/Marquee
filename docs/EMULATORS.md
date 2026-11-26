@@ -520,10 +520,13 @@ gates are recorded in [Quiver Q2a](QUIVER_INTEGRATION.md#q2a--pinned-2-ship-engi
 
 Ship of Harkinian is a native port, not an N64 emulator. Its managed recipe pins
 9.3.1 and runs with an installation-local `SHIP_HOME` plus the AppImage
-extract-and-run fallback for Fedora hosts without FUSE 2. The supplied PAL 1.1
-input passed the pinned supported-hash check, generated its assets and reached
-file select in an isolated Marquee launch. Gameplay and persistent native saves
-remain acceptance gates. See [Quiver Q2c](QUIVER_INTEGRATION.md#q2c--ocarina--shipwright-pilot-2026-10-25).
+extract-and-run fallback for Fedora hosts without FUSE 2. When the engine is
+installed and game data is missing, **Choose ROM** copies a dump whose SHA-1 is
+on the published list into the port folder; the original stays put and first
+launch still generates assets. The supplied PAL 1.1 input passed the pinned
+supported-hash check, generated its assets and reached file select in an isolated
+Marquee launch. Gameplay and persistent native saves remain acceptance gates.
+See [Quiver Q2c](QUIVER_INTEGRATION.md#q2c--ocarina--shipwright-pilot-2026-10-25).
 
 ### Reviewing a newer port release
 

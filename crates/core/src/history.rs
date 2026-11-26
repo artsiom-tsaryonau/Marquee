@@ -8,6 +8,8 @@ use serde::Serialize;
 pub struct GameHistory {
     pub sessions: Vec<Session>,
     pub week_seconds: i64,
+    #[serde(default)]
+    pub stream_seconds: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -23,6 +25,13 @@ pub fn for_edition(
 ) -> GameHistory {
     let start = week_start(now_unix, offset_secs);
     let week_seconds = credited(sessions, Some(edition_id), start);
+    let stream_seconds = sessions
+        .iter()
+        .filter(|session| session.edition_id == edition_id)
+        .filter(|session| session.mode == "stream")
+        .filter(|session| matches!(session.state, SessionState::Ended))
+        .map(|session| session.duration_seconds.unwrap_or(0).max(0))
+        .sum();
     let sessions = sessions
         .iter()
         .filter(|session| session.edition_id == edition_id)
@@ -32,6 +41,7 @@ pub fn for_edition(
     GameHistory {
         sessions,
         week_seconds,
+        stream_seconds,
     }
 }
 
@@ -76,7 +86,7 @@ pub(crate) fn counts_this_week(started_at: &str, now_unix: i64, offset_secs: i64
     unix_of(started_at).is_some_and(|started| started >= week_start(now_unix, offset_secs))
 }
 
-fn unix_of(stamp: &str) -> Option<i64> {
+pub(crate) fn unix_of(stamp: &str) -> Option<i64> {
     let stamp = stamp.strip_suffix('Z')?;
     let (date, time) = stamp.split_once('T')?;
     let mut date = date.split('-');
@@ -123,6 +133,7 @@ mod tests {
             state,
             error: None,
             port_id: None,
+            mode: "local".into(),
         }
     }
 
@@ -143,6 +154,12 @@ mod tests {
         let history = for_edition(&sessions, "a", now, 2 * 3600);
         assert_eq!(history.week_seconds, 120);
         assert_eq!(history.sessions.len(), 4);
+        assert_eq!(history.stream_seconds, 0);
         assert_eq!(summary(&sessions, now, 2 * 3600).week_seconds, 150);
+        let mut streamed = session("a", "2026-11-24T12:00:00Z", 40, SessionState::Ended);
+        streamed.mode = "stream".into();
+        let mut mixed = sessions;
+        mixed.push(streamed);
+        assert_eq!(for_edition(&mixed, "a", now, 2 * 3600).stream_seconds, 40);
     }
 }

@@ -400,6 +400,8 @@ enum PortsCmd {
     Install { id: String },
     /// Start an installed port
     Launch { id: String },
+    /// Copy a verified ROM into a port folder (Shipwright, 2Ship)
+    Setup { id: String, path: PathBuf },
 }
 
 #[derive(Subcommand)]
@@ -1083,6 +1085,7 @@ fn run() -> marquee_core::error::Result<()> {
                     println!("started {id}");
                     return Ok(());
                 }
+                PortsCmd::Setup { id, path } => core.start_port_setup(&id, path)?,
             };
             println!("{}", serde_json::to_string_pretty(&list)?);
         }

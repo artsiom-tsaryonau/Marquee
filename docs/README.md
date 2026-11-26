@@ -57,7 +57,7 @@ and console-recipe gates are open.
 | [Cleanup](CLEANUP.md) | Existing storage cleanup and preservation guidance |
 | [Corrections](CORRECTIONS.md) | Dated findings and evidence retained for audits |
 
-Use actual schema/code state when implementing migrations; v4–v6 are allocated.
+Use actual schema/code state when implementing migrations; v4–v7 are allocated.
 The library and manager have separate write ownership and durable receipt
 handoff; see the manager plan. M1 prepares local sources only and always
 preserves originals. PS3 firmware setup is a separate reviewed manager recipe;

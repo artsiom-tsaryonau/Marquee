@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-pub const SCHEMA_VERSION: i64 = 6;
+pub const SCHEMA_VERSION: i64 = 7;
 pub const SYSTEM_PS2: &str = "ps2";
 pub const SYSTEM_PS1: &str = "ps1";
 pub const KIND_PS2_ISO: &str = "ps2_iso";
@@ -271,6 +271,13 @@ pub struct Session {
     /// Set when this row is a native-port session rather than a library edition.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub port_id: Option<String>,
+    /// `local` Play, or `stream` for a private-display session (schema v7).
+    #[serde(default = "local_session_mode")]
+    pub mode: String,
+}
+
+fn local_session_mode() -> String {
+    "local".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

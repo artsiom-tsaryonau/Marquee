@@ -775,6 +775,49 @@ fn schema_v2_upgrade_clears_implicit_profiles_and_preserves_library_data() {
 }
 
 #[test]
+fn schema_v6_sessions_gain_mode_local() {
+    let t = tempfile::tempdir().unwrap();
+    let data = t.path().join("data");
+    {
+        let core = Core::open_isolated(Some(data.clone()), true).unwrap();
+        core.with_db(|db| {
+            db.conn.execute(
+                "INSERT INTO editions(id,system,scan_title,imported_at) VALUES('edition','ps2','Game','2026-01-01')",
+                [],
+            )?;
+            db.insert_session(
+                "legacy",
+                "edition",
+                "runner.fake",
+                "2026-01-01T00:00:00Z",
+                "ended",
+            )?;
+            db.conn.execute_batch(
+                "ALTER TABLE sessions DROP COLUMN mode; PRAGMA user_version=6;",
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    }
+    let core = Core::open_isolated(Some(data), true).unwrap();
+    let version: i64 = core
+        .db_arc()
+        .lock()
+        .unwrap()
+        .conn
+        .query_row("PRAGMA user_version", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(version, crate::model::SCHEMA_VERSION);
+    let session = core
+        .with_db(crate::sessions::list)
+        .unwrap()
+        .into_iter()
+        .find(|session| session.id == "legacy")
+        .unwrap();
+    assert_eq!(session.mode, "local");
+}
+
+#[test]
 fn launcher_commands_share_persistence_validation_and_invalidation() {
     let t = tempfile::tempdir().unwrap();
     let data = t.path().join("data");

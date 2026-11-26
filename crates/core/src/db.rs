@@ -178,6 +178,19 @@ impl Db {
                 PRAGMA user_version=6; COMMIT;",
             )?;
         }
+        let version: i64 = self
+            .conn
+            .query_row("PRAGMA user_version", [], |r| r.get(0))?;
+        if version == 6 {
+            self.conn.execute_batch("BEGIN IMMEDIATE;")?;
+            if !column_exists(&self.conn, "sessions", "mode")? {
+                self.conn.execute(
+                    "ALTER TABLE sessions ADD COLUMN mode TEXT NOT NULL DEFAULT 'local'",
+                    [],
+                )?;
+            }
+            self.conn.execute_batch("PRAGMA user_version=7; COMMIT;")?;
+        }
         crate::romfacts::ensure_table(&self.conn)?;
         crate::wanted::ensure_table(&self.conn)?;
         crate::music::ensure_tables(&self.conn)?;
@@ -185,6 +198,9 @@ impl Db {
         crate::metadata_search::ensure_tables(&self.conn)?;
         crate::app_lists::ensure_tables(&self.conn)?;
         crate::port_sessions::ensure_table(&self.conn)?;
+        let version: i64 = self
+            .conn
+            .query_row("PRAGMA user_version", [], |r| r.get(0))?;
         if version > SCHEMA_VERSION {
             return Err(crate::error::AppError::new(
                 "DB",
@@ -590,10 +606,28 @@ impl Db {
         started_at: &str,
         state: &str,
     ) -> Result<()> {
+        self.insert_session_with_mode(id, edition_id, runner_id, started_at, state, "local")
+    }
+
+    pub fn insert_session_with_mode(
+        &self,
+        id: &str,
+        edition_id: &str,
+        runner_id: &str,
+        started_at: &str,
+        state: &str,
+        mode: &str,
+    ) -> Result<()> {
+        if !matches!(mode, "local" | "stream") {
+            return Err(crate::error::AppError::new(
+                "BAD_REQUEST",
+                "session mode must be local or stream",
+            ));
+        }
         self.conn.execute(
-            "INSERT INTO sessions(id, edition_id, runner_id, started_at, state)
-             VALUES(?1, ?2, ?3, ?4, ?5)",
-            params![id, edition_id, runner_id, started_at, state],
+            "INSERT INTO sessions(id, edition_id, runner_id, started_at, state, mode)
+             VALUES(?1, ?2, ?3, ?4, ?5, ?6)",
+            params![id, edition_id, runner_id, started_at, state, mode],
         )?;
         Ok(())
     }
@@ -627,22 +661,10 @@ impl Db {
 
     pub fn list_sessions(&self) -> Result<Vec<SessionRow>> {
         let mut stmt = self.conn.prepare(
-            "SELECT id, edition_id, runner_id, started_at, ended_at, duration_seconds, exit_code, state, error
+            "SELECT id, edition_id, runner_id, started_at, ended_at, duration_seconds, exit_code, state, error, mode
              FROM sessions ORDER BY started_at DESC",
         )?;
-        let rows = stmt.query_map([], |r| {
-            Ok(SessionRow {
-                id: r.get(0)?,
-                edition_id: r.get(1)?,
-                runner_id: r.get(2)?,
-                started_at: r.get(3)?,
-                ended_at: r.get(4)?,
-                duration_seconds: r.get(5)?,
-                exit_code: r.get(6)?,
-                state: r.get(7)?,
-                error: r.get(8)?,
-            })
-        })?;
+        let rows = stmt.query_map([], session_from_row)?;
         Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
     }
 
@@ -650,22 +672,10 @@ impl Db {
         Ok(self
             .conn
             .query_row(
-                "SELECT id, edition_id, runner_id, started_at, ended_at, duration_seconds, exit_code, state, error
+                "SELECT id, edition_id, runner_id, started_at, ended_at, duration_seconds, exit_code, state, error, mode
                  FROM sessions WHERE id = ?1",
                 [id],
-                |r| {
-                    Ok(SessionRow {
-                        id: r.get(0)?,
-                        edition_id: r.get(1)?,
-                        runner_id: r.get(2)?,
-                        started_at: r.get(3)?,
-                        ended_at: r.get(4)?,
-                        duration_seconds: r.get(5)?,
-                        exit_code: r.get(6)?,
-                        state: r.get(7)?,
-                        error: r.get(8)?,
-                    })
-                },
+                session_from_row,
             )
             .optional()?)
     }
@@ -741,6 +751,21 @@ impl Db {
 /// True when `table` already has `column`. Used to keep migrations idempotent:
 /// the v0 schema is created in full, so a database stamped v2 already carries
 /// columns that a later step would otherwise try to add again.
+fn session_from_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<SessionRow> {
+    Ok(SessionRow {
+        id: r.get(0)?,
+        edition_id: r.get(1)?,
+        runner_id: r.get(2)?,
+        started_at: r.get(3)?,
+        ended_at: r.get(4)?,
+        duration_seconds: r.get(5)?,
+        exit_code: r.get(6)?,
+        state: r.get(7)?,
+        error: r.get(8)?,
+        mode: r.get(9)?,
+    })
+}
+
 fn column_exists(conn: &rusqlite::Connection, table: &str, column: &str) -> Result<bool> {
     let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
     let mut rows = stmt.query([])?;
@@ -831,6 +856,7 @@ pub struct SessionRow {
     pub exit_code: Option<i32>,
     pub state: String,
     pub error: Option<String>,
+    pub mode: String,
 }
 
 pub use marquee_media::time::{format_unix, now_rfc3339};

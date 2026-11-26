@@ -44,7 +44,7 @@ export function asError(err: unknown): AppError {
 }
 
 /** The commands are identical on every surface; only the transport (`call`) differs. */
-export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable' | 'pickArchives' | 'pickPs3Content' | 'pickConsoleContent' | 'pickPs3Firmware' | 'pickTorrent' | 'onArchiveDrop' | 'pickMusic' | 'pickMusicCover' | 'musicUrl' | 'mediaUrl' | 'pickMedia' | 'pickMediaDisc'> {
+export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'subscribe' | 'whenReady' | 'webUrl' | 'pickExecutable' | 'pickArchives' | 'pickPs3Content' | 'pickConsoleContent' | 'pickPs3Firmware' | 'pickTorrent' | 'onArchiveDrop' | 'pickMusic' | 'pickMusicCover' | 'musicUrl' | 'mediaUrl' | 'pickMedia' | 'pickMediaDisc' | 'pickPortRom'> {
   return {
     storageMoveStatus: () => call('storage_move_status'),
     storageMoveReview: (parent) => call('storage_move_review', { parent }),
@@ -176,6 +176,7 @@ export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'su
     listPorts: () => call<PortInfo[]>('list_ports'),
     checkPortUpdates: () => call<PortInfo[]>('check_port_updates'),
     installPort: (portId) => call<PortInfo[]>('start_port_install', { port_id: portId }),
+    setupPort: (portId, path) => call<PortInfo[]>('start_port_setup', { port_id: portId, path }),
     cancelPortInstall: (portId) => call<PortInfo[]>('cancel_port_install', { port_id: portId }),
     launchPort: (portId) => call<void>('launch_port', { port_id: portId }),
     portSessions: (portId) => call<GameHistory>('port_sessions', { port_id: portId }),

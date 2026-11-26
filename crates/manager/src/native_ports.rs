@@ -12,7 +12,12 @@ use std::sync::{Arc, Mutex};
 pub enum Request {
     List,
     Start { id: String },
+    Setup { id: String, source: PathBuf },
     Cancel { id: String },
+}
+
+fn install_kind() -> String {
+    "install".into()
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Receipt {
@@ -27,10 +32,14 @@ pub struct Receipt {
 pub struct Job {
     pub id: String,
     pub attempt_id: String,
+    #[serde(default = "install_kind")]
+    pub kind: String,
     pub state: String,
     pub message: String,
     pub error_code: Option<String>,
     pub receipt: Option<Receipt>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub setup: Option<port_engine::SetupReceipt>,
 }
 struct Active {
     id: String,
@@ -49,12 +58,22 @@ impl Host {
             manager,
             active: Mutex::new(None),
         });
-        host.manager.database()?.execute_batch("CREATE TABLE IF NOT EXISTS native_port_jobs(id TEXT PRIMARY KEY, payload TEXT NOT NULL); CREATE TABLE IF NOT EXISTS native_port_receipts(attempt_id TEXT PRIMARY KEY, payload TEXT NOT NULL);")?;
+        host.manager.database()?.execute_batch("CREATE TABLE IF NOT EXISTS native_port_jobs(id TEXT PRIMARY KEY, payload TEXT NOT NULL); CREATE TABLE IF NOT EXISTS native_port_receipts(attempt_id TEXT PRIMARY KEY, payload TEXT NOT NULL); CREATE TABLE IF NOT EXISTS native_port_setup_receipts(attempt_id TEXT PRIMARY KEY, payload TEXT NOT NULL);")?;
         // Called once under the daemon lease, never by a snapshot reader.
         for mut job in host.list()? {
-            if job.state == "installing" {
+            if job.state == "installing" || job.state == "setting_up" {
+                if job.state == "setting_up" {
+                    let _ = std::fs::remove_file(
+                        port_engine::port_dir(&host.data, &job.id).join(".marquee-setup-partial"),
+                    );
+                }
+                job.message = if job.kind == "setup" {
+                    "Game-data setup interrupted. Choose the ROM again to recover."
+                } else {
+                    "Engine installation interrupted. Retry installation to recover; game files are retained."
+                }
+                .into();
                 job.state = "interrupted".into();
-                job.message = "Engine installation interrupted. Retry installation to recover; game files are retained.".into();
                 job.error_code = Some("PORT_INTERRUPTED".into());
                 host.save(&job)?;
             }
@@ -104,10 +123,12 @@ impl Host {
                 let job = Job {
                     id: id.clone(),
                     attempt_id: uuid::Uuid::new_v4().to_string(),
+                    kind: "install".into(),
                     state: "installing".into(),
                     message: "Starting engine installation…".into(),
                     error_code: None,
                     receipt: previous,
+                    setup: None,
                 };
                 self.save(&job)?;
                 *active = Some(Active {
@@ -120,6 +141,57 @@ impl Host {
                 if let Err(error) = std::thread::Builder::new()
                     .name("native-engine".into())
                     .spawn(move || host.execute(job))
+                {
+                    *active = None;
+                    failed.state = "failed".into();
+                    failed.message = error.to_string();
+                    failed.error_code = Some("IO".into());
+                    self.save(&failed)?;
+                    return Err(error.into());
+                }
+                drop(active);
+                self.list()
+            }
+            Request::Setup { id, source } => {
+                port_engine::find(&id)?;
+                if !port_engine::setup_available(&id) {
+                    return Err(AppError::new(
+                        "PORT_SETUP",
+                        "This port's game-data setup is not available yet",
+                    ));
+                }
+                let mut active = self.active.lock().unwrap_or_else(|e| e.into_inner());
+                if let Some(existing) = active.as_ref() {
+                    if existing.id == id {
+                        return self.list();
+                    }
+                    return Err(AppError::new(
+                        "INSTALL_BUSY",
+                        "Another native engine is installing",
+                    ));
+                }
+                let previous = self.list()?.into_iter().find(|j| j.id == id);
+                let job = Job {
+                    id: id.clone(),
+                    attempt_id: uuid::Uuid::new_v4().to_string(),
+                    kind: "setup".into(),
+                    state: "setting_up".into(),
+                    message: "Starting game-data setup…".into(),
+                    error_code: None,
+                    receipt: previous.as_ref().and_then(|j| j.receipt.clone()),
+                    setup: previous.and_then(|j| j.setup),
+                };
+                self.save(&job)?;
+                *active = Some(Active {
+                    id,
+                    cancel: false,
+                    publishing: false,
+                });
+                let host = self.clone();
+                let mut failed = job.clone();
+                if let Err(error) = std::thread::Builder::new()
+                    .name("native-setup".into())
+                    .spawn(move || host.execute_setup(job, source))
                 {
                     *active = None;
                     failed.state = "failed".into();
@@ -229,6 +301,44 @@ impl Host {
         }
         *self.active.lock().unwrap_or_else(|e| e.into_inner()) = None;
     }
+
+    fn execute_setup(&self, mut job: Job, source: PathBuf) {
+        let result = (|| {
+            let def = port_engine::find(&job.id)?;
+            let setup = port_engine::place_rom(&self.data, &def, &source, &mut |m| {
+                self.checkpoint(&mut job, m)
+            })?;
+            job.state = "setup".into();
+            job.message = setup.note.clone();
+            job.setup = Some(setup.clone());
+            let mut db = self.manager.database()?;
+            let tx = db.transaction()?;
+            tx.execute(
+                "INSERT INTO native_port_setup_receipts(attempt_id,payload) VALUES(?1,?2)",
+                params![job.attempt_id, serde_json::to_string(&setup)?],
+            )?;
+            tx.execute(
+                "UPDATE native_port_jobs SET payload=?2 WHERE id=?1",
+                params![job.id, serde_json::to_string(&job)?],
+            )?;
+            tx.commit()?;
+            Ok::<_, AppError>(())
+        })();
+        if let Err(error) = result {
+            job.state = if error.code == "PORT_CANCELLED" {
+                "cancelled"
+            } else {
+                "failed"
+            }
+            .into();
+            job.message = error.message;
+            job.error_code = Some(error.code);
+            if let Err(error) = self.save(&job) {
+                eprintln!("Native setup checkpoint failed: {}", error.message);
+            }
+        }
+        *self.active.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    }
 }
 
 /// The library owner rechecks the exact output before publishing a completed attempt.
@@ -295,10 +405,12 @@ mod tests {
         Job {
             id: "2ship2harkinian".into(),
             attempt_id: "attempt".into(),
+            kind: "install".into(),
             state: "installing".into(),
             message: "Downloading…".into(),
             error_code: None,
             receipt: None,
+            setup: None,
         }
     }
     #[test]
@@ -378,5 +490,90 @@ mod tests {
         std::fs::remove_file(engine.join("engine")).unwrap();
         std::os::unix::fs::symlink("/dev/null", engine.join("engine")).unwrap();
         assert!(verify_receipt(dir.path(), &job).is_err());
+    }
+
+    #[test]
+    fn setup_is_allowlisted_and_refuses_unknown_dumps() {
+        let dir = tempfile::tempdir().unwrap();
+        let host = host(dir.path());
+        let rom = dir.path().join("unknown.z64");
+        std::fs::write(&rom, b"not listed").unwrap();
+        assert_eq!(
+            host.dispatch(Request::Setup {
+                id: "uzdoom".into(),
+                source: rom.clone(),
+            })
+            .unwrap_err()
+            .code,
+            "PORT_SETUP"
+        );
+        host.dispatch(Request::Setup {
+            id: "shipwright".into(),
+            source: rom,
+        })
+        .unwrap();
+        let job = (0..80)
+            .find_map(|_| {
+                let job = host
+                    .list()
+                    .unwrap()
+                    .into_iter()
+                    .find(|j| j.id == "shipwright")?;
+                if job.state == "setting_up" {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                    None
+                } else {
+                    Some(job)
+                }
+            })
+            .expect("setup job finished");
+        assert_eq!(job.kind, "setup");
+        assert_eq!(job.state, "failed");
+        assert_eq!(job.error_code.as_deref(), Some("PORT_ROM_UNKNOWN"));
+        assert!(!dir.path().join("ports/shipwright/unknown.z64").exists());
+        host.dispatch(Request::Setup {
+            id: "2ship2harkinian".into(),
+            source: dir.path().join("unknown.z64"),
+        })
+        .unwrap();
+        let mm = (0..80)
+            .find_map(|_| {
+                let job = host
+                    .list()
+                    .unwrap()
+                    .into_iter()
+                    .find(|j| j.id == "2ship2harkinian")?;
+                if job.state == "setting_up" {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                    None
+                } else {
+                    Some(job)
+                }
+            })
+            .expect("2ship setup finished");
+        assert_eq!(mm.error_code.as_deref(), Some("PORT_ROM_UNKNOWN"));
+    }
+
+    #[test]
+    fn restart_marks_an_in_flight_setup_interrupted() {
+        let dir = tempfile::tempdir().unwrap();
+        let old = host(dir.path());
+        old.save(&Job {
+            id: "shipwright".into(),
+            attempt_id: "setup-attempt".into(),
+            kind: "setup".into(),
+            state: "setting_up".into(),
+            message: "Copying game file…".into(),
+            error_code: None,
+            receipt: None,
+            setup: None,
+        })
+        .unwrap();
+        drop(old);
+        let recovered = host(dir.path());
+        let jobs = recovered.list().unwrap();
+        assert_eq!(jobs[0].state, "interrupted");
+        assert_eq!(jobs[0].kind, "setup");
+        assert_eq!(jobs[0].attempt_id, "setup-attempt");
     }
 }

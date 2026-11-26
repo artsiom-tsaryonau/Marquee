@@ -360,7 +360,10 @@ impl Client {
         &self,
         request: crate::native_ports::Request,
     ) -> Result<Vec<crate::native_ports::Job>> {
-        let explicit = matches!(request, crate::native_ports::Request::Start { .. });
+        let explicit = matches!(
+            request,
+            crate::native_ports::Request::Start { .. } | crate::native_ports::Request::Setup { .. }
+        );
         if !explicit && !self.data.join("manager/jobs.db").exists() {
             return Ok(vec![]);
         }

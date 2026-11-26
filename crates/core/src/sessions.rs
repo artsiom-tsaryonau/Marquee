@@ -22,7 +22,7 @@ pub fn list(db: &Db) -> Result<Vec<Session>> {
         .collect()
 }
 
-fn row_to_session(row: SessionRow) -> Result<Session> {
+pub(crate) fn row_to_session(row: SessionRow) -> Result<Session> {
     Ok(Session {
         id: row.id,
         edition_id: row.edition_id,
@@ -38,6 +38,11 @@ fn row_to_session(row: SessionRow) -> Result<Session> {
         },
         error: row.error,
         port_id: None,
+        mode: if row.mode.is_empty() {
+            "local".into()
+        } else {
+            row.mode
+        },
     })
 }
 
@@ -122,6 +127,7 @@ pub fn launch(
             state: SessionState::Running,
             error: None,
             port_id: None,
+            mode: "local".into(),
         };
         let isolate = runners::uses_marquee_prefix(&runner);
         // Pair the game with a BIOS of its own region. Best effort: no match,
@@ -306,7 +312,7 @@ fn wait_and_finish(
 }
 
 /// A normal exit sooner than this after launch is a failed start, not a played session.
-const EARLY_EXIT_SECS: i64 = 10;
+pub(crate) const EARLY_EXIT_SECS: i64 = 10;
 
 pub(crate) struct WatchedExit {
     pub duration: i64,
@@ -424,7 +430,10 @@ pub fn recover(
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .list_sessions()?;
-    for row in rows.into_iter().filter(|r| r.state == "running") {
+    for row in rows
+        .into_iter()
+        .filter(|r| r.state == "running" && r.mode != "stream")
+    {
         let identity = db
             .lock()
             .unwrap_or_else(|e| e.into_inner())

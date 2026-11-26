@@ -735,7 +735,7 @@ class AppState {
   }
 
   private applyPorts(list: PortInfo[]) {
-    this.portBusy = Object.fromEntries(list.filter((p) => p.job?.state === 'installing').map((p) => [p.id, p.job!.message]));
+    this.portBusy = Object.fromEntries(list.filter((p) => p.job?.state === 'installing' || p.job?.state === 'setting_up').map((p) => [p.id, p.job!.message]));
     for (const p of list) {
       if (p.job && ['failed', 'interrupted', 'cancelled'].includes(p.job.state)) this.portErrors[p.id] = p.job.message;
       else delete this.portErrors[p.id];
@@ -1004,6 +1004,7 @@ class AppState {
     if (port.id in this.portBusy) return;
     const operation = portAction(port).operation;
     if (operation === 'install') await this.installPort(port);
+    else if (operation === 'setup') await this.setupPort(port);
     else if (operation === 'folder') await this.openPortFolder(port);
     else await this.launchPort(port);
   }
@@ -1025,6 +1026,21 @@ class AppState {
     } catch (err) {
       delete this.portBusy[port.id];
       this.portErrors[port.id] = (err as { message?: string }).message ?? `Could not install ${port.name}`;
+      this.notify(this.portErrors[port.id]);
+    }
+  }
+  async setupPort(port: PortEntry) {
+    if (port.id in this.portBusy) return;
+    const path = await this.api.pickPortRom();
+    if (!path) return;
+    delete this.portErrors[port.id];
+    this.portBusy[port.id] = `Copying ROM for ${port.name}…`;
+    try {
+      this.applyPorts(await this.api.setupPort(port.id, path));
+      this.notify('ROM copy accepted. You can close Marquee while it runs.');
+    } catch (err) {
+      delete this.portBusy[port.id];
+      this.portErrors[port.id] = (err as { message?: string }).message ?? `Could not copy the ROM for ${port.name}`;
       this.notify(this.portErrors[port.id]);
     }
   }

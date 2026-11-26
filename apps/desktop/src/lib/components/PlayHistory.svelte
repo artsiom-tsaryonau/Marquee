@@ -37,7 +37,7 @@
       {#each history.sessions.slice(0, 8) as session (session.id)}
         <li>
           <span>{ago(session.started_at)}</span>
-          <span>{session.state === 'failed' ? 'Did not stay open' : session.state === 'running' ? 'Playing now' : session.duration_seconds ? hours(session.duration_seconds / 60) : 'Ended'}</span>
+          <span>{session.state === 'failed' ? 'Did not stay open' : session.state === 'running' ? 'Playing now' : session.duration_seconds ? `${hours(session.duration_seconds / 60)}${session.mode === 'stream' ? ' streamed' : ''}` : 'Ended'}</span>
         </li>
       {/each}
     </ul>

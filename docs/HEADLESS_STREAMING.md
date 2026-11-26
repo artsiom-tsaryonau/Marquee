@@ -85,9 +85,14 @@ plan. Marquee refuses to adopt/stop another container, refuses unrelated Wolf
 catalogues, and keeps the host configuration/pairing when it retires the old fixed
 Sonic/Vanquish slots. The first replacement saves a configuration backup.
 Reopening Marquee can inspect the existing owned host and reconnect. Streamed
-sessions do not yet contribute library playtime/history, and full session recovery
-is limited to the owned container and its receipt. Saves/checkpoints remain
-emulator- and title-specific; a working transport is not full gameplay acceptance.
+play records a library session with `mode='stream'` once Wolf shows the owned
+app, checkpoints while the host runs, and completes on Stop, game exit
+(`last-exit.json`), or host loss. Closing the viewer does not end that row.
+Ended stream time is credited like local Play and shown as
+`x h (y h streamed)`. A stream left running when Marquee exits is recovered if
+the host is still up, or completed from the last checkpoint if it is not.
+Saves/checkpoints remain emulator- and title-specific; a working transport is
+not full gameplay acceptance.
 
 ## Xenia acceptance pilot
 

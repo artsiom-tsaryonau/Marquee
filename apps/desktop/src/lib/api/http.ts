@@ -107,6 +107,9 @@ export const httpApi: LibraryApi = {
   async pickPs3Firmware() {
     return window.prompt('Absolute PS3UPDAT.PUP path on the Marquee computer (not a browser upload)')?.trim() || null;
   },
+  async pickPortRom() {
+    return window.prompt('Absolute Nintendo 64 ROM path on the Marquee computer (not a browser upload)')?.trim() || null;
+  },
   async pickConsoleContent() {
     return window.prompt('Absolute PS4 PKG, Xbox 360 ISO or console RAR path on the Marquee computer (not a browser upload)')?.trim() || null;
   },

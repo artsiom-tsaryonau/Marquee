@@ -23,7 +23,7 @@ Marquee does not download BIOS files or commercial games.
 | Web (`marquee run web`) | **Works.** Same dispatch layer as the desktop shell, token-authenticated, no sample data. |
 | CLI (`marquee`) | **Works** without GTK. Same core as desktop. Use `--data-dir` for isolation. |
 | Desktop (`./scripts/run.sh desktop`) | Optimized standalone window with embedded UI. NVIDIA/Wayland now defaults to accelerated shared-memory transport; see [live rendering correction](DESKTOP_RENDERING.md). Software mode is an explicit fallback. Native folder-picker / Play clicks are **not live-tested**. |
-| Persistent library | SQLite schema **v6** at `$XDG_DATA_HOME/marquee/library.db` (or `--data-dir` / `MARQUEE_DATA_DIR`). Artwork v2, session recovery v3, root-system v4 and `preparation_receipts` v6 are in that sequence. Newer `user_version` is rejected. |
+| Persistent library | SQLite schema **v7** at `$XDG_DATA_HOME/marquee/library.db` (or `--data-dir` / `MARQUEE_DATA_DIR`). Artwork v2, session recovery v3, root-system v4, `preparation_receipts` v6 and `sessions.mode` v7 are in that sequence. Newer `user_version` is rejected. |
 | In-app PCSX2 install | **Built, via the emulator catalogue.** Downloads the official AppImage, verifies it, unpacks it into `$XDG_DATA_HOME/marquee/runners/pcsx2/current`. Flatpak, keep-as-AppImage and the dedicated installer were removed 2026-10-21; host copies are never discovered. First launch seeds `PCSX2.ini` so no setup wizard appears (see [EMULATORS](EMULATORS.md)). |
 | Serial covers | **Built.** xlenore/ps2-covers JPEG cache, `convertFileSrc` + asset protocol. ScreenScraper/SteamGridDB still [follow-up](ENRICHMENT.md#ps2-metadata-matching-and-cached-artwork). |
 | Real PCSX2 Play → quit → duration | **Pending.** Fake runner `/bin/sleep` records duration in tests. That is not the gate. |
@@ -246,7 +246,7 @@ After import, Marquee fetches 2D covers from [xlenore/ps2-covers](https://github
 
 | Claim | Where |
 | --- | --- |
-| Schema v6 | `crates/core/src/db.rs` / `crates/core/src/model.rs` (`SCHEMA_VERSION`) |
+| Schema v7 | `crates/core/src/db.rs` / `crates/core/src/model.rs` (`SCHEMA_VERSION`) |
 | ISO scan + serial | `crates/core/src/library.rs`, `crates/core/src/iso.rs` (`cover_serial`) |
 | PCSX2 argv + BIOS | `crates/core/src/runners.rs` |
 | PCSX2 install | `crates/core/src/lib.rs` (`install_pcsx2`) via the emulator catalogue |

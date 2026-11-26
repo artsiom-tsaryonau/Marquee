@@ -132,6 +132,7 @@ export interface Session {
   state: 'running' | 'ended' | 'failed';
   error: string | null;
   port_id?: string | null;
+  mode?: 'local' | 'stream';
 }
 
 export interface SkipCount {
@@ -284,6 +285,7 @@ export type CoreEvent =
 export interface GameHistory {
   sessions: Session[];
   week_seconds: number;
+  stream_seconds?: number;
 }
 export interface PlaySummary {
   week_seconds: number;
@@ -573,6 +575,7 @@ export interface LibraryApi {
   inspectConsole(path:string, system: 'ps4'|'ps5'|'xbox'|'xbox360'): Promise<ConsoleInspection>;
   pickPs3Content(): Promise<string | null>;
   pickPs3Firmware(): Promise<string | null>;
+  pickPortRom(): Promise<string | null>;
   ps3FirmwareStatus(): Promise<Ps3FirmwareStatus>;
   reviewPs3Firmware(path: string): Promise<Ps3FirmwareStatus>;
   installPs3Firmware(reviewToken: string): Promise<Ps3FirmwareStatus>;
@@ -641,6 +644,7 @@ export interface LibraryApi {
   listPorts(): Promise<PortInfo[]>;
   checkPortUpdates(): Promise<PortInfo[]>;
   installPort(portId: string): Promise<PortInfo[]>;
+  setupPort(portId: string, path: string): Promise<PortInfo[]>;
   cancelPortInstall(portId: string): Promise<PortInfo[]>;
   launchPort(portId: string): Promise<void>;
   portSessions(portId: string): Promise<GameHistory>;

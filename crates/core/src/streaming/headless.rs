@@ -1,17 +1,21 @@
 //! Library-owned private-display launches. No arbitrary command manifests or desktop capture.
+use crate::db::now_rfc3339;
 use crate::error::{AppError, Result};
+use crate::model::{CoreEvent, Session, SessionState};
+use crate::sessions::EventSink;
 use crate::source_builds::{run, valid_image};
 use crate::{runners, Core};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
-use std::time::Duration;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, UNIX_EPOCH};
 
 const APP: &str = "Marquee library game";
 const XENIA_REVISION: &str = "451f915566d57436555c6eb4ee77bb4717eb01de";
@@ -162,6 +166,145 @@ fn owned(core: &Core, data: &Path, container: &Value) -> Result<Owner> {
     }
     Ok(owner)
 }
+
+fn watching() -> &'static Mutex<HashSet<String>> {
+    static WATCHING: std::sync::OnceLock<Mutex<HashSet<String>>> = std::sync::OnceLock::new();
+    WATCHING.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+fn library_container_running(data: &Path) -> bool {
+    container(data)
+        .ok()
+        .flatten()
+        .is_some_and(|info| info["State"]["Running"] == true)
+}
+
+fn stream_profile(data: &Path, edition_id: &str) -> Option<PathBuf> {
+    let owner = owner(data).ok().flatten()?;
+    let plan: Plan = serde_json::from_value(
+        read_json(
+            &root(data)
+                .join("launches")
+                .join(&owner.plan)
+                .join("launch.json"),
+        )
+        .ok()?,
+    )
+    .ok()?;
+    Some(
+        root(data)
+            .join("profiles")
+            .join(owner.library)
+            .join(plan.adapter)
+            .join(edition_id),
+    )
+}
+
+fn game_exited(profile: &Path, started_unix: i64) -> bool {
+    let Ok(meta) = fs::metadata(profile.join("last-exit.json")) else {
+        return false;
+    };
+    let Ok(mtime) = meta.modified() else {
+        return false;
+    };
+    let mtime = mtime
+        .duration_since(UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_secs() as i64)
+        .unwrap_or(0);
+    mtime >= started_unix
+}
+
+fn finish_stream_row(
+    db: &Arc<Mutex<crate::db::Db>>,
+    sink: Arc<dyn crate::sessions::EventSink>,
+    row: crate::db::SessionRow,
+    error: Option<&str>,
+) -> Result<()> {
+    let started = crate::history::unix_of(&row.started_at).unwrap_or(crate::unix_now());
+    let elapsed = (crate::unix_now() - started).max(row.duration_seconds.unwrap_or(0));
+    let (state, error, credit) = if elapsed < crate::sessions::EARLY_EXIT_SECS {
+        (
+            "failed",
+            error.or(Some("Streamed session ended before it stayed open")),
+            false,
+        )
+    } else {
+        ("ended", error, true)
+    };
+    let guard = db.lock().unwrap_or_else(|e| e.into_inner());
+    guard.complete_session(&row.id, elapsed, None, state, error, credit)?;
+    if let Ok(Some(row)) = guard.session_by_id(&row.id) {
+        if let Ok(session) = crate::sessions::row_to_session(row) {
+            if session.state == SessionState::Failed {
+                sink.emit(CoreEvent::SessionFailed { session });
+            } else {
+                sink.emit(CoreEvent::SessionEnded { session });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn spawn_stream_watch(
+    db: Arc<Mutex<crate::db::Db>>,
+    sink: Arc<dyn crate::sessions::EventSink>,
+    data: PathBuf,
+    session_id: String,
+    edition_id: String,
+    started_unix: i64,
+) {
+    {
+        let mut watching = watching().lock().unwrap_or_else(|e| e.into_inner());
+        if !watching.insert(session_id.clone()) {
+            return;
+        }
+    }
+    std::thread::spawn(move || {
+        let profile = stream_profile(&data, &edition_id);
+        loop {
+            std::thread::sleep(Duration::from_millis(250));
+            let elapsed = (crate::unix_now() - started_unix).max(0);
+            let still_running = {
+                let guard = db.lock().unwrap_or_else(|e| e.into_inner());
+                match guard.session_by_id(&session_id) {
+                    Ok(Some(row)) if row.state == "running" => {
+                        let _ = guard.checkpoint_session(&session_id, elapsed);
+                        true
+                    }
+                    _ => false,
+                }
+            };
+            if !still_running {
+                break;
+            }
+            let exited = profile
+                .as_ref()
+                .is_some_and(|path| game_exited(path, started_unix));
+            let host = library_container_running(&data);
+            if !exited && host {
+                continue;
+            }
+            let reason = if exited {
+                None
+            } else {
+                Some("Streaming host is no longer running")
+            };
+            let row = {
+                let guard = db.lock().unwrap_or_else(|e| e.into_inner());
+                guard.session_by_id(&session_id).ok().flatten()
+            };
+            if let Some(row) = row {
+                let _ = finish_stream_row(&db, Arc::clone(&sink), row, reason);
+            }
+            break;
+        }
+        watching()
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(&session_id);
+    });
+}
+
 fn digest_image(receipt: &Value) -> Result<String> {
     let image = receipt["image"].as_str().unwrap_or_default();
     if !valid_image(image) {
@@ -559,12 +702,14 @@ impl Core {
                             .ok_or_else(|| err("Owned streaming app is missing"))?;
                         if viewer["running"] == true {
                             if viewer["app_id"] == app.id {
+                                self.start_stream_session(&plan.edition_id, &plan.runner_id)?;
                                 return Ok(());
                             }
                             return Err(err(
                                 "Close the other viewer before reconnecting this game",
                             ));
                         }
+                        self.start_stream_session(&plan.edition_id, &plan.runner_id)?;
                         return self.streaming_open_viewer(app.id.clone());
                     }
                 }
@@ -578,8 +723,10 @@ impl Core {
                         "End the running streamed game before switching games or emulators",
                     ));
                 }
+                self.complete_stream_sessions(None)?;
                 output(Command::new("podman").args(["stop", "--time", "10", &name(&c.data_dir)]))?;
             } else {
+                self.complete_stream_sessions(Some("Streaming host is no longer running"))?;
                 output(Command::new("podman").args(["rm", &name(&c.data_dir)]))?;
             }
         } else if super::wolf::WolfClient::new(&c.socket)?.inspect().is_ok() {
@@ -689,8 +836,8 @@ impl Core {
             &root(&c.data_dir).join("owner.json"),
             &Owner {
                 library: key(self),
-                edition_id: plan.edition_id,
-                runner_id: plan.runner_id,
+                edition_id: plan.edition_id.clone(),
+                runner_id: plan.runner_id.clone(),
                 plan: plan_id,
             },
         )?;
@@ -698,6 +845,7 @@ impl Core {
         for _ in 0..60 {
             if let Ok(host) = super::wolf::WolfClient::new(&c.socket)?.inspect() {
                 if let Some(app) = host.apps.into_iter().find(|a| a.title == APP) {
+                    self.start_stream_session(&plan.edition_id, &plan.runner_id)?;
                     return self.streaming_open_viewer(app.id);
                 }
             }
@@ -712,6 +860,7 @@ impl Core {
         if self.headless.lock().unwrap_or_else(|e| e.into_inner()).busy {
             return Err(err("Wait for headless setup to finish before stopping it"));
         }
+        self.complete_stream_sessions(None)?;
         let c = self.headless_connection()?;
         if let Some(info) = container(&c.data_dir)? {
             owned(self, &c.data_dir, &info)?;
@@ -722,6 +871,100 @@ impl Core {
         }
         Ok(())
     }
+
+    fn start_stream_session(&self, edition_id: &str, runner_id: &str) -> Result<()> {
+        let sessions = self.with_db(crate::sessions::list)?;
+        if let Some(existing) = sessions.iter().find(|session| {
+            session.state == SessionState::Running
+                && session.mode == "stream"
+                && session.edition_id == edition_id
+        }) {
+            spawn_stream_watch(
+                self.db_arc(),
+                self.hub(),
+                self.paths.data_dir.clone(),
+                existing.id.clone(),
+                existing.edition_id.clone(),
+                crate::history::unix_of(&existing.started_at).unwrap_or(crate::unix_now()),
+            );
+            return Ok(());
+        }
+        self.complete_stream_sessions(None)?;
+        let session_id = uuid::Uuid::new_v4().to_string();
+        let started = now_rfc3339();
+        self.with_db(|db| {
+            db.insert_session_with_mode(
+                &session_id,
+                edition_id,
+                runner_id,
+                &started,
+                "running",
+                "stream",
+            )
+        })?;
+        let session = Session {
+            id: session_id.clone(),
+            edition_id: edition_id.to_string(),
+            runner_id: runner_id.to_string(),
+            started_at: started.clone(),
+            ended_at: None,
+            duration_seconds: None,
+            exit_code: None,
+            state: SessionState::Running,
+            error: None,
+            port_id: None,
+            mode: "stream".into(),
+        };
+        self.hub().emit(CoreEvent::SessionStarted { session });
+        spawn_stream_watch(
+            self.db_arc(),
+            self.hub(),
+            self.paths.data_dir.clone(),
+            session_id,
+            edition_id.to_string(),
+            crate::history::unix_of(&started).unwrap_or(crate::unix_now()),
+        );
+        Ok(())
+    }
+
+    fn complete_stream_sessions(&self, error: Option<&str>) -> Result<()> {
+        let rows = self.with_db(|db| db.list_sessions())?;
+        for row in rows
+            .into_iter()
+            .filter(|row| row.state == "running" && row.mode == "stream")
+        {
+            finish_stream_row(&self.db_arc(), self.hub(), row, error)?;
+        }
+        Ok(())
+    }
+}
+
+pub fn recover_stream(core: &Core) -> Result<()> {
+    let rows = core.with_db(|db| db.list_sessions())?;
+    for row in rows
+        .into_iter()
+        .filter(|row| row.state == "running" && row.mode == "stream")
+    {
+        let host = library_container_running(&core.paths.data_dir);
+        if host {
+            spawn_stream_watch(
+                core.db_arc(),
+                core.hub(),
+                core.paths.data_dir.clone(),
+                row.id.clone(),
+                row.edition_id.clone(),
+                crate::history::unix_of(&row.started_at).unwrap_or(crate::unix_now()),
+            );
+        } else {
+            finish_stream_row(
+                &core.db_arc(),
+                core.hub(),
+                row,
+                Some("Marquee exited while this streamed session was running"),
+            )?;
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -881,5 +1124,79 @@ mod tests {
             "LAUNCH_BUSY"
         );
         assert!(core.headless_stop().is_err());
+    }
+
+    #[test]
+    fn streamed_session_lifecycle_credits_playtime() {
+        let temp = tempfile::tempdir().unwrap();
+        let core = Core::open_isolated(Some(temp.path().join("data")), true).unwrap();
+        core.with_db(|db| {
+            db.conn.execute(
+                "INSERT INTO editions(id,system,scan_title,imported_at) VALUES('edition','ps2','Game','2026-01-01')",
+                [],
+            )?;
+            db.insert_session_with_mode(
+                "stream-1",
+                "edition",
+                "runner.fake",
+                "2026-01-01T00:00:00Z",
+                "running",
+                "stream",
+            )?;
+            db.complete_session("stream-1", 120, None, "ended", None, true)
+        })
+        .unwrap();
+        let snap = core.snapshot().unwrap();
+        let session = snap
+            .sessions
+            .iter()
+            .find(|session| session.id == "stream-1")
+            .unwrap();
+        assert_eq!(session.mode, "stream");
+        assert_eq!(session.state, SessionState::Ended);
+        assert_eq!(
+            snap.editions
+                .iter()
+                .find(|edition| edition.id == "edition")
+                .unwrap()
+                .playtime_seconds,
+            120
+        );
+        assert_eq!(core.game_sessions("edition").unwrap().stream_seconds, 120);
+    }
+
+    #[test]
+    fn refused_headless_launch_does_not_insert_a_stream_session() {
+        let temp = tempfile::tempdir().unwrap();
+        let core = Arc::new(Core::open_isolated(Some(temp.path().join("data")), true).unwrap());
+        core.with_db(|db| {
+            db.conn.execute(
+                "INSERT INTO editions(id,system,scan_title,imported_at) VALUES('edition','ps2','Game','2026-01-01')",
+                [],
+            )?;
+            db.insert_session(
+                "session",
+                "edition",
+                "runner.fake",
+                "2026-01-01T00:00:00Z",
+                "running",
+            )
+        })
+        .unwrap();
+        let err = core.headless_launch("edition").unwrap_err();
+        assert!(err.message.contains("Close the local game"));
+        let sessions = core.with_db(crate::sessions::list).unwrap();
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].mode, "local");
+    }
+
+    #[test]
+    fn last_exit_after_session_start_counts_as_game_exit() {
+        let temp = tempfile::tempdir().unwrap();
+        let profile = temp.path();
+        let started = crate::unix_now() - 5;
+        assert!(!game_exited(profile, started));
+        fs::write(profile.join("last-exit.json"), "{}").unwrap();
+        assert!(game_exited(profile, started));
     }
 }

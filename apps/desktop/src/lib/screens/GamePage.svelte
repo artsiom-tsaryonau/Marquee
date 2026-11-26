@@ -22,6 +22,7 @@
   import XeniaSaves from '../components/XeniaSaves.svelte';
   let headlessActive = $state(false);
   let tab = $state<GameDetailTab>('overview');
+  let streamedSeconds = $state(0);
 
   const g = $derived(app.current ?? app.hero);
   const variants = $derived(g ? app.games.filter((x) => canonicalId(x) === canonicalId(g)) : []);
@@ -37,6 +38,14 @@
   const status = $derived(g ? gameStatus(g) : null);
   const share = $derived(g && offline ? app.transferFor(g.id) : undefined);
   $effect(() => { if (app.torrentsOn) return app.watchTransfers(); });
+  $effect(() => {
+    streamedSeconds = 0;
+    if (!g || g.source === 'port' || g.source === 'catalogue') return;
+    const id = g.id;
+    void app.api.gameSessions(id).then((history) => {
+      if (g?.id === id) streamedSeconds = history.stream_seconds ?? 0;
+    }).catch(() => {});
+  });
   let editing = $state(false);
   let titleDraft = $state('');
   let titleInput = $state<HTMLInputElement>();
@@ -159,7 +168,7 @@
     </div>
   {#if app.runnerSelectionBusy}<span class="selection-status" role="status">Saving emulator…</span>{:else if app.runnerSelectionUnconfirmed}<span class="selection-status" role="status">Select the emulator again to confirm it before playing.</span>{/if}
   <div class="play-strip" aria-label="Game activity">
-    <div><span><small><Icon name="clock" size={14} />PLAYTIME</small><strong>{g.source === 'catalogue' ? 'Not tracked' : g.playtimeMin ? hours(g.playtimeMin) : 'Not played yet'}</strong></span></div>
+    <div><span><small><Icon name="clock" size={14} />PLAYTIME</small><strong>{g.source === 'catalogue' ? 'Not tracked' : g.playtimeMin ? `${hours(g.playtimeMin)}${streamedSeconds ? ` (${hours(streamedSeconds / 60)} streamed)` : ''}` : 'Not played yet'}</strong></span></div>
     <div><span><small><Icon name="clock" size={14} />LAST PLAYED</small><strong>{g.lastPlayed ? ago(g.lastPlayed) : '—'}</strong></span></div>
     <div><span><small><Icon name="controller" size={14} />PLAY WITH</small><strong>{launchVia}</strong></span></div>
   </div>

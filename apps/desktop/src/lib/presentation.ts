@@ -29,13 +29,15 @@ export function emulatorName(game: GameEntry): string {
 }
 
 /** Missing data opens the supported folder fallback, never reinstalls the engine. */
-export function portAction(port: Pick<PortEntry, 'status'>): { label: string; operation: 'launch' | 'install' | 'folder' } {
+export function portAction(port: Pick<PortEntry, 'id' | 'status'>): { label: string; operation: 'launch' | 'install' | 'folder' | 'setup' } {
   switch (port.status) {
     case 'installed': return { label: 'Open port', operation: 'launch' };
     case 'ready': return { label: 'Play', operation: 'launch' };
     case 'update': return { label: 'Update', operation: 'install' };
     case 'review': return { label: 'Open port', operation: 'launch' };
-    case 'needs-rom':
+    case 'needs-rom': return ['shipwright', '2ship2harkinian'].includes(port.id)
+      ? { label: 'Choose ROM', operation: 'setup' }
+      : { label: 'Open game files folder', operation: 'folder' };
     case 'needs-data': return { label: 'Open game files folder', operation: 'folder' };
     default: return { label: 'Install', operation: 'install' };
   }

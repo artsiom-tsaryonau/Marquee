@@ -52,13 +52,13 @@ Line numbers are as of `9453414`; re-locate by symbol name if they moved.
 | Xbox 360 | Verified ISO prepare/register/Play with Xenia; storage/content/cache/config/log forced under `<data>/xenia/`. Vanquish menu, audio, keyboard, clean exit observed; gameplay and native save not | `emulators.rs:~789-833`; [Xbox 360 adapter](CONSOLE_PREPARATION.md#xbox-360-verified-iso-adapter-2026-10-25) |
 | Streaming API | Streaming screen covers an existing host: connection, viewer install/pair/open/disconnect, pairing, revoke, end game, and Wolf runtime build/probe/rollback. No host Start button | `crates/core/src/streaming/controls.rs`; `runtime.rs`; `apps/desktop/src/lib/screens/Streaming.svelte` |
 | Headless | Allowlist is `(genesis, runner.blastem.marquee)` and `(xbox360, runner.xenia.marquee)`. `base_image()` prefers `streaming/library/base.json`, then Sonic/Wolf, then the Xenia pilot. Xbox 360 still requires the pinned Xenia receipt. Ports publish on `127.0.0.1` only | `crates/core/src/streaming/headless.rs`; `catalog/streaming/library/library-game.py` |
-| Stream playtime | No `sessions::` use under `streaming/`. Headless refuses while a local session runs; local Play refuses while headless is active | `headless.rs:424-425`; `lib.rs:312-316` |
+| Stream playtime | Schema v7 `sessions.mode`. Headless inserts `mode='stream'` when Wolf shows the library app, checkpoints, and completes on stop, `last-exit.json`, or host loss. Viewer close does not end playtime | `streaming/headless.rs`; `db.rs` v7 |
 | Viewer target | Moonlight `stream`/`pair` target is the literal `127.0.0.1`; Wolf `WOLF_INTERNAL_IP` is `127.0.0.1` | `streaming/viewer.rs:70-72`, `:120-123`; `catalog/streaming/wolf/entrypoint.py:57` |
 | Steam | `steam::discover()` builds a transient `Inventory` (`steam-install:{lib_fp}:{appid}`); exposed as `inspect_steam` (API/CLI), not persisted, not in the desktop UI, no launch. `steam_web_api`/`steam_id` keys exist with no consumer | `crates/core/src/steam/mod.rs:145-225`; `lib.rs:644`; `crates/core/src/keys.rs:41-57` |
 | Windows runtime | Only Purple: pinned umu zipapp, isolated `<data>/windows/purple/`, receipt, cancel. No Legendary/gogdl code | `crates/core/src/purple.rs:21-89` |
 | Portable packages | Proposal only; manager `Receipt` has `id, recipe, source_sha256, system, destination, files[path,size,sha256]` | [portable packages](PORTABLE_PACKAGES.md); `crates/manager/src/service.rs:35-49` |
 | Storage | Inventory, configurable collection/BIOS folders, same-filesystem managed installation moves with journal and rollback. No cross-filesystem move, no cleanup candidates, no artifact registry | `crates/core/src/storage.rs`; `crates/manager/src/relocation.rs`; `crates/core/src/storage_moves.rs` |
-| Identity | Schema v6. `editions` is effectively an installation; no `games`/`installations` tables | `crates/core/src/model.rs:4`; [unified library](UNIFIED_LIBRARY.md) |
+| Identity | Schema v7. `editions` is effectively an installation; no `games`/`installations` tables | `crates/core/src/model.rs:4`; [unified library](UNIFIED_LIBRARY.md) |
 | Soundtracks | Pinned yt-dlp used for metadata only (`--skip-download`, cookies/plugins/remote components off); local `music_import` copies into content-addressed storage. No manager music job | `crates/core/src/music_discovery.rs:16-237`; `crates/core/src/music.rs:449` |
 | Controllers | No `gilrs`; browser Gamepad API drives focus only; keyboard seeds for Xenia, PCSX2, Mesen | `apps/desktop/src/lib/focus.ts`; `crates/core/src/bios.rs:336-396`; `catalog/emulators/xenia.json` |
 | Saves | Emulator profiles are per emulator (`<data>/<emulator>/xdg-*`), not per game. Ports keep saves in `<data>/ports/<id>/`. Port engine updates keep `.engine-backup`. No save backup feature | `emulators.rs:~789-833`; `port_engine.rs:~450-522` |
@@ -99,8 +99,8 @@ If UL1 lands before ST3c, swap the numbers here in the same change set.
 | --- | --- | --- | --- | --- | --- |
 | NP1 | Port play sessions and playtime | Ports | M | FD1 | Done 2026-11-26. Live Shipwright play unperformed |
 | NP2 | Port data readiness (`needs-rom` / `needs-data`) | Ports | S | — | Done 2026-11-25 |
-| NP3 | Shipwright game-data setup job | Ports | M | NP2 | Open |
-| NP4 | Data setup for the other five ports, one per change set | Ports | S each | NP2 | Open |
+| NP3 | Shipwright game-data setup job | Ports | M | NP2 | Done 2026-11-26. Live ROM setup unperformed |
+| NP4 | Data setup for the other five ports, one per change set | Ports | S each | NP2 | 2ship2harkinian done 2026-11-26. Zelda64Recomp, sm64coopdx, Fallout 2, UZDoom open |
 | NP5 | Port release review screen and re-pin script | Ports | S | FD3 | Done 2026-11-25 |
 | PS4-1 | shadPS4 launch contract and runner | Consoles | S | — | Done 2026-11-26. Live title boot unperformed |
 | PS4-2 | PS4 base-game preparation recipe | Consoles | L | PS4-1 | Open |
@@ -110,7 +110,7 @@ If UL1 lands before ST3c, swap the numbers here in the same change set.
 | X360-1 | Xbox 360 save/relaunch acceptance support | Consoles | S | — | Done in code. Live Vanquish save/relaunch unperformed |
 | ST3a | Wolf runtime build/status/probe/rollback in the app | Streaming | M | — | Done 2026-11-26. No host Start button |
 | ST3b | Base image independent of the Xenia pilot | Streaming | M | — | Done 2026-11-26. Live Genesis stream unperformed |
-| ST3c | Streamed playtime | Streaming | M | FD2 | Open |
+| ST3c | Streamed playtime | Streaming | M | FD2 | Done 2026-11-26. Live stream playtime unperformed |
 | HL1 | Mesen headless adapter | Streaming | M | ST3b | Open |
 | HL2 | DuckStation and PCSX2 headless adapters | Streaming | M each | HL1 | Open |
 | ST4 | Embedded receiver research spike | Streaming | S | FD7 | Done 2026-11-25. No receiver code |
@@ -664,3 +664,17 @@ Live Xbox 360 save/relaunch was not played. No commit was made in this pass.
   `KytyPS5-2026-10-25-83f8bfd` Linux tarball (GitHub digest
   `737ea99e…b6d7e9`). `--game` is recorded; save/profile paths and a runner
   were not added. Live `--help` unperformed.
+
+- **ST3c.** Schema v7 adds `sessions.mode` (`local` default). A headless
+  launch records `mode='stream'` once Wolf shows the library app, checkpoints
+  while the host runs, and completes on Stop, game `last-exit.json`, or host
+  loss. Viewer close does not end the row. Ended stream time is credited and
+  shown as `x h (y h streamed)`. Live stream playtime was not performed.
+
+- **NP3.** Shipwright `needs-rom` offers Choose ROM. The manager copies a
+  matching dump into the port folder (original untouched), writes
+  `.marquee-setup.json`, and records that first launch generates assets.
+  Unknown dumps are refused. Live ROM setup was not performed.
+
+- **NP4 (2ship2harkinian).** Majora’s Mask uses the same ROM copy job as
+  Shipwright against its published SHA-1 list. Live ROM setup unperformed.
