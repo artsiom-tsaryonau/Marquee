@@ -103,11 +103,11 @@ If UL1 lands before ST3c, swap the numbers here in the same change set.
 | NP4 | Data setup for the other five ports, one per change set | Ports | S each | NP2 | 2ship2harkinian and sm64coopdx done 2026-11-26 (live ROM setup needs an owner dump). Zelda64Recomp, Fallout 2, UZDoom open |
 | NP5 | Port release review screen and re-pin script | Ports | S | FD3 | Done 2026-11-25 |
 | PS4-1 | shadPS4 launch contract and runner | Consoles | S | — | Done 2026-11-26. Live title boot unperformed |
-| PS4-2 | PS4 base-game preparation recipe | Consoles | L | PS4-1 | Open |
+| PS4-2 | PS4 base-game preparation recipe | Consoles | L | PS4-1 | Open. Blocked on a playable owner title: Shadow of the Colossus is Menus-only in shadPS4 (#502, v0.21.0); both PS4 inputs were removed 2026-11-26 |
 | PS4-3 | PS4 system descriptor and Library Play | Consoles | M | PS4-2 | Open |
 | PS5-1 | KytyPS5 pin and launch contract | Consoles | S | — | Done 2026-11-26. Live --help and save-path check unperformed |
 | PS5-2 | PS5 preparation and Library Play | Consoles | L | PS5-1 | Open |
-| X360-1 | Xbox 360 save/relaunch acceptance support | Consoles | S | — | Done in code. Live Vanquish save/relaunch unperformed |
+| X360-1 | Xbox 360 save/relaunch acceptance support | Consoles | S | — | Done in code. 2026-11-26: Forza 2, Forza 4 and Dreamcast Collection prepared; profile "Player" signs in at boot; Forza 2 wrote a save under it. Relaunch-and-load unperformed; Forza 2 froze once at its menu |
 | ST3a | Wolf runtime build/status/probe/rollback in the app | Streaming | M | — | Done 2026-11-26. No host Start button |
 | ST3b | Base image independent of the Xenia pilot | Streaming | M | — | Done 2026-11-26. Live Genesis stream passed 2026-11-26 |
 | ST3c | Streamed playtime | Streaming | M | FD2 | Done 2026-11-26. Live stream playtime passed 2026-11-26 |
@@ -131,6 +131,20 @@ If UL1 lands before ST3c, swap the numbers here in the same change set.
 | F2 | Save snapshots and restore | New | M | FD4 | Done 2026-11-26 |
 | F3 | Soundtrack downloads (MU4) | New | L | FD5 | Open |
 | F4 | Controller inventory and native navigation | New | M | FD8 | Open |
+| SAT1 | Sega Saturn via Ymir, IPL import by hash, Saturn disc intake | Emulators | M | — | Done 2026-11-26. UEFA Euro 96 boots, takes input, keeps BIOS settings, exits cleanly; in-game backup save unperformed |
+| SAT2 | Mednafen as a second Saturn runner (pinned source build) | Emulators | M | SAT1 | Open |
+| N3DS1 | Nintendo 3DS via Azahar, encrypted-dump warning | Emulators | S | — | Done 2026-11-26. Pokémon Moon boots, takes input, exits; Driver: Renegade imported |
+| UX1 | Fullscreen default and per-emulator enforced settings (no menus while playing) | Emulators | S | — | Done 2026-11-26. Xenia, Azahar, Ymir verified chrome-free |
+| STOP1 | Stop game for local Play (close, then force after a timeout) | Emulators | S | — | Open. Next: a frozen fullscreen game currently has no way out |
+| PATCH1 | Xenia patch series: force-quit on window close, hide-menu option, default profile | Emulators | M | STOP1 | Open |
+| PATCH2 | Ymir patch series: hide-menu option, automatic BIOS language and clock | Emulators | S | SAT1 | Open |
+| PATCH3 | Shipwright: generate assets without the first-launch dialogs | Ports | S | NP3 | Open |
+| PSP1 | PSP via PPSSPP, PSN .pkg conversion (pkg2zip) | Emulators | M | — | Open. Persona 3 Portable waiting |
+| GC1 | GameCube via Dolphin | Emulators | M | — | Open. Metroid Prime (.ciso) waiting |
+| NSW1 | Switch via Eden: keys, firmware, NSP | Emulators | L | — | Open. Keys, firmware 23.5.0 and Nightshade present |
+| WIIU1 | Wii U via Cemu: NUS install of game, update and DLC | Emulators | M | — | Blocked: needs the Wii U common key (keys.txt) |
+| VITA1 | PS Vita via Vita3K | Emulators | M | — | Blocked: Persona 4 Golden needs its zRIF licence |
+| XBOX1 | Original Xbox Library Play via xemu | Emulators | M | — | Blocked: needs Xbox BIOS, MCPX and HDD image |
 
 ## Waves
 
@@ -142,6 +156,9 @@ Items in one wave can run in parallel unless the conflict map says otherwise.
 3. **Wave 3, built on wave 2:** NP3, NP4, PS4-2, HL1, MP1, SL2, F3, F4.
 4. **Wave 4:** PS4-3, PS5-2, HL2, ST5, S1B, E1, MP2.
 5. **Wave 5:** G1, MP3, UL1.
+6. **Owner order 2026-11-26 (emulators):** STOP1, then PATCH1; PSP1, GC1 and
+   NSW1 in parallel; PATCH2, PATCH3 and SAT2 after. WIIU1, VITA1 and XBOX1 wait for
+   owner-supplied keys or firmware.
 
 UL1 can start earlier as a design and migration-fixture change, but its cutover
 waits until S1A and E1 show which installation shapes the model must hold.
@@ -720,6 +737,22 @@ Live Xbox 360 save/relaunch was not played. No commit was made in this pass.
   - port session history returns `ended_at` and `exit_code`.
   A physical controller and listening to the audio were not checked; the
   `soh.elf` stream was running in PipeWire.
+
+### 2026-11-26 emulators and collection
+
+- **Saturn (SAT1), 3DS (N3DS1), no-menu play (UX1):** details and live checks in
+  [Emulators](EMULATORS.md#sega-saturn-2026-11-26).
+- **XS Moto (PS1):** intake now repairs CUE sheets whose `FILE` names point at
+  renamed track files, so the serial (SLES-04095) resolves and the disc opens.
+  DuckStation's own updater no longer prompts at launch.
+- **btrfs after a reboot:** the collection folder and the managed-installations
+  folder both failed identity checks after a device renumber (42 to 54) and blocked
+  intake and preparation. Both now record the statvfs filesystem id.
+- **Collection layout:** game archives, BIOS and firmware moved out of the
+  repository into `~/Games/Marquee/sources/{imported/<system>,bios,emulators}`;
+  about 60 GB of byte-identical duplicates and recreatable copies were removed.
+  Homebrew was removed from the library at the owner's request and can be
+  re-fetched with `roms/fetch-homebrew.sh`.
 
 ### 2026-11-26 follow-up audit
 

@@ -1,6 +1,6 @@
 # Marquee roadmap
 
-Updated 2026-10-25. This document owns product priority and milestone status.
+Updated 2026-11-26. This document owns product priority and milestone status.
 [Marquee manager](MARQUEE_MANAGER.md) owns the acquisition architecture and detailed
 implementation sequence. Dated feature reports do not override these decisions.
 
@@ -327,7 +327,26 @@ setup, native saves and gameplay/relaunch acceptance remain open. No game data
 was downloaded or an engine launched by this installation-only test.
 
 
-## Current owner priority: decomps, PS4 and PS5 (2026-10-25)
+## Current owner priority: emulators the owner plays (2026-11-26)
+
+The owner plays alone and wants games to start ready: fullscreen with no emulator
+menus, profiles and first-run prompts handled by Marquee, and personal patches to
+emulators where settings cannot do it (nothing is distributed). The item IDs below
+are tracked in the [feature plan](FEATURE_PLAN.md#tracker).
+
+1. **Stop game (STOP1).** A frozen fullscreen game must have a way out from Marquee.
+2. **Emulator patch series (PATCH1–3).** Pinned upstream plus small patches built by
+   the existing source-build recipes: Xenia first (force-quit on close, hide-menu
+   option, default profile), then Ymir and Shipwright. Settings-only emulators are
+   not forked.
+3. **Owned games waiting for an emulator.** PSP (Persona 3 Portable, PSN package),
+   GameCube (Metroid Prime, Dolphin) and Switch (Nightshade, Eden). Wii U, Vita and
+   original Xbox wait for owner-supplied keys or firmware.
+4. **Done 2026-11-26.** Shipwright save/restore, Genesis streaming, Saturn (Ymir) and
+   3DS (Azahar) Library Play, Xbox 360 profile and saves, no-menu fullscreen play.
+   PS4 stays blocked: the only PS4 title reached menus only, and was removed.
+
+## Owner priority: decomps, PS4 and PS5 (2026-10-25; superseded above)
 
 1. **Native engines — durable foundation implemented.** Q2b moves shipped port
    installation into the existing manager: close/reconnect, progress, cancellation,
