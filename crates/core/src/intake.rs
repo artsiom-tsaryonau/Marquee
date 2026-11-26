@@ -411,6 +411,18 @@ impl Core {
             d if d.is_empty() => message,
             d => format!("{message} Possible duplicate of: {}.", d.join(", ")),
         };
+        let encrypted_3ds = system == "3ds"
+            && wanted.iter().any(|(_, rel)| {
+                matches!(ext_of(rel).as_str(), "3ds" | "cci")
+                    && marquee_media::n3ds::decrypted(&dest_dir.join(rel)) == Some(false)
+            });
+        let message = if encrypted_3ds {
+            format!(
+                "{message} This 3DS dump is encrypted; Azahar needs a decrypted dump to boot it."
+            )
+        } else {
+            message
+        };
         let mut rep = report(
             outcome,
             Some(system),

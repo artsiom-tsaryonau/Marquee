@@ -1,0 +1,16 @@
+{
+  "id": "3ds",
+  "display_name": "Nintendo 3DS",
+  "supported_extensions": [
+    "3ds",
+    "cci",
+    "cxi",
+    "3dsx"
+  ],
+  "skipped_extensions": [
+    "cia"
+  ],
+  "runner_kind": "emulator",
+  "emulator": "azahar",
+  "notes": "Cartridge dumps must be decrypted (NCCH NoCrypto flag). .cia installer packages are not imported as games."
+}

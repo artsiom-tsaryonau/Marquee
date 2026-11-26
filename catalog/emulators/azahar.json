@@ -9,5 +9,15 @@
   "asset_excludes": [],
   "binary": "AppRun",
   "config_subdir": "azahar",
-  "requirement": "Decrypted 3DS titles \u2014 library jobs planned; manual import fallback"
+  "requirement": "Nintendo 3DS emulator. Library Play runs decrypted cartridge dumps (.3ds/.cci/.cxi) and homebrew (.3dsx); encrypted dumps do not boot. Saves and settings stay in Marquee's Azahar folder.",
+  "kind": "emulator",
+  "launch": [
+    "{rom}"
+  ],
+  "fullscreen_args": [
+    "-f"
+  ],
+  "windowed_args": [
+    "-w"
+  ]
 }

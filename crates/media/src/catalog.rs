@@ -13,6 +13,7 @@ const GENERIC_JSON: &[&str] = &[
     include_str!("../../../catalog/systems/neogeo.json"),
     include_str!("../../../catalog/systems/dreamcast.json"),
     include_str!("../../../catalog/systems/saturn.json"),
+    include_str!("../../../catalog/systems/3ds.json"),
     include_str!("../../../catalog/systems/nes.json"),
     include_str!("../../../catalog/systems/snes.json"),
     include_str!("../../../catalog/systems/gb.json"),

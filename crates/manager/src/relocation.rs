@@ -62,11 +62,27 @@ fn rename(source: &Path, destination: &Path) -> Result<()> {
     sync(destination.parent().unwrap())
 }
 
-#[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
+/// A directory's identity. `device` can change across reboots on btrfs (each
+/// subvolume gets an anonymous device number); `fsid` from statvfs does not.
+#[derive(Clone, Serialize, Deserialize, Debug)]
 struct Identity {
     device: u64,
     inode: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    fsid: Option<u64>,
 }
+impl PartialEq for Identity {
+    fn eq(&self, other: &Self) -> bool {
+        self.inode == other.inode
+            && match (self.fsid, other.fsid) {
+                (Some(a), Some(b)) => a == b,
+                (None, None) => self.device == other.device,
+                // A record written before fsid existed matches on the inode.
+                _ => true,
+            }
+    }
+}
+impl Eq for Identity {}
 fn identity(path: &Path) -> Result<Identity> {
     let m = fs::symlink_metadata(path)?;
     if !m.is_dir() {
@@ -75,7 +91,18 @@ fn identity(path: &Path) -> Result<Identity> {
     Ok(Identity {
         device: m.dev(),
         inode: m.ino(),
+        fsid: filesystem_id(path),
     })
+}
+fn filesystem_id(path: &Path) -> Option<u64> {
+    use std::os::unix::ffi::OsStrExt;
+    let c = std::ffi::CString::new(path.as_os_str().as_bytes()).ok()?;
+    // SAFETY: `c` is a valid NUL-terminated path and `s` is a plain C struct.
+    let mut s: libc::statvfs = unsafe { std::mem::zeroed() };
+    if unsafe { libc::statvfs(c.as_ptr(), &mut s) } != 0 {
+        return None;
+    }
+    Some(s.f_fsid as u64).filter(|id| *id != 0)
 }
 #[derive(Clone, Serialize, Deserialize, PartialEq, Eq)]
 struct Entry {
@@ -245,12 +272,19 @@ pub(crate) fn installation_root(data: &Path) -> Result<PathBuf> {
     let stable = legacy(data);
     match configured(data)? {
         Some(location) => {
-            if identity(&location.path)? != location.identity
-                || fs::canonicalize(&stable)? != location.path
-            {
+            let current = identity(&location.path)?;
+            if current != location.identity || fs::canonicalize(&stable)? != location.path {
                 return Err(error(
                     "Installation location changed; recover it in Storage settings",
                 ));
+            }
+            if location.identity.fsid.is_none() && current.fsid.is_some() {
+                // Pin the record to the filesystem now that it matched.
+                let upgraded = Location {
+                    path: location.path.clone(),
+                    identity: current,
+                };
+                write(&folder(data).join("location.json"), &upgraded)?;
             }
             service::private_dir(&location.path)?;
             Ok(location.path)
@@ -542,6 +576,27 @@ impl Offline {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_reboot_that_renumbers_the_device_is_the_same_directory() {
+        let id = |device, fsid| Identity {
+            device,
+            inode: 7,
+            fsid,
+        };
+        assert_eq!(id(42, Some(9)), id(54, Some(9)));
+        assert_eq!(id(42, None), id(54, Some(9)));
+        assert_ne!(id(42, Some(9)), id(42, Some(8)));
+        assert_ne!(id(42, None), id(54, None));
+        assert_ne!(
+            id(42, Some(9)),
+            Identity {
+                device: 42,
+                inode: 8,
+                fsid: Some(9)
+            }
+        );
+    }
     struct Fixture {
         temp: tempfile::TempDir,
         data: PathBuf,

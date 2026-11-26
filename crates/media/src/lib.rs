@@ -4,6 +4,7 @@ pub mod catalog;
 pub mod cue;
 pub mod error;
 pub mod iso;
+pub mod n3ds;
 mod rar;
 pub mod saturn;
 pub mod time;
