@@ -391,7 +391,6 @@ impl HashCache {
 }
 
 const ROM_MAX_BYTES: u64 = 512 * 1024 * 1024;
-const SETUP_PARTIAL: &str = ".marquee-setup-partial";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SetupReceipt {
@@ -459,53 +458,42 @@ pub fn place_rom(
     let dest_dir = port_dir(data, &def.id);
     fs::create_dir_all(&dest_dir)?;
     let name = safe_rom_name(source, def);
-    let dest = unique_dest(&dest_dir, &name);
-    let relative = dest
-        .file_name()
-        .and_then(|n| n.to_str())
-        .ok_or_else(|| AppError::new("PORT_ROM", "Invalid ROM file name"))?
-        .to_string();
-    let partial = dest_dir.join(SETUP_PARTIAL);
-    let _ = fs::remove_file(&partial);
-    checkpoint("Copying game file…")?;
-    if let Err(error) = copy_rom(source, &partial, bytes, checkpoint) {
-        let _ = fs::remove_file(&partial);
-        return Err(error);
-    }
-    let (copied_sha1, copied_sha256, copied_bytes) = match digest_file(&partial, bytes) {
-        Ok(digest) => digest,
-        Err(error) => {
-            let _ = fs::remove_file(&partial);
-            return Err(error);
+    let (dest, present) = rom_destination(&dest_dir, &name, bytes, &sha256)?;
+    if !present {
+        let mut partial = tempfile::NamedTempFile::new_in(&dest_dir)?;
+        copy_rom(source, partial.as_file_mut(), bytes, checkpoint)?;
+        let (_, copied_sha256, _) = digest_file(partial.path(), bytes)?;
+        if copied_sha256 != sha256 {
+            return Err(AppError::new(
+                "PORT_ROM",
+                "Copied ROM did not match the source",
+            ));
         }
-    };
-    if copied_sha256 != sha256 || copied_bytes != bytes {
-        let _ = fs::remove_file(&partial);
-        return Err(AppError::new(
-            "PORT_ROM",
-            "Copied ROM did not match the source",
-        ));
+        checkpoint("Publishing ROM…")?;
+        partial
+            .persist_noclobber(&dest)
+            .map_err(|error| error.error)?;
+    } else {
+        checkpoint("Publishing ROM…")?;
     }
-    fs::rename(&partial, &dest).map_err(|error| {
-        let _ = fs::remove_file(&partial);
-        AppError::from(error)
-    })?;
-    checkpoint("Recording setup…")?;
+    let relative = dest.file_name().unwrap().to_string_lossy().into_owned();
     let receipt = SetupReceipt {
         recipe: def.id.clone(),
-        rom_sha1: Some(copied_sha1),
-        rom_sha256: copied_sha256.clone(),
+        rom_sha1: Some(sha1),
+        rom_sha256: sha256.clone(),
         outputs: vec![SetupOutput {
             path: relative,
-            sha256: copied_sha256,
+            sha256,
             bytes,
         }],
         note: "ROM placed, first launch will generate assets".into(),
     };
     let path = dest_dir.join(".marquee-setup.json");
-    let tmp = dest_dir.join(".marquee-setup.json.tmp");
-    fs::write(&tmp, serde_json::to_vec_pretty(&receipt)?)?;
-    fs::rename(tmp, path)?;
+    let mut receipt_file = tempfile::NamedTempFile::new_in(&dest_dir)?;
+    receipt_file.write_all(&serde_json::to_vec_pretty(&receipt)?)?;
+    receipt_file.as_file().sync_all()?;
+    receipt_file.persist(path).map_err(|error| error.error)?;
+    File::open(&dest_dir)?.sync_all()?;
     Ok(receipt)
 }
 
@@ -585,11 +573,7 @@ fn safe_rom_name(source: &Path, def: &PortDef) -> String {
     name.into()
 }
 
-fn unique_dest(dir: &Path, name: &str) -> PathBuf {
-    let dest = dir.join(name);
-    if !dest.exists() {
-        return dest;
-    }
+fn rom_destination(dir: &Path, name: &str, bytes: u64, digest: &str) -> Result<(PathBuf, bool)> {
     let path = Path::new(name);
     let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("game");
     let ext = path
@@ -597,23 +581,38 @@ fn unique_dest(dir: &Path, name: &str) -> PathBuf {
         .and_then(|s| s.to_str())
         .map(|s| format!(".{s}"))
         .unwrap_or_default();
-    for i in 2..100 {
-        let candidate = dir.join(format!("{stem}-{i}{ext}"));
-        if !candidate.exists() {
-            return candidate;
+    for index in 1..=100 {
+        let candidate = match index {
+            1 => dir.join(name),
+            100 => dir.join(format!("{stem}-copy{ext}")),
+            _ => dir.join(format!("{stem}-{index}{ext}")),
+        };
+        match fs::symlink_metadata(&candidate) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok((candidate, false)),
+            Err(error) => return Err(error.into()),
+            Ok(meta)
+                if meta.is_file()
+                    && meta.len() == bytes
+                    && digest_file(&candidate, bytes)?.1 == digest =>
+            {
+                return Ok((candidate, true))
+            }
+            Ok(_) => {}
         }
     }
-    dir.join(format!("{stem}-copy{ext}"))
+    Err(AppError::new(
+        "PORT_ROM",
+        "No free ROM filename in the port folder",
+    ))
 }
 
 fn copy_rom(
     source: &Path,
-    dest: &Path,
+    output: &mut File,
     expected: u64,
     checkpoint: &mut dyn FnMut(&str) -> Result<()>,
 ) -> Result<()> {
     let mut input = File::open(source)?;
-    let mut output = File::create(dest)?;
     let mut buf = [0u8; 1024 * 1024];
     let mut copied = 0u64;
     loop {
@@ -1761,6 +1760,20 @@ mod correction_tests {
         let source = src_dir.path().join("ZELOOTMA.z64");
         fs::write(&source, bytes).unwrap();
         let (def, sha1) = hashed_rom(bytes);
+        let cancel = place_rom(data.path(), &def, &source, &mut |message| {
+            if message == "Publishing ROM…" {
+                return Err(AppError::new("PORT_CANCELLED", "cancelled"));
+            }
+            Ok(())
+        })
+        .unwrap_err();
+        assert_eq!(cancel.code, "PORT_CANCELLED");
+        assert_eq!(
+            fs::read_dir(port_dir(data.path(), "shipwright"))
+                .unwrap()
+                .count(),
+            0
+        );
         let receipt = place_rom(data.path(), &def, &source, &mut |_| Ok(())).unwrap();
         assert_eq!(receipt.recipe, "shipwright");
         assert_eq!(receipt.rom_sha1.as_deref(), Some(sha1.as_str()));
@@ -1769,6 +1782,8 @@ mod correction_tests {
             receipt.note,
             "ROM placed, first launch will generate assets"
         );
+        let retried = place_rom(data.path(), &def, &source, &mut |_| Ok(())).unwrap();
+        assert_eq!(retried.outputs[0].path, receipt.outputs[0].path);
         let dest = port_dir(data.path(), "shipwright").join("ZELOOTMA.z64");
         assert_eq!(fs::read(&dest).unwrap(), bytes);
         assert_eq!(fs::read(&source).unwrap(), bytes);
@@ -1849,7 +1864,7 @@ mod correction_tests {
         assert_eq!(err.code, "PORT_CANCELLED");
         let dest = port_dir(data.path(), "shipwright");
         assert!(!dest.join("large.z64").exists());
-        assert!(!dest.join(SETUP_PARTIAL).exists());
+        assert_eq!(fs::read_dir(dest).unwrap().count(), 0);
         assert_eq!(fs::read(&source).unwrap(), bytes);
     }
 }

@@ -39,7 +39,7 @@ fn read_small(path: &Path) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn emulator_image(program: &Path) -> Result<String> {
+pub(super) fn emulator_image(program: &Path) -> Result<String> {
     let image = String::from_utf8(read_small(&program.join("image-id"))?)
         .map_err(|_| AppError::new("STREAMING_GAME_RECEIPT", "Invalid image receipt"))?;
     let image = image.trim();

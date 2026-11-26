@@ -51,8 +51,8 @@ Line numbers are as of `9453414`; re-locate by symbol name if they moved.
 | PS4/PS5 | shadPS4 has `kind: emulator` and `-g` launch; no `catalog/systems/ps4.json` yet. `kytyps5.json` has no `kind`. Read-only `console::inspect` exists. ShadPKG base extraction of CUSA08809 passed only as an isolated operator spike | `catalog/emulators/shadps4.json`; `crates/core/src/console.rs`; [console preparation](CONSOLE_PREPARATION.md) |
 | Xbox 360 | Verified ISO prepare/register/Play with Xenia; storage/content/cache/config/log forced under `<data>/xenia/`. Vanquish menu, audio, keyboard, clean exit observed; gameplay and native save not | `emulators.rs:~789-833`; [Xbox 360 adapter](CONSOLE_PREPARATION.md#xbox-360-verified-iso-adapter-2026-10-25) |
 | Streaming API | Streaming screen covers an existing host: connection, viewer install/pair/open/disconnect, pairing, revoke, end game, and Wolf runtime build/probe/rollback. No host Start button | `crates/core/src/streaming/controls.rs`; `runtime.rs`; `apps/desktop/src/lib/screens/Streaming.svelte` |
-| Headless | Allowlist is `(genesis, runner.blastem.marquee)` and `(xbox360, runner.xenia.marquee)`. `base_image()` prefers `streaming/library/base.json`, then Sonic/Wolf, then the Xenia pilot. Xbox 360 still requires the pinned Xenia receipt. Ports publish on `127.0.0.1` only | `crates/core/src/streaming/headless.rs`; `catalog/streaming/library/library-game.py` |
-| Stream playtime | Schema v7 `sessions.mode`. Headless inserts `mode='stream'` when Wolf shows the library app, checkpoints, and completes on stop, `last-exit.json`, or host loss. Viewer close does not end playtime | `streaming/headless.rs`; `db.rs` v7 |
+| Headless | Allowlist is `(genesis, runner.blastem.marquee)` and `(xbox360, runner.xenia.marquee)`. Genesis uses a reviewed Sonic/BlastEm image or composes one from managed Wolf and BlastEm. Xbox 360 still requires the pinned Xenia receipt. Ports publish on `127.0.0.1` only | `crates/core/src/streaming/headless.rs`; `catalog/streaming/library/library-game.py` |
+| Stream playtime | Schema v7 `sessions.mode`. Headless inserts `mode='stream'` when the emulator holds its profile lock, checkpoints while it runs, and completes when it exits. Viewer close does not end playtime | `streaming/headless.rs`; `db.rs` v7 |
 | Viewer target | Moonlight `stream`/`pair` target is the literal `127.0.0.1`; Wolf `WOLF_INTERNAL_IP` is `127.0.0.1` | `streaming/viewer.rs:70-72`, `:120-123`; `catalog/streaming/wolf/entrypoint.py:57` |
 | Steam | `steam::discover()` builds a transient `Inventory` (`steam-install:{lib_fp}:{appid}`); exposed as `inspect_steam` (API/CLI), not persisted, not in the desktop UI, no launch. `steam_web_api`/`steam_id` keys exist with no consumer | `crates/core/src/steam/mod.rs:145-225`; `lib.rs:644`; `crates/core/src/keys.rs:41-57` |
 | Windows runtime | Only Purple: pinned umu zipapp, isolated `<data>/windows/purple/`, receipt, cancel. No Legendary/gogdl code | `crates/core/src/purple.rs:21-89` |
@@ -390,24 +390,22 @@ the section.
 
 ## ST3b — Base image independent of the Xenia pilot
 
-**Change.** Introduce a library base receipt `streaming/library/base.json`
-built from pinned Wolf plus the bridge, used by `base_image()`
-(`headless.rs:159-173`). Keep reading `xenia-pilot/current.json` as a
-fallback for existing installs. Xenia-specific layers move into the Xenia
-adapter build.
+**Change.** Genesis can reuse the Sonic/BlastEm pilot or compose the installed
+Wolf and managed BlastEm images. Image selection checks local availability.
+Each library adapter caches its result against the immutable parent and recipe.
+Existing Xenia pilot installs and legacy library base receipts are supported.
 
-**Tests.** Genesis plan builds without a Xenia receipt; existing Xenia path
-unchanged.
+**Tests.** Cover missing images, managed composition and adapter-specific selection.
 
 ## ST3c — Streamed playtime
 
-**Change.** Schema v7 `sessions.mode`. `headless_launch` inserts a session
-(`mode = 'stream'`) when Wolf reports the app session started, checkpoints
-while it runs and completes it on `headless_stop`, game exit or host loss.
-Credit playtime per FD2. Game page shows "x h (y h streamed)".
+**Change.** Schema v7 records streamed games with `mode = 'stream'`. The
+emulator process lock in the configured streaming folder confirms startup and
+continued play. Reconnect reuses the running row. Recovery credits the last
+saved duration when the process has ended.
 
-**Tests.** Migration from v6 keeps rows with `mode = 'local'`; fake Wolf
-session lifecycle completes the row; refused-launch paths create no row.
+**Tests.** Cover migration, refusal during local play, reconnect, recovery in a
+custom streaming folder, exit and checkpoint credit.
 
 ## HL1 — Mesen headless adapter
 
@@ -647,11 +645,9 @@ Live Xbox 360 save/relaunch was not played. No commit was made in this pass.
   Podman answer stops the build. Probe and NVIDIA probe run in the background
   and cannot overlap a build. A failed rebuild still shows the last good receipt.
 
-- **ST3b.** Library headless prefers `streaming/library/base.json`, then the
-  Sonic/BlastEm pilot, then the managed Wolf image, and only then the Xenia
-  pilot. Xbox 360 still requires the pinned Xenia receipt. The library
-  entrypoint no longer imports the Sonic `game-entrypoint.py` helper.
-  Live Genesis streaming was not performed.
+- **ST3b.** Genesis reuses the Sonic/BlastEm image or builds it from managed
+  Wolf and BlastEm. Existing Xenia pilot installations remain supported.
+  Each adapter caches the derived library image with its own receipt.
 
 - **F1 follow-up.** Home “this week” includes ended port sessions. A port
   engine install refuses while that port is running.
@@ -666,9 +662,8 @@ Live Xbox 360 save/relaunch was not played. No commit was made in this pass.
   were not added. Live `--help` unperformed.
 
 - **ST3c.** Schema v7 adds `sessions.mode` (`local` default). A headless
-  launch records `mode='stream'` once Wolf shows the library app, checkpoints
-  while the host runs, and completes on Stop, game `last-exit.json`, or host
-  loss. Viewer close does not end the row. Ended stream time is credited and
+  launch records `mode='stream'` after observing the game process lock in the configured streaming folder.
+  Recovery credits the last confirmed checkpoint if the process has ended. Viewer close does not end the row. Ended stream time is credited and
   shown as `x h (y h streamed)`. Live stream playtime was not performed.
 
 - **NP3.** Shipwright `needs-rom` offers Choose ROM. The manager copies a

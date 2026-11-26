@@ -62,8 +62,9 @@ def main():
         if not os.environ.get('PULSE_SINK') or not os.environ.get('PULSE_SERVER'):
             raise RuntimeError('Private Wolf audio route is unavailable')
         argv, env = launch(manifest, root)
-        with (root / 'last-launch.log').open('w') as log:
-            child = subprocess.Popen(argv, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+        with (root / 'last-launch.log').open('w') as log, (root / ('playing-' + manifest['launch_id'] + '.lock')).open('a') as lease:
+            child = subprocess.Popen(argv, env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True, pass_fds=(lease.fileno(),))
+            fcntl.flock(lease, fcntl.LOCK_EX)
             def stop(_sig, _frame):
                 if child.poll() is None: os.killpg(child.pid, signal.SIGTERM)
             signal.signal(signal.SIGTERM, stop); signal.signal(signal.SIGINT, stop)

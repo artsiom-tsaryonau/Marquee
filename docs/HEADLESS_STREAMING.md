@@ -56,9 +56,9 @@ screen when dependencies are missing. The API shared by desktop and browser is
 `headless_status`, `headless_launch` and confirmed `headless_stop`.
 
 The selected streaming folder must already contain the reviewed Wolf identity,
-pairing and reference viewer. Genesis/BlastEm uses the library base receipt at
-`streaming/library/base.json` when present, otherwise the Sonic/BlastEm pilot
-image or the managed Wolf image. Xbox 360 still needs the pinned Xenia pilot
+pairing and reference viewer. Genesis uses the Sonic/BlastEm image when available. On a fresh setup,
+Marquee combines the managed Wolf host and the reviewed BlastEm build before launch.
+Each adapter caches its library image separately. Xbox 360 still needs the pinned Xenia pilot
 receipt at `streaming/xenia-pilot/current.json`. Initial backend build and
 pairing remain prerequisites; this cut does not turn an arbitrary fresh host
 into a configured streaming server. Configure that folder and its
@@ -85,12 +85,12 @@ plan. Marquee refuses to adopt/stop another container, refuses unrelated Wolf
 catalogues, and keeps the host configuration/pairing when it retires the old fixed
 Sonic/Vanquish slots. The first replacement saves a configuration backup.
 Reopening Marquee can inspect the existing owned host and reconnect. Streamed
-play records a library session with `mode='stream'` once Wolf shows the owned
-app, checkpoints while the host runs, and completes on Stop, game exit
-(`last-exit.json`), or host loss. Closing the viewer does not end that row.
+play records a library session with `mode='stream'` after the game process starts. Marquee observes a file lock in the selected
+streaming profile to checkpoint playtime, detect exit and recover after restart.
+Closing the viewer does not end that row.
 Ended stream time is credited like local Play and shown as
 `x h (y h streamed)`. A stream left running when Marquee exits is recovered if
-the host is still up, or completed from the last checkpoint if it is not.
+the emulator still holds its lock. Otherwise Marquee credits the last checkpoint.
 Saves/checkpoints remain emulator- and title-specific; a working transport is
 not full gameplay acceptance.
 

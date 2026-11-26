@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, UNIX_EPOCH};
+use std::time::Duration;
 
 const APP: &str = "Marquee library game";
 const XENIA_REVISION: &str = "451f915566d57436555c6eb4ee77bb4717eb01de";
@@ -47,6 +47,8 @@ pub struct State {
 struct Plan {
     schema_version: u8,
     launch_id: String,
+    #[serde(default)]
+    process_lease: bool,
     edition_id: String,
     runner_id: String,
     adapter: String,
@@ -172,46 +174,30 @@ fn watching() -> &'static Mutex<HashSet<String>> {
     WATCHING.get_or_init(|| Mutex::new(HashSet::new()))
 }
 
-fn library_container_running(data: &Path) -> bool {
-    container(data)
-        .ok()
-        .flatten()
-        .is_some_and(|info| info["State"]["Running"] == true)
+fn process_lease(data: &Path, library: &str, plan: &Plan) -> PathBuf {
+    let profile = root(data)
+        .join("profiles")
+        .join(library)
+        .join(&plan.adapter)
+        .join(&plan.edition_id);
+    if plan.process_lease {
+        profile.join(format!("playing-{}.lock", plan.launch_id))
+    } else {
+        profile.join("writer.lock")
+    }
 }
 
-fn stream_profile(data: &Path, edition_id: &str) -> Option<PathBuf> {
-    let owner = owner(data).ok().flatten()?;
-    let plan: Plan = serde_json::from_value(
-        read_json(
-            &root(data)
-                .join("launches")
-                .join(&owner.plan)
-                .join("launch.json"),
-        )
-        .ok()?,
-    )
-    .ok()?;
-    Some(
-        root(data)
-            .join("profiles")
-            .join(owner.library)
-            .join(plan.adapter)
-            .join(edition_id),
-    )
-}
-
-fn game_exited(profile: &Path, started_unix: i64) -> bool {
-    let Ok(meta) = fs::metadata(profile.join("last-exit.json")) else {
-        return false;
+fn playing(lease: &Path) -> Result<bool> {
+    let file = match fs::File::open(lease) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(error.into()),
     };
-    let Ok(mtime) = meta.modified() else {
-        return false;
-    };
-    let mtime = mtime
-        .duration_since(UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_secs() as i64)
-        .unwrap_or(0);
-    mtime >= started_unix
+    match file.try_lock_shared() {
+        Ok(()) => Ok(false),
+        Err(fs::TryLockError::WouldBlock) => Ok(true),
+        Err(fs::TryLockError::Error(error)) => Err(error.into()),
+    }
 }
 
 fn finish_stream_row(
@@ -220,8 +206,14 @@ fn finish_stream_row(
     row: crate::db::SessionRow,
     error: Option<&str>,
 ) -> Result<()> {
-    let started = crate::history::unix_of(&row.started_at).unwrap_or(crate::unix_now());
-    let elapsed = (crate::unix_now() - started).max(row.duration_seconds.unwrap_or(0));
+    let guard = db.lock().unwrap_or_else(|e| e.into_inner());
+    let Some(row) = guard
+        .session_by_id(&row.id)?
+        .filter(|current| current.state == "running")
+    else {
+        return Ok(());
+    };
+    let elapsed = row.duration_seconds.unwrap_or(0);
     let (state, error, credit) = if elapsed < crate::sessions::EARLY_EXIT_SECS {
         (
             "failed",
@@ -231,7 +223,6 @@ fn finish_stream_row(
     } else {
         ("ended", error, true)
     };
-    let guard = db.lock().unwrap_or_else(|e| e.into_inner());
     guard.complete_session(&row.id, elapsed, None, state, error, credit)?;
     if let Ok(Some(row)) = guard.session_by_id(&row.id) {
         if let Ok(session) = crate::sessions::row_to_session(row) {
@@ -248,9 +239,8 @@ fn finish_stream_row(
 fn spawn_stream_watch(
     db: Arc<Mutex<crate::db::Db>>,
     sink: Arc<dyn crate::sessions::EventSink>,
-    data: PathBuf,
+    lease: PathBuf,
     session_id: String,
-    edition_id: String,
     started_unix: i64,
 ) {
     {
@@ -260,43 +250,30 @@ fn spawn_stream_watch(
         }
     }
     std::thread::spawn(move || {
-        let profile = stream_profile(&data, &edition_id);
         loop {
             std::thread::sleep(Duration::from_millis(250));
-            let elapsed = (crate::unix_now() - started_unix).max(0);
-            let still_running = {
-                let guard = db.lock().unwrap_or_else(|e| e.into_inner());
-                match guard.session_by_id(&session_id) {
-                    Ok(Some(row)) if row.state == "running" => {
-                        let _ = guard.checkpoint_session(&session_id, elapsed);
-                        true
+            let guard = db.lock().unwrap_or_else(|e| e.into_inner());
+            let row = match guard.session_by_id(&session_id) {
+                Ok(Some(row)) if row.state == "running" => row,
+                Ok(_) => break,
+                Err(_) => continue,
+            };
+            match playing(&lease) {
+                Ok(true) => {
+                    let seconds =
+                        (crate::unix_now() - started_unix).max(row.duration_seconds.unwrap_or(0));
+                    if Some(seconds) != row.duration_seconds {
+                        let _ = guard.checkpoint_session(&session_id, seconds);
                     }
-                    _ => false,
                 }
-            };
-            if !still_running {
-                break;
+                Ok(false) => {
+                    drop(guard);
+                    if finish_stream_row(&db, Arc::clone(&sink), row, None).is_ok() {
+                        break;
+                    }
+                }
+                Err(_) => continue,
             }
-            let exited = profile
-                .as_ref()
-                .is_some_and(|path| game_exited(path, started_unix));
-            let host = library_container_running(&data);
-            if !exited && host {
-                continue;
-            }
-            let reason = if exited {
-                None
-            } else {
-                Some("Streaming host is no longer running")
-            };
-            let row = {
-                let guard = db.lock().unwrap_or_else(|e| e.into_inner());
-                guard.session_by_id(&session_id).ok().flatten()
-            };
-            if let Some(row) = row {
-                let _ = finish_stream_row(&db, Arc::clone(&sink), row, reason);
-            }
-            break;
         }
         watching()
             .lock()
@@ -357,28 +334,75 @@ fn xenia_pilot_image(data: &Path) -> Result<String> {
     digest_image(&receipt)
 }
 
-fn base_image(data: &Path) -> Result<String> {
-    if let Some(image) = library_base(data)? {
-        return Ok(image);
-    }
-    if let Some(image) = sonic_pilot_image(data)? {
-        return Ok(image);
-    }
-    if let Some(image) = wolf_image(data)? {
-        return Ok(image);
-    }
-    xenia_pilot_image(data)
+#[derive(Debug, PartialEq)]
+enum Base {
+    Ready(String),
+    ComposeBlastem,
 }
 
-fn adapter_base(data: &Path, adapter: &str) -> Result<String> {
+fn adapter_base(data: &Path, adapter: &str, program: &Path) -> Result<Base> {
+    resolve_base(data, adapter, program, |image| {
+        output(Command::new("podman").args(["image", "exists", image])).is_ok()
+    })
+}
+
+fn resolve_base(
+    data: &Path,
+    adapter: &str,
+    program: &Path,
+    installed: impl Fn(&str) -> bool,
+) -> Result<Base> {
     if adapter == "xenia" {
-        return xenia_pilot_image(data);
+        let image = xenia_pilot_image(data)?;
+        if installed(&image) {
+            return Ok(Base::Ready(image));
+        }
+        return Err(err(
+            "Rebuild the Xenia pilot image in the selected streaming folder",
+        ));
     }
-    base_image(data)
+    if let Some(image) = sonic_pilot_image(data)?.filter(|image| installed(image)) {
+        return Ok(Base::Ready(image));
+    }
+    if wolf_image(data)?.is_some_and(|image| installed(&image))
+        && super::game_pilot::emulator_image(program).is_ok_and(|image| installed(&image))
+    {
+        return Ok(Base::ComposeBlastem);
+    }
+    if let Ok(image) = xenia_pilot_image(data) {
+        if installed(&image) {
+            return Ok(Base::Ready(image));
+        }
+    }
+    // Older installs may retain only the composed library image. Early receipts
+    // could point to a plain Wolf image, so check its emulator before reuse.
+    if let Some(image) = library_base(data)?.filter(|image| installed(image)) {
+        output(Command::new("podman").args([
+            "run",
+            "--rm",
+            "--pull=never",
+            "--network=none",
+            "--entrypoint",
+            "/opt/blastem/blastem",
+            &image,
+            "-v",
+        ]))?;
+        return Ok(Base::Ready(image));
+    }
+    Err(err(
+        "Build the managed Wolf host and the reviewed BlastEm emulator before streaming Genesis",
+    ))
 }
 
-fn build(data: &Path, adapter: &str) -> Result<String> {
-    let base = adapter_base(data, adapter)?;
+fn build(data: &Path, adapter: &str, program: &Path) -> Result<String> {
+    let base = match adapter_base(data, adapter, program)? {
+        Base::Ready(image) => image,
+        Base::ComposeBlastem => digest_image(&super::game_pilot::build(
+            data,
+            program,
+            &AtomicBool::new(false),
+        )?)?,
+    };
     let mut hash = Sha256::new();
     hash.update(base.as_bytes());
     for (name, bytes) in FILES {
@@ -387,7 +411,7 @@ fn build(data: &Path, adapter: &str) -> Result<String> {
         hash.update(bytes);
     }
     let hash = format!("{:x}", hash.finalize());
-    let receipt_path = root(data).join("image.json");
+    let receipt_path = root(data).join(format!("image-{adapter}.json"));
     if let Ok(receipt) = read_json(&receipt_path) {
         if receipt["recipe"] == hash {
             if let Some(image) = receipt["image"].as_str().filter(|v| valid_image(v)) {
@@ -430,17 +454,6 @@ fn build(data: &Path, adapter: &str) -> Result<String> {
         &receipt_path,
         &json!({"image":image,"recipe":hash,"base":base}),
     )?;
-    if adapter != "xenia" {
-        write_json(
-            &root(data).join("base.json"),
-            &json!({
-                "schema_version": 1,
-                "image": image,
-                "recipe": hash,
-                "base": base,
-            }),
-        )?;
-    }
     Ok(image)
 }
 fn render_device() -> Result<(PathBuf, bool)> {
@@ -530,6 +543,7 @@ impl Core {
             Ok(Plan {
                 schema_version: 1,
                 launch_id: uuid::Uuid::new_v4().to_string(),
+                process_lease: true,
                 edition_id: id.into(),
                 runner_id: runner.id.clone(),
                 adapter: adapter.into(),
@@ -580,10 +594,15 @@ impl Core {
         let supported = plan.as_ref().is_none_or(|p| p.is_ok());
         let c = self.headless_connection();
         let setup = c.as_ref().map_err(|e| e.clone()).and_then(|c| {
-            match plan.as_ref() {
-                Some(Ok(plan)) => adapter_base(&c.data_dir, &plan.adapter)?,
-                _ => base_image(&c.data_dir)?,
-            };
+            let adapter = plan
+                .as_ref()
+                .and_then(|result| result.as_ref().ok())
+                .map_or("blastem", |plan| plan.adapter.as_str());
+            adapter_base(
+                &c.data_dir,
+                adapter,
+                &crate::emulators::program_dir(&self.paths, "blastem"),
+            )?;
             if super::receiver::status(&c.data_dir)?.is_none() {
                 return Err(err("Install the streaming viewer in Streaming setup"));
             }
@@ -640,8 +659,13 @@ impl Core {
         self.storage_move_ready()?;
         let _gate = self.headless_gate.lock().unwrap_or_else(|e| e.into_inner());
         self.storage_move_ready()?;
-        if self.with_db(|db| db.running_session())?.is_some()
-            || self.with_db(|db| crate::port_sessions::has_running(&db.conn))?
+        if self.with_db(|db| {
+            Ok(db.conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM sessions WHERE state='running' AND mode='local')",
+                [],
+                |row| row.get::<_, bool>(0),
+            )?)
+        })? || self.with_db(|db| crate::port_sessions::has_running(&db.conn))?
         {
             return Err(err("Close the local game before starting a stream"));
         }
@@ -702,15 +726,14 @@ impl Core {
                             .ok_or_else(|| err("Owned streaming app is missing"))?;
                         if viewer["running"] == true {
                             if viewer["app_id"] == app.id {
-                                self.start_stream_session(&plan.edition_id, &plan.runner_id)?;
-                                return Ok(());
+                                return self.track_stream_start(&c.data_dir, &old);
                             }
                             return Err(err(
                                 "Close the other viewer before reconnecting this game",
                             ));
                         }
-                        self.start_stream_session(&plan.edition_id, &plan.runner_id)?;
-                        return self.streaming_open_viewer(app.id.clone());
+                        self.streaming_open_viewer(app.id.clone())?;
+                        return self.track_stream_start(&c.data_dir, &old);
                     }
                 }
                 if viewer["running"] == true {
@@ -723,8 +746,8 @@ impl Core {
                         "End the running streamed game before switching games or emulators",
                     ));
                 }
-                self.complete_stream_sessions(None)?;
                 output(Command::new("podman").args(["stop", "--time", "10", &name(&c.data_dir)]))?;
+                self.complete_stream_sessions(None)?;
             } else {
                 self.complete_stream_sessions(Some("Streaming host is no longer running"))?;
                 output(Command::new("podman").args(["rm", &name(&c.data_dir)]))?;
@@ -739,7 +762,11 @@ impl Core {
                 "Close the current viewer before starting a headless host",
             ));
         }
-        let image = build(&c.data_dir, &plan.adapter)?;
+        let image = build(
+            &c.data_dir,
+            &plan.adapter,
+            &crate::emulators::program_dir(&self.paths, "blastem"),
+        )?;
         // Revalidate after image preparation, before any runtime publication.
         let fresh = self.headless_plan(&plan.edition_id)?;
         if fresh.runner_id != plan.runner_id
@@ -845,8 +872,8 @@ impl Core {
         for _ in 0..60 {
             if let Ok(host) = super::wolf::WolfClient::new(&c.socket)?.inspect() {
                 if let Some(app) = host.apps.into_iter().find(|a| a.title == APP) {
-                    self.start_stream_session(&plan.edition_id, &plan.runner_id)?;
-                    return self.streaming_open_viewer(app.id);
+                    self.streaming_open_viewer(app.id)?;
+                    return self.track_stream_start(&c.data_dir, &plan);
                 }
             }
             std::thread::sleep(Duration::from_millis(250));
@@ -860,7 +887,6 @@ impl Core {
         if self.headless.lock().unwrap_or_else(|e| e.into_inner()).busy {
             return Err(err("Wait for headless setup to finish before stopping it"));
         }
-        self.complete_stream_sessions(None)?;
         let c = self.headless_connection()?;
         if let Some(info) = container(&c.data_dir)? {
             owned(self, &c.data_dir, &info)?;
@@ -869,22 +895,38 @@ impl Core {
             }
             output(Command::new("podman").args(["stop", "--time", "10", &name(&c.data_dir)]))?;
         }
-        Ok(())
+        self.complete_stream_sessions(None)
     }
 
-    fn start_stream_session(&self, edition_id: &str, runner_id: &str) -> Result<()> {
+    fn track_stream_start(&self, data: &Path, plan: &Plan) -> Result<()> {
+        let lease = process_lease(data, &key(self), plan);
+        for _ in 0..120 {
+            if playing(&lease)? {
+                return self.start_stream_session(&plan.edition_id, &plan.runner_id, lease);
+            }
+            std::thread::sleep(Duration::from_millis(250));
+        }
+        Err(err("The emulator did not start within 30 seconds. Check the viewer and reconnect to retry."))
+    }
+
+    fn start_stream_session(
+        &self,
+        edition_id: &str,
+        runner_id: &str,
+        lease: PathBuf,
+    ) -> Result<()> {
         let sessions = self.with_db(crate::sessions::list)?;
         if let Some(existing) = sessions.iter().find(|session| {
             session.state == SessionState::Running
                 && session.mode == "stream"
                 && session.edition_id == edition_id
+                && session.runner_id == runner_id
         }) {
             spawn_stream_watch(
                 self.db_arc(),
                 self.hub(),
-                self.paths.data_dir.clone(),
+                lease,
                 existing.id.clone(),
-                existing.edition_id.clone(),
                 crate::history::unix_of(&existing.started_at).unwrap_or(crate::unix_now()),
             );
             return Ok(());
@@ -919,9 +961,8 @@ impl Core {
         spawn_stream_watch(
             self.db_arc(),
             self.hub(),
-            self.paths.data_dir.clone(),
+            lease,
             session_id,
-            edition_id.to_string(),
             crate::history::unix_of(&started).unwrap_or(crate::unix_now()),
         );
         Ok(())
@@ -939,29 +980,52 @@ impl Core {
     }
 }
 
+// Receipts and profile locks live in the configured streaming directory.
+fn recovered_lease(core: &Core, row: &crate::db::SessionRow) -> Result<Option<PathBuf>> {
+    let data = core.streaming_connection()?.data_dir;
+    let Some(owner) = owner(&data)?.filter(|owner| {
+        owner.library == key(core)
+            && owner.edition_id == row.edition_id
+            && owner.runner_id == row.runner_id
+    }) else {
+        return Ok(None);
+    };
+    let manifest = root(&data)
+        .join("launches")
+        .join(owner.plan)
+        .join("launch.json");
+    let plan: Plan = serde_json::from_value(read_json(&manifest)?)?;
+    if plan.edition_id != row.edition_id || plan.runner_id != row.runner_id {
+        return Ok(None);
+    }
+    let lease = process_lease(&data, &owner.library, &plan);
+    Ok(playing(&lease)?.then_some(lease))
+}
+
 pub fn recover_stream(core: &Core) -> Result<()> {
     let rows = core.with_db(|db| db.list_sessions())?;
     for row in rows
         .into_iter()
         .filter(|row| row.state == "running" && row.mode == "stream")
     {
-        let host = library_container_running(&core.paths.data_dir);
-        if host {
+        let active_lease = recovered_lease(core, &row);
+        let reason = match &active_lease {
+            Err(error) => format!(
+                "Stream recovery could not verify the emulator: {}",
+                error.message
+            ),
+            _ => "The streamed game ended while Marquee was closed".into(),
+        };
+        if let Ok(Some(lease)) = active_lease {
             spawn_stream_watch(
                 core.db_arc(),
                 core.hub(),
-                core.paths.data_dir.clone(),
+                lease,
                 row.id.clone(),
-                row.edition_id.clone(),
                 crate::history::unix_of(&row.started_at).unwrap_or(crate::unix_now()),
             );
         } else {
-            finish_stream_row(
-                &core.db_arc(),
-                core.hub(),
-                row,
-                Some("Marquee exited while this streamed session was running"),
-            )?;
+            finish_stream_row(&core.db_arc(), core.hub(), row, Some(&reason))?;
         }
     }
     Ok(())
@@ -1055,63 +1119,39 @@ mod tests {
     }
 
     #[test]
-    fn genesis_uses_the_library_base_without_an_xenia_pilot() {
+    fn genesis_and_xenia_use_adapter_capable_bases() {
         let temp = tempfile::tempdir().unwrap();
         let data = temp.path();
-        assert!(base_image(data).is_err());
-        write_json(
-            &root(data).join("base.json"),
-            &json!({"schema_version":1,"image":sha('a')}),
-        )
-        .unwrap();
-        assert_eq!(base_image(data).unwrap(), sha('a'));
-        assert_eq!(adapter_base(data, "blastem").unwrap(), sha('a'));
-        assert!(adapter_base(data, "xenia")
-            .unwrap_err()
-            .message
-            .contains("private-display"));
-    }
-
-    #[test]
-    fn xenia_pilot_fallback_keeps_its_pins_and_stays_the_xenia_host_image() {
-        let temp = tempfile::tempdir().unwrap();
-        let data = temp.path();
-        let xenia = data.join("streaming/xenia-pilot/current.json");
-        write_json(
-            &xenia,
-            &json!({
-                "image": sha('b'),
-                "xenia_revision": "wrong",
-                "xenia_sha256": XENIA_SHA256,
-            }),
-        )
-        .unwrap();
-        assert!(base_image(data).is_err());
-        write_json(
-            &xenia,
-            &json!({
-                "image": sha('b'),
-                "xenia_revision": XENIA_REVISION,
-                "xenia_sha256": XENIA_SHA256,
-            }),
-        )
-        .unwrap();
-        assert_eq!(base_image(data).unwrap(), sha('b'));
+        assert!(resolve_base(data, "blastem", data, |_| true).is_err());
+        write_json(&data.join("streaming/wolf/current.json"), &json!({
+            "schema_version":1,"image":sha('d'),"wolf_revision":"w","compositor_revision":"c",
+            "recipe_sha256":"r","built_at":"","baseline_probe":null,"license_inventory":"","live_streaming_verified":false
+        })).unwrap();
+        assert!(resolve_base(data, "blastem", data, |_| true).is_err());
+        fs::write(data.join("image-id"), sha('e')).unwrap();
+        write_json(&data.join("source-build.json"), &json!({"image":sha('e'),
+            "repository":"https://github.com/libretro/blastem","commit":"ab743653ed110eeb7b1fe64d00cc5f9279c2bfec","recipe":"blastem-standalone-sdl-v1"})).unwrap();
+        assert_eq!(
+            resolve_base(data, "blastem", data, |_| true).unwrap(),
+            Base::ComposeBlastem
+        );
         write_json(
             &data.join("streaming/sonic-pilot/current.json"),
-            &json!({"schema_version":1,"image":sha('c')}),
-        )
-        .unwrap();
-        assert_eq!(base_image(data).unwrap(), sha('c'));
-        assert_eq!(adapter_base(data, "xenia").unwrap(), sha('b'));
-        write_json(
-            &root(data).join("base.json"),
             &json!({"schema_version":1,"image":sha('a')}),
         )
         .unwrap();
-        assert_eq!(base_image(data).unwrap(), sha('a'));
-        assert_eq!(adapter_base(data, "blastem").unwrap(), sha('a'));
-        assert_eq!(adapter_base(data, "xenia").unwrap(), sha('b'));
+        assert_eq!(
+            resolve_base(data, "blastem", data, |_| true).unwrap(),
+            Base::Ready(sha('a'))
+        );
+        assert!(resolve_base(data, "xenia", data, |_| true).is_err());
+        write_json(&data.join("streaming/xenia-pilot/current.json"), &json!({"image":sha('b'), "xenia_revision": XENIA_REVISION, "xenia_sha256": XENIA_SHA256})).unwrap();
+        assert_eq!(
+            resolve_base(data, "xenia", data, |_| true).unwrap(),
+            Base::Ready(sha('b'))
+        );
+        assert!(resolve_base(data, "blastem", data, |_| false).is_err());
+        assert!(resolve_base(data, "xenia", data, |_| false).is_err());
     }
 
     #[test]
@@ -1143,9 +1183,10 @@ mod tests {
                 "running",
                 "stream",
             )?;
-            db.complete_session("stream-1", 120, None, "ended", None, true)
+            db.checkpoint_session("stream-1", 120)
         })
         .unwrap();
+        recover_stream(&core).unwrap();
         let snap = core.snapshot().unwrap();
         let session = snap
             .sessions
@@ -1191,12 +1232,65 @@ mod tests {
     }
 
     #[test]
-    fn last_exit_after_session_start_counts_as_game_exit() {
+    fn recovery_and_reconnect_use_the_active_games_streaming_folder() {
         let temp = tempfile::tempdir().unwrap();
-        let profile = temp.path();
-        let started = crate::unix_now() - 5;
-        assert!(!game_exited(profile, started));
-        fs::write(profile.join("last-exit.json"), "{}").unwrap();
-        assert!(game_exited(profile, started));
+        let core = Arc::new(Core::open_isolated(Some(temp.path().join("library")), true).unwrap());
+        let data = temp.path().join("stream");
+        let plan: Plan = serde_json::from_value(json!({
+            "schema_version":1, "launch_id":"launch", "process_lease":true,
+            "edition_id":"edition", "runner_id":"runner.fake", "adapter":"blastem",
+            "title":"Game", "source":"/fixture.md", "size":512, "mtime":0, "serial":null
+        }))
+        .unwrap();
+        write_json(&root(&data).join("launches/test/launch.json"), &plan).unwrap();
+        write_json(
+            &root(&data).join("owner.json"),
+            &Owner {
+                library: key(&core),
+                edition_id: plan.edition_id.clone(),
+                runner_id: plan.runner_id.clone(),
+                plan: "test".into(),
+            },
+        )
+        .unwrap();
+        let lease = process_lease(&data, &key(&core), &plan);
+        fs::create_dir_all(lease.parent().unwrap()).unwrap();
+        let holder = fs::File::create(&lease).unwrap();
+        holder.lock().unwrap();
+        core.with_db(|db| {
+            db.set_setting("streaming.local_connection", &json!({"data_dir":data,"socket":data.join("streaming/wolf/state/runtime/wolf.sock")}).to_string())?;
+            db.conn.execute("INSERT INTO editions(id,system,scan_title,imported_at) VALUES('edition','genesis','Game','2026-01-01')", [])?;
+            db.insert_session_with_mode("session", "edition", "runner.fake", &now_rfc3339(), "running", "stream")
+        }).unwrap();
+        recover_stream(&core).unwrap();
+        core.track_stream_start(&data, &plan).unwrap();
+        let rows = core.with_db(|db| db.list_sessions()).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].state, "running");
+        // The public entry point now reaches media validation past the local-session gate.
+        assert_eq!(
+            core.headless_launch("edition").unwrap_err().message,
+            "Game files are missing"
+        );
+        drop(holder);
+        for _ in 0..40 {
+            if core.with_db(|db| db.running_session()).unwrap().is_none() {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        panic!("stream watcher did not finish");
+    }
+
+    #[test]
+    fn session_tracking_requires_a_live_emulator_lock() {
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("playing.lock");
+        assert!(!playing(&path).unwrap());
+        let holder = fs::File::create(&path).unwrap();
+        holder.lock().unwrap();
+        assert!(playing(&path).unwrap());
+        drop(holder);
+        assert!(!playing(&path).unwrap());
     }
 }

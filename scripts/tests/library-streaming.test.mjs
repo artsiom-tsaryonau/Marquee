@@ -7,19 +7,18 @@ test('library host retires fixed slots, preserves pairing and refuses unrelated 
 import runpy,tempfile,tomllib
 from pathlib import Path
 entry=runpy.run_path('catalog/streaming/library/library-entrypoint.py')
-inline=runpy.run_path('catalog/streaming/sonic/game-entrypoint.py')['inline']
 with tempfile.TemporaryDirectory() as d:
  p=Path(d)/'config.toml'
  p.write_text('hostname="retained"\\npaired_clients=[{client_cert="test"}]\\n[gstreamer]\\nvalue=1\\n[[profiles]]\\nid="moonlight-profile-id"\\n[[profiles.apps]]\\ntitle="Marquee Vanquish pilot"\\n[profiles.apps.runner]\\ntype="process"\\nrun_cmd="/usr/bin/python3 /opt/marquee-wolf/xenia-game.py"\\n')
- entry['configure'](p,inline)
+ entry['configure'](p)
  result=tomllib.loads(p.read_text())
  assert result['paired_clients']==[{'client_cert':'test'}]
  assert result['profiles'][0]['apps']==[entry['APP']]
  assert p.with_suffix('.before-library.toml').exists()
- entry['configure'](p,inline)
+ entry['configure'](p)
  p.write_text(p.read_text().replace('/opt/marquee-wolf/library-game.py','/unrelated.py'))
  before=p.read_bytes()
- try:entry['configure'](p,inline)
+ try:entry['configure'](p)
  except RuntimeError:pass
  else:raise AssertionError('Unrelated command replaced')
  assert p.read_bytes()==before

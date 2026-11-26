@@ -209,7 +209,7 @@ impl Host {
                     if job.publishing {
                         return Err(AppError::new(
                             "PORT_PUBLISHING",
-                            "Engine publication has started; wait for completion",
+                            "File publication has started; wait for completion",
                         ));
                     }
                     job.cancel = true;
@@ -229,7 +229,7 @@ impl Host {
                 "Engine installation cancelled; existing game files are retained",
             ));
         }
-        if message == "Publishing engine…" {
+        if matches!(message, "Publishing engine…" | "Publishing ROM…") {
             control.publishing = true;
         }
         if !message.is_empty() && job.message != message {

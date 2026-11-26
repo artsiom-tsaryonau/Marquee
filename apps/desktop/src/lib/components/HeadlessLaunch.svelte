@@ -32,7 +32,7 @@
     finally { busy = false; }
   }
   function stream() {
-    if (!status?.ready) { app.go('streaming'); return; }
+    if (!activeHere && !status?.ready) { app.go('streaming'); return; }
     music.pauseForGame(); void act(()=>app.api.headlessLaunch(editionId));
   }
 </script>
