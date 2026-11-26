@@ -225,6 +225,28 @@ A game is only playable if the emulator has input bindings, and a seeded config 
 
 Games open in a **window** by default. Settings → Games → "Open games in" (setting `display_mode`, API `set_display_mode`) switches every emulator to fullscreen, effective on the next Play. PCSX2 and DuckStation get `-nofullscreen` or `-fullscreen`. Catalogue emulators take `fullscreen_args` or `windowed_args` from their entry: Mesen and RMG add `--fullscreen` only in fullscreen mode, Flycast gets `-config window:fullscreen=yes` or `=no` because it remembers the last mode. Checked on this host: the command lines switch with the setting and PCSX2 and Flycast stayed running in both modes; I could not see the windows, so the actual window size and decorations are unverified. A window or fullscreen change you make inside an emulator is still that emulator's own to remember (Mesen and RMG), so a launch does not reset it.
 
+### No menus while playing (2026-11-26)
+
+On this library `display_mode` is now `fullscreen`, which hides every emulator's
+menu bar (Xenia, Ymir, Azahar, Mesen, mGBA and the Qt runners show it only in a
+window). Checked on a private 1280×720 display: Forza Motorsport 2 (Xenia),
+Pokémon Moon (Azahar) and UEFA Euro 96 (Ymir) filled it with no menu, status or
+title bar. Streaming already started emulators fullscreen (`-f`, `--fullscreen=true`).
+
+Catalogue entries can also list `settings`: `key = value` lines in an INI or flat
+TOML file, re-applied before every launch and Tools → Open, leaving the rest of the
+file alone. Azahar uses them to turn off its status bar, dock title bars, close
+confirmation and Discord presence, and to hide an idle mouse pointer. Qt stores a
+`<key>\default=true` flag beside each value that makes it ignore the value, so both
+are written.
+
+**Xenia profile.** A profile named "Player" (`E0300000FDE027B2`) was created once in
+this library's Xenia, and Xenia signs it in at boot (`logged_profile_slot_0_xuid`).
+Forza Motorsport 2 skipped its "no profile" warning and wrote its save under that
+profile. Forza 2 later froze at its main menu and ignored the window close; Marquee
+has no Stop button for a local game yet, so a frozen fullscreen game has to be
+ended from outside.
+
 ## Keeping the library to real games
 
 `marquee prune` (API `prune_library`) removes library entries whose files no longer exist, but only ones never played, not favourites and without a custom title; anything with history stays and shows as missing. Marquee never deletes game files itself.

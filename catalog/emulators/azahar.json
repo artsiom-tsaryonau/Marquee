@@ -19,5 +19,67 @@
   ],
   "windowed_args": [
     "-w"
+  ],
+  "settings": [
+    {
+      "path": "azahar-emu/qt-config.ini",
+      "section": "UI",
+      "key": "showStatusBar",
+      "value": "false"
+    },
+    {
+      "path": "azahar-emu/qt-config.ini",
+      "section": "UI",
+      "key": "showStatusBar\\default",
+      "value": "false"
+    },
+    {
+      "path": "azahar-emu/qt-config.ini",
+      "section": "UI",
+      "key": "displayTitleBars",
+      "value": "false"
+    },
+    {
+      "path": "azahar-emu/qt-config.ini",
+      "section": "UI",
+      "key": "displayTitleBars\\default",
+      "value": "false"
+    },
+    {
+      "path": "azahar-emu/qt-config.ini",
+      "section": "UI",
+      "key": "confirmClose",
+      "value": "false"
+    },
+    {
+      "path": "azahar-emu/qt-config.ini",
+      "section": "UI",
+      "key": "confirmClose\\default",
+      "value": "false"
+    },
+    {
+      "path": "azahar-emu/qt-config.ini",
+      "section": "UI",
+      "key": "enable_discord_presence",
+      "value": "false"
+    },
+    {
+      "path": "azahar-emu/qt-config.ini",
+      "section": "UI",
+      "key": "enable_discord_presence\\default",
+      "value": "false"
+    },
+    {
+      "path": "azahar-emu/qt-config.ini",
+      "section": "UI",
+      "key": "hideInactiveMouse",
+      "value": "true"
+    },
+    {
+      "path": "azahar-emu/qt-config.ini",
+      "section": "UI",
+      "key": "hideInactiveMouse\\default",
+      "value": "false"
+    }
   ]
 }

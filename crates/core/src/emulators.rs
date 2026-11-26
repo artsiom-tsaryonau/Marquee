@@ -54,8 +54,76 @@ pub struct SeedFile {
     pub root: Option<String>,
 }
 
-/// Write the entry's seed files under `home` unless they already exist.
+/// One `key = value` in an INI or flat TOML file under the emulator's folders.
+#[derive(Debug, Clone, Deserialize)]
+pub struct EnforcedSetting {
+    pub path: String,
+    #[serde(default)]
+    pub root: Option<String>,
+    pub section: String,
+    pub key: String,
+    pub value: String,
+}
+
+/// The emulator's `XDG_CONFIG_HOME`, or the sibling `xdg-data` for `root: data`.
+fn seed_base(home: &Path, root: Option<&str>) -> Option<PathBuf> {
+    match root {
+        None | Some("config") => Some(home.to_path_buf()),
+        Some("data") => home.parent().map(|parent| parent.join("xdg-data")),
+        Some(_) => None,
+    }
+}
+
+/// Re-apply the entry's enforced settings; the file is rewritten only on change.
+fn apply_settings(def: &EmulatorDef, home: &Path) {
+    let mut by_file: Vec<(PathBuf, Vec<&EnforcedSetting>)> = Vec::new();
+    for setting in &def.settings {
+        let rel = Path::new(&setting.path);
+        if !rel
+            .components()
+            .all(|c| matches!(c, std::path::Component::Normal(_)))
+        {
+            continue;
+        }
+        let Some(base) = seed_base(home, setting.root.as_deref()) else {
+            continue;
+        };
+        let target = base.join(rel);
+        match by_file.iter_mut().find(|(path, _)| *path == target) {
+            Some((_, list)) => list.push(setting),
+            None => by_file.push((target, vec![setting])),
+        }
+    }
+    for (target, settings) in by_file {
+        let before = fs::read_to_string(&target).unwrap_or_default();
+        let after = settings.iter().fold(before.clone(), |text, s| {
+            crate::bios::set_ini_value(&text, &s.section, &s.key, &s.value)
+        });
+        if after == before {
+            continue;
+        }
+        let Some(parent) = target.parent() else {
+            continue;
+        };
+        if fs::create_dir_all(parent).is_err() {
+            continue;
+        }
+        if let Ok(mut tmp) = tempfile::NamedTempFile::new_in(parent) {
+            if std::io::Write::write_all(&mut tmp, after.as_bytes()).is_ok() {
+                let _ = tmp.persist(&target);
+            }
+        }
+    }
+}
+
+/// Write the entry's seed files under `home` unless they already exist, then
+/// re-apply its enforced settings.
 pub fn seed_config(def: &EmulatorDef, home: &Path) {
+    write_seeds(def, home);
+    apply_settings(def, home);
+}
+
+fn write_seeds(def: &EmulatorDef, home: &Path) {
     for seed in &def.seed {
         let rel = Path::new(&seed.path);
         let safe = rel
@@ -64,13 +132,8 @@ pub fn seed_config(def: &EmulatorDef, home: &Path) {
         if !safe {
             continue;
         }
-        let base = match seed.root.as_deref() {
-            Some("data") => match home.parent() {
-                Some(parent) => parent.join("xdg-data"),
-                None => continue,
-            },
-            None | Some("config") => home.to_path_buf(),
-            Some(_) => continue,
+        let Some(base) = seed_base(home, seed.root.as_deref()) else {
+            continue;
         };
         let target = base.join(rel);
         if target.exists() {
@@ -223,6 +286,10 @@ pub struct EmulatorDef {
     /// Config files written before launch when missing (skips first-run wizards).
     #[serde(default)]
     pub seed: Vec<SeedFile>,
+    /// INI-style keys Marquee re-applies before every launch (window chrome,
+    /// prompts). Everything else in the file stays the emulator's.
+    #[serde(default)]
+    pub settings: Vec<EnforcedSetting>,
     /// Icon to fetch at install time when the download holds no image.
     #[serde(default)]
     pub icon_download: Option<IconDownload>,
@@ -1358,6 +1425,34 @@ mod tests {
         let latest = latest(&def).unwrap();
         assert_eq!(latest.sha256, pin.sha256);
         assert_eq!(latest.version, pin.version);
+    }
+
+    #[test]
+    fn azahar_window_chrome_is_switched_off_before_every_launch() {
+        let t = tempfile::tempdir().unwrap();
+        let home = t.path().join("azahar/xdg-config");
+        let ini = home.join("azahar-emu/qt-config.ini");
+        fs::create_dir_all(ini.parent().unwrap()).unwrap();
+        fs::write(
+            &ini,
+            "[UI]\nshowStatusBar=true\nshowStatusBar\\default=true\ntheme=dark\n[Audio]\nvolume=1\n",
+        )
+        .unwrap();
+        let def = find("azahar").unwrap();
+        seed_config(&def, &home);
+        let text = fs::read_to_string(&ini).unwrap();
+        for line in [
+            "showStatusBar = false",
+            "showStatusBar\\default = false",
+            "confirmClose = false",
+            "displayTitleBars = false",
+        ] {
+            assert!(text.contains(line), "{line} missing in {text}");
+        }
+        assert!(text.contains("theme=dark") && text.contains("[Audio]\nvolume=1"));
+        let modified = fs::metadata(&ini).unwrap().modified().unwrap();
+        seed_config(&def, &home);
+        assert_eq!(fs::metadata(&ini).unwrap().modified().unwrap(), modified);
     }
 
     #[test]
