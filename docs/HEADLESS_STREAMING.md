@@ -56,8 +56,11 @@ screen when dependencies are missing. The API shared by desktop and browser is
 `headless_status`, `headless_launch` and confirmed `headless_stop`.
 
 The selected streaming folder must already contain the reviewed Wolf identity,
-pairing, reference viewer and pinned Xenia/Sonic base image. Initial backend build
-and pairing remain prerequisites; this cut does not turn an arbitrary fresh host
+pairing and reference viewer. Genesis/BlastEm uses the library base receipt at
+`streaming/library/base.json` when present, otherwise the Sonic/BlastEm pilot
+image or the managed Wolf image. Xbox 360 still needs the pinned Xenia pilot
+receipt at `streaming/xenia-pilot/current.json`. Initial backend build and
+pairing remain prerequisites; this cut does not turn an arbitrary fresh host
 into a configured streaming server. Configure that folder and its
 `streaming/wolf/state/runtime/wolf.sock` in Streaming → Advanced connection.
 

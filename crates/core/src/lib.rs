@@ -580,6 +580,7 @@ impl Core {
     /// Accept work into the detached manager before returning to the UI.
     pub fn start_port_install(&self, id: &str) -> Result<Vec<ports::PortInfo>> {
         ports::find(id)?;
+        self.snapshot_idle(&format!("port:{id}"))?;
         if let Some(installed) = self.installed_port(id)? {
             snapshots::create(&self.paths, &format!("port:{id}"), &[installed.bin])?;
         }
@@ -719,7 +720,8 @@ impl Core {
     }
 
     pub fn play_summary(&self) -> Result<history::PlaySummary> {
-        let sessions = self.with_db(crate::sessions::list)?;
+        let mut sessions = self.with_db(crate::sessions::list)?;
+        sessions.extend(self.with_db(|db| port_sessions::credited_sessions(&db.conn))?);
         let now = unix_now();
         Ok(history::summary(
             &sessions,
@@ -886,7 +888,9 @@ impl Core {
     ) -> Result<Vec<emulators::EmulatorInfo>> {
         self.require_ps3_setup_idle(id)?;
         let def = emulators::find(id)?;
-        if self.with_db(|db| db.running_session())?.is_some() {
+        if self.with_db(|db| db.running_session())?.is_some()
+            || self.with_db(|db| port_sessions::has_running(&db.conn))?
+        {
             return Err(AppError::new("LAUNCH_BUSY", "close the running game first"));
         }
         {

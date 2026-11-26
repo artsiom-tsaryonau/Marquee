@@ -1,5 +1,24 @@
-import type { LibraryApi, StreamingState } from './api/contracts';
+import type { LibraryApi, RuntimeStatus, StreamingState } from './api/contracts';
 import { asError } from './api/core';
+
+export function runtimeSummary(status: RuntimeStatus | null): string {
+  if (!status) return 'Runtime status unavailable';
+  if (status.building) {
+    return status.job === 'probe' ? 'Probing the Wolf runtime…' : 'Building the Wolf runtime…';
+  }
+  if (status.receipt) return `Runtime ready · built ${status.receipt.built_at}`;
+  if (status.error) return status.error.message;
+  return 'No managed Wolf runtime is built';
+}
+
+export function probeSummary(probe: unknown): string {
+  if (!probe || typeof probe !== 'object') return '';
+  const result = probe as { software_h264_encode_test?: unknown; nvidia_h264_encode_test?: unknown };
+  const parts = [];
+  if (result.software_h264_encode_test === true) parts.push('software encode passed');
+  if (result.nvidia_h264_encode_test === true) parts.push('NVIDIA H.264 encode passed');
+  return parts.length ? `Last probe: ${parts.join(' · ')}` : '';
+}
 
 /** One request at a time; navigation stops polling, never a game or viewer. */
 export class StreamingControls {

@@ -14,6 +14,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 const APP: &str = "Marquee library game";
+const XENIA_REVISION: &str = "451f915566d57436555c6eb4ee77bb4717eb01de";
+const XENIA_SHA256: &str = "b96b2723b0af55b5c4d837916e12035f172fe9ebbab2e90ba6c64f2f21fd5d8b";
 const FILES: &[(&str, &[u8])] = &[
     (
         "Containerfile",
@@ -26,6 +28,10 @@ const FILES: &[(&str, &[u8])] = &[
     (
         "library-game.py",
         include_bytes!("../../../../catalog/streaming/library/library-game.py"),
+    ),
+    (
+        "game.py",
+        include_bytes!("../../../../catalog/streaming/sonic/game.py"),
     ),
 ];
 #[derive(Default)]
@@ -156,24 +162,80 @@ fn owned(core: &Core, data: &Path, container: &Value) -> Result<Owner> {
     }
     Ok(owner)
 }
-fn base_image(data: &Path) -> Result<String> {
-    let receipt = read_json(&data.join("streaming/xenia-pilot/current.json")).map_err(|_| {
-        err("Build the reviewed private-display runtime first; see Streaming setup")
-    })?;
+fn digest_image(receipt: &Value) -> Result<String> {
     let image = receipt["image"].as_str().unwrap_or_default();
-    if !valid_image(image)
-        || receipt["xenia_revision"] != "451f915566d57436555c6eb4ee77bb4717eb01de"
-        || receipt["xenia_sha256"]
-            != "b96b2723b0af55b5c4d837916e12035f172fe9ebbab2e90ba6c64f2f21fd5d8b"
-    {
+    if !valid_image(image) {
         return Err(err(
             "The private-display base image receipt is incompatible",
         ));
     }
     Ok(image.into())
 }
-fn build(data: &Path) -> Result<String> {
-    let base = base_image(data)?;
+
+fn library_base(data: &Path) -> Result<Option<String>> {
+    let path = root(data).join("base.json");
+    if !path.exists() {
+        return Ok(None);
+    }
+    let receipt = read_json(&path)?;
+    if receipt["schema_version"] != 1 {
+        return Err(err("The library streaming base receipt is incompatible"));
+    }
+    Ok(Some(digest_image(&receipt)?))
+}
+
+fn sonic_pilot_image(data: &Path) -> Result<Option<String>> {
+    let path = data.join("streaming/sonic-pilot/current.json");
+    if !path.exists() {
+        return Ok(None);
+    }
+    let receipt = read_json(&path)?;
+    if receipt["schema_version"] != 1 {
+        return Ok(None);
+    }
+    Ok(digest_image(&receipt).ok())
+}
+
+fn wolf_image(data: &Path) -> Result<Option<String>> {
+    Ok(super::runtime::status(data)?
+        .map(|receipt| receipt.image)
+        .filter(|image| valid_image(image)))
+}
+
+fn xenia_pilot_image(data: &Path) -> Result<String> {
+    let receipt = read_json(&data.join("streaming/xenia-pilot/current.json")).map_err(|_| {
+        err("Build the reviewed private-display runtime first; see Streaming setup")
+    })?;
+    if receipt["xenia_revision"] != XENIA_REVISION || receipt["xenia_sha256"] != XENIA_SHA256 {
+        return Err(err(
+            "The private-display base image receipt is incompatible",
+        ));
+    }
+    digest_image(&receipt)
+}
+
+fn base_image(data: &Path) -> Result<String> {
+    if let Some(image) = library_base(data)? {
+        return Ok(image);
+    }
+    if let Some(image) = sonic_pilot_image(data)? {
+        return Ok(image);
+    }
+    if let Some(image) = wolf_image(data)? {
+        return Ok(image);
+    }
+    xenia_pilot_image(data)
+}
+
+fn adapter_base(data: &Path, adapter: &str) -> Result<String> {
+    if adapter == "xenia" {
+        return xenia_pilot_image(data);
+    }
+    base_image(data)
+}
+
+fn build(data: &Path, adapter: &str) -> Result<String> {
+    let base = adapter_base(data, adapter)?;
     let mut hash = Sha256::new();
     hash.update(base.as_bytes());
     for (name, bytes) in FILES {
@@ -225,6 +287,17 @@ fn build(data: &Path) -> Result<String> {
         &receipt_path,
         &json!({"image":image,"recipe":hash,"base":base}),
     )?;
+    if adapter != "xenia" {
+        write_json(
+            &root(data).join("base.json"),
+            &json!({
+                "schema_version": 1,
+                "image": image,
+                "recipe": hash,
+                "base": base,
+            }),
+        )?;
+    }
     Ok(image)
 }
 fn render_device() -> Result<(PathBuf, bool)> {
@@ -364,7 +437,10 @@ impl Core {
         let supported = plan.as_ref().is_none_or(|p| p.is_ok());
         let c = self.headless_connection();
         let setup = c.as_ref().map_err(|e| e.clone()).and_then(|c| {
-            base_image(&c.data_dir)?;
+            match plan.as_ref() {
+                Some(Ok(plan)) => adapter_base(&c.data_dir, &plan.adapter)?,
+                _ => base_image(&c.data_dir)?,
+            };
             if super::receiver::status(&c.data_dir)?.is_none() {
                 return Err(err("Install the streaming viewer in Streaming setup"));
             }
@@ -516,7 +592,7 @@ impl Core {
                 "Close the current viewer before starting a headless host",
             ));
         }
-        let image = build(&c.data_dir)?;
+        let image = build(&c.data_dir, &plan.adapter)?;
         // Revalidate after image preparation, before any runtime publication.
         let fresh = self.headless_plan(&plan.edition_id)?;
         if fresh.runner_id != plan.runner_id
@@ -731,6 +807,70 @@ mod tests {
         wrong["Config"]["Labels"]["io.marquee.headless.plan"] = json!("another-plan");
         assert!(owned(&core, &data, &wrong).is_err());
     }
+    fn sha(digit: char) -> String {
+        format!("sha256:{}", digit.to_string().repeat(64))
+    }
+
+    #[test]
+    fn genesis_uses_the_library_base_without_an_xenia_pilot() {
+        let temp = tempfile::tempdir().unwrap();
+        let data = temp.path();
+        assert!(base_image(data).is_err());
+        write_json(
+            &root(data).join("base.json"),
+            &json!({"schema_version":1,"image":sha('a')}),
+        )
+        .unwrap();
+        assert_eq!(base_image(data).unwrap(), sha('a'));
+        assert_eq!(adapter_base(data, "blastem").unwrap(), sha('a'));
+        assert!(adapter_base(data, "xenia")
+            .unwrap_err()
+            .message
+            .contains("private-display"));
+    }
+
+    #[test]
+    fn xenia_pilot_fallback_keeps_its_pins_and_stays_the_xenia_host_image() {
+        let temp = tempfile::tempdir().unwrap();
+        let data = temp.path();
+        let xenia = data.join("streaming/xenia-pilot/current.json");
+        write_json(
+            &xenia,
+            &json!({
+                "image": sha('b'),
+                "xenia_revision": "wrong",
+                "xenia_sha256": XENIA_SHA256,
+            }),
+        )
+        .unwrap();
+        assert!(base_image(data).is_err());
+        write_json(
+            &xenia,
+            &json!({
+                "image": sha('b'),
+                "xenia_revision": XENIA_REVISION,
+                "xenia_sha256": XENIA_SHA256,
+            }),
+        )
+        .unwrap();
+        assert_eq!(base_image(data).unwrap(), sha('b'));
+        write_json(
+            &data.join("streaming/sonic-pilot/current.json"),
+            &json!({"schema_version":1,"image":sha('c')}),
+        )
+        .unwrap();
+        assert_eq!(base_image(data).unwrap(), sha('c'));
+        assert_eq!(adapter_base(data, "xenia").unwrap(), sha('b'));
+        write_json(
+            &root(data).join("base.json"),
+            &json!({"schema_version":1,"image":sha('a')}),
+        )
+        .unwrap();
+        assert_eq!(base_image(data).unwrap(), sha('a'));
+        assert_eq!(adapter_base(data, "blastem").unwrap(), sha('a'));
+        assert_eq!(adapter_base(data, "xenia").unwrap(), sha('b'));
+    }
+
     #[test]
     fn busy_headless_start_blocks_local_launch_without_contacting_a_host() {
         let temp = tempfile::tempdir().unwrap();

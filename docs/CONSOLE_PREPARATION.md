@@ -22,7 +22,7 @@ platform identifiers without providing import or launch support.
 | --- | --- | --- |
 | Nintendo Switch / `switch` | No managed emulator entry found | Select and validate a runner; content inventory, prerequisites, installation/launch adapter and live evidence |
 | PlayStation 3 / `ps3` | RPCS3 managed install/open, read-only discovery, reviewed manager-owned firmware setup | Verified ISO registration and direct launch implemented; live acceptance, broader package preparation and edition relationships remain |
-| PlayStation 4 / `ps4` | shadPS4 managed install/open, experimental | Package or prepared-folder inspection, title/version relationships, explicit supported install method and per-game launch/validation |
+| PlayStation 4 / `ps4` | shadPS4 managed install/open and `-g` Library Play runner (experimental) | Package extraction job, `ps4` system descriptor, title/version relationships and live launch/validation |
 | PlayStation 5 / `ps5` | KytyPS5 managed install/open, experimental Linux research build | Actual input inspection, pinned runtime/CLI contract, reviewed preparation, library launch and title-specific live acceptance |
 | Original Xbox / `xbox` | xemu managed install/open; BIOS/MCPX/HDD requirements recorded | Firmware/HDD configuration, input format inspection, tested conversion only when needed, library/launch/save adapter |
 | Xbox 360 / `xbox360` | Pinned Linux Xenia Canary; verified ISO preparation, registration and launch | Vanquish menu, audio, focused keyboard input and clean exit confirmed; gameplay and native save/relaunch remain unverified |
@@ -222,7 +222,28 @@ profiles/saves and record actual boot/gameplay/exit results. The KytyPS5 Linux
 runtime is also installed only in this isolated pilot; PS5 payload extraction and
 launch have not been attempted.
 
+### KytyPS5 pin (PS5-1, 2026-11-26)
+
+Catalogue pin: GitHub asset
+`KytyPS5-2026-10-25-83f8bfd-Linux-x86_64.tar.gz`, SHA-256
+`737ea99ea0022adae2b63f07b5bd1e708c8aa2acdd1a77f83531494b48b6d7e9`
+(digest published on the release). The 2026-10-25 source review still holds:
+`--game <directory|elf|zar>`. Profile and save directories were not confirmed
+against a live Linux process, so there is no library runner. Do not pass a RAR
+to this CLI. Demon's Souls on Linux remains Logo-only in the later compatibility
+notes; PS5-2 Library Play is not realistic on that title yet.
+
 Primary tool: [ShadPKG v2.1.0](https://github.com/seregonwar/ShadPKG/releases/tag/v2.1.0).
+
+### shadPS4 launch contract (PS4-1, 2026-11-26)
+
+The managed Linux SDL build keeps Tools/open on `-b`/`--big-picture`. Library Play
+uses the documented SDL/Qt CLI: `-g <eboot.bin|elf|game-folder>` and
+`-f true|false` for the window vs fullscreen setting. Isolation is the shared
+`env XDG_CONFIG_HOME/XDG_DATA_HOME/XDG_CACHE_HOME` prefix under
+`<data>/shadps4/xdg-*`; no extra `--user-path` flag is passed. A PS4 game is not
+importable until the PS4-2 package job and PS4-3 system descriptor exist. Live
+boot of a prepared title was not performed.
 
 
 ## Xbox-family inspection and Xenia runtime (2026-10-25)

@@ -416,6 +416,21 @@ export interface ManagerStatus { running: boolean; pid: number | null; stopping:
 export interface StreamingConnection { data_dir: string; socket: string }
 export interface StreamingApp { id: string; title: string; support_hdr: boolean; start_virtual_compositor: boolean; start_audio_server: boolean }
 export interface StreamingSession { session_id: string; app_id: string | null; client_ip: string; video_width: number; video_height: number; video_refresh_rate: number; audio_channel_count: number }
+export interface RuntimeReceipt {
+  image: string;
+  built_at: string;
+  wolf_revision: string;
+  live_streaming_verified: boolean;
+}
+export interface RuntimeStatus {
+  receipt: RuntimeReceipt | null;
+  previous: RuntimeReceipt | null;
+  building: boolean;
+  job: 'build' | 'probe' | 'rollback' | null;
+  error: { code: string; message: string } | null;
+  probe: unknown;
+  log: string;
+}
 export interface StreamingState {
   headless?: HeadlessStatus;
   connection: StreamingConnection;
@@ -534,6 +549,11 @@ export interface LibraryApi {
   streamingPair(clientIp: string, pin: string): Promise<void>;
   streamingRevoke(clientId: string): Promise<void>;
   streamingEndGame(sessionId: string): Promise<void>;
+  streamingRuntimeStatus(): Promise<RuntimeStatus>;
+  streamingRuntimeBuild(): Promise<void>;
+  streamingRuntimeCancel(): Promise<void>;
+  streamingRuntimeProbe(nvidia?: boolean): Promise<unknown>;
+  streamingRuntimeRollback(): Promise<unknown>;
   torrentDownloads(): Promise<TorrentDownload[]>;
   inspectTorrentPreparation(infoHash: string, path: string, system: string): Promise<PreparationJob>;
   browserJobs(): Promise<BrowserJob[]>;

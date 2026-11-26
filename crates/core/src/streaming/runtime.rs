@@ -57,6 +57,10 @@ fn root(data: &Path) -> PathBuf {
     data.join("streaming/wolf")
 }
 
+fn podman() -> Command {
+    Command::new(std::env::var_os("MARQUEE_PODMAN").unwrap_or_else(|| "podman".into()))
+}
+
 fn recipe_hash() -> String {
     let mut hash = Sha256::new();
     for (name, bytes) in FILES {
@@ -69,6 +73,10 @@ fn recipe_hash() -> String {
 
 pub fn status(data: &Path) -> Result<Option<Receipt>> {
     read_receipt(&root(data).join("current.json"))
+}
+
+pub fn previous(data: &Path) -> Result<Option<Receipt>> {
+    read_receipt(&root(data).join("previous.json"))
 }
 
 fn read_receipt(path: &Path) -> Result<Option<Receipt>> {
@@ -171,7 +179,7 @@ pub fn build(data: &Path, cancel: &AtomicBool) -> Result<Receipt> {
     fs::write(&log, [])?;
     let preflight = work.path().join("podman.json");
     run(
-        Command::new("podman").args(["info", "--format=json"]),
+        podman().args(["info", "--format=json"]),
         &preflight,
         cancel,
         Duration::from_secs(30),
@@ -216,7 +224,7 @@ pub fn build(data: &Path, cancel: &AtomicBool) -> Result<Receipt> {
     )?;
     let image_file = work.path().join("image-id");
     run(
-        Command::new("podman")
+        podman()
             .args(["build", "--force-rm", "--layers", "--iidfile"])
             .arg(&image_file)
             .arg("--build-arg")
@@ -290,7 +298,7 @@ fn probe_image(
     if !valid_image(image) {
         return Err(AppError::new("STREAMING_IMAGE", "Invalid image identity"));
     }
-    let mut command = Command::new("podman");
+    let mut command = podman();
     command.args([
         "run",
         "--rm",
@@ -345,18 +353,18 @@ fn probe_image(
     Ok(value)
 }
 
-pub fn probe(data: &Path, nvidia: bool, render_node: Option<&Path>) -> Result<Value> {
+pub fn probe(
+    data: &Path,
+    nvidia: bool,
+    render_node: Option<&Path>,
+    cancel: &AtomicBool,
+) -> Result<Value> {
     let receipt = status(data)?.ok_or_else(|| {
         AppError::new("STREAMING_MISSING", "Build the managed Wolf backend first")
     })?;
+    let _lock = InstanceLock::acquire(&root(data).join("build.lock"))?;
     let output = tempfile::NamedTempFile::new_in(root(data))?;
-    probe_image(
-        &receipt.image,
-        output.path(),
-        &AtomicBool::new(false),
-        nvidia,
-        render_node,
-    )
+    probe_image(&receipt.image, output.path(), cancel, nvidia, render_node)
 }
 
 /// Select the previous image for subsequent starts, after rerunning its baseline.

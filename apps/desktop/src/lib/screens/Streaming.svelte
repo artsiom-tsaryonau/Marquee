@@ -1,7 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { app } from '../state.svelte';
-  import { StreamingControls } from '../streaming.svelte';
+  import { StreamingControls, probeSummary, runtimeSummary } from '../streaming.svelte';
+  import type { RuntimeStatus } from '../api/contracts';
+  import { asError } from '../api/core';
   import { music } from '../music.svelte';
   const controls = new StreamingControls(app.api);
   const snapshot = $derived(controls.state);
@@ -10,11 +12,18 @@
   let socket = $state('');
   let pin = $state('');
   let client = $state('');
+  let runtime = $state<RuntimeStatus | null>(null);
+  let runtimeError = $state('');
+  let rollback = $state(false);
   onMount(() => {
     let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
     async function poll() {
       await controls.refresh();
+      try {
+        const next = await app.api.streamingRuntimeStatus();
+        if (!stopped) { runtime = next; runtimeError = ''; }
+      } catch (err) { if (!stopped) runtimeError = asError(err).message; }
       if (stopped) return;
       if (!folder && controls.state) { folder = controls.state.connection.data_dir; socket = controls.state.connection.socket; }
       timer = setTimeout(poll, 3000);
@@ -35,6 +44,22 @@
   {#if controls.error}<p class="error" role="alert">{controls.error}</p>{/if}
   {#if !snapshot}<p aria-live="polite">{controls.busy ? 'Checking streaming…' : 'Streaming status unavailable. Try Refresh.'}</p>
   {:else}
+    <section class="glass-panel panel">
+      <h2>Host runtime</h2>
+      <p aria-live="polite">{runtimeSummary(runtime)}</p>
+      {#if runtimeError}<p class="error" role="alert">{runtimeError}</p>{/if}
+      {#if runtime?.error}<p class="error" role="alert">{runtime.error.message}</p>{/if}
+      {#if probeSummary(runtime?.probe)}<p class="hint">{probeSummary(runtime?.probe)}</p>{/if}
+      {#if runtime?.log}<p class="hint">{runtime.log}</p>{/if}
+      <div class="actions">
+        <button class="btn glass" data-nav disabled={!!runtime?.building || controls.busy} onclick={() => controls.act(() => app.api.streamingRuntimeBuild())}>Build runtime</button>
+        {#if runtime?.building}<button class="btn glass" data-nav onclick={() => void controls.act(() => app.api.streamingRuntimeCancel())}>Cancel {runtime.job === 'probe' ? 'probe' : 'build'}</button>{/if}
+        <button class="btn glass" data-nav disabled={!runtime?.receipt || !!runtime.building || controls.busy} onclick={() => controls.act(() => app.api.streamingRuntimeProbe(false))}>Probe</button>
+        <button class="btn glass" data-nav disabled={!runtime?.receipt || !!runtime.building || controls.busy} onclick={() => controls.act(() => app.api.streamingRuntimeProbe(true))}>Probe NVIDIA</button>
+        <button class="btn glass" data-nav disabled={!runtime?.previous || !!runtime.building || controls.busy} onclick={() => { if (!rollback) { rollback = true; return; } rollback = false; void controls.act(() => app.api.streamingRuntimeRollback()); }}>{rollback ? 'Confirm rollback' : 'Roll back'}</button>
+      </div>
+      <p class="hint">This builds the reviewed Wolf image used by library streaming. It does not start a host. Use Stream on a supported game for that.</p>
+    </section>
     <section class="glass-panel panel">
       <h2>Headless library games</h2>
       <p>Choose Stream beside Play for supported Genesis/BlastEm and Xbox 360/Xenia games. Games render on a private virtual display and keep separate streaming saves. Closing the viewer keeps the game running.</p>

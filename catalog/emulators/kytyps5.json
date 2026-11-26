@@ -9,5 +9,10 @@
   "asset_excludes": [],
   "binary": "kyty_launcher",
   "config_subdir": "KytyPS5",
-  "requirement": "Experimental PS5 research runner. Expect frequent upstream breakage, manual game setup, and narrow title compatibility. Not a substitute for playing on real hardware."
+  "download": {
+    "url": "https://github.com/KytyPS5/KytyPS5/releases/download/KytyPS5-2026-10-25-83f8bfd/KytyPS5-2026-10-25-83f8bfd-Linux-x86_64.tar.gz",
+    "sha256": "737ea99ea0022adae2b63f07b5bd1e708c8aa2acdd1a77f83531494b48b6d7e9",
+    "version": "KytyPS5-2026-10-25-83f8bfd"
+  },
+  "requirement": "Experimental PS5 research runner. The pinned Linux tarball is KytyPS5-2026-10-25-83f8bfd. Upstream CLI is --game <directory|elf|zar>. Profile and save folders were not confirmed against a live install, so there is no library runner yet. Not a substitute for playing on real hardware."
 }

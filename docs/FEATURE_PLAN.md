@@ -48,10 +48,10 @@ Line numbers are as of `9453414`; re-locate by symbol name if they moved.
 | Port pins | Six recipes compiled in with `include_str!`; `pinned_release.{tag, asset, sha256, binary_sha256}`. Pinned install whose upstream tag differs reports `review`. No runtime override | `port_engine.rs:19-56`, `:109-120` |
 | Port playtime UI | `nativePortGame` sets `playtimeMin: 0`; Game page shows "Not tracked" for ports | `apps/desktop/src/lib/unified.ts:43-49`; `GamePage.svelte:~160` |
 | Play adapters | A system gets Play from `catalog/systems/<id>.json` `emulator`, plus a catalogue emulator with `kind` and `launch`; `emulators::sync_runners` registers `runner.<id>.marquee`; `runners::launch_argv` appends `{rom}` | `crates/core/src/emulators.rs:~1003`; `crates/core/src/runners.rs:~194-229` |
-| PS4/PS5 | `shadps4.json` and `kytyps5.json` have no `kind`, so no runner. No `catalog/systems/ps4.json` or `ps5.json`. Read-only `console::inspect` exists (`inspect_pkg` for PS4, RAR inventory for PS5). ShadPKG base extraction of CUSA08809 passed only as an isolated operator spike | `crates/core/src/console.rs:48-171`; [console preparation](CONSOLE_PREPARATION.md#bounded-ps4ps5-inspection-2026-10-25) |
+| PS4/PS5 | shadPS4 has `kind: emulator` and `-g` launch; no `catalog/systems/ps4.json` yet. `kytyps5.json` has no `kind`. Read-only `console::inspect` exists. ShadPKG base extraction of CUSA08809 passed only as an isolated operator spike | `catalog/emulators/shadps4.json`; `crates/core/src/console.rs`; [console preparation](CONSOLE_PREPARATION.md) |
 | Xbox 360 | Verified ISO prepare/register/Play with Xenia; storage/content/cache/config/log forced under `<data>/xenia/`. Vanquish menu, audio, keyboard, clean exit observed; gameplay and native save not | `emulators.rs:~789-833`; [Xbox 360 adapter](CONSOLE_PREPARATION.md#xbox-360-verified-iso-adapter-2026-10-25) |
-| Streaming API | Streaming screen covers an existing host: connection, viewer install/pair/open/disconnect, pairing, revoke, end game. Wolf `runtime::{status, build, probe, rollback}` are CLI-only | `crates/core/src/streaming/controls.rs:132-233`; `runtime.rs:70-364`; `crates/cli/src/main.rs:118-164` |
-| Headless | Allowlist is `(genesis, runner.blastem.marquee)` and `(xbox360, runner.xenia.marquee)`; the in-container launcher matches the same two. `base_image()` reads the Xenia pilot receipt even for Genesis. Ports publish on `127.0.0.1` only | `crates/core/src/streaming/headless.rs:159-173`, `:280-287`, `:597-608`; `catalog/streaming/library/library-game.py:11-44` |
+| Streaming API | Streaming screen covers an existing host: connection, viewer install/pair/open/disconnect, pairing, revoke, end game, and Wolf runtime build/probe/rollback. No host Start button | `crates/core/src/streaming/controls.rs`; `runtime.rs`; `apps/desktop/src/lib/screens/Streaming.svelte` |
+| Headless | Allowlist is `(genesis, runner.blastem.marquee)` and `(xbox360, runner.xenia.marquee)`. `base_image()` prefers `streaming/library/base.json`, then Sonic/Wolf, then the Xenia pilot. Xbox 360 still requires the pinned Xenia receipt. Ports publish on `127.0.0.1` only | `crates/core/src/streaming/headless.rs`; `catalog/streaming/library/library-game.py` |
 | Stream playtime | No `sessions::` use under `streaming/`. Headless refuses while a local session runs; local Play refuses while headless is active | `headless.rs:424-425`; `lib.rs:312-316` |
 | Viewer target | Moonlight `stream`/`pair` target is the literal `127.0.0.1`; Wolf `WOLF_INTERNAL_IP` is `127.0.0.1` | `streaming/viewer.rs:70-72`, `:120-123`; `catalog/streaming/wolf/entrypoint.py:57` |
 | Steam | `steam::discover()` builds a transient `Inventory` (`steam-install:{lib_fp}:{appid}`); exposed as `inspect_steam` (API/CLI), not persisted, not in the desktop UI, no launch. `steam_web_api`/`steam_id` keys exist with no consumer | `crates/core/src/steam/mod.rs:145-225`; `lib.rs:644`; `crates/core/src/keys.rs:41-57` |
@@ -102,14 +102,14 @@ If UL1 lands before ST3c, swap the numbers here in the same change set.
 | NP3 | Shipwright game-data setup job | Ports | M | NP2 | Open |
 | NP4 | Data setup for the other five ports, one per change set | Ports | S each | NP2 | Open |
 | NP5 | Port release review screen and re-pin script | Ports | S | FD3 | Done 2026-11-25 |
-| PS4-1 | shadPS4 launch contract and runner | Consoles | S | — | Open |
+| PS4-1 | shadPS4 launch contract and runner | Consoles | S | — | Done 2026-11-26. Live title boot unperformed |
 | PS4-2 | PS4 base-game preparation recipe | Consoles | L | PS4-1 | Open |
 | PS4-3 | PS4 system descriptor and Library Play | Consoles | M | PS4-2 | Open |
-| PS5-1 | KytyPS5 pin and launch contract | Consoles | S | — | Open |
+| PS5-1 | KytyPS5 pin and launch contract | Consoles | S | — | Done 2026-11-26. Live --help and save-path check unperformed |
 | PS5-2 | PS5 preparation and Library Play | Consoles | L | PS5-1 | Open |
 | X360-1 | Xbox 360 save/relaunch acceptance support | Consoles | S | — | Done in code. Live Vanquish save/relaunch unperformed |
-| ST3a | Wolf runtime build/status/probe/rollback in the app | Streaming | M | — | Open |
-| ST3b | Base image independent of the Xenia pilot | Streaming | M | — | Open |
+| ST3a | Wolf runtime build/status/probe/rollback in the app | Streaming | M | — | Done 2026-11-26. No host Start button |
+| ST3b | Base image independent of the Xenia pilot | Streaming | M | — | Done 2026-11-26. Live Genesis stream unperformed |
 | ST3c | Streamed playtime | Streaming | M | FD2 | Open |
 | HL1 | Mesen headless adapter | Streaming | M | ST3b | Open |
 | HL2 | DuckStation and PCSX2 headless adapters | Streaming | M each | HL1 | Open |
@@ -641,3 +641,26 @@ Live Xbox 360 save/relaunch was not played. No commit was made in this pass.
   and before a port engine install starts. Storage lists the newest five per
   scope. Restore refuses while that game is running, copies the current files
   first, and does not follow symlinks.
+
+- **ST3a.** The Streaming screen can build, cancel, probe and roll back the
+  managed Wolf image. It still has no button that starts a host. A non-rootless
+  Podman answer stops the build. Probe and NVIDIA probe run in the background
+  and cannot overlap a build. A failed rebuild still shows the last good receipt.
+
+- **ST3b.** Library headless prefers `streaming/library/base.json`, then the
+  Sonic/BlastEm pilot, then the managed Wolf image, and only then the Xenia
+  pilot. Xbox 360 still requires the pinned Xenia receipt. The library
+  entrypoint no longer imports the Sonic `game-entrypoint.py` helper.
+  Live Genesis streaming was not performed.
+
+- **F1 follow-up.** Home “this week” includes ended port sessions. A port
+  engine install refuses while that port is running.
+
+- **PS4-1.** shadPS4 registers `runner.shadps4.marquee` with `-g` on the
+  prepared path, `-f true|false`, isolated XDG folders, and Tools still using
+  `-b`. No `ps4` system descriptor yet. Live boot unperformed.
+
+- **PS5-1.** KytyPS5 installs from the pinned
+  `KytyPS5-2026-10-25-83f8bfd` Linux tarball (GitHub digest
+  `737ea99e…b6d7e9`). `--game` is recorded; save/profile paths and a runner
+  were not added. Live `--help` unperformed.

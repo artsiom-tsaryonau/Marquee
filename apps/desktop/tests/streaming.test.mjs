@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { StreamingControls } from '../src/lib/streaming.svelte';
+import { StreamingControls, probeSummary, runtimeSummary } from '../src/lib/streaming.svelte';
 import { commands } from '../src/lib/api/core';
 
 test('destructive actions require a second click on the same item', async () => {
@@ -38,4 +38,13 @@ test('shared commands keep viewer disconnect distinct from stopping a game', asy
   const api = commands(async (cmd, args) => calls.push([cmd, args]));
   await api.streamingDisconnectViewer(); await api.streamingEndGame('s'); await api.streamingRevoke('c'); await api.streamingPairViewer();
   assert.deepEqual(calls, [['streaming_disconnect_viewer', undefined], ['streaming_end_game', {session_id:'s', confirmed:true}], ['streaming_revoke', {client_id:'c', confirmed:true}], ['streaming_pair_viewer', undefined]]);
+});
+test('runtime summary stays honest about a missing or building image', () => {
+  const empty = { receipt: null, previous: null, building: false, job: null, error: null, probe: null, log: '' };
+  assert.equal(runtimeSummary(null), 'Runtime status unavailable');
+  assert.match(runtimeSummary(empty), /No managed Wolf runtime/);
+  assert.match(runtimeSummary({ ...empty, building: true }), /Building/);
+  assert.match(runtimeSummary({ ...empty, building: true, job: 'probe' }), /Probing/);
+  assert.match(runtimeSummary({ ...empty, receipt: { image: 'sha256:abc', built_at: '2026-11-26T00:00:00Z', wolf_revision: 'rev', live_streaming_verified: false }, error: { code: 'STREAMING_ROOTLESS', message: 'Configure rootless Podman' } }), /2026-11-26/);
+  assert.match(probeSummary({ software_h264_encode_test: true, nvidia_h264_encode_test: true }), /NVIDIA/);
 });

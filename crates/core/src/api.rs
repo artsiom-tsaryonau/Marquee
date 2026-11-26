@@ -246,6 +246,20 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
             }
             out(core.streaming_end_game(&text(&args, "session_id")?)?)
         }
+        "streaming_runtime_status" => core.streaming_runtime_status(),
+        "streaming_runtime_build" => out(core.streaming_runtime_build()?),
+        "streaming_runtime_cancel" => out(core.streaming_runtime_cancel()?),
+        "streaming_runtime_probe" => out(core
+            .streaming_runtime_probe(args.get("nvidia").and_then(Value::as_bool) == Some(true))?),
+        "streaming_runtime_rollback" => {
+            if args.get("confirmed").and_then(Value::as_bool) != Some(true) {
+                return Err(AppError::new(
+                    "STREAMING_CONFIRM",
+                    "Confirm rolling back the Wolf runtime",
+                ));
+            }
+            out(core.streaming_runtime_rollback()?)
+        }
         "health" => out(core.health()?),
         "library_snapshot" => out(core.snapshot()?),
         "import_catalogue" => {

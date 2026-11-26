@@ -452,9 +452,9 @@ pub fn info(
             "duckstation" => "Library Play hides the main window with -nogui and shows the game fullscreen. A display is still required.",
             "mgba" => "Open uses Qt. To launch only the game window, add --marquee-sdl, -f, then an absolute game path as separate arguments. GB/GBC library Play uses Qt with the selected game. SDL is an optional game-only frontend; neither is displayless emulation.",
             "rpcs3" => "Library Play uses --no-gui with a verified base-disc ISO and the managed firmware/save profile. Tools opens RPCS3 configuration separately.",
-            "shadps4" => "Experimental. Marquee installs the official Linux SDL build and opens Big Picture mode. No PS4 library adapter or automated firmware flow yet.",
+            "shadps4" => "Experimental. Library Play passes -g and the prepared eboot or game folder. Tools still opens Big Picture. Config, saves and shader cache stay under Marquee's isolated XDG folders. Package extraction and a PS4 system descriptor remain separate.",
             "xenia" => "Experimental native Linux runner. Library Play starts a verified Xbox 360 ISO directly using Vulkan and keyboard controller emulation. Enter is Start; WASD moves, arrows look, and J/K/U/I are A/B/X/Y. Saves, content, config and cache stay inside Marquee. Game compatibility still requires live validation.",
-            "kytyps5" => "Experimental research runner. Marquee unpacks the published Linux tarball and opens kyty_launcher. Compatibility and config paths are upstream-defined.",
+            "kytyps5" => "Experimental research runner. Marquee unpacks the pinned Linux tarball KytyPS5-2026-10-25-83f8bfd and opens kyty_launcher. Upstream CLI is --game <directory|elf|zar>. Profile and save folders are not confirmed, so there is no library runner yet.",
             _ => "Marquee currently opens this emulator’s own interface. Direct game launch and displayless execution need a separate verified adapter; no generic headless flag is applied.",
         }.into(),
         source_build: crate::source_builds::supported(&def.id),
@@ -1294,6 +1294,76 @@ mod tests {
     }
 
     #[test]
+    fn kytyps5_pins_the_reviewed_linux_tarball_and_does_not_register_a_runner() {
+        let def = find("kytyps5").unwrap();
+        assert!(def.kind.is_none());
+        let pin = def.download.as_ref().unwrap();
+        assert_eq!(
+            pin.sha256,
+            "737ea99ea0022adae2b63f07b5bd1e708c8aa2acdd1a77f83531494b48b6d7e9"
+        );
+        assert_eq!(pin.version, "KytyPS5-2026-10-25-83f8bfd");
+        assert!(pin
+            .url
+            .ends_with("KytyPS5-2026-10-25-83f8bfd-Linux-x86_64.tar.gz"));
+        let latest = latest(&def).unwrap();
+        assert_eq!(latest.sha256, pin.sha256);
+        assert_eq!(latest.version, pin.version);
+    }
+
+    #[test]
+    fn shadps4_becomes_a_runner_with_isolated_xdg_and_a_prepared_game_path() {
+        let def = find("shadps4").unwrap();
+        assert_eq!(def.kind.as_deref(), Some("emulator"));
+        assert_eq!(def.launch, ["-g", "{rom}"]);
+        assert_eq!(def.fullscreen_args, ["-f", "true"]);
+        assert_eq!(def.windowed_args, ["-f", "false"]);
+        assert_eq!(def.open_args, ["-b"]);
+        let temp = tempfile::tempdir().unwrap();
+        let paths = Paths::resolve(Some(temp.path().join("data"))).unwrap();
+        let db = Db::open_in_memory().unwrap();
+        let bin = program_dir(&paths, "shadps4").join(&def.binary);
+        fs::create_dir_all(bin.parent().unwrap()).unwrap();
+        fs::write(&bin, "x").unwrap();
+        db.set_setting(
+            &setting_key("shadps4"),
+            &serde_json::to_string(&Installed {
+                version: "v".into(),
+                bin: def.binary.clone(),
+            })
+            .unwrap(),
+        )
+        .unwrap();
+        sync_runners(&db, &paths).unwrap();
+        let runner = crate::runners::snapshot(&db)
+            .unwrap()
+            .into_iter()
+            .find(|row| row.id == runner_id("shadps4"))
+            .unwrap();
+        assert!(runner
+            .command
+            .iter()
+            .any(|arg| arg.starts_with("XDG_CONFIG_HOME=") && arg.contains("shadps4/xdg-config")));
+        assert!(runner
+            .command
+            .iter()
+            .any(|arg| arg.starts_with("XDG_DATA_HOME=") && arg.contains("shadps4/xdg-data")));
+        assert!(runner
+            .command
+            .iter()
+            .any(|arg| arg.starts_with("XDG_CACHE_HOME=") && arg.contains("shadps4/xdg-cache")));
+        let game = Path::new("/games/CUSA08809/eboot.bin");
+        let argv = crate::runners::launch_argv(&runner, game, &[], false).unwrap();
+        let tail = &argv[argv.len() - 4..];
+        assert_eq!(tail, ["-f", "false", "-g", "/games/CUSA08809/eboot.bin"]);
+        let full = crate::runners::launch_argv(&runner, game, &[], true).unwrap();
+        assert_eq!(
+            &full[full.len() - 4..],
+            ["-f", "true", "-g", "/games/CUSA08809/eboot.bin"]
+        );
+    }
+
+    #[test]
     fn a_download_without_a_published_checksum_is_refused() {
         let def = find("duckstation").unwrap();
         let release = json!({
@@ -1415,6 +1485,7 @@ mod tests {
             kinds,
             [
                 "duckstation",
+                "emulator",
                 "emulator",
                 "emulator",
                 "emulator",

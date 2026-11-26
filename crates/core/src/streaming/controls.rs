@@ -4,6 +4,7 @@ use crate::Core;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 const KEY: &str = "streaming.local_connection";
@@ -56,8 +57,18 @@ struct Operation {
 }
 
 #[derive(Default)]
+struct RuntimeJob {
+    running: bool,
+    kind: Option<&'static str>,
+    cancel: Option<Arc<AtomicBool>>,
+    error: Option<AppError>,
+    probe: Option<Value>,
+}
+
+#[derive(Default)]
 pub struct Manager {
     operation: Mutex<Operation>,
+    runtime: Mutex<RuntimeJob>,
 }
 
 enum Action {
@@ -233,6 +244,155 @@ impl Core {
     pub fn streaming_end_game(&self, session_id: &str) -> Result<()> {
         super::wolf::WolfClient::new(self.streaming_connection()?.socket)?.stop_session(session_id)
     }
+
+    pub fn streaming_runtime_status(&self) -> Result<Value> {
+        let data = &self.paths.data_dir;
+        let job = self
+            .streaming_controls
+            .runtime
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        Ok(json!({
+            "receipt": super::runtime::status(data)?,
+            "previous": super::runtime::previous(data)?,
+            "building": job.running,
+            "job": job.kind,
+            "error": job.error,
+            "probe": job.probe,
+            "log": runtime_log_tail(data),
+        }))
+    }
+
+    pub fn streaming_runtime_build(&self) -> Result<()> {
+        self.start_runtime_job("build", |data, cancel| {
+            super::runtime::build(data, cancel).map(|_| None)
+        })
+    }
+
+    pub fn streaming_runtime_cancel(&self) -> Result<()> {
+        let job = self
+            .streaming_controls
+            .runtime
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        if let Some(cancel) = &job.cancel {
+            cancel.store(true, Ordering::SeqCst);
+        }
+        Ok(())
+    }
+
+    pub fn streaming_runtime_probe(&self, nvidia: bool) -> Result<()> {
+        let job = self
+            .streaming_controls
+            .runtime
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        if job.running {
+            return Err(AppError::new(
+                "STREAMING_BUSY",
+                "Wait for the Wolf runtime job to finish",
+            ));
+        }
+        drop(job);
+        if super::runtime::status(&self.paths.data_dir)?.is_none() {
+            return Err(AppError::new(
+                "STREAMING_MISSING",
+                "Build the managed Wolf backend first",
+            ));
+        }
+        self.start_runtime_job("probe", move |data, cancel| {
+            super::runtime::probe(data, nvidia, None, cancel).map(Some)
+        })
+    }
+
+    pub fn streaming_runtime_rollback(&self) -> Result<super::runtime::Receipt> {
+        let mut job = self
+            .streaming_controls
+            .runtime
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        if job.running {
+            return Err(AppError::new(
+                "STREAMING_BUSY",
+                "Wait for the Wolf runtime job to finish",
+            ));
+        }
+        job.running = true;
+        job.kind = Some("rollback");
+        job.error = None;
+        drop(job);
+        let result = super::runtime::rollback(&self.paths.data_dir);
+        let mut job = self
+            .streaming_controls
+            .runtime
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        job.running = false;
+        job.kind = None;
+        job.error = result.as_ref().err().cloned();
+        result
+    }
+
+    fn start_runtime_job(
+        &self,
+        kind: &'static str,
+        work: impl FnOnce(&std::path::Path, &AtomicBool) -> Result<Option<Value>> + Send + 'static,
+    ) -> Result<()> {
+        let mut job = self
+            .streaming_controls
+            .runtime
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        if job.running {
+            return Err(AppError::new(
+                "STREAMING_BUSY",
+                "A Wolf runtime job is already running",
+            ));
+        }
+        let cancel = Arc::new(AtomicBool::new(false));
+        job.running = true;
+        job.kind = Some(kind);
+        job.error = None;
+        job.cancel = Some(Arc::clone(&cancel));
+        let data = self.paths.data_dir.clone();
+        let manager = Arc::clone(&self.streaming_controls);
+        if let Err(error) = std::thread::Builder::new()
+            .name("marquee-wolf-build".into())
+            .spawn(move || {
+                let result = work(&data, &cancel);
+                let mut job = manager
+                    .runtime
+                    .lock()
+                    .unwrap_or_else(|error| error.into_inner());
+                job.running = false;
+                job.kind = None;
+                job.cancel = None;
+                match result {
+                    Ok(probe) => {
+                        if probe.is_some() {
+                            job.probe = probe;
+                        }
+                        job.error = None;
+                    }
+                    Err(error) => job.error = Some(error),
+                }
+            })
+        {
+            job.running = false;
+            job.kind = None;
+            job.cancel = None;
+            return Err(AppError::new("SPAWN_FAILED", error.to_string()));
+        }
+        Ok(())
+    }
+}
+
+fn runtime_log_tail(data: &std::path::Path) -> String {
+    let Ok(bytes) = std::fs::read(data.join("streaming/wolf/build.log")) else {
+        return String::new();
+    };
+    let start = bytes.len().saturating_sub(500);
+    String::from_utf8_lossy(&bytes[start..]).trim().to_string()
 }
 
 #[cfg(test)]
@@ -274,7 +434,11 @@ mod tests {
     fn destructive_api_calls_require_confirmation_before_contacting_host() {
         let dir = tempfile::tempdir().unwrap();
         let core = Arc::new(Core::open_isolated(Some(dir.path().join("data")), true).unwrap());
-        for command in ["streaming_end_game", "streaming_revoke"] {
+        for command in [
+            "streaming_end_game",
+            "streaming_revoke",
+            "streaming_runtime_rollback",
+        ] {
             assert_eq!(
                 crate::api::dispatch(&core, command, json!({}))
                     .unwrap_err()
@@ -294,6 +458,65 @@ mod tests {
         assert!(completed(json!({"reason":"receiver-exited","exit_code":null})).is_err());
         assert!(completed(json!({"reason":"receiver-exited","exit_code":0})).is_ok());
         assert!(completed(json!({"reason":"viewer-disconnected"})).is_ok());
+    }
+
+    #[test]
+    fn runtime_status_is_empty_until_a_build_and_a_fake_podman_cannot_pass_as_rootless() {
+        let temp = tempfile::tempdir().unwrap();
+        let bin = temp.path().join("bin");
+        std::fs::create_dir(&bin).unwrap();
+        std::fs::write(
+            bin.join("podman"),
+            "#!/bin/sh\nsleep 0.3\nprintf '%s\\n' '{\"host\":{\"security\":{\"rootless\":false}}}'\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(
+            bin.join("podman"),
+            <std::fs::Permissions as std::os::unix::fs::PermissionsExt>::from_mode(0o755),
+        )
+        .unwrap();
+        let core = Core::open_isolated(Some(temp.path().join("data")), true).unwrap();
+        let status = core.streaming_runtime_status().unwrap();
+        assert!(status["receipt"].is_null());
+        assert_eq!(status["building"], false);
+        assert!(status["job"].is_null());
+        assert_eq!(
+            core.streaming_runtime_rollback().unwrap_err().code,
+            "STREAMING_MISSING"
+        );
+        assert_eq!(
+            core.streaming_runtime_probe(false).unwrap_err().code,
+            "STREAMING_MISSING"
+        );
+        let previous = std::env::var_os("MARQUEE_PODMAN");
+        std::env::set_var("MARQUEE_PODMAN", bin.join("podman"));
+        struct Restore(Option<std::ffi::OsString>);
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                match &self.0 {
+                    Some(value) => std::env::set_var("MARQUEE_PODMAN", value),
+                    None => std::env::remove_var("MARQUEE_PODMAN"),
+                }
+            }
+        }
+        let _restore = Restore(previous);
+        core.streaming_runtime_build().unwrap();
+        assert_eq!(
+            core.streaming_runtime_probe(false).unwrap_err().code,
+            "STREAMING_BUSY"
+        );
+        let mut code = String::new();
+        for _ in 0..40 {
+            let status = core.streaming_runtime_status().unwrap();
+            if status["building"] == false {
+                if let Some(error) = status["error"]["code"].as_str() {
+                    code = error.to_string();
+                    break;
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        assert_eq!(code, "STREAMING_ROOTLESS");
     }
 
     #[test]

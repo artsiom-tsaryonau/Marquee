@@ -540,7 +540,12 @@ fn streaming(
             StreamingCmd::Probe {
                 nvidia,
                 render_node,
-            } => runtime::probe(&paths.data_dir, *nvidia, render_node.as_deref())?,
+            } => runtime::probe(
+                &paths.data_dir,
+                *nvidia,
+                render_node.as_deref(),
+                &std::sync::atomic::AtomicBool::new(false),
+            )?,
             _ => unreachable!(),
         };
         println!("{}", serde_json::to_string_pretty(&value)?);

@@ -63,6 +63,10 @@ pub fn totals(conn: &Connection, port_id: &str) -> Result<(i64, i64, Option<Stri
     .map_err(Into::into)
 }
 
+pub fn credited_sessions(conn: &Connection) -> Result<Vec<Session>> {
+    Ok(list_conn(conn, None)?.into_iter().map(to_session).collect())
+}
+
 pub fn history_for(core: &Core, port_id: &str) -> Result<GameHistory> {
     let rows = core.with_db(|db| list_conn(&db.conn, Some(port_id)))?;
     let now = crate::unix_now();
@@ -456,5 +460,24 @@ mod tests {
     fn played(core: &Core) -> (i64, i64) {
         let (seconds, count, _) = core.with_db(|db| totals(&db.conn, "shipwright")).unwrap();
         (seconds, count)
+    }
+
+    #[test]
+    fn home_week_total_includes_ended_port_play_and_install_waits_until_the_port_exits() {
+        let temp = tempfile::tempdir().unwrap();
+        let core = Core::open_isolated(Some(temp.path().join("data")), true).unwrap();
+        let started = now_rfc3339();
+        core.with_db(|db| {
+            insert(&db.conn, "played", "shipwright", &started)?;
+            finish(&db.conn, "played", 90, Some(0), "ended", None)
+        })
+        .unwrap();
+        assert_eq!(core.play_summary().unwrap().week_seconds, 90);
+        core.with_db(|db| insert(&db.conn, "run", "shipwright", &started))
+            .unwrap();
+        assert_eq!(
+            core.start_port_install("shipwright").unwrap_err().code,
+            "LAUNCH_BUSY"
+        );
     }
 }

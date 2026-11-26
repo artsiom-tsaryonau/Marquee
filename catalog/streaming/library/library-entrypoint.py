@@ -1,6 +1,7 @@
 """Publish one reviewed library launch slot in the owned, paired Wolf host."""
 import fcntl
 import json
+import math
 import os
 from pathlib import Path
 import runpy
@@ -17,7 +18,20 @@ KNOWN = {
 }
 
 
-def configure(path, inline):
+def inline(value):
+    if isinstance(value, (str, bool)) or type(value) is int:
+        return json.dumps(value, ensure_ascii=True)
+    if type(value) is float and math.isfinite(value):
+        return json.dumps(value)
+    if isinstance(value, list):
+        return "[" + ", ".join(inline(item) for item in value) + "]"
+    if isinstance(value, dict):
+        return "{" + ", ".join(json.dumps(key) + " = " + inline(item)
+                                for key, item in value.items()) + "}"
+    raise RuntimeError("Unsupported value in the reviewed host configuration")
+
+
+def configure(path):
     text = path.read_text()
     if len(text.encode()) > 1024 * 1024:
         raise RuntimeError('Host configuration exceeds the review limit')
@@ -48,6 +62,5 @@ if __name__ == '__main__':
     os.umask(0o077)
     with Path('/state/library-host.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        inline = runpy.run_path('/opt/marquee-wolf/game-entrypoint.py')['inline']
-        configure(Path('/state/config.toml'), inline)
+        configure(Path('/state/config.toml'))
         runpy.run_path('/opt/marquee-wolf/entrypoint.py', run_name='__main__')
