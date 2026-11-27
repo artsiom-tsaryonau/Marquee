@@ -1,0 +1,71 @@
+diff --git a/Directory.Build.props b/Directory.Build.props
+index d6d3751..a6e2893 100644
+--- a/Directory.Build.props
++++ b/Directory.Build.props
+@@ -2,6 +2,6 @@
+   <PropertyGroup>
+     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+-    <TargetFramework>net8.0</TargetFramework>
++    <TargetFramework>net10.0</TargetFramework>
+   </PropertyGroup>
+ </Project>
+diff --git a/LibOrbisPkg/PFS/PFSCReader.cs b/LibOrbisPkg/PFS/PFSCReader.cs
+index 12c6c1b..4c9fdb2 100644
+--- a/LibOrbisPkg/PFS/PFSCReader.cs
++++ b/LibOrbisPkg/PFS/PFSCReader.cs
+@@ -1,4 +1,4 @@
+-﻿using System;
++using System;
+ using System.Runtime.InteropServices;
+ using System.IO.MemoryMappedFiles;
+ using System.IO;
+@@ -84,7 +84,16 @@ namespace LibOrbisPkg.PFS
+         using (var bufStream = new MemoryStream(sectorBuf))
+         using (var ds = new DeflateStream(bufStream, CompressionMode.Decompress))
+         {
+-          ds.Read(output, 0, hdr.BlockSz);
++          // .NET 6+ DeflateStream.Read may return less than asked: read until full.
++          int filled = 0;
++          while (filled < hdr.BlockSz)
++          {
++            int n = ds.Read(output, filled, hdr.BlockSz - filled);
++            if (n == 0) break;
++            filled += n;
++          }
++          if (filled < hdr.BlockSz)
++            Array.Clear(output, filled, hdr.BlockSz - filled);
+         }
+       }
+     }
+diff --git a/PkgTool/Program.cs b/PkgTool/Program.cs
+index 0c68b76..6a5e58a 100644
+--- a/PkgTool/Program.cs
++++ b/PkgTool/Program.cs
+@@ -110,7 +110,7 @@ namespace PkgTool
+           var passcode = optionals["passcode"];
+           Pkg pkg;
+ 
+-          var mmf = MemoryMappedFile.CreateFromFile(pkgPath);
++          var mmf = MemoryMappedFile.CreateFromFile(pkgPath, FileMode.Open, null, 0, MemoryMappedFileAccess.Read);
+           using (var s = mmf.CreateViewStream(0, 0, MemoryMappedFileAccess.Read))
+           {
+             pkg = new PkgReader(s).ReadPkg();
+@@ -135,7 +135,7 @@ namespace PkgTool
+           var passcode = optionals["passcode"];
+           Pkg pkg;
+ 
+-          var mmf = MemoryMappedFile.CreateFromFile(pkgPath);
++          var mmf = MemoryMappedFile.CreateFromFile(pkgPath, FileMode.Open, null, 0, MemoryMappedFileAccess.Read);
+           using (var s = mmf.CreateViewStream(0, 0, MemoryMappedFileAccess.Read))
+           {
+             pkg = new PkgReader(s).ReadPkg();
+@@ -189,7 +189,7 @@ namespace PkgTool
+           var passcode = optionals["passcode"];
+ 
+           Pkg pkg;
+-          var mmf = MemoryMappedFile.CreateFromFile(pkgPath);
++          var mmf = MemoryMappedFile.CreateFromFile(pkgPath, FileMode.Open, null, 0, MemoryMappedFileAccess.Read);
+           using (var s = mmf.CreateViewStream(0, 0, MemoryMappedFileAccess.Read))
+           {
+             pkg = new PkgReader(s).ReadPkg();
