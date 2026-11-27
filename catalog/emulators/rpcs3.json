@@ -26,5 +26,19 @@
   ],
   "fullscreen_args": [
     "--fullscreen"
+  ],
+  "settings": [
+    {
+      "path": "rpcs3/GuiConfigs/CurrentSettings.ini",
+      "section": "main_window",
+      "key": "confirmationBoxExitGame",
+      "value": "false"
+    },
+    {
+      "path": "rpcs3/GuiConfigs/CurrentSettings.ini",
+      "section": "GSFrame",
+      "key": "hideMouseOnIdle",
+      "value": "true"
+    }
   ]
 }
