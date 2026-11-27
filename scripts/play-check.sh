@@ -47,12 +47,15 @@ cleanup() {
     pkill -KILL -f "gamescope --backend headless -W $w -H $h" 2>/dev/null || true
     sleep 1
     pactl unload-module "$module" 2>/dev/null || true
+    rm -f "$marker"
 }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
-export PULSE_SINK="$sink" PIPEWIRE_NODE="$sink" SDL_AUDIO_DEVICE_NAME="$sink"
+export PULSE_SINK="$sink" PIPEWIRE_NODE="$sink"
+# SDL can talk to PipeWire directly and ignore PULSE_SINK; make it use PulseAudio.
+export SDL_AUDIODRIVER=pulseaudio SDL_AUDIO_DRIVER=pulseaudio
 
-before=$(ls "$runtime" | grep -E '^gamescope-[0-9]+$' || true)
+marker=$(mktemp)
 export MARQUEE_DISPLAY_MODE=window
 export MARQUEE_LAUNCH_PREFIX="[\"gamescope\",\"--backend\",\"headless\",\"-W\",\"$w\",\"-H\",\"$h\",\"-w\",\"$w\",\"-h\",\"$h\",\"--\"]"
 "$bin" launch "$id" > "$out/marquee.log" 2>&1 &
@@ -60,7 +63,9 @@ launcher=$!
 
 display=""
 for _ in $(seq 1 100); do
-    display=$(comm -13 <(echo "$before" | sort) <(ls "$runtime" | grep -E '^gamescope-[0-9]+$' | sort) | head -1)
+    # The socket this gamescope created (names are reused after a crash).
+    display=$(find "$runtime" -maxdepth 1 -name 'gamescope-[0-9]*' ! -name '*-ei' ! -name '*.lock' \
+        -newer "$marker" -printf '%f\n' 2>/dev/null | head -1)
     [ -n "$display" ] && break
     sleep 0.1
 done
