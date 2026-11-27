@@ -32,6 +32,8 @@ const CATALOGUE: &[&str] = &[
     include_str!("../../../catalog/emulators/rpcs3.json"),
     include_str!("../../../catalog/emulators/ppsspp.json"),
     include_str!("../../../catalog/emulators/vita3k.json"),
+    include_str!("../../../catalog/emulators/dolphin.json"),
+    include_str!("../../../catalog/emulators/eden.json"),
     include_str!("../../../catalog/emulators/xemu.json"),
     include_str!("../../../catalog/emulators/azahar.json"),
     include_str!("../../../catalog/emulators/mgba.json"),
@@ -1790,6 +1792,8 @@ mod tests {
             kinds,
             [
                 "duckstation",
+                "emulator",
+                "emulator",
                 "emulator",
                 "emulator",
                 "emulator",

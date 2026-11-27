@@ -1,0 +1,67 @@
+{
+  "id": "dolphin",
+  "name": "Dolphin",
+  "systems": [
+    "gamecube"
+  ],
+  "binary": "AppRun",
+  "config_subdir": "dolphin",
+  "requirement": "GameCube emulator (unofficial anylinux AppImage of Dolphin 2609b; upstream ships Linux only as Flatpak). Library Play runs .iso/.gcm/.ciso/.gcz/.rvz images; no BIOS needed. Keyboard drives controller 1.",
+  "download": {
+    "url": "https://github.com/pkgforge-dev/Dolphin-emu-AppImage/releases/download/2609b%402026-11-22_1795373059/Dolphin_Emulator-2609b-anylinux-x86_64.AppImage",
+    "sha256": "7719d18ef3c00ea08af783fdb1d1f2dcabdc9db34c28fb2d0b145ef0beaa767b",
+    "version": "2609b"
+  },
+  "kind": "emulator",
+  "launch": [
+    "-b",
+    "-e",
+    "{rom}"
+  ],
+  "fullscreen_args": [
+    "-C",
+    "Dolphin.Display.Fullscreen=True"
+  ],
+  "windowed_args": [
+    "-C",
+    "Dolphin.Display.Fullscreen=False"
+  ],
+  "settings": [
+    {
+      "path": "dolphin-emu/Dolphin.ini",
+      "section": "Analytics",
+      "key": "PermissionAsked",
+      "value": "True"
+    },
+    {
+      "path": "dolphin-emu/Dolphin.ini",
+      "section": "Analytics",
+      "key": "Enabled",
+      "value": "False"
+    },
+    {
+      "path": "dolphin-emu/Dolphin.ini",
+      "section": "Interface",
+      "key": "ConfirmStop",
+      "value": "False"
+    },
+    {
+      "path": "dolphin-emu/Dolphin.ini",
+      "section": "Interface",
+      "key": "ShowToolbar",
+      "value": "False"
+    },
+    {
+      "path": "dolphin-emu/Dolphin.ini",
+      "section": "Display",
+      "key": "RenderToMain",
+      "value": "False"
+    },
+    {
+      "path": "dolphin-emu/Dolphin.ini",
+      "section": "General",
+      "key": "AutoUpdateTrack",
+      "value": ""
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "id": "eden",
+  "name": "Eden",
+  "systems": [
+    "switch"
+  ],
+  "binary": "AppRun",
+  "config_subdir": "eden",
+  "requirement": "Nintendo Switch emulator (yuzu lineage), from the project's own server (its GitHub releases are blocked). Needs the owner's prod.keys/title.keys and a firmware dump installed into its NAND. Library Play runs .nsp/.xci; updates and DLC install into the NAND.",
+  "download": {
+    "url": "https://stable.eden-emu.dev/v0.2.1/Eden-Linux-v0.2.1-amd64-clang-pgo.AppImage",
+    "sha256": "7a28bf988b0648831989722bdbaa90ab31371b403808199813e0ea7c8b25ba6d",
+    "version": "0.2.1"
+  },
+  "kind": "emulator",
+  "launch": [
+    "-g",
+    "{rom}"
+  ],
+  "fullscreen_args": [
+    "-f"
+  ],
+  "firmware": [
+    {
+      "name": "prod.keys",
+      "required": true,
+      "root": "data",
+      "dir": "eden/keys",
+      "note": "Console keys dumped from the owner's Switch."
+    },
+    {
+      "name": "title.keys",
+      "required": false,
+      "root": "data",
+      "dir": "eden/keys",
+      "note": "Title keys for digital games."
+    }
+  ]
+}

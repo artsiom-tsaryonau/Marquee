@@ -95,7 +95,8 @@ separate levels of support. The current emulator names and roles are:
 | Sega Saturn / Nintendo 3DS | **Ymir / Azahar** | Library launch; Saturn BIOS matched by hash; Euro 96 and Pokémon Moon boot |
 | Wii U | **Cemu** | Library launch of decrypted folder games named from `meta.xml`; update and DLC from Cemu's storage; Smash Bros. boots |
 | Original Xbox | **xemu** | Library launch with the owner's BIOS, MCPX ROM and hard disk; XISO images (redump trimmed); Forza Motorsport starts |
-| PSP / PS Vita | **PPSSPP / Vita3K** | PSP library launch (ISO/CSO/CHD/PBP); Vita3K installed with firmware 3.74, games need their licence key |
+| PSP / PS Vita | **PPSSPP / Vita3K** | PSP library launch (ISO/CSO/CHD/PBP); Persona 3 Portable runs. Vita3K installed with firmware 3.74, games need their licence key |
+| GameCube / Switch | **Dolphin / Eden** | Library launch; Metroid Prime (CISO) and Nightshade / Breath of the Wild run; Switch keys and firmware placed by Marquee |
 | PS4 / PS5 research | **shadPS4 / KytyPS5** | Setup-only tools; no playable PS4/PS5 title yet |
 
 Managed native-engine recipes include **Shipwright / Ship of Harkinian**,

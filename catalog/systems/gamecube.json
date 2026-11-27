@@ -1,0 +1,17 @@
+{
+  "id": "gamecube",
+  "display_name": "GameCube",
+  "supported_extensions": [
+    "iso",
+    "gcm",
+    "ciso",
+    "gcz",
+    "rvz"
+  ],
+  "skipped_extensions": [
+    "txt"
+  ],
+  "runner_kind": "emulator",
+  "emulator": "dolphin",
+  "notes": "GameCube disc images; Dolphin reads compressed CISO, GCZ and RVZ directly."
+}

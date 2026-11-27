@@ -16,7 +16,7 @@ export type Platform =
   | 'neogeo' | 'genesis' | 'atari2600' | 'atari5200' | 'sms' | 'atari7800' | 'tg16' | 'tgcd' | 'cdi'
   | 'segacd' | 'jaguar' | '32x' | 'saturn' | 'jaguarcd' | 'dreamcast' | 'xbox' | 'xbox360'
   | 'xbox360-digital' | 'ps3' | 'ps4' | 'wii' | 'wiiware' | 'wiiu' | 'gb' | 'lynx' | 'gamegear'
-  | 'virtualboy' | 'gbc' | 'ds' | 'psp' | '3ds';
+  | 'virtualboy' | 'gbc' | 'ds' | 'psp' | '3ds' | 'switch';
 
 export type Motif = 'sun' | 'rings' | 'peaks' | 'grid' | 'waves' | 'shards' | 'orbit' | 'monolith';
 

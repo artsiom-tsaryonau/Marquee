@@ -17,6 +17,8 @@ const GENERIC_JSON: &[&str] = &[
     include_str!("../../../catalog/systems/wiiu.json"),
     include_str!("../../../catalog/systems/xbox.json"),
     include_str!("../../../catalog/systems/psp.json"),
+    include_str!("../../../catalog/systems/gamecube.json"),
+    include_str!("../../../catalog/systems/switch.json"),
     include_str!("../../../catalog/systems/nes.json"),
     include_str!("../../../catalog/systems/snes.json"),
     include_str!("../../../catalog/systems/gb.json"),

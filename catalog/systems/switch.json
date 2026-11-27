@@ -1,0 +1,15 @@
+{
+  "id": "switch",
+  "display_name": "Nintendo Switch",
+  "supported_extensions": [
+    "nsp",
+    "xci"
+  ],
+  "skipped_extensions": [
+    "nca",
+    "url"
+  ],
+  "runner_kind": "emulator",
+  "emulator": "eden",
+  "notes": "Base games as .nsp or .xci. Updates and DLC are installed into Eden's NAND, not imported as games."
+}

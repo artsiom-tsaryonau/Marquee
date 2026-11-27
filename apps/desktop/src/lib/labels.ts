@@ -27,7 +27,7 @@ export const platformLabel: Record<Platform, string> = {
   '32x': 'Sega 32X', saturn: 'Saturn', jaguarcd: 'Jaguar CD', dreamcast: 'Dreamcast', xbox: 'Xbox',
   xbox360: 'Xbox 360', 'xbox360-digital': 'Xbox 360 Digital', ps3: 'PlayStation 3', ps4: 'PlayStation 4', wii: 'Wii', wiiware: 'WiiWare',
   wiiu: 'Wii U', gb: 'Game Boy', lynx: 'Lynx', gamegear: 'Game Gear', virtualboy: 'Virtual Boy', gbc: 'Game Boy Color',
-  neogeo: 'Neo Geo', ds: 'Nintendo DS', psp: 'PSP', '3ds': 'Nintendo 3DS',
+  neogeo: 'Neo Geo', ds: 'Nintendo DS', psp: 'PSP', '3ds': 'Nintendo 3DS', switch: 'Nintendo Switch',
 };
 
 /** Emulator catalogue system ids, as people say them. */
