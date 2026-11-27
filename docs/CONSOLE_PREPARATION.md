@@ -244,6 +244,11 @@ with a disk-backed `/tmp` and an unlimited stack too: its known heap corruption 
 updates ([issue 3](https://github.com/seregonwar/ShadPKG/issues/3)). Candidates:
 LibOrbisPkg `PkgTool pkg_extract` (LGPL-3.0, .NET) or a Rust extractor in Marquee
 (PS4-2). Staging: `~/Games/Marquee/.staging/driveclub/`.
+LibOrbisPkg revision `92a4e7f8` (built for .NET 10; `pkg_extract` patched to map the
+package read-only, as the sandbox mounts it) extracted the update: 57 PFS files,
+20 GB, `eboot.bin` and `game.ndx` but no `game.chc` (the package has none). Its
+`param.sfo` and the other PKG entries outside the PFS came from ShadPKG, which
+writes them before it crashes. ShadPKG for bases, LibOrbisPkg for updates.
 
 ### shadPS4 launch contract (PS4-1, 2026-11-26)
 
