@@ -283,7 +283,7 @@ export type CoreEvent =
   | { type: 'tool_install_finished'; tool_id: string; runner_id: string | null }
   | { type: 'tool_install_failed'; tool_id: string; message: string }
   | { type: 'port_progress'; port_id: string; message: string }
-  | { type: 'artwork_finished'; fetched: number; skipped: number; failed: number };
+  | { type: 'artwork_finished'; media_added?: number; info_updated?: number; fetched: number; skipped: number; failed: number };
 
 export interface GameHistory {
   sessions: Session[];
@@ -683,6 +683,8 @@ export interface BrowserJob {
 }
 
 export interface ArtworkReport {
+  media_added?: number;
+  info_updated?: number;
   fetched: number;
   skipped: number;
   failed: number;

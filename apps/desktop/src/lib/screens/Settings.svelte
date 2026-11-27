@@ -76,7 +76,7 @@
     <h2>Disc library maintenance</h2>
     <div class="item"><div><strong>Last import</strong><span>{app.lastScan ? `${app.lastScan.added} added · ${app.lastScan.skipped_unsupported} companion or unsupported files` : 'No scan results available in this session'}</span></div><button class="btn glass small" data-nav onclick={() => app.rescan()} disabled={app.scanning}>{app.scanning ? 'Scanning…' : 'Rescan folders'}</button></div>
     <div class="item"><div><strong>Emulator detection</strong><span>Refresh after installing or moving an emulator.</span></div><button class="btn glass small" data-nav onclick={() => app.refreshRunners()}>Refresh emulators</button></div>
-    <div class="item"><div><strong>Box art</strong><span>Looks up covers for supported platforms. Missing artwork never blocks Play.</span></div><button class="btn glass small" data-nav onclick={() => app.refreshArtwork()} disabled={app.fetchingArt || !app.games.length}>{app.fetchingArt ? 'Fetching…' : 'Fetch covers'}</button></div>
+    <div class="item"><div><strong>Images and game details</strong><span>Fill missing covers, screenshots, backgrounds and game details. Existing covers and facts are kept; downloaded images appear in each game’s Media tab.</span></div><button class="btn glass small" data-nav onclick={() => app.refreshArtwork()} disabled={app.fetchingArt || !app.games.length}>{app.fetchingArt ? 'Refreshing…' : 'Refresh images and details'}</button></div>
   </section>
 
   <section class="glass-panel" hidden={category !== 'providers'}>

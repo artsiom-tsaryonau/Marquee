@@ -189,6 +189,8 @@ pub(crate) fn tgdb_platform(system: &str) -> Option<u32> {
         "ps3" => 12,
         "xbox360" => 15,
         "dreamcast" => 16,
+        "saturn" => 17,
+        "3ds" => 4912,
         "genesis" => 18,
         "neogeo" => 24,
         _ => return None,
@@ -206,11 +208,31 @@ fn tidy_description(raw: &str) -> Option<String> {
 
 /// Use the first search result that is the same game.
 fn pick_game(json: &Value, wanted: &str, genres: &BTreeMap<u64, String>) -> Option<GameInfo> {
-    let game = json["data"]["games"].as_array()?.iter().find(|g| {
-        g["game_title"]
-            .as_str()
-            .is_some_and(|t| romart::names_agree(wanted, t))
-    })?;
+    let games = json["data"]["games"].as_array()?;
+    let exact: Vec<_> = games
+        .iter()
+        .filter(|game| {
+            game["game_title"].as_str().is_some_and(|title| {
+                romart::looks_retail(title) && romart::provider_title_agrees(wanted, title)
+            })
+        })
+        .collect();
+    let matches: Vec<_> = if exact.is_empty() {
+        games
+            .iter()
+            .filter(|game| {
+                game["game_title"].as_str().is_some_and(|title| {
+                    romart::looks_retail(title) && romart::names_agree(wanted, title)
+                })
+            })
+            .collect()
+    } else {
+        exact
+    };
+    if matches.len() != 1 {
+        return None;
+    }
+    let game = matches[0];
     let genre = game["genres"].as_array().and_then(|ids| {
         let names: Vec<&str> = ids
             .iter()
@@ -223,11 +245,18 @@ fn pick_game(json: &Value, wanted: &str, genres: &BTreeMap<u64, String>) -> Opti
     let info = GameInfo {
         genre,
         year: game["release_date"].as_str().and_then(year_of),
-        developer: None,
-        publisher: None,
-        players: game["players"].as_i64().filter(|p| (1..=16).contains(p)),
+        developer: game["developer_names"].as_str().map(str::to_owned),
+        publisher: game["publisher_names"].as_str().map(str::to_owned),
+        players: game["players"]
+            .as_i64()
+            .or_else(|| game["players"].as_str()?.parse().ok())
+            .filter(|p| (1..=16).contains(p)),
         description: game["overview"].as_str().and_then(tidy_description),
-        source: String::new(),
+        source: game["id"]
+            .as_u64()
+            .filter(|id| *id > 0)
+            .map(|id| format!("thegamesdb:{id}"))
+            .unwrap_or_else(|| "thegamesdb".into()),
     };
     (info.description.is_some() || info.genre.is_some() || info.year.is_some()).then_some(info)
 }
@@ -253,25 +282,127 @@ pub(crate) fn tgdb_genres(cache: &Path, key: &str) -> BTreeMap<u64, String> {
     out
 }
 
-/// Ask TheGamesDB. The error text of a failed request contains the key in its
-/// URL, so errors are dropped here and never shown or logged.
+#[derive(Default)]
+struct Companies {
+    developers: BTreeMap<u64, String>,
+    publishers: BTreeMap<u64, String>,
+}
+
+fn company_list(cache: &Path, key: &str, kind: &str) -> BTreeMap<u64, String> {
+    let file = cache.join(format!("tgdb-{kind}.json"));
+    let known = romart::load(&file);
+    if romart::fresh(&file) {
+        return known;
+    }
+    let endpoint = if kind == "developers" {
+        "Developers"
+    } else {
+        "Publishers"
+    };
+    let Ok(json) = http::get_json(&format!("{TGDB}/{endpoint}?apikey={}", romart::encode(key)))
+    else {
+        return known;
+    };
+    let Some(values) = json["data"][kind].as_object() else {
+        return known;
+    };
+    let names: BTreeMap<_, _> = values
+        .iter()
+        .filter_map(|(id, value)| {
+            let name = value["name"].as_str()?.trim();
+            (!name.is_empty() && name.len() <= 300 && !name.chars().any(char::is_control))
+                .then(|| Some((id.parse::<u64>().ok()?, name.to_string())))
+                .flatten()
+        })
+        .collect();
+    if !names.is_empty() {
+        romart::save(&file, &names);
+    }
+    names
+}
+
+fn company_names(ids: &Value, names: &BTreeMap<u64, String>) -> Option<String> {
+    let found: Vec<_> = ids
+        .as_array()?
+        .iter()
+        .filter_map(|id| names.get(&id.as_u64()?))
+        .take(6)
+        .cloned()
+        .collect();
+    (!found.is_empty()).then(|| found.join(", "))
+}
+
+pub(crate) fn tgdb_id(info: &GameInfo) -> Option<u64> {
+    info.source.split('+').find_map(|source| {
+        source
+            .strip_prefix("thegamesdb:")?
+            .parse::<u64>()
+            .ok()
+            .filter(|id| *id > 0)
+    })
+}
+
+fn prefer_usa(games: &mut Vec<Value>, wanted: &str, usa: bool) {
+    if usa
+        && games.iter().any(|game| {
+            game["country_id"] == 50
+                && game["game_title"].as_str().is_some_and(|title| {
+                    romart::looks_retail(title) && romart::provider_title_agrees(wanted, title)
+                })
+        })
+    {
+        games.retain(|game| game["country_id"] == 50);
+    }
+}
+
+// API errors may contain query-string credentials; never surface or cache them.
 fn tgdb_lookup(
     key: &str,
-    platform: u32,
-    name: &str,
+    pending: &Pending<'_>,
     genres: &BTreeMap<u64, String>,
+    companies: &Companies,
     left: &AtomicI64,
 ) -> Option<GameInfo> {
-    let term = romart::plain_title(name);
-    let url = format!(
-        "{TGDB}/Games/ByGameName?apikey={key}&name={}&fields=overview,players,genres&filter%5Bplatform%5D={platform}",
-        romart::encode(&term)
-    );
-    let json = http::get_json(&url).ok()?;
+    let term = romart::plain_title(&pending.name);
+    let platform = pending.platform;
+    let known = tgdb_id(&pending.info);
+    let fields = "overview,players,genres,platform,publishers";
+    let url = if let Some(id) = known {
+        format!(
+            "{TGDB}/Games/ByGameID?apikey={}&id={id}&fields={fields}",
+            romart::encode(key)
+        )
+    } else {
+        format!("{TGDB}/Games/ByGameName?apikey={}&name={}&fields={fields}&filter%5Bplatform%5D={platform}",romart::encode(key),romart::encode(&term))
+    };
+    let mut json = http::get_json(&url).ok()?;
     if let Some(n) = json["remaining_monthly_allowance"].as_i64() {
         left.store(n, Ordering::SeqCst);
     }
-    pick_game(&json, &term, genres)
+    let games = json["data"]["games"].as_array_mut()?;
+    games.retain(|game| {
+        game["platform"].as_u64() == Some(u64::from(platform))
+            && known.is_none_or(|id| game["id"].as_u64() == Some(id))
+    });
+    if known.is_none() {
+        let usa = pending.edition.region.as_deref() == Some("NTSC-U")
+            || pending.edition.scan_title.to_lowercase().contains("(usa)");
+        prefer_usa(games, &term, usa);
+    }
+    for game in games.iter_mut() {
+        if let Some(name) = company_names(&game["developers"], &companies.developers) {
+            game["developer_names"] = Value::String(name);
+        }
+        if let Some(name) = company_names(&game["publishers"], &companies.publishers) {
+            game["publisher_names"] = Value::String(name);
+        }
+    }
+    let title = if known.is_some() {
+        games.first()?["game_title"].as_str()?.to_string()
+    } else {
+        term
+    };
+    pick_game(&json, &title, genres)
 }
 
 pub(crate) fn fill(info: &mut GameInfo, from: &GameInfo) {
@@ -304,7 +435,10 @@ pub fn run(core: &Core, edition_id: Option<&str>) -> usize {
     let Ok(snap) = core.snapshot() else { return 0 };
     let cache = core.paths.cache_dir.clone();
     let dat_dir = cache.join("libretro");
-    let (crc_file, tried_file) = (cache.join("romcrc.json"), cache.join("romfacts-tried.json"));
+    let (crc_file, tried_file) = (
+        cache.join("romcrc.json"),
+        cache.join("romfacts-tried-v2.json"),
+    );
     let key = core.key("thegamesdb").ok().flatten();
     let mut crc_cache: CrcCache = romart::load(&crc_file);
     // edition -> (when, whether TheGamesDB was asked)
@@ -321,7 +455,7 @@ pub fn run(core: &Core, edition_id: Option<&str>) -> usize {
     {
         let have = e.info.clone().unwrap_or_default();
         if edition_id.is_none() {
-            if have.description.is_some() {
+            if !info_wants_tgdb(&e.info) {
                 continue;
             }
             if let Some((when, asked)) = tried.get(&e.id) {
@@ -419,6 +553,10 @@ pub fn run(core: &Core, edition_id: Option<&str>) -> usize {
             .collect();
         if !todo.is_empty() {
             let genres = tgdb_genres(&cache, key);
+            let companies = Companies {
+                developers: company_list(&cache, key, "developers"),
+                publishers: company_list(&cache, key, "publishers"),
+            };
             let left = AtomicI64::new(i64::MAX);
             let stop = AtomicBool::new(false);
             let next = AtomicUsize::new(0);
@@ -432,7 +570,7 @@ pub fn run(core: &Core, edition_id: Option<&str>) -> usize {
                             break;
                         }
                         let p = &pending[at];
-                        let found = tgdb_lookup(key, p.platform, &p.name, &genres, &left);
+                        let found = tgdb_lookup(key, p, &genres, &companies, &left);
                         if left.load(Ordering::SeqCst) < TGDB_RESERVE {
                             stop.store(true, Ordering::SeqCst);
                         }
@@ -447,7 +585,7 @@ pub fn run(core: &Core, edition_id: Option<&str>) -> usize {
                 let p = &mut pending[at];
                 if let Some(found) = result {
                     fill(&mut p.info, found);
-                    add_source(&mut p.info, "thegamesdb");
+                    add_source(&mut p.info, &found.source);
                 }
                 asked.insert(p.edition.id.clone());
                 tried.insert(p.edition.id.clone(), (now, true));
@@ -460,11 +598,27 @@ pub fn run(core: &Core, edition_id: Option<&str>) -> usize {
         if !asked.contains(&p.edition.id) {
             tried.insert(p.edition.id.clone(), (now, false));
         }
-        if p.info != p.edition.info.clone().unwrap_or_default()
-            && core
-                .with_db(|db| upsert(db, &p.edition.id, &p.info))
-                .is_ok()
-        {
+        // Merge against the latest row after network work, so a concurrent
+        // user correction wins over this refresh's older snapshot.
+        let updated = core
+            .with_db(|db| {
+                if db.edition_by_id(&p.edition.id)?.is_none() {
+                    return Ok(false);
+                }
+                let mut current = list(db)?.remove(&p.edition.id).unwrap_or_default();
+                let before = current.clone();
+                fill(&mut current, &p.info);
+                for source in p.info.source.split('+').filter(|source| !source.is_empty()) {
+                    add_source(&mut current, source);
+                }
+                if current == before {
+                    return Ok(false);
+                }
+                upsert(db, &p.edition.id, &current)?;
+                Ok(true)
+            })
+            .unwrap_or(false);
+        if updated {
             changed += 1;
         }
     }
@@ -474,7 +628,14 @@ pub fn run(core: &Core, edition_id: Option<&str>) -> usize {
 }
 
 fn info_wants_tgdb(have: &Option<GameInfo>) -> bool {
-    have.as_ref().is_none_or(|i| i.description.is_none())
+    have.as_ref().is_none_or(|i| {
+        i.description.is_none()
+            || i.developer.is_none()
+            || i.publisher.is_none()
+            || i.year.is_none()
+            || i.players.is_none()
+            || tgdb_id(i).is_none()
+    })
 }
 
 #[cfg(test)]
@@ -519,6 +680,49 @@ mod tests {
             &genres
         )
         .is_none());
+    }
+
+    #[test]
+    fn known_usa_region_does_not_pick_a_different_release_or_demo() {
+        let mut games = vec![
+            serde_json::json!({"id":1,"game_title":"Silent Hill","country_id":18,"release_date":"2000-01-01"}),
+            serde_json::json!({"id":2,"game_title":"Silent Hill","country_id":50,"release_date":"1999-02-23"}),
+            serde_json::json!({"id":3,"game_title":"Silent Hill [Trade Demo]","country_id":50,"release_date":"1998-01-01"}),
+        ];
+        prefer_usa(&mut games, "Silent Hill (USA)", true);
+        let json = serde_json::json!({"data":{"games":games}});
+        // Both real and demo titles must not collapse into an ambiguous identity.
+        assert!(romart::provider_title_agrees(
+            "Silent Hill (USA)",
+            "Silent Hill"
+        ));
+        assert!(!romart::provider_title_agrees(
+            "Silent Hill (USA)",
+            "Silent Hill [Trade Demo]"
+        ));
+        let selected = pick_game(&json, "Silent Hill (USA)", &Default::default());
+        let selected = selected.unwrap();
+        assert_eq!(tgdb_id(&selected), Some(2));
+        assert_eq!(selected.year, Some(1999));
+    }
+
+    #[test]
+    fn resolved_provider_ids_and_company_names_fill_gaps_without_ambiguity() {
+        let json = serde_json::json!({"data":{"games":[{"id":7,"game_title":"Pokémon Moon","platform":4912,"release_date":"2016-11-18","players":"4","developer_names":"Game Freak","publisher_names":"Nintendo","overview":"A game description from its provider."}]}});
+        let facts = pick_game(&json, "Pokemon Moon", &Default::default()).unwrap();
+        assert_eq!(tgdb_id(&facts), Some(7));
+        assert_eq!(facts.players, Some(4));
+        assert_eq!(facts.developer.as_deref(), Some("Game Freak"));
+        assert_eq!(facts.publisher.as_deref(), Some("Nintendo"));
+        let mut duplicate = json.clone();
+        let game = duplicate["data"]["games"][0].clone();
+        duplicate["data"]["games"]
+            .as_array_mut()
+            .unwrap()
+            .push(game);
+        assert!(pick_game(&duplicate, "Pokemon Moon", &Default::default()).is_none());
+        assert_eq!(tgdb_platform("3ds"), Some(4912));
+        assert_eq!(tgdb_platform("saturn"), Some(17));
     }
 
     #[test]

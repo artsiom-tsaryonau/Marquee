@@ -15,6 +15,7 @@ use crate::error::{AppError, Result};
 use crate::http;
 use crate::model::{ArtworkReport, Edition};
 use crate::Core;
+use rusqlite::OptionalExtension;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
 use std::fs::{self, File};
@@ -41,6 +42,21 @@ const SOURCES: &[Source] = &[
     Source {
         system: "xbox360",
         thumbs: "Microsoft - Xbox 360",
+        dat: None,
+    },
+    Source {
+        system: "ps3",
+        thumbs: "Sony - PlayStation 3",
+        dat: None,
+    },
+    Source {
+        system: "saturn",
+        thumbs: "Sega - Saturn",
+        dat: None,
+    },
+    Source {
+        system: "3ds",
+        thumbs: "Nintendo - Nintendo 3DS",
         dat: None,
     },
     Source {
@@ -260,11 +276,31 @@ pub fn plain_title(title: &str) -> String {
         .to_string()
 }
 
-fn squash(s: &str) -> String {
+pub(crate) fn squash(s: &str) -> String {
     s.chars()
         .filter(|c| c.is_alphanumeric())
         .flat_map(char::to_lowercase)
+        .map(|c| match c {
+            'á' | 'à' | 'â' | 'ä' | 'ã' | 'å' => 'a',
+            'é' | 'è' | 'ê' | 'ë' => 'e',
+            'í' | 'ì' | 'î' | 'ï' => 'i',
+            'ó' | 'ò' | 'ô' | 'ö' | 'õ' => 'o',
+            'ú' | 'ù' | 'û' | 'ü' => 'u',
+            'ñ' => 'n',
+            'ç' => 'c',
+            _ => c,
+        })
         .collect()
+}
+
+pub(crate) fn same_title(wanted: &str, found: &str) -> bool {
+    let a = squash(&plain_title(wanted));
+    !a.is_empty() && a == squash(&plain_title(found))
+}
+
+pub(crate) fn provider_title_agrees(wanted: &str, found: &str) -> bool {
+    let wanted = squash(&plain_title(wanted));
+    !wanted.is_empty() && wanted == squash(found)
 }
 
 /// A search result is accepted only when its name is the same game.
@@ -292,22 +328,29 @@ pub fn names_agree(wanted: &str, found: &str) -> bool {
 /// No-Intro tags that mark homebrew, prototypes and unlicensed releases.
 /// Those share names with famous games, so a name search would mislead.
 pub fn looks_retail(official: &str) -> bool {
-    let l = official.to_lowercase();
-    ![
-        "(world)",
-        "(proto",
-        "(beta",
-        "(demo",
-        "(homebrew",
-        "(aftermarket",
-        "(unl",
-        "(pirate",
-        "(hack",
-        "(sample",
-        "(kiosk",
-    ]
-    .iter()
-    .any(|t| l.contains(t))
+    let lower = official.to_lowercase();
+    !lower.split(['(', '[']).skip(1).any(|tag| {
+        let tag = tag.split([')', ']']).next().unwrap_or("");
+        tag.split(|character: char| !character.is_ascii_alphabetic())
+            .any(|word| {
+                [
+                    "proto",
+                    "prototype",
+                    "beta",
+                    "demo",
+                    "homebrew",
+                    "aftermarket",
+                    "unl",
+                    "unlicensed",
+                    "pirate",
+                    "hack",
+                    "sample",
+                    "kiosk",
+                    "pd",
+                ]
+                .contains(&word)
+            })
+    })
 }
 
 fn thumbnail_names(name: &str) -> Vec<&str> {
@@ -344,7 +387,131 @@ fn thumbnail(system: &Source, name: &str) -> Option<(Vec<u8>, &'static str)> {
     None
 }
 
-fn steamgriddb(key: &str, title: &str) -> Option<(Vec<u8>, &'static str)> {
+/// An index fallback retains the platform and complete base title. It may
+/// choose regional packaging, never a numbered sequel, demo, hack or prototype.
+pub(crate) fn indexed_thumbnail(
+    cache: &Path,
+    system: &Source,
+    name: &str,
+    kind: &str,
+) -> Option<String> {
+    let directory = cache.join("thumbnail-indexes-v2");
+    let file = directory.join(format!("{}-{kind}.txt", system.system));
+    let repo = system.thumbs.replace(' ', "_");
+    if !fresh(&file) {
+        fs::create_dir_all(&directory).ok()?;
+        let index_url = format!("{THUMB_BASE}/{}/{kind}/.index", encode(system.thumbs));
+        let index = http::get_text_limited(&index_url, 2 * 1024 * 1024)
+            .ok()
+            .map(|text| format!("#exported-server\n{text}"))
+            .or_else(|| {
+                // The exported thumbnail server can lag or be unavailable. Only
+                // enumerate filenames from the same official per-system repository.
+                let root_file = directory.join(format!("{}-tree.json", system.system));
+                let root: serde_json::Value = if fresh(&root_file) {
+                    load(&root_file)
+                } else {
+                    let root = http::get_json(&format!(
+                        "https://api.github.com/repos/libretro-thumbnails/{repo}/git/trees/master"
+                    ))
+                    .ok()?;
+                    save(&root_file, &root);
+                    root
+                };
+                let sha = root["tree"]
+                    .as_array()?
+                    .iter()
+                    .find(|entry| entry["path"] == kind)?["sha"]
+                    .as_str()?;
+                if sha.len() != 40 || !sha.bytes().all(|b| b.is_ascii_hexdigit()) {
+                    return None;
+                }
+                let tree = http::get_text_limited(
+                    &format!(
+                        "https://api.github.com/repos/libretro-thumbnails/{repo}/git/trees/{sha}"
+                    ),
+                    8 * 1024 * 1024,
+                )
+                .ok()?;
+                let tree: serde_json::Value = serde_json::from_str(&tree).ok()?;
+                if tree["truncated"].as_bool().unwrap_or(true) {
+                    return None;
+                }
+                Some(
+                    tree["tree"]
+                        .as_array()?
+                        .iter()
+                        .filter(|entry| entry["type"] == "blob" && entry["mode"] == "100644")
+                        .filter_map(|entry| entry["path"].as_str())
+                        .collect::<Vec<_>>()
+                        .join("\n"),
+                )
+            })?;
+        fs::write(&file, index).ok()?;
+    }
+    let index = fs::read_to_string(file).ok()?;
+    let filename = select_thumbnail_name(&index, name)?;
+    if index.starts_with("#exported-server\n") {
+        Some(format!(
+            "{THUMB_BASE}/{}/{kind}/{}",
+            encode(system.thumbs),
+            encode(&filename)
+        ))
+    } else {
+        Some(format!(
+            "https://raw.githubusercontent.com/libretro-thumbnails/{repo}/master/{kind}/{}",
+            encode(&filename)
+        ))
+    }
+}
+
+fn select_thumbnail_name(index: &str, name: &str) -> Option<String> {
+    let exact: Vec<_> = thumbnail_names(name)
+        .into_iter()
+        .map(|name| format!("{}.png", thumb_name(name)))
+        .collect();
+    let mut candidates: Vec<&str> = index
+        .lines()
+        .map(str::trim)
+        .filter(|line| line.ends_with(".png") && !line.contains(['/', '\\', '\0']))
+        .filter(|line| same_title(name, line.trim_end_matches(".png")) && looks_retail(line))
+        .collect();
+    candidates.sort_by_key(|line| {
+        (
+            exact
+                .iter()
+                .position(|name| name == *line)
+                .unwrap_or(usize::MAX),
+            !line.contains("(World)"),
+            !line.contains("(USA)"),
+            *line,
+        )
+    });
+    candidates.first().map(|line| (*line).to_string())
+}
+
+fn release_year(seconds: i64) -> Option<i64> {
+    fn days(year: i64) -> i64 {
+        if year % 4 == 0 && (year % 100 != 0 || year % 400 == 0) {
+            366
+        } else {
+            365
+        }
+    }
+    let mut year = 1970;
+    let mut day = seconds.div_euclid(86400);
+    while day < 0 && year > 1950 {
+        year -= 1;
+        day += days(year);
+    }
+    while day >= days(year) && year < 2101 {
+        day -= days(year);
+        year += 1;
+    }
+    (day >= 0 && (1950..=2100).contains(&year)).then_some(year)
+}
+
+fn steamgriddb(key: &str, title: &str, year: Option<i64>) -> Option<(Vec<u8>, &'static str)> {
     let term = plain_title(title);
     if term.len() < 3 {
         return None;
@@ -357,10 +524,30 @@ fn steamgriddb(key: &str, title: &str) -> Option<(Vec<u8>, &'static str)> {
         key,
     )
     .ok()?;
-    let game = search["data"]
+    let matches: Vec<_> = search["data"]
         .as_array()?
         .iter()
-        .find(|g| g["name"].as_str().is_some_and(|n| names_agree(&term, n)))?;
+        .filter(|game| {
+            game["name"]
+                .as_str()
+                .is_some_and(|name| provider_title_agrees(&term, name))
+        })
+        .collect();
+    let matches: Vec<_> = matches
+        .into_iter()
+        .filter(|game| {
+            year.is_none_or(|wanted| {
+                game["release_date"]
+                    .as_i64()
+                    .and_then(release_year)
+                    .is_some_and(|found| (found - wanted).abs() <= 1)
+            })
+        })
+        .collect();
+    if matches.len() != 1 {
+        return None;
+    }
+    let game = matches[0];
     let id = game["id"].as_u64()?;
     steamgriddb_id(key, id)
 }
@@ -383,28 +570,87 @@ pub(crate) fn steamgriddb_id(key: &str, id: u64) -> Option<(Vec<u8>, &'static st
     None
 }
 
+pub(crate) fn validate_image(bytes: &[u8]) -> Result<&'static str> {
+    let ext = image_kind(bytes).ok_or_else(|| AppError::new("NETWORK", "Not a usable image"))?;
+    let mut reader = image::ImageReader::new(std::io::Cursor::new(bytes)).with_guessed_format()?;
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(4096);
+    limits.max_image_height = Some(4096);
+    limits.max_alloc = Some(64 * 1024 * 1024);
+    reader.limits(limits);
+    reader
+        .decode()
+        .map_err(|_| AppError::new("NETWORK", "Artwork cannot be decoded within image limits"))?;
+    Ok(ext)
+}
+
 pub(crate) fn store(
     core: &Core,
     art_dir: &Path,
-    e: &Edition,
+    edition: &Edition,
     bytes: &[u8],
     source: &str,
 ) -> Result<()> {
-    let ext = image_kind(bytes).ok_or_else(|| AppError::new("NETWORK", "Not a usable image"))?;
-    let dest = art_dir.join(format!("{}.{ext}", e.id));
-    let mut tmp = tempfile::NamedTempFile::new_in(art_dir)?;
-    tmp.write_all(bytes)?;
-    tmp.as_file().sync_all()?;
-    tmp.persist(&dest)
-        .map_err(|err| AppError::new("IO", err.to_string()))?;
+    store_artwork(core, art_dir, edition, bytes, source, true).map(|_| ())
+}
+
+pub(crate) fn store_missing(
+    core: &Core,
+    art_dir: &Path,
+    edition: &Edition,
+    bytes: &[u8],
+    source: &str,
+) -> Result<bool> {
+    store_artwork(core, art_dir, edition, bytes, source, false)
+}
+
+fn store_artwork(
+    core: &Core,
+    art_dir: &Path,
+    edition: &Edition,
+    bytes: &[u8],
+    source: &str,
+    overwrite: bool,
+) -> Result<bool> {
+    let extension = validate_image(bytes)?;
+    let destination = art_dir.join(format!(
+        "{}-{}.{extension}",
+        edition.id,
+        uuid::Uuid::new_v4()
+    ));
+    let mut temporary = tempfile::NamedTempFile::new_in(art_dir)?;
+    temporary.write_all(bytes)?;
+    temporary.as_file().sync_all()?;
     core.with_db(|db| {
+        let current: Option<String> = db
+            .conn
+            .query_row(
+                "SELECT path FROM artwork WHERE edition_id=?1 AND kind='cover'",
+                [&edition.id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if !overwrite
+            && current
+                .as_ref()
+                .is_some_and(|path| Path::new(path).is_file())
+        {
+            return Ok(false);
+        }
+        if db.edition_by_id(&edition.id)?.is_none() {
+            return Err(AppError::new("ARTWORK", "Game was removed during refresh"));
+        }
+        temporary
+            .persist(&destination)
+            .map_err(|error| AppError::new("IO", error.to_string()))?;
         db.upsert_artwork(
-            &e.id,
+            &edition.id,
             "cover",
-            &dest.to_string_lossy(),
+            &destination.to_string_lossy(),
             source,
             &crate::db::now_rfc3339(),
-        )
+        )?;
+        Ok(true)
     })
 }
 
@@ -417,6 +663,7 @@ struct Task<'a> {
     /// or disc games. Public-domain and homebrew ROMs share names with famous
     /// games, and a wrong cover is worse than none.
     sgdb: bool,
+    year: Option<i64>,
 }
 
 const MISS_TTL_SECS: u64 = 14 * 24 * 3600;
@@ -428,11 +675,17 @@ pub(crate) fn now_secs() -> u64 {
         .unwrap_or(0)
 }
 
-fn lookup(task: &Task, key: Option<&str>) -> Option<(Vec<u8>, &'static str)> {
-    thumbnail(task.src, &task.name).or_else(|| {
-        key.filter(|_| task.sgdb)
-            .and_then(|k| steamgriddb(k, &task.name))
-    })
+fn lookup(task: &Task, cache: &Path, key: Option<&str>) -> Option<(Vec<u8>, &'static str)> {
+    thumbnail(task.src, &task.name)
+        .or_else(|| {
+            let url = indexed_thumbnail(cache, task.src, &task.name, "Named_Boxarts")?;
+            let bytes = http::get_bytes(&url).ok()?;
+            image_kind(&bytes).map(|_| (bytes, "libretro-thumbnails"))
+        })
+        .or_else(|| {
+            key.filter(|_| task.sgdb)
+                .and_then(|k| steamgriddb(k, &task.name, task.year))
+        })
 }
 
 /// Fill in missing covers. Safe to call often: games that already have a cover
@@ -454,7 +707,7 @@ pub fn run(core: &Core, edition_id: Option<&str>, report: &mut ArtworkReport) {
     let (crc_file, names_file, miss_file) = (
         cache.join("romcrc.json"),
         cache.join("romnames.json"),
-        cache.join("romart-miss.json"),
+        cache.join("romart-miss-v2.json"),
     );
     let mut crc_cache: CrcCache = load(&crc_file);
     let mut names: BTreeMap<String, String> = load(&names_file);
@@ -533,7 +786,13 @@ pub fn run(core: &Core, edition_id: Option<&str>, report: &mut ArtworkReport) {
             edition: e,
             src,
             name,
-            sgdb: official.as_deref().is_some_and(looks_retail) || disc,
+            year: e.info.as_ref().and_then(|info| info.year),
+            sgdb: disc
+                || official.as_deref().is_some_and(|name| {
+                    looks_retail(name)
+                        && (!name.to_lowercase().contains("(world)")
+                            || e.info.as_ref().and_then(|info| info.year).is_some())
+                }),
         });
     }
 
@@ -547,7 +806,7 @@ pub fn run(core: &Core, edition_id: Option<&str>, report: &mut ArtworkReport) {
                 scope.spawn(|| loop {
                     let i = next.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     let Some(task) = tasks.get(i) else { break };
-                    let found = lookup(task, key.as_deref());
+                    let found = lookup(task, &cache, key.as_deref());
                     out.lock().unwrap_or_else(|e| e.into_inner())[i] = found;
                 });
             }
@@ -556,13 +815,16 @@ pub fn run(core: &Core, edition_id: Option<&str>, report: &mut ArtworkReport) {
     };
     for (task, found) in tasks.iter().zip(results) {
         match found {
-            Some((bytes, label)) => match store(core, &art_dir, task.edition, &bytes, label) {
-                Ok(()) => {
-                    report.fetched += 1;
-                    misses.remove(&task.edition.id);
+            Some((bytes, label)) => {
+                match store_missing(core, &art_dir, task.edition, &bytes, label) {
+                    Ok(true) => {
+                        report.fetched += 1;
+                        misses.remove(&task.edition.id);
+                    }
+                    Ok(false) => report.skipped += 1,
+                    Err(_) => report.failed += 1,
                 }
-                Err(_) => report.failed += 1,
-            },
+            }
             None => {
                 misses.insert(task.edition.id.clone(), now);
                 report.skipped += 1;
@@ -641,6 +903,21 @@ mod tests {
     }
 
     #[test]
+    fn indexed_images_keep_title_and_exclude_sequels_and_unreleased_variants() {
+        let index = "Pokemon Moon (USA).png\nPokemon Ultra Moon (USA).png\nPokemon Moon (USA) (Demo).png\n../Pokemon Moon.png\n";
+        assert_eq!(
+            select_thumbnail_name(index, "Pokémon Moon (axekin.com)").as_deref(),
+            Some("Pokemon Moon (USA).png")
+        );
+        assert!(select_thumbnail_name(index, "Pokemon Sun").is_none());
+        for system in ["3ds", "saturn", "ps3", "xbox360"] {
+            assert!(source_for(system).is_some());
+        }
+        assert!(same_title("Pokémon Moon", "Pokemon Moon"));
+        assert!(!same_title("Pokemon Moon", "Pokemon Ultra Moon"));
+    }
+
+    #[test]
     fn search_results_must_name_the_same_game() {
         assert_eq!(
             thumbnail_names(
@@ -676,7 +953,9 @@ mod tests {
         ));
         assert!(looks_retail("Super Mario Bros. (USA)"));
         assert!(!looks_retail("Pitfall! (World) (Homebrew)"));
-        assert!(!looks_retail("Alter Ego (World)"));
+        assert!(!looks_retail("Silent Hill [Trade Demo]"));
+        assert!(looks_retail("Alter Ego (World)"));
+        assert!(looks_retail("Sonic The Hedgehog 2 (World) (Rev B)"));
         assert!(!names_agree("Go", "Gone Home"));
     }
 }

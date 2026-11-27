@@ -186,6 +186,8 @@ pub fn fetch_cover(url: &str) -> crate::error::Result<Vec<u8>> {
 pub fn finish(report: ArtworkReport, sink: Option<Arc<dyn EventSink>>) -> ArtworkReport {
     if let Some(sink) = sink {
         sink.emit(CoreEvent::ArtworkFinished {
+            media_added: report.media_added,
+            info_updated: report.info_updated,
             fetched: report.fetched,
             skipped: report.skipped,
             failed: report.failed,

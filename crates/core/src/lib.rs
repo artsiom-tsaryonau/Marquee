@@ -9,6 +9,7 @@ pub mod db;
 pub mod desktop_rendering;
 pub mod emulators;
 pub mod error;
+mod game_images;
 pub mod game_media;
 pub mod history;
 pub mod http;
@@ -311,7 +312,8 @@ impl Core {
             }
         }
         romart::run(self, edition_id, &mut report);
-        romfacts::run(self, edition_id);
+        report.info_updated = romfacts::run(self, edition_id) as u32;
+        game_images::run(self, edition_id, &mut report);
         Ok(artwork::finish(report, sink))
     }
 

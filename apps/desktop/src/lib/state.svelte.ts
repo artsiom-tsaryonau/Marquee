@@ -284,7 +284,7 @@ class AppState {
     }
     if (event.type === 'artwork_finished') {
       this.fetchingArt = false;
-      this.notify(`Covers: ${event.fetched} fetched · ${event.skipped} skipped · ${event.failed} failed`);
+      this.notify(`Added ${event.fetched} covers and ${event.media_added ?? 0} images · ${event.info_updated ?? 0} game details updated${event.failed ? ` · ${event.failed} failed` : ''}`);
       void this.api.snapshot().then((snap) => this.applySnapshot(snap));
     }
   }

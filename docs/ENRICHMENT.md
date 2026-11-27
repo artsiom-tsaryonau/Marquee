@@ -1,6 +1,6 @@
 # Metadata enrichment: artwork, facts and provider plans
 
-Updated 2026-10-24. This document owns current optional ROM artwork/facts behavior
+Updated 2026-11-27. This document owns current optional ROM artwork/facts behavior
 and future provider research. [Catalogue metadata](CATALOGUE_METADATA.md) owns
 saved provider snapshots and verified/manual links; [UI/UX](UI_UX.md) owns visual
 and controller presentation. [Roadmap](ROADMAP.md) owns priority. Enrichment must
@@ -12,16 +12,58 @@ For the owner's current coverage audit and the on-disk locations to preserve,
 see [runtime files and existing-game metadata](RUNTIME_FILES.md#metadata-and-covers-for-existing-games).
 The 2026-10-25 gap-fill refresh added seven covers (14 total) and expanded fact
 records from six to 22 while preserving all 858 game identities and play history.
-The later audit found 182 cached official-name matches and 138 uncovered games
-whose provider fallback was excluded solely by the blanket `(World)` rule below.
-That is a known heuristic limitation: **World is a region label, not proof of
-homebrew**. Removing that rule alone can also confuse homebrew with same-name
-retail games. A reviewed platform/release-aware fallback and local game-cover
-selection remain follow-up work. Cached misses also delay ordinary retries for
-14 days; a selected-game refresh bypasses that backoff. Missing artwork does not
-mean a game is fake, or establish that no provider has information about it.
+An earlier audit found 182 cached official-name matches and 138 uncovered games
+excluded solely by a blanket `(World)` rule. World is a region, not evidence of
+homebrew. Current lookup accepts it when other matching safeguards hold; automatic
+SteamGridDB lookup additionally requires a known, compatible release year for
+World-labelled cartridge entries. Demo/homebrew/hack tags remain excluded.
 
-`Fetch covers`, automatic refresh after scans, and `Core::refresh_artwork` use
+### Images and details refresh (2026-11-27)
+
+**Settings → Library locations → Refresh images and details** and the selected-game
+refresh now fill missing covers and facts and download images into **Game → Media
+→ Images**. Existing local covers and nonempty facts are retained. A correction
+made during a network request wins over the older refresh snapshot. Game IDs,
+media identity, names, favourites and play history are not rewritten by enrichment.
+
+- PS3, Saturn and 3DS join the automatic artwork source list; TheGamesDB has
+  platform mappings for Saturn and 3DS. Large disc and 3DS images are not hashed
+  merely to obtain artwork.
+- Filename-index fallback matches the full base title within the same platform,
+  filters demos/prototypes/hacks, and retains exact revision filenames when
+  available. The official per-system libretro GitHub repositories are a fallback
+  when the exported thumbnail server is unavailable. Git symlink aliases are
+  excluded from raw-image downloads so their text is never cached as a picture.
+- SteamGridDB automatic matching requires a unique complete title, normalizes
+  common accents, and checks a known release year. Ambiguous results remain for
+  reviewed selection. Provider edition qualifiers are not discarded as ROM tags.
+- TheGamesDB returns developer/publisher IDs; cached name lists now resolve them.
+  Refresh retains the selected game ID and uses it on subsequent lookups. A known
+  US region can narrow matches; otherwise duplicate regional records are not
+  silently resolved. Existing descriptions no longer prevent filling other gaps.
+- TheGamesDB supplies up to two screenshots, one background image and one title
+  screen per game, with a missing front cover as fallback. Libretro supplies
+  gameplay/title images where needed. Galleries retain public image source URLs;
+  API URLs containing credentials are neither stored nor surfaced in errors.
+- Downloaded galleries use stable per-edition identities and content-addressed
+  image files. Refresh is idempotent, keeps local collections, and validates
+  decoding/dimensions before adding images. It does not fetch videos or game data.
+- Image-list requests are cached for 30 days, limited to 30 fresh lookups per run,
+  and stop at the provider quota reserve. Gallery downloads have a 64 MiB run
+  budget; failed URLs wait seven days unless a selected-game refresh is requested.
+  Fact and cover retry caches use new versioned names for this expanded lookup.
+
+Provider identities are references for presentation, not verified ROM/release
+identity. Unknown fields remain empty. General manual fact editing, cover/hero
+choice with preview/undo, author/asset provenance for older cover rows and refresh
+progress/cancellation remain separate follow-ups.
+
+Primary references: [TheGamesDB API](https://api.thegamesdb.net/),
+[libretro thumbnail repository](https://github.com/libretro-thumbnails/libretro-thumbnails),
+[SteamGridDB API v2](https://www.steamgriddb.com/api/v2).
+
+
+`Refresh images and details`, automatic refresh after scans, and `Core::refresh_artwork` use
 `crates/core/src/romart.rs` and `romfacts.rs`. Covers fill gaps without replacing
 existing covers. Missing keys, provider errors and no-match results are nonfatal.
 Settings → API keys supplies configured provider keys, with environment/`.env`
@@ -32,7 +74,7 @@ fallback as documented in the root README.
 1. **PS1/PS2 serial covers** (xlenore sets) — unchanged, see [PS2](PS2.md).
 2. **libretro-database + libretro-thumbnails** for Genesis / Mega Drive, NES, SNES, Game Boy, Game Boy Color, PC Engine, N64 and DS. The ROM is hashed (CRC-32, also without an iNES or SNES copier header), looked up in the No-Intro list to get the **official game name**, and box art (then title screen, then screenshot) is fetched by that name. A messy file name does not matter. No account or key.
 3. **SteamGridDB** (needs `STEAM_GRID_DB_API_KEY` in Settings → API keys or `.env`) for games that still have no cover, but **only** when:
-   - the game has an official No-Intro name that looks retail (not `World`, `Proto`, `Beta`, `Demo`, `Homebrew`, `Aftermarket`, `Unl`, `Pirate`, `Hack`), or
+   - the game has an official No-Intro name that looks retail (not `Proto`, `Beta`, `Demo`, `Homebrew`, `Aftermarket`, `Unl`, `Pirate`, `Hack`), or
    - it is a PS1, PS2 or Dreamcast disc image.
    A search result is used only if its name is essentially the same game (`Tetris` does not match `Tetris Effect`).
 
@@ -94,7 +136,7 @@ Shown on the game page (About text, Genre · year, Developer, Publisher, Players
 ### Fact sources
 
 1. **libretro-database** `metadat/genre`, `releaseyear`, `developer`, `publisher`: for Genesis / Mega Drive, NES, SNES, Game Boy, Game Boy Color, PC Engine, N64 and DS. The ROM is matched by checksum, as for [covers](ENRICHMENT.md#implemented-artwork-and-facts). No account.
-2. **TheGamesDB** (key `THE_GAMES_DB_API_KEY`, Settings → API keys): descriptions and player counts for those systems and for PS1, PS2 and Dreamcast, by name; also fills a missing genre or year. Developers and publishers from TheGamesDB are not used (it returns ids that need large lists).
+2. **TheGamesDB** (key `THE_GAMES_DB_API_KEY`, Settings → API keys): descriptions and player counts for those systems and for PS1, PS2 and Dreamcast, by name; also fills a missing genre or year. Developer and publisher IDs are resolved through bounded, cached provider lists.
 
 A field is filled once and never overwritten by a later source.
 
@@ -108,7 +150,7 @@ A field is filled once and never overwritten by a later source.
 ### Fact limits
 
 - PS1, PS2 and Dreamcast get genre and year only from TheGamesDB (libretro has no lists for them).
-- Developers and publishers for disc games.
+- Missing provider fields remain unknown even when a game has a reviewed match.
 - Editing facts by hand.
 
 ## Remaining work
@@ -179,3 +221,24 @@ Serial-based box art from xlenore/ps2-covers is already in the tree (schema v2 `
 **CLI/errors/tests:** extend the CLI only for operations Tauri also uses (candidate list/accept, artwork refresh), keep `--data-dir` isolation, add `PROVIDER_UNCONFIGURED` and `RATE_LIMITED` here. Test ScreenScraper success, ambiguity, no match, 401/403, 429/backoff, timeout, malformed body, cancellation and cached offline response; artwork cache hit, atomic replace, truncated/oversized image, unsafe path, override preservation; UI candidate chooser and key status without echoing the secret.
 
 **Done when:** offline import/launch/playtime work with providers off; ScreenScraper matching exists with credentials, caching, attribution and failures; SteamGridDB artwork exists without serial-as-platform-id; overrides survive refresh; license/registration status is recorded (no live-access claim while pending); README says enrichment is optional.
+
+### Live refresh acceptance — 2026-11-27
+
+The current library began with 17 entries and 10 covers. The approved live refresh
+added six covers and 37 gallery images with no failed downloads. Six same-game,
+platform-scoped provider references were reviewed for regional or translated-title
+ambiguity; selected refreshes added nine more images and filled additional gaps.
+A concurrently imported Xbox 360 Dreamcast Collection also gained a cover/details
+on the repeat refresh. Final coverage: 17 covers across 18 entries, 46 downloaded
+images linked to 15 games, and 16 fact records improved. The only uncovered entry
+has missing Neo Geo game files. Descriptions for Dreamcast Collection and UEFA Euro 96 remain empty after
+this refresh; unknown fields are not invented.
+
+Headless verification displayed the Pokémon Moon gallery with five decoded images
+and readable captions. Repeat refresh kept the total gallery count at 50 (46 new
+provider images plus four existing local assets). Checks retained every original
+game, media/root row, session, port session, original cover byte and existing local
+media asset; existing nonempty facts were preserved. Newly imported records were
+retained alongside the originals. A private pre-refresh database and receipt are
+kept under the runtime data directory's `metadata-refresh-backups/2026-11-27/`.
+The complete repository check script passed with two test threads.

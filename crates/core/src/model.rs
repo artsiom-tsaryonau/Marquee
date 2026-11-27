@@ -402,6 +402,10 @@ pub enum CoreEvent {
         message: String,
     },
     ArtworkFinished {
+        #[serde(default)]
+        media_added: u32,
+        #[serde(default)]
+        info_updated: u32,
         fetched: u32,
         skipped: u32,
         failed: u32,
@@ -410,6 +414,10 @@ pub enum CoreEvent {
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ArtworkReport {
+    #[serde(default)]
+    pub media_added: u32,
+    #[serde(default)]
+    pub info_updated: u32,
     pub fetched: u32,
     pub skipped: u32,
     pub failed: u32,

@@ -361,7 +361,7 @@ impl Core {
             Ok(())
         })
     }
-    fn media_store(
+    pub(crate) fn media_store(
         &self,
         collection: &str,
         name: &str,
