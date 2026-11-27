@@ -5,6 +5,27 @@ library with a Jellyfin-like experience alongside games. This is a roadmap;
 the implemented OST player serves local desktop/browser use, not remote accounts
 or a production LAN media service.
 
+### Gallery reliability and curation — 2026-11-27
+
+Gallery URLs resolve independently for the selected collection and media type.
+A failed item retains the healthy previews and offers its own retry action;
+image decode failures use the same path. Unavailable images have image-specific
+placeholders. Videos no longer request URLs for images in unrelated collections.
+
+Images now carry the same advisory **Contains spoilers** label as videos, both
+on thumbnails and in the viewer. Opening remains immediate, following the
+owner's advisory-label preference. Edit/remove controls name the asset, and
+metadata preview summaries participate in controller spatial navigation.
+
+Removing media from an automatically downloaded collection keeps a hidden asset
+record. Refresh respects that removal, including downloads already in flight.
+**Restore removed media** restores the saved IDs, captions and spoiler labels
+without another provider request. Unlinking a downloaded collection is also
+remembered across refreshes; use **Link an existing collection** to reconnect it.
+Original files and retained managed copies stay intact. Ordinary local collection
+removal retains its existing behavior; managed-cache garbage collection remains
+separate work.
+
 ## Implemented foundation
 
 The **Media** destination and game-page Media tab hold explicit local extras

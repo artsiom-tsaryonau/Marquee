@@ -76,23 +76,28 @@ labels remain. Facts, provider covers and gallery inserts check that the referen
 is still current after network work, so an older download cannot reapply a replaced
 match. Regression tests reproduce replacement and reject stale image/cover writes.
 
-Remaining priorities, in recommended implementation order:
+Follow-up status after the gallery reliability and curation fixes:
 
 | Priority | Finding and evidence | Improvement |
 | --- | --- | --- |
-| P2 | **One media URL failure blanks healthy previews.** Injecting one HTTP failure into the five-image Moon collection produced zero image thumbnails and five video placeholders. `MediaLibrary.refresh` waits on one `Promise.all` before saving any resolved URLs. | Resolve independently, retain successful URLs, show an image-specific error and provide per-asset retry. |
-| P2 | **Image spoiler flags have no effect.** Marking a copied screenshot as containing spoilers left its thumbnail and full image visible with no warning. Only the video branch renders a badge. | Hide flagged thumbnails and require a deliberate reveal in the viewer; apply the policy during next/previous navigation too. |
-| P2 | **Refresh does not remember curation.** Source review: `media_remove` deletes the asset row without an exclusion, while `save_gallery` recreates assets and inserts missing game links for the stable provider collection. Unlinked provider collections can therefore relink on refresh. | Persist hidden sources and dismissed collection links, with an explicit reset/restore action. Preserve user-added collections. |
-| P2 | **Artwork replacement has no asset preview or undo.** Source review: the candidate chooser shows a title/provider ID, then the backend downloads the first compatible grid and replaces the cover. | Show available assets, dimensions and provenance; preview beside the current cover and keep a reversible previous selection. |
+| Fixed | **One media URL failure blanks healthy previews.** The original five-image fault fixture lost all five previews. | URLs now resolve independently, decode failures show image-specific placeholders, and each failed item has its own retry. |
+| Fixed | **Image spoiler flags have no effect.** The original fixture rendered a flagged image without any label. | Images now show advisory labels in thumbnails and the viewer, matching the owner's recorded preference for immediate opening. |
+| Fixed | **Refresh does not remember curation.** Removed provider assets and unlinked collections previously returned. | Hidden asset records and dismissed links survive reopen and refresh. In-flight inserts recheck these choices; explicit restore preserves captions/flags, and explicit relinking clears the dismissal. |
+| P2 | **Artwork replacement has no asset preview or undo.** The candidate chooser shows a title/provider ID, then the backend downloads the first compatible grid and replaces the cover. | Show available assets, dimensions and provenance; preview beside the current cover and keep a reversible previous selection. |
 | P2 | **Regional matches are difficult to review and populated mistakes cannot be corrected.** A read-only two-release fixture rendered identical titles/platforms/years apart from opaque IDs. Country and full release date are discarded, and Apply only fills empty fields. | Carry region/date/edition information into the review; show field differences and allow explicit per-field correction with undo. |
-| P2 | **Gallery work scales with all assets, even in Videos.** Opening global Images requested 50 media URLs while displaying two thumbnails. Switching to Videos issued another 50 requests with no video assets. Collections are also presented as 16 wrapping tabs without search. | Resolve visible assets on demand, filter before requesting, preserve URL state between views, and add collection search/grouping. |
-| P2 | **Refresh offers no useful progress or cancellation.** Source review: the complete cover/fact/gallery pipeline returns one report; the UI holds a single busy flag. | Run a tracked background job with game/provider progress, cancellation and scoped retry. |
-| P3 | **Controller and media-management polish remains.** Preview summaries lack the spatial-navigation marker; repeated edit/remove buttons lack asset-specific accessible names. Removed media rows leave cached files behind. Downloaded fanart has no user-facing hero-selection flow. | Add controller-reachable previews and descriptive labels; provide safe orphan-cache cleanup and a cover/hero picker. |
+| Partial | **Gallery work scales with all assets, even in Videos.** The original fixture requested 50 image URLs in global Images and another 50 in empty Videos. | URL requests now follow only the selected collection and media type, with per-view caching across collection changes. Search/grouping of the 16 collection tabs remains open. |
+| P2 | **Refresh offers no useful progress or cancellation.** The complete cover/fact/gallery pipeline returns one report; the UI holds a single busy flag. | Run a tracked background job with game/provider progress, cancellation and scoped retry. |
+| Partial | **Controller and media-management polish remains.** | Preview summaries now participate in spatial navigation, and edit/remove buttons name their assets. Safe orphan-cache cleanup and a cover/hero picker remain open. |
 
-At 390 px the reviewed metadata fixture had no horizontal overflow. The browser
-reported no JavaScript errors during these scenarios. Desktop screenshots verify
-the current layout; physical controller and native fullscreen behavior remain
-separate acceptance checks.
+Follow-up browser acceptance: injecting one failed URL left four of five Moon
+previews visible, with an image-specific placeholder; retry made one request and
+restored the fifth preview. A flagged screenshot showed labels in its thumbnail
+and viewer. Remove/restore and unlink/relink worked through the UI. Global Images
+made two URL requests for the two displayed assets; empty Videos made zero.
+The gallery and metadata fixtures had no horizontal overflow at 390 px, and the
+browser reported no JavaScript errors. Full repository checks passed, including
+persisted curation and independent media-resolution regressions. Physical
+controller and native fullscreen behavior remain separate acceptance checks.
 
 
 `Refresh images and details`, automatic refresh after scans, and `Core::refresh_artwork` use

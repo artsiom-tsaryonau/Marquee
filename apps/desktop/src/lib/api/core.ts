@@ -69,6 +69,7 @@ export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'su
     mediaPosition:(id,position)=>call('media_position',{id,position}),
     mediaUpdate:(id,title,spoiler)=>call('media_update',{id,title,spoiler}),
     mediaRemove:(id)=>call('media_remove',{id}),
+    mediaRestoreHidden:(id)=>call('media_restore_hidden',{id}),
     musicFind: (title) => call('music_find', { title }),
     musicOpenSource: (albumId) => call('music_open_source', { album_id: albumId }),
     musicSaveAlbum: (draft) => call('music_save_album', { ...draft }),

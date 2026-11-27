@@ -170,6 +170,7 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
             flag(&args, "spoiler")?,
         )?),
         "media_remove" => out(core.media_remove(&text(&args, "id")?)?),
+        "media_restore_hidden" => out(core.media_restore_hidden(&text(&args, "id")?)?),
         "music_search_youtube" => out(core.music_search_youtube(
             &text(&args, "query")?,
             serde_json::from_value(

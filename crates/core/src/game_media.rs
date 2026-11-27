@@ -61,7 +61,9 @@ fn validate(s: &str) -> Result<()> {
 pub fn ensure_tables(c: &rusqlite::Connection) -> Result<()> {
     c.execute_batch("CREATE TABLE IF NOT EXISTS game_media_collections(id TEXT PRIMARY KEY,title TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS game_media_links(collection_id TEXT NOT NULL REFERENCES game_media_collections(id),game_key TEXT NOT NULL,PRIMARY KEY(collection_id,game_key));
-    CREATE TABLE IF NOT EXISTS game_media_assets(id TEXT PRIMARY KEY,collection_id TEXT NOT NULL REFERENCES game_media_collections(id),title TEXT NOT NULL,kind TEXT NOT NULL,mime TEXT NOT NULL,media TEXT NOT NULL,bytes INTEGER NOT NULL,source TEXT NOT NULL,spoiler INTEGER NOT NULL,position REAL NOT NULL DEFAULT 0,UNIQUE(collection_id,media));")?;
+    CREATE TABLE IF NOT EXISTS game_media_assets(id TEXT PRIMARY KEY,collection_id TEXT NOT NULL REFERENCES game_media_collections(id),title TEXT NOT NULL,kind TEXT NOT NULL,mime TEXT NOT NULL,media TEXT NOT NULL,bytes INTEGER NOT NULL,source TEXT NOT NULL,spoiler INTEGER NOT NULL,position REAL NOT NULL DEFAULT 0,UNIQUE(collection_id,media));
+    CREATE TABLE IF NOT EXISTS game_media_hidden_assets(asset_id TEXT PRIMARY KEY REFERENCES game_media_assets(id) ON DELETE CASCADE);
+    CREATE TABLE IF NOT EXISTS game_media_dismissed_links(collection_id TEXT NOT NULL REFERENCES game_media_collections(id),game_key TEXT NOT NULL,PRIMARY KEY(collection_id,game_key));")?;
     Ok(())
 }
 #[derive(Serialize)]
@@ -81,6 +83,24 @@ pub struct Collection {
     pub title: String,
     pub game_keys: Vec<String>,
     pub assets: Vec<Asset>,
+    pub hidden_count: usize,
+}
+
+/// Provider refresh must respect explicit removal/unlink actions, including
+/// actions made while an image was being downloaded.
+pub(crate) fn download_is_dismissed(
+    db: &crate::db::Db,
+    collection: &str,
+    source: &str,
+) -> Result<bool> {
+    let Some(game) = collection.strip_prefix("provider-images:") else {
+        return Ok(false);
+    };
+    Ok(db.conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM game_media_dismissed_links WHERE collection_id=?1 AND game_key=?2)
+         OR EXISTS(SELECT 1 FROM game_media_hidden_assets h JOIN game_media_assets a ON a.id=h.asset_id WHERE a.collection_id=?1 AND a.source=?3)",
+        params![collection, game, source], |row| row.get(0),
+    )?)
 }
 #[derive(Serialize, Clone)]
 pub struct DiscItem {
@@ -319,9 +339,10 @@ impl Core {
             for (id,title) in rows {
                 let mut s=db.conn.prepare("SELECT game_key FROM game_media_links WHERE collection_id=?1 ORDER BY game_key")?;
                 let keys=s.query_map([&id],|r|r.get(0))?.collect::<std::result::Result<Vec<String>,_>>()?;
-                let mut s=db.conn.prepare("SELECT id,title,kind,media,bytes,source,spoiler,position FROM game_media_assets WHERE collection_id=?1 ORDER BY title,id")?;
+                let mut s=db.conn.prepare("SELECT id,title,kind,media,bytes,source,spoiler,position FROM game_media_assets WHERE collection_id=?1 AND id NOT IN (SELECT asset_id FROM game_media_hidden_assets) ORDER BY title,id")?;
                 let assets=s.query_map([&id],|r|{let media:String=r.get(3)?;Ok(Asset{id:r.get(0)?,title:r.get(1)?,kind:r.get(2)?,bytes:r.get(4)?,source:r.get(5)?,spoiler:r.get(6)?,position:r.get(7)?,available:regular(&self.paths.data_dir.join("game-media").join(media)).is_ok()})})?.collect::<std::result::Result<Vec<_>,_>>()?;
-                out.push(Collection{id,title,game_keys:keys,assets});
+                let hidden_count=db.conn.query_row("SELECT COUNT(*) FROM game_media_hidden_assets h JOIN game_media_assets a ON a.id=h.asset_id WHERE a.collection_id=?1",[&id],|row|row.get(0))?;
+                out.push(Collection{id,title,game_keys:keys,assets,hidden_count});
             } Ok(out)
         })
     }
@@ -347,17 +368,29 @@ impl Core {
     pub fn media_link(&self, id: &str, game: &str, linked: bool) -> Result<()> {
         validate(game)?;
         self.with_db(|db| {
+            let transaction = db.conn.unchecked_transaction()?;
             if linked {
+                db.conn.execute(
+                    "DELETE FROM game_media_dismissed_links WHERE collection_id=?1 AND game_key=?2",
+                    params![id, game],
+                )?;
                 db.conn.execute(
                     "INSERT OR IGNORE INTO game_media_links VALUES(?1,?2)",
                     params![id, game],
                 )?;
             } else {
+                if id.starts_with("provider-images:") {
+                    db.conn.execute(
+                        "INSERT OR IGNORE INTO game_media_dismissed_links VALUES(?1,?2)",
+                        params![id, game],
+                    )?;
+                }
                 db.conn.execute(
                     "DELETE FROM game_media_links WHERE collection_id=?1 AND game_key=?2",
                     params![id, game],
                 )?;
             }
+            transaction.commit()?;
             Ok(())
         })
     }
@@ -470,6 +503,9 @@ impl Core {
         let id = Uuid::new_v4().to_string();
         let spoiler = kind == "video";
         self.with_db(|db| {
+            if source.starts_with("https://") && download_is_dismissed(db, collection, source)? {
+                return Ok(());
+            }
             if let Some(edition) = reference {
                 if !crate::romfacts::reference_is_current(db, edition)? {
                     return Err(err("Metadata match changed while downloading this image; refresh again"));
@@ -543,7 +579,7 @@ impl Core {
         }
         let (name, mime): (String, String) = self.with_db(|db| {
             Ok(db.conn.query_row(
-                "SELECT media,mime FROM game_media_assets WHERE id=?1",
+                "SELECT media,mime FROM game_media_assets WHERE id=?1 AND id NOT IN (SELECT asset_id FROM game_media_hidden_assets)",
                 [id],
                 |r| Ok((r.get(0)?, r.get(1)?)),
             )?)
@@ -578,8 +614,18 @@ impl Core {
     }
     pub fn media_remove(&self, id: &str) -> Result<()> {
         self.with_db(|db| {
-            db.conn
-                .execute("DELETE FROM game_media_assets WHERE id=?1", [id])?;
+            let transaction = db.conn.unchecked_transaction()?;
+            let hidden = db.conn.execute("INSERT OR IGNORE INTO game_media_hidden_assets SELECT id FROM game_media_assets WHERE id=?1 AND collection_id LIKE 'provider-images:%'", [id])?;
+            if hidden == 0 {
+                db.conn.execute("DELETE FROM game_media_assets WHERE id=?1 AND collection_id NOT LIKE 'provider-images:%'", [id])?;
+            }
+            transaction.commit()?;
+            Ok(())
+        })
+    }
+    pub fn media_restore_hidden(&self, collection: &str) -> Result<()> {
+        self.with_db(|db| {
+            db.conn.execute("DELETE FROM game_media_hidden_assets WHERE asset_id IN (SELECT id FROM game_media_assets WHERE collection_id=?1)", [collection])?;
             Ok(())
         })
     }

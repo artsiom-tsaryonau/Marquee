@@ -62,7 +62,7 @@
             <strong>{candidate.title}</strong>
             <small>{candidate.system ? `${candidate.system.toUpperCase()} · ` : ''}{candidate.facts?.year ? `${candidate.facts.year} · ` : ''}Provider ID {candidate.id}</small>
             {#if candidate.facts?.genre || candidate.facts?.players}<p class="facts">{candidate.facts.genre || ''}{candidate.facts.players ? ` · ${candidate.facts.players} player${candidate.facts.players === 1 ? '' : 's'}` : ''}</p>{/if}
-            {#if candidate.facts}<details><summary>Preview game details</summary><p>{candidate.facts.description || 'No description supplied for this release.'}</p></details>{/if}
+            {#if candidate.facts}<details><summary data-nav>Preview game details</summary><p>{candidate.facts.description || 'No description supplied for this release.'}</p></details>{/if}
           </div>
           <button class="btn glass small" data-nav disabled={busy} onclick={() => apply(candidate.id)}>{candidate.facts ? 'Fill missing details' : 'Use artwork match'}</button>
         </li>

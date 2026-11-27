@@ -111,6 +111,9 @@ fn save_gallery(
         .starts_with("https://cdn.thegamesdb.net/")
         .then_some(edition);
     let ready = core.with_db(|db| {
+        if crate::game_media::download_is_dismissed(db, &id, &image.url)? {
+            return Ok(false);
+        }
         if reference.is_some() && !romfacts::reference_is_current(db, edition)? {
             return Ok(false);
         }
@@ -255,6 +258,19 @@ pub fn run(core: &Core, edition_id: Option<&str>, report: &mut ArtworkReport) {
             if downloaded >= 64 * 1024 * 1024 {
                 break;
             }
+            if image.kind != "cover"
+                && core
+                    .with_db(|db| {
+                        crate::game_media::download_is_dismissed(
+                            db,
+                            &format!("provider-images:{}", edition.id),
+                            &image.url,
+                        )
+                    })
+                    .unwrap_or(true)
+            {
+                continue;
+            }
             if image.kind == "cover"
                 && edition
                     .cover_path
@@ -307,6 +323,84 @@ pub fn run(core: &Core, edition_id: Option<&str>, report: &mut ArtworkReport) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn refresh_respects_persisted_removals_and_unlinks_until_explicit_restore() {
+        let temp = tempfile::tempdir().unwrap();
+        let data = temp.path().join("library");
+        let core = Core::open_isolated(Some(data.clone()), false).unwrap();
+        core.with_db(|db| { db.conn.execute("INSERT INTO editions(id,system,scan_title,imported_at) VALUES('game','ps1','My game','2026-01-01')", [])?; Ok(()) }).unwrap();
+        let edition = core.snapshot().unwrap().editions.remove(0);
+        let mut png = std::io::Cursor::new(vec![]);
+        image::DynamicImage::new_rgb8(8, 8)
+            .write_to(&mut png, image::ImageFormat::Png)
+            .unwrap();
+        let bytes = png.into_inner();
+        let remote = RemoteImage {
+            kind: "screenshot".into(),
+            url: "https://cdn.thegamesdb.net/images/original/screenshots/7.jpg".into(),
+        };
+        assert!(save_gallery(&core, &edition, &remote, &bytes).unwrap());
+        let collection = core.media_collections(Some("game")).unwrap().remove(0);
+        let asset = &collection.assets[0];
+        core.media_update(&asset.id, "My caption", true).unwrap();
+        core.media_remove(&asset.id).unwrap();
+        core.media_remove(&asset.id).unwrap(); // Repeated removal is idempotent.
+        assert!(core.media_open(&asset.id).is_err());
+        drop(core);
+        let core = Core::open_isolated(Some(data), false).unwrap();
+        assert!(!save_gallery(&core, &edition, &remote, &bytes).unwrap());
+        // Also reject a download which had passed its early check before removal.
+        core.media_store_checked(
+            &collection.id,
+            "Late.png",
+            &remote.url,
+            bytes.as_slice(),
+            bytes.len() as u64,
+            None,
+        )
+        .unwrap();
+        let hidden = core.media_collections(Some("game")).unwrap().remove(0);
+        assert!(hidden.assets.is_empty());
+        assert_eq!(hidden.hidden_count, 1);
+        core.media_restore_hidden(&collection.id).unwrap();
+        let restored = core.media_collections(Some("game")).unwrap().remove(0);
+        assert_eq!(restored.hidden_count, 0);
+        assert_eq!(restored.assets[0].id, asset.id);
+        assert_eq!(restored.assets[0].title, "My caption");
+        assert!(restored.assets[0].spoiler);
+        assert!(core.media_open(&asset.id).is_ok());
+        core.media_link(&collection.id, "game", false).unwrap();
+        assert!(!save_gallery(&core, &edition, &remote, &bytes).unwrap());
+        assert!(core.media_collections(Some("game")).unwrap().is_empty());
+        let mut changed = std::io::Cursor::new(vec![]);
+        image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(8, 8, image::Rgb([255, 0, 0])))
+            .write_to(&mut changed, image::ImageFormat::Png)
+            .unwrap();
+        let changed = changed.into_inner();
+        let another = RemoteImage {
+            kind: "screenshot".into(),
+            url: "https://cdn.thegamesdb.net/images/original/screenshots/8.jpg".into(),
+        };
+        core.media_store_checked(
+            &collection.id,
+            "Late.png",
+            &another.url,
+            changed.as_slice(),
+            changed.len() as u64,
+            None,
+        )
+        .unwrap();
+        assert_eq!(core.media_collections(None).unwrap()[0].assets.len(), 1);
+        core.media_link(&collection.id, "game", true).unwrap();
+        assert!(save_gallery(&core, &edition, &another, &changed).unwrap());
+        assert_eq!(
+            core.media_collections(Some("game")).unwrap()[0]
+                .assets
+                .len(),
+            2
+        );
+    }
+
     #[test]
     fn stale_provider_downloads_cannot_reapply_a_replaced_match() {
         let temp = tempfile::tempdir().unwrap();
