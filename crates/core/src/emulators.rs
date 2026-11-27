@@ -112,7 +112,13 @@ fn apply_settings(def: &EmulatorDef, home: &Path) {
     for (target, settings) in by_file {
         let before = fs::read_to_string(&target).unwrap_or_default();
         let after = settings.iter().fold(before.clone(), |text, s| {
-            crate::bios::set_ini_value(&text, &s.section, &s.key, &s.value)
+            let value = match seed_base(home, Some("data")) {
+                Some(data) if s.value.contains("{xdg-data}") => {
+                    s.value.replace("{xdg-data}", &data.to_string_lossy())
+                }
+                _ => s.value.clone(),
+            };
+            crate::bios::set_ini_value(&text, &s.section, &s.key, &value)
         });
         if after == before {
             continue;

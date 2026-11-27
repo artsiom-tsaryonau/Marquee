@@ -6,7 +6,7 @@
   ],
   "binary": "AppRun",
   "config_subdir": "eden",
-  "requirement": "Nintendo Switch emulator (yuzu lineage), from the project's own server (its GitHub releases are blocked). Needs the owner's prod.keys/title.keys and a firmware dump installed into its NAND. Library Play runs .nsp/.xci; updates and DLC install into the NAND.",
+  "requirement": "Nintendo Switch emulator (yuzu lineage), from the project's own server (its GitHub releases are blocked). Needs the owner's prod.keys/title.keys and a firmware dump installed into its NAND. Library Play runs .nsp/.xci; updates and DLC (.nsp) go in eden/external-content in Marquee's Eden folder, which Eden loads at every boot.",
   "download": {
     "url": "https://stable.eden-emu.dev/v0.2.1/Eden-Linux-v0.2.1-amd64-clang-pgo.AppImage",
     "sha256": "7a28bf988b0648831989722bdbaa90ab31371b403808199813e0ea7c8b25ba6d",
@@ -34,6 +34,32 @@
       "root": "data",
       "dir": "eden/keys",
       "note": "Title keys for digital games."
+    }
+  ],
+  "settings": [
+    {
+      "path": "eden/qt-config.ini",
+      "section": "UI",
+      "key": "Paths\\external_content_dirs\\size",
+      "value": "1"
+    },
+    {
+      "path": "eden/qt-config.ini",
+      "section": "UI",
+      "key": "Paths\\external_content_dirs\\1\\path",
+      "value": "{xdg-data}/eden/external-content"
+    },
+    {
+      "path": "eden/qt-config.ini",
+      "section": "UI",
+      "key": "confirmStop",
+      "value": "2"
+    },
+    {
+      "path": "eden/qt-config.ini",
+      "section": "UI",
+      "key": "confirmStop\\default",
+      "value": "false"
     }
   ]
 }
