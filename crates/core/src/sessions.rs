@@ -746,12 +746,25 @@ mod prefix_tests {
     fn a_launch_prefix_wraps_the_game_command() {
         let argv = vec!["emu".to_string(), "game.iso".to_string()];
         // Env is process-wide; this is the only test that sets this variable.
-        std::env::set_var("MARQUEE_LAUNCH_PREFIX", r#"["gamescope","--backend","headless","--"]"#);
+        std::env::set_var(
+            "MARQUEE_LAUNCH_PREFIX",
+            r#"["gamescope","--backend","headless","--"]"#,
+        );
         let wrapped = super::with_launch_prefix(&argv);
         std::env::set_var("MARQUEE_LAUNCH_PREFIX", "not json");
         let ignored = super::with_launch_prefix(&argv);
         std::env::remove_var("MARQUEE_LAUNCH_PREFIX");
-        assert_eq!(wrapped, ["gamescope", "--backend", "headless", "--", "emu", "game.iso"]);
+        assert_eq!(
+            wrapped,
+            [
+                "gamescope",
+                "--backend",
+                "headless",
+                "--",
+                "emu",
+                "game.iso"
+            ]
+        );
         assert_eq!(ignored, argv);
     }
 }
