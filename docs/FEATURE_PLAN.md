@@ -78,6 +78,7 @@ recommended defaults below are accepted.
 | FD4 | Save snapshot scope | Accepted: whole emulator profile data directory and whole port directory (minus engine files), on demand and before emulator/port updates; keep the newest 5 per scope | F2 |
 | FD5 | Soundtrack download format | Accepted: best audio stream as published (no transcode, no FFmpeg dependency); only URLs the owner linked | F3 |
 | FD6 | LAN streaming exposure | Accepted: off by default. When enabled, publish on one owner-selected interface address, never `0.0.0.0` | ST5 |
+| ST6 | Play on a phone: Moonlight for iOS/Android with its on-screen touch controller, per-system layouts | Streaming | M | ST5, HL2 | Open (owner ask 2026-11-27). Moonlight's mobile clients already draw a virtual gamepad, so no overlay of Marquee's own is needed first; needs LAN publish (ST5) and headless adapters for each runner (HL1/HL2, then Cemu, xemu, PPSSPP, Azahar, Ymir) |
 | FD7 | Embedded player | Accepted: research only. The decision is recorded under ST4 in the streaming guide; do not build a receiver | ST4 |
 | FD8 | Native controller library | Accepted: `gilrs` in the Tauri process for inventory and UI navigation; emulator binding profiles only after hardware arrives | F4 |
 | FD9 | Epic/GOG backends | Accepted: pin upstream Legendary and heroic-gogdl Linux binaries when their release assets verify; otherwise pin a source commit built in the existing rootless source-build path | E1, G1 |

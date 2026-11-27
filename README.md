@@ -30,6 +30,29 @@ Epic/GOG installation, portable package export/import and library-wide streaming
 for every runtime remain unfinished. PS4/PS5 tool entries do not establish playable
 game compatibility. See the [roadmap](docs/ROADMAP.md) and [documentation index](docs/README.md).
 
+## What Marquee adds on top of the emulators
+
+Each emulator is a good program on its own; Marquee is the layer that makes them
+behave like one console you just play.
+
+- **Games start ready.** Marquee writes each emulator's first-run settings before
+  launch, so there are no setup wizards, update prompts, exit confirmations or menus:
+  Cemu skips Getting Started, xemu its welcome screen, RPCS3 its "Exit Game?" box,
+  Shipwright most of its first-launch dialogs. Fullscreen is the default.
+- **Keyboard layouts that work.** Emulators that ship no keyboard mapping get one
+  (RMG for N64, Cemu's GamePad, Xenia, PCSX2), written once so your own later
+  layout or controller is kept.
+- **Stop game.** A frozen fullscreen game can be ended from Marquee (close, then
+  kill after 8 s), and the time played still counts.
+- **One library, isolated profiles.** Every emulator runs from Marquee's own folder
+  with its own settings and saves, never your host installs; pinned versions with
+  checksums, rollback for source builds, play time and save snapshots per game.
+- **Dumps become playable.** Archive intake, BIOS/firmware import matched by name,
+  size or hash, Wii U titles read from `meta.xml`, Xbox redump images trimmed to
+  XISO, PS4 packages unpacked for recomps (with a fixed LibOrbisPkg).
+- **Streaming.** Games can run on a private virtual display and stream to Moonlight,
+  so the same library plays on another screen.
+
 ## Technologies and tools
 
 | Area | Technologies | Role in Marquee |
@@ -69,12 +92,16 @@ separate levels of support. The current emulator names and roles are:
 | GB / GBC; GBA tool | **mGBA** | Alternative GB/GBC runner and managed source-build tool; no general GBA library adapter yet |
 | Nintendo DS / Nintendo 64 | **melonDS / Rosalie's Mupen GUI (RMG)** | Library launch adapters |
 | Dreamcast / Neo Geo | **Flycast / FinalBurn Neo (FBNeo)** | Library launch adapters; firmware and matching game-set requirements apply |
-| PSP / Wii U / Nintendo 3DS | **PPSSPP / Cemu / Azahar** | Managed tools; library adapters and live acceptance remain separate work |
-| Original Xbox / PS4 / PS5 research | **xemu / shadPS4 / KytyPS5** | Experimental or setup-only tools; not validated playable library integrations |
+| Sega Saturn / Nintendo 3DS | **Ymir / Azahar** | Library launch; Saturn BIOS matched by hash; Euro 96 and Pokémon Moon boot |
+| Wii U | **Cemu** | Library launch of decrypted folder games named from `meta.xml`; update and DLC from Cemu's storage; Smash Bros. boots |
+| Original Xbox | **xemu** | Library launch with the owner's BIOS, MCPX ROM and hard disk; XISO images (redump trimmed); Forza Motorsport starts |
+| PSP / PS Vita | **PPSSPP / Vita3K** | PSP library launch (ISO/CSO/CHD/PBP); Vita3K installed with firmware 3.74, games need their licence key |
+| PS4 / PS5 research | **shadPS4 / KytyPS5** | Setup-only tools; no playable PS4/PS5 title yet |
 
 Managed native-engine recipes include **Shipwright / Ship of Harkinian**,
 **2Ship2Harkinian**, **Zelda 64: Recompiled**, **sm64coopdx**, **Fallout 2 Community
-Edition** and **UZDoom**. Installing an engine does not supply its required original
+Edition**, **UZDoom** and **DriveClub Recomp** (PS4, native Linux; plays from the
+owner's base and 1.28 update dumps). Installing an engine does not supply its required original
 game data. See [emulators](docs/EMULATORS.md), [console preparation](docs/CONSOLE_PREPARATION.md)
 and [native-port discovery](docs/QUIVER_INTEGRATION.md).
 
