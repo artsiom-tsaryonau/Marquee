@@ -1289,6 +1289,28 @@ pub fn launch(
         })
 }
 
+/// PATCH3: until Shipwright has generated `oot.o2r` (or `oot-mq.o2r`), pass it the
+/// ROM that setup placed. A ROM on its command line is extracted straight away,
+/// which skips the "Generate one now?", "ROMs found" and "Extract another?" dialogs;
+/// only its closing "Run SoH?" question remains.
+fn first_launch_roms(dir: &Path) -> Vec<PathBuf> {
+    if dir.join("oot.o2r").exists() || dir.join("oot-mq.o2r").exists() {
+        return Vec::new();
+    }
+    let Ok(raw) = fs::read(dir.join(".marquee-setup.json")) else {
+        return Vec::new();
+    };
+    let Ok(receipt) = serde_json::from_slice::<SetupReceipt>(&raw) else {
+        return Vec::new();
+    };
+    receipt
+        .outputs
+        .iter()
+        .filter_map(|output| relative_file(dir, &output.path))
+        .filter(|path| path.is_file() && inside(dir, path))
+        .collect()
+}
+
 /// Shipwright otherwise writes into the host's shared ~/.local/share/soh profile.
 /// Use its supported override and AppImage runtime fallback on hosts without FUSE 2.
 /// sm64coopdx otherwise uses ~/.local/share/sm64coopdx and copies the ROM there;
@@ -1298,6 +1320,7 @@ fn configure_launch(command: &mut Command, dir: &Path, def: &PortDef) {
         command
             .env("SHIP_HOME", dir)
             .env("APPIMAGE_EXTRACT_AND_RUN", "1");
+        command.args(first_launch_roms(dir));
     }
     if def.id == "sm64coopdx" {
         command.arg("--savepath").arg(dir);
@@ -1390,6 +1413,49 @@ mod tests {
             .map(|a| a.to_string_lossy().into_owned())
             .collect();
         assert_eq!(args, ["--savepath", dir.to_str().unwrap()]);
+    }
+
+    #[test]
+    fn shipwright_first_launch_gets_the_placed_rom_until_assets_exist() {
+        let t = tempfile::tempdir().unwrap();
+        let dir = t.path();
+        let def = find("shipwright").unwrap();
+        let args = |dir: &Path| {
+            let mut command = Command::new("engine");
+            configure_launch(&mut command, dir, &def);
+            command
+                .get_args()
+                .map(|a| a.to_string_lossy().into_owned())
+                .collect::<Vec<_>>()
+        };
+        assert!(args(dir).is_empty(), "no setup receipt, no ROM argument");
+        fs::write(dir.join("oot.z64"), b"rom").unwrap();
+        let receipt = SetupReceipt {
+            recipe: "shipwright".into(),
+            rom_sha1: None,
+            rom_sha256: "00".into(),
+            outputs: vec![
+                SetupOutput {
+                    path: "oot.z64".into(),
+                    sha256: "00".into(),
+                    bytes: 3,
+                },
+                SetupOutput {
+                    path: "../escape.z64".into(),
+                    sha256: "00".into(),
+                    bytes: 3,
+                },
+            ],
+            note: String::new(),
+        };
+        fs::write(
+            dir.join(".marquee-setup.json"),
+            serde_json::to_vec(&receipt).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(args(dir), [dir.join("oot.z64").to_str().unwrap()]);
+        fs::write(dir.join("oot.o2r"), b"assets").unwrap();
+        assert!(args(dir).is_empty(), "generated assets: plain launch");
     }
 
     #[test]

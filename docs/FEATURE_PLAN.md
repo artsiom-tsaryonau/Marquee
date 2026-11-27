@@ -137,9 +137,9 @@ If UL1 lands before ST3c, swap the numbers here in the same change set.
 | N3DS1 | Nintendo 3DS via Azahar, encrypted-dump warning | Emulators | S | — | Done 2026-11-26. Pokémon Moon boots, takes input, exits; Driver: Renegade imported |
 | UX1 | Fullscreen default and per-emulator enforced settings (no menus while playing) | Emulators | S | — | Done 2026-11-26. Xenia, Azahar, Ymir verified chrome-free |
 | STOP1 | Stop game for local Play (close, then force after a timeout) | Emulators | S | — | Done in code 2026-11-27. Stop game on the Playing overlay and game page (SIGTERM to the game's process group, SIGKILL after 8 s; a second Stop forces it); stopped sessions end with playtime credited. Live stop of a frozen emulator unperformed |
-| PATCH1 | Xenia patch series: force-quit on window close, hide-menu option, default profile | Emulators | M | STOP1 | Open |
-| PATCH2 | Ymir patch series: hide-menu option, automatic BIOS language and clock | Emulators | S | SAT1 | Open |
-| PATCH3 | Shipwright: generate assets without the first-launch dialogs | Ports | S | NP3 | Open |
+| PATCH1 | Xenia patch series: force-quit on window close, hide-menu option, default profile | Emulators | M | STOP1 | Not needed (2026-11-27 source review of 451f915). Xenia installs no SIGTERM handler, so Stop game ends a frozen game at once; a close-button watchdog only runs if the UI thread still responds, which a freeze rules out. Menu: hidden by fullscreen (UX1). Profile: config `logged_profile_slot_0_xuid` |
+| PATCH2 | Ymir patch series: hide-menu option, automatic BIOS language and clock | Emulators | S | SAT1 | Deferred 2026-11-27. Menu hidden by fullscreen; BIOS language and clock persist after the one-time set-up (`state/smpc-us_eu.bin`), so only a brand-new profile asks. Revisit only if profiles are recreated |
+| PATCH3 | Shipwright: generate assets without the first-launch dialogs | Ports | S | NP3 | Done in code 2026-11-27 without a fork: until `oot.o2r` exists, Play passes the setup-placed ROM on the command line, which 9.3.1 extracts directly (one "Run SoH?" dialog left of four). Live first launch unperformed |
 | PSP1 | PSP via PPSSPP, PSN .pkg conversion (pkg2zip) | Emulators | M | — | Open. Persona 3 Portable waiting |
 | GC1 | GameCube via Dolphin | Emulators | M | — | Open. Metroid Prime (.ciso) waiting |
 | NSW1 | Switch via Eden: keys, firmware, NSP | Emulators | L | — | Open. Keys, firmware 23.5.0 and Nightshade present |
