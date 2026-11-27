@@ -4,15 +4,9 @@
   "systems": [
     "xbox"
   ],
-  "github": "xemu-project/xemu",
-  "asset_suffix": "x86_64.appimage",
-  "asset_excludes": [
-    "dbg",
-    "aarch"
-  ],
   "binary": "AppRun",
   "config_subdir": "xemu",
-  "requirement": "Xbox BIOS, MCPX ROM and HDD image \u2014 setup jobs planned; manual import fallback",
+  "requirement": "Original Xbox emulator. Library Play boots an Xbox disc image (XISO) with the owner's MCPX boot ROM, flash BIOS and hard disk image, placed from the BIOS inbox. Keyboard drives controller 1.",
   "firmware": [
     {
       "name": "mcpx_1.0.bin",
@@ -24,26 +18,48 @@
       "size": 512,
       "root": "data",
       "dir": "xemu/xemu",
-      "note": "MCPX boot ROM. xemu reads its path from xemu.toml; Marquee does not write that file yet."
+      "note": "MCPX boot ROM. Marquee's seeded xemu.toml points xemu at it."
     },
     {
       "name": "Complex_4627.bin",
       "aliases": [
         "Complex.bin",
-        "cerbios.bin",
-        "bios.bin"
+        "Complex_4627v1.03.bin",
+        "bios.bin",
+        "cerbios.bin"
       ],
       "required": true,
       "root": "data",
       "dir": "xemu/xemu",
-      "note": "Xbox flash ROM. Needs a matching xemu.toml entry (not written yet)."
+      "note": "Xbox flash ROM (1 MiB). Marquee's seeded xemu.toml points xemu at it.",
+      "size": 1048576
     },
     {
       "name": "xbox_hdd.qcow2",
       "required": true,
       "root": "data",
       "dir": "xemu/xemu",
-      "note": "Xbox hard disk image. Needs a matching xemu.toml entry (not written yet)."
+      "note": "Xbox hard disk image. Marquee's seeded xemu.toml points xemu at it."
+    }
+  ],
+  "download": {
+    "url": "https://github.com/xemu-project/xemu/releases/download/v0.8.139/xemu-0.8.139-x86_64.AppImage",
+    "sha256": "220282aacf09b30b35c55ba900a774fb6940c70deca1408bc70a4c9cc67c322f",
+    "version": "0.8.139"
+  },
+  "kind": "emulator",
+  "launch": [
+    "-dvd_path",
+    "{rom}"
+  ],
+  "fullscreen_args": [
+    "-full-screen"
+  ],
+  "seed": [
+    {
+      "path": "xemu/xemu/xemu.toml",
+      "root": "data",
+      "contents": "[general]\nshow_welcome = false\nskip_boot_anim = true\n\n[general.updates]\ncheck = false\n\n[sys.files]\nbootrom_path = '{xdg-data}/xemu/xemu/mcpx_1.0.bin'\nflashrom_path = '{xdg-data}/xemu/xemu/Complex_4627.bin'\nhdd_path = '{xdg-data}/xemu/xemu/xbox_hdd.qcow2'\neeprom_path = '{xdg-data}/xemu/xemu/eeprom.bin'\n"
     }
   ]
 }

@@ -199,7 +199,19 @@ fn write_seeds(def: &EmulatorDef, home: &Path) {
         if let Some(parent) = target.parent() {
             let _ = fs::create_dir_all(parent);
         }
-        let _ = fs::write(&target, &seed.contents);
+        // `{xdg-data}` is the emulator's data root, for configs that need absolute
+        // paths (xemu's BIOS and hard disk). Quotes in it would break TOML strings.
+        let contents = match seed_base(home, Some("data")) {
+            Some(data) if seed.contents.contains("{xdg-data}") => {
+                let data = data.to_string_lossy();
+                if data.contains(['\'', '"']) {
+                    continue;
+                }
+                seed.contents.replace("{xdg-data}", &data)
+            }
+            _ => seed.contents.clone(),
+        };
+        let _ = fs::write(&target, contents);
     }
 }
 
@@ -1283,6 +1295,29 @@ mod tests {
     }
 
     #[test]
+    fn xemu_config_points_at_the_imported_bios_with_absolute_paths() {
+        let def = find("xemu").unwrap();
+        let temp = tempfile::tempdir().unwrap();
+        let home = temp.path().join("xemu/xdg-config");
+        seed_config(&def, &home);
+        let toml =
+            fs::read_to_string(temp.path().join("xemu/xdg-data/xemu/xemu/xemu.toml")).unwrap();
+        let data = temp.path().join("xemu/xdg-data");
+        assert!(toml.contains("show_welcome = false"));
+        assert!(toml.contains(&format!(
+            "flashrom_path = '{}/xemu/xemu/Complex_4627.bin'",
+            data.display()
+        )));
+        assert!(!toml.contains("{xdg-data}"));
+        let flash = def
+            .firmware
+            .iter()
+            .find(|f| f.name == "Complex_4627.bin")
+            .unwrap();
+        assert!(flash.aliases.iter().any(|a| a == "Complex_4627v1.03.bin"));
+    }
+
+    #[test]
     fn xenia_pins_linux_build_and_keeps_writable_paths_in_managed_data() {
         let temp = tempfile::tempdir().unwrap();
         let paths = Paths::resolve(Some(temp.path().join("library with spaces"))).unwrap();
@@ -1754,6 +1789,7 @@ mod tests {
             kinds,
             [
                 "duckstation",
+                "emulator",
                 "emulator",
                 "emulator",
                 "emulator",

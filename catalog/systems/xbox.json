@@ -1,0 +1,14 @@
+{
+  "id": "xbox",
+  "display_name": "Xbox",
+  "supported_extensions": [
+    "iso",
+    "xiso"
+  ],
+  "skipped_extensions": [
+    "xbe"
+  ],
+  "runner_kind": "emulator",
+  "emulator": "xemu",
+  "notes": "Original Xbox disc images in XISO form (the game partition only). A full redump image keeps a 387 MiB video partition in front, which xemu cannot boot; trim it to XISO first."
+}

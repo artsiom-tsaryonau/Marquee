@@ -145,7 +145,7 @@ If UL1 lands before ST3c, swap the numbers here in the same change set.
 | NSW1 | Switch via Eden: keys, firmware, NSP | Emulators | L | — | Open. Keys, firmware 23.5.0 and Nightshade present |
 | WIIU1 | Wii U via Cemu: game, update and DLC | Emulators | M | — | Library Play done 2026-11-27: Cemu 2.6 pinned, `wiiu` system (the `.rpx` in `code/`, named from `meta/meta.xml`), seeded settings skip the Getting Started wizard, keyboard GamePad profile. Super Smash Bros. for Wii U boots from Library Play with update v304 and DLC mounted from Cemu's mlc01 (placed by hand). Open: an intake job for Wii U archives (game to the library, update/DLC to mlc01), keys.txt placement for encrypted dumps, a played match |
 | VITA1 | PS Vita via Vita3K | Emulators | M | — | Blocked: Persona 4 Golden needs its zRIF licence |
-| XBOX1 | Original Xbox Library Play via xemu | Emulators | M | — | Blocked: needs Xbox BIOS, MCPX and HDD image |
+| XBOX1 | Original Xbox Library Play via xemu | Emulators | M | — | Done in code 2026-11-27: xemu 0.8.139 pinned, `xbox` system, seeded `xemu.toml` (no welcome, no update check, BIOS/MCPX/HDD paths), owner BIOS imported through `marquee bios import`. Forza Motorsport (redump image trimmed by hand to XISO at 0x18300000) starts from Library Play and stays running; the screen was not seen. Open: XISO trimming in intake, a confirmed title screen and played race |
 
 ## Waves
 

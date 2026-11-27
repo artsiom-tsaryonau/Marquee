@@ -462,6 +462,24 @@ fullscreen mode. No firmware is needed; `keys.txt` only decrypts encrypted dumps
   Library Play: base folder, update v304 and DLC mounted, Vulkan, title running.
   Keys not yet pressed in a match.
 
+## Original Xbox (2026-11-27)
+
+[xemu](https://github.com/xemu-project/xemu) 0.8.139 is pinned as its Linux AppImage
+(SHA-256 `220282aa…c322f`). Library Play passes `-dvd_path <image>` and
+`-full-screen` in fullscreen mode.
+
+- **BIOS.** `marquee bios import` (or the inbox) places the owner's MCPX boot ROM
+  (`mcpx_1.0.bin`, 512 bytes), flash BIOS (`Complex_4627.bin`, 1 MiB; also matched as
+  `Complex_4627v1.03.bin`) and hard disk (`xbox_hdd.qcow2`) in `xemu/xdg-data/xemu/xemu`.
+- **Config.** A seeded `xemu.toml` there turns off the welcome screen, boot animation
+  and update check and points `[sys.files]` at those files. Seed files can use
+  `{xdg-data}` for the emulator's data folder when a config needs absolute paths.
+- **Disc images** must be XISO: xemu has no redump support. A redump image has a
+  0x18300000-byte video partition first (`MICROSOFT*XBOX*MEDIA` at 0x18310000);
+  XISO is the rest of the file. Forza Motorsport was trimmed that way by hand.
+- **Checked live.** Forza Motorsport started from Library Play with the BIOS and
+  stayed running for a minute; the screen itself was not seen.
+
 ## Sega Saturn (2026-11-26)
 
 [Ymir](https://github.com/ymir-emu/Ymir) v0.4.1 (GPL-3.0) is pinned as the AVX2
