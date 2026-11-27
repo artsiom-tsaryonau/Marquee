@@ -1766,6 +1766,7 @@ mod tests {
                 "emulator",
                 "emulator",
                 "emulator",
+                "emulator",
                 "pcsx2"
             ],
             "only emulators with a library integration become runners"

@@ -1,0 +1,17 @@
+{
+  "id": "wiiu",
+  "display_name": "Wii U",
+  "supported_extensions": [
+    "rpx"
+  ],
+  "skipped_extensions": [
+    "app",
+    "h3",
+    "tik",
+    "tmd",
+    "cert"
+  ],
+  "runner_kind": "emulator",
+  "emulator": "cemu",
+  "notes": "Games in the decrypted folder layout (code/, content/, meta/); the .rpx in code/ is the entry and meta/meta.xml names it. Encrypted NUS (.app/.tik/.tmd) and .wud/.wux discs are not imported. Updates and DLC are installed into Cemu's mlc01."
+}

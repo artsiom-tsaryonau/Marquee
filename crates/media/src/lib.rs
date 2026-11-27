@@ -8,6 +8,7 @@ pub mod n3ds;
 mod rar;
 pub mod saturn;
 pub mod time;
+pub mod wiiu;
 
 pub mod http;
 

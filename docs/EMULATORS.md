@@ -441,6 +441,27 @@ config are host paths, also mounted at the same locations in the container, so
 they remain meaningful if the previous verified binary is restored.
 
 
+## Wii U (2026-11-27)
+
+[Cemu](https://github.com/cemu-project/Cemu) 2.6 is pinned as its Linux AppImage
+(SHA-256 `0c20c4ae…186313`). Library Play passes `-g <code/*.rpx>` and `-f` in
+fullscreen mode. No firmware is needed; `keys.txt` only decrypts encrypted dumps.
+
+- **Games** are decrypted folders (`code/`, `content/`, `meta/`). The scan names
+  them from `meta/meta.xml` (`longname_en`, `title_id`), not from the `.rpx`.
+- **Updates and DLC** live in Cemu's own storage:
+  `cemu/xdg-data/Cemu/mlc01/usr/title/0005000e/<id>` (update) and `0005000c/<id>`
+  (DLC). Cemu mounts them by title ID at boot.
+- **First run.** Seeded `Cemu/settings.xml` (Vulkan, no update check, no Discord,
+  graphic-pack and Vulkan notices marked shown) skips the Getting Started wizard,
+  which Cemu shows whenever that file is missing.
+- **Keyboard GamePad** (`controllerProfiles/controller0.xml`, GDK key values):
+  WASD left stick, TFGH right stick, arrows D-pad, J/K/U/I = A/B/X/Y, Q/E = L/R,
+  Z/C = ZL/ZR, Enter = Plus, Backspace = Minus, M = Home.
+- **Checked live.** Super Smash Bros. for Wii U (EU, 0005000010145000) booted from
+  Library Play: base folder, update v304 and DLC mounted, Vulkan, title running.
+  Keys not yet pressed in a match.
+
 ## Sega Saturn (2026-11-26)
 
 [Ymir](https://github.com/ymir-emu/Ymir) v0.4.1 (GPL-3.0) is pinned as the AVX2

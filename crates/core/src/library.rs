@@ -215,7 +215,19 @@ fn ingest_disc(
     } else {
         None
     };
+    // Wii U folder games are named by meta/meta.xml, not by the .rpx file name.
+    let wiiu = (descriptor.id == "wiiu")
+        .then(|| marquee_media::wiiu::meta(path))
+        .flatten();
     let identity = match kind {
+        _ if wiiu.is_some() => {
+            let m = wiiu.as_ref().unwrap();
+            crate::iso::DiscIdentity {
+                serial: Some(m.title_id.clone()),
+                serial_raw: Some(m.title_id.clone()),
+                region: None,
+            }
+        }
         MediaKind::Xbox360Iso => {
             let m = xbox360.as_ref().unwrap();
             crate::iso::DiscIdentity {
@@ -262,6 +274,7 @@ fn ingest_disc(
     let title = ps3
         .as_ref()
         .map(|m| m.title.clone())
+        .or_else(|| wiiu.as_ref().map(|m| m.title.clone()))
         .unwrap_or_else(|| title_from_filename(path));
     db.upsert_edition(
         &edition_id,

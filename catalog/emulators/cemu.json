@@ -4,10 +4,30 @@
   "systems": [
     "wiiu"
   ],
-  "github": "cemu-project/Cemu",
-  "asset_suffix": "x86_64.appimage",
-  "asset_excludes": [],
   "binary": "AppRun",
   "config_subdir": "cemu",
-  "requirement": "Wii U keys and game files \u2014 setup jobs planned; manual import fallback"
+  "requirement": "Wii U emulator. Library Play runs games in the decrypted folder layout (code/, content/, meta/) through the .rpx in code/; updates and DLC go into Cemu's mlc01 in Marquee's Cemu folder. No firmware is needed; keys.txt is only for encrypted dumps. Keyboard controls the GamePad.",
+  "download": {
+    "url": "https://github.com/cemu-project/Cemu/releases/download/v2.6/Cemu-2.6-x86_64.AppImage",
+    "sha256": "0c20c4aeb800bb13d9bab9474ef45a6f8fcde6402cad9b32ac2a1bbd03186313",
+    "version": "2.6"
+  },
+  "kind": "emulator",
+  "launch": [
+    "-g",
+    "{rom}"
+  ],
+  "fullscreen_args": [
+    "-f"
+  ],
+  "seed": [
+    {
+      "path": "Cemu/settings.xml",
+      "contents": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<content>\n    <check_update>false</check_update>\n    <use_discord_presence>false</use_discord_presence>\n    <fullscreen_menubar>false</fullscreen_menubar>\n    <vk_warning>true</vk_warning>\n    <gp_download>true</gp_download>\n    <Graphic>\n        <api>1</api>\n    </Graphic>\n</content>\n"
+    },
+    {
+      "path": "Cemu/controllerProfiles/controller0.xml",
+      "contents": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<emulated_controller>\n\t<type>Wii U GamePad</type>\n\t<controller>\n\t\t<api>Keyboard</api>\n\t\t<uuid>keyboard</uuid>\n\t\t<display_name>Keyboard</display_name>\n\t\t<mappings>\n\t\t\t<entry>\n\t\t\t\t<mapping>1</mapping>\n\t\t\t\t<button>106</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>2</mapping>\n\t\t\t\t<button>107</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>3</mapping>\n\t\t\t\t<button>117</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>4</mapping>\n\t\t\t\t<button>105</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>5</mapping>\n\t\t\t\t<button>113</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>6</mapping>\n\t\t\t\t<button>101</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>7</mapping>\n\t\t\t\t<button>122</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>8</mapping>\n\t\t\t\t<button>99</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>9</mapping>\n\t\t\t\t<button>65293</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>10</mapping>\n\t\t\t\t<button>65288</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>11</mapping>\n\t\t\t\t<button>65362</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>12</mapping>\n\t\t\t\t<button>65364</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>13</mapping>\n\t\t\t\t<button>65361</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>14</mapping>\n\t\t\t\t<button>65363</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>15</mapping>\n\t\t\t\t<button>120</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>16</mapping>\n\t\t\t\t<button>118</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>17</mapping>\n\t\t\t\t<button>119</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>18</mapping>\n\t\t\t\t<button>115</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>19</mapping>\n\t\t\t\t<button>97</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>20</mapping>\n\t\t\t\t<button>100</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>21</mapping>\n\t\t\t\t<button>116</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>22</mapping>\n\t\t\t\t<button>103</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>23</mapping>\n\t\t\t\t<button>102</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>24</mapping>\n\t\t\t\t<button>104</button>\n\t\t\t</entry>\n\t\t\t<entry>\n\t\t\t\t<mapping>27</mapping>\n\t\t\t\t<button>109</button>\n\t\t\t</entry>\n\t\t</mappings>\n\t</controller>\n</emulated_controller>\n"
+    }
+  ]
 }
