@@ -1,0 +1,13 @@
+{
+  "id": "ps4",
+  "display_name": "PlayStation 4",
+  "supported_extensions": [
+    "bin"
+  ],
+  "skipped_extensions": [
+    "pkg"
+  ],
+  "runner_kind": "emulator",
+  "emulator": "shadps4",
+  "notes": "Prepared (extracted) game folders: the eboot.bin beside sce_sys/param.sfo is the entry and names the game. Packages are extracted first (ShadPKG for bases, patched LibOrbisPkg for updates)."
+}

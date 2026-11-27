@@ -151,6 +151,11 @@ fn walk_dir(
         if descriptor.id == "neogeo" && entry.file_name().eq_ignore_ascii_case("neogeo.zip") {
             continue; // Firmware is a dependency, not a playable game.
         }
+        // A prepared PS4 game is its eboot.bin beside sce_sys/param.sfo; other .bin
+        // files in the folder are game data.
+        if descriptor.id == "ps4" && ps4_param(&path).is_none() {
+            continue;
+        }
         let ext = path
             .extension()
             .and_then(|e| e.to_str())
@@ -215,11 +220,20 @@ fn ingest_disc(
     } else {
         None
     };
+    let ps4 = (descriptor.id == "ps4").then(|| ps4_param(path)).flatten();
     // Wii U folder games are named by meta/meta.xml, not by the .rpx file name.
     let wiiu = (descriptor.id == "wiiu")
         .then(|| marquee_media::wiiu::meta(path))
         .flatten();
     let identity = match kind {
+        _ if ps4.is_some() => {
+            let m = ps4.as_ref().unwrap();
+            crate::iso::DiscIdentity {
+                serial: Some(m.title_id.clone()),
+                serial_raw: Some(m.title_id.clone()),
+                region: None,
+            }
+        }
         _ if wiiu.is_some() => {
             let m = wiiu.as_ref().unwrap();
             crate::iso::DiscIdentity {
@@ -275,6 +289,7 @@ fn ingest_disc(
         .as_ref()
         .map(|m| m.title.clone())
         .or_else(|| wiiu.as_ref().map(|m| m.title.clone()))
+        .or_else(|| ps4.as_ref().map(|m| m.title.replace(['™', '®'], "")))
         .unwrap_or_else(|| title_from_filename(path));
     db.upsert_edition(
         &edition_id,
@@ -310,6 +325,18 @@ fn ingest_disc(
         report.added += 1;
     }
     Ok(())
+}
+
+/// PARAM.SFO of a prepared PS4 game, read beside its eboot.bin.
+fn ps4_param(path: &Path) -> Option<crate::ps3::Metadata> {
+    if !path.file_name()?.eq_ignore_ascii_case("eboot.bin") {
+        return None;
+    }
+    let sfo = path.parent()?.join("sce_sys").join("param.sfo");
+    if fs::metadata(&sfo).ok()?.len() > 1024 * 1024 {
+        return None;
+    }
+    crate::ps3::parse_sfo(&fs::read(sfo).ok()?).ok()
 }
 
 fn title_from_filename(path: &Path) -> String {
