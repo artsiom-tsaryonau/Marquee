@@ -62,6 +62,38 @@ Primary references: [TheGamesDB API](https://api.thegamesdb.net/),
 [libretro thumbnail repository](https://github.com/libretro-thumbnails/libretro-thumbnails),
 [SteamGridDB API v2](https://www.steamgriddb.com/api/v2).
 
+### Follow-up metadata and media audit (2026-11-27)
+
+Scope: source review and a local headless browser against an isolated copy of the
+18-game, 50-image library, with provider keys disabled. Screenshots and fault
+injection used the copy only. No game launch, native gamepad, torrent transfer or
+new live-provider acceptance is implied by this pass.
+
+**Fixed:** choosing a different reviewed TheGamesDB release could leave the first
+provider ID in the provenance string controlling subsequent refreshes. The newest
+reviewed ID now wins, including reselection of a previous ID. Historical source
+labels remain. Facts, provider covers and gallery inserts check that the reference
+is still current after network work, so an older download cannot reapply a replaced
+match. Regression tests reproduce replacement and reject stale image/cover writes.
+
+Remaining priorities, in recommended implementation order:
+
+| Priority | Finding and evidence | Improvement |
+| --- | --- | --- |
+| P2 | **One media URL failure blanks healthy previews.** Injecting one HTTP failure into the five-image Moon collection produced zero image thumbnails and five video placeholders. `MediaLibrary.refresh` waits on one `Promise.all` before saving any resolved URLs. | Resolve independently, retain successful URLs, show an image-specific error and provide per-asset retry. |
+| P2 | **Image spoiler flags have no effect.** Marking a copied screenshot as containing spoilers left its thumbnail and full image visible with no warning. Only the video branch renders a badge. | Hide flagged thumbnails and require a deliberate reveal in the viewer; apply the policy during next/previous navigation too. |
+| P2 | **Refresh does not remember curation.** Source review: `media_remove` deletes the asset row without an exclusion, while `save_gallery` recreates assets and inserts missing game links for the stable provider collection. Unlinked provider collections can therefore relink on refresh. | Persist hidden sources and dismissed collection links, with an explicit reset/restore action. Preserve user-added collections. |
+| P2 | **Artwork replacement has no asset preview or undo.** Source review: the candidate chooser shows a title/provider ID, then the backend downloads the first compatible grid and replaces the cover. | Show available assets, dimensions and provenance; preview beside the current cover and keep a reversible previous selection. |
+| P2 | **Regional matches are difficult to review and populated mistakes cannot be corrected.** A read-only two-release fixture rendered identical titles/platforms/years apart from opaque IDs. Country and full release date are discarded, and Apply only fills empty fields. | Carry region/date/edition information into the review; show field differences and allow explicit per-field correction with undo. |
+| P2 | **Gallery work scales with all assets, even in Videos.** Opening global Images requested 50 media URLs while displaying two thumbnails. Switching to Videos issued another 50 requests with no video assets. Collections are also presented as 16 wrapping tabs without search. | Resolve visible assets on demand, filter before requesting, preserve URL state between views, and add collection search/grouping. |
+| P2 | **Refresh offers no useful progress or cancellation.** Source review: the complete cover/fact/gallery pipeline returns one report; the UI holds a single busy flag. | Run a tracked background job with game/provider progress, cancellation and scoped retry. |
+| P3 | **Controller and media-management polish remains.** Preview summaries lack the spatial-navigation marker; repeated edit/remove buttons lack asset-specific accessible names. Removed media rows leave cached files behind. Downloaded fanart has no user-facing hero-selection flow. | Add controller-reachable previews and descriptive labels; provide safe orphan-cache cleanup and a cover/hero picker. |
+
+At 390 px the reviewed metadata fixture had no horizontal overflow. The browser
+reported no JavaScript errors during these scenarios. Desktop screenshots verify
+the current layout; physical controller and native fullscreen behavior remain
+separate acceptance checks.
+
 
 `Refresh images and details`, automatic refresh after scans, and `Core::refresh_artwork` use
 `crates/core/src/romart.rs` and `romfacts.rs`. Covers fill gaps without replacing

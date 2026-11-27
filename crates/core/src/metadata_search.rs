@@ -160,7 +160,7 @@ impl Core {
                 .remove(edition_id)
                 .unwrap_or_default();
             crate::romfacts::fill(&mut info, &facts);
-            crate::romfacts::add_source(&mut info, &format!("thegamesdb:{id}"));
+            crate::romfacts::select_tgdb_id(&mut info, id);
             crate::romfacts::upsert(db, edition_id, &info)?;
             db.conn.execute(
                 "DELETE FROM metadata_search_reviews WHERE token=?1",
@@ -326,6 +326,37 @@ mod tests {
         assert!(info.source.contains("thegamesdb:843"));
         assert!(core.apply_game_facts("game", "review", 843).is_err());
     }
+    #[test]
+    fn replacing_a_reviewed_match_changes_the_reference_used_by_refresh() {
+        let temp = tempfile::tempdir().unwrap();
+        let core = Core::open_isolated(Some(temp.path().join("data")), false).unwrap();
+        let candidate = Candidate {
+            id: 8,
+            title: "Correct game".into(),
+            system: Some("ps1".into()),
+            facts: Some(crate::model::GameInfo {
+                year: Some(1999),
+                source: "thegamesdb:8".into(),
+                ..Default::default()
+            }),
+        };
+        core.with_db(|db| {
+            db.conn.execute("INSERT INTO editions(id,system,scan_title,imported_at) VALUES('game','ps1','My game','2026-01-01')",[])?;
+            crate::romfacts::upsert(db,"game",&crate::model::GameInfo{source:"libretro+thegamesdb:7".into(),..Default::default()})?;
+            db.conn.execute("INSERT INTO metadata_search_reviews VALUES('review','game',?1,?2)",params![serde_json::to_string(&vec![candidate])?,now()])?;
+            Ok(())
+        }).unwrap();
+        core.apply_game_facts("game", "review", 8).unwrap();
+        let facts = core.snapshot().unwrap().editions[0].info.clone().unwrap();
+        assert_eq!(crate::romfacts::tgdb_id(&facts), Some(8));
+        assert!(facts.source.contains("libretro"));
+        // Preserve historical contributors without letting the old reference win.
+        assert!(facts.source.contains("thegamesdb:7"));
+        let mut facts = facts;
+        crate::romfacts::select_tgdb_id(&mut facts, 7);
+        assert_eq!(crate::romfacts::tgdb_id(&facts), Some(7));
+    }
+
     #[test]
     fn provider_reviews_are_bounded_edition_bound_and_expire() {
         let input = serde_json::json!({"data":[{"id":1,"name":"God of War III"},{"id":0,"name":"Invalid"},{"id":2,"name":"Bad\nname"}]});

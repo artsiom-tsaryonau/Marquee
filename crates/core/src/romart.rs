@@ -622,6 +622,12 @@ fn store_artwork(
     temporary.write_all(bytes)?;
     temporary.as_file().sync_all()?;
     core.with_db(|db| {
+        if !overwrite
+            && source == "thegamesdb"
+            && !crate::romfacts::reference_is_current(db, edition)?
+        {
+            return Ok(false);
+        }
         let current: Option<String> = db
             .conn
             .query_row(

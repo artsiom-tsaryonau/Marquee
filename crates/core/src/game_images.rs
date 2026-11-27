@@ -106,7 +106,14 @@ fn save_gallery(
     {
         return Ok(false);
     }
-    core.with_db(|db| {
+    let reference = image
+        .url
+        .starts_with("https://cdn.thegamesdb.net/")
+        .then_some(edition);
+    let ready = core.with_db(|db| {
+        if reference.is_some() && !romfacts::reference_is_current(db, edition)? {
+            return Ok(false);
+        }
         if db.edition_by_id(&edition.id)?.is_none() {
             return Err(crate::AppError::new(
                 "GAME_MEDIA",
@@ -127,8 +134,11 @@ fn save_gallery(
             "INSERT OR IGNORE INTO game_media_links(collection_id,game_key) VALUES(?1,?2)",
             rusqlite::params![id, edition.id],
         )?;
-        Ok(())
+        Ok(true)
     })?;
+    if !ready {
+        return Ok(false);
+    }
     let before = core
         .media_collections(Some(&edition.id))?
         .iter()
@@ -159,12 +169,13 @@ fn save_gallery(
     } else {
         label.to_string()
     };
-    core.media_store(
+    core.media_store_checked(
         &id,
         &format!("{label}.{extension}"),
         &image.url,
         bytes,
         bytes.len() as u64,
+        reference,
     )?;
     let after = core
         .media_collections(Some(&edition.id))?
@@ -296,6 +307,68 @@ pub fn run(core: &Core, edition_id: Option<&str>, report: &mut ArtworkReport) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn stale_provider_downloads_cannot_reapply_a_replaced_match() {
+        let temp = tempfile::tempdir().unwrap();
+        let core = Core::open_isolated(Some(temp.path().join("library")), false).unwrap();
+        core.with_db(|db| {
+            db.conn.execute("INSERT INTO editions(id,system,scan_title,imported_at) VALUES('game','ps1','My game','2026-01-01')", [])?;
+            romfacts::upsert(db, "game", &crate::model::GameInfo {
+                source: "thegamesdb:7".into(), ..Default::default()
+            })
+        }).unwrap();
+        let previous = core.snapshot().unwrap().editions.remove(0);
+        core.with_db(|db| {
+            romfacts::upsert(
+                db,
+                "game",
+                &crate::model::GameInfo {
+                    source: "thegamesdb:7+thegamesdb:8".into(),
+                    ..Default::default()
+                },
+            )
+        })
+        .unwrap();
+        assert!(!core
+            .with_db(|db| romfacts::reference_is_current(db, &previous))
+            .unwrap());
+        let mut png = std::io::Cursor::new(vec![]);
+        image::DynamicImage::new_rgb8(8, 8)
+            .write_to(&mut png, image::ImageFormat::Png)
+            .unwrap();
+        let bytes = png.into_inner();
+        let remote = RemoteImage {
+            kind: "screenshot".into(),
+            url: "https://cdn.thegamesdb.net/images/original/screenshots/7.jpg".into(),
+        };
+        assert!(!save_gallery(&core, &previous, &remote, &bytes).unwrap());
+        assert!(core.media_collections(Some("game")).unwrap().is_empty());
+        fs::create_dir_all(&core.paths.cache_dir).unwrap();
+        assert!(!romart::store_missing(
+            &core,
+            &core.paths.cache_dir,
+            &previous,
+            &bytes,
+            "thegamesdb"
+        )
+        .unwrap());
+        assert!(core.snapshot().unwrap().editions[0].cover_path.is_none());
+        let collection = core.media_create("Gallery", Some("game")).unwrap();
+        assert!(core
+            .media_store_checked(
+                &collection,
+                "Stale.png",
+                &remote.url,
+                bytes.as_slice(),
+                bytes.len() as u64,
+                Some(&previous)
+            )
+            .is_err());
+        assert!(core.media_collections(Some("game")).unwrap()[0]
+            .assets
+            .is_empty());
+    }
+
     #[test]
     fn provider_gallery_is_idempotent_and_keeps_local_images_and_editions() {
         let temp = tempfile::tempdir().unwrap();

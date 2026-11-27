@@ -16,7 +16,7 @@ use crate::http;
 use crate::model::{Edition, GameInfo};
 use crate::romart::{self, CrcCache, Source};
 use crate::Core;
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
@@ -333,13 +333,51 @@ fn company_names(ids: &Value, names: &BTreeMap<u64, String>) -> Option<String> {
 }
 
 pub(crate) fn tgdb_id(info: &GameInfo) -> Option<u64> {
-    info.source.split('+').find_map(|source| {
+    info.source.rsplit('+').find_map(|source| {
         source
             .strip_prefix("thegamesdb:")?
             .parse::<u64>()
             .ok()
             .filter(|id| *id > 0)
     })
+}
+
+/// A reviewed selection is authoritative; earlier labels remain provenance.
+pub(crate) fn select_tgdb_id(info: &mut GameInfo, id: u64) {
+    let selected = format!("thegamesdb:{id}");
+    let mut sources: Vec<_> = info
+        .source
+        .split('+')
+        .filter(|source| !source.is_empty() && *source != selected)
+        .map(str::to_owned)
+        .collect();
+    sources.push(selected);
+    info.source = sources.join("+");
+}
+
+pub(crate) fn reference_is_current(db: &Db, edition: &Edition) -> Result<bool> {
+    let Some(current) = db.edition_by_id(&edition.id)? else {
+        return Ok(false);
+    };
+    if current.system != edition.system
+        || current.media_id != edition.media_id
+        || current.scan_title != edition.scan_title
+    {
+        return Ok(false);
+    }
+    let source: Option<String> = db
+        .conn
+        .query_row(
+            "SELECT source FROM edition_info WHERE edition_id=?1",
+            [&edition.id],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let current = GameInfo {
+        source: source.unwrap_or_default(),
+        ..Default::default()
+    };
+    Ok(tgdb_id(&current) == edition.info.as_ref().and_then(tgdb_id))
 }
 
 fn prefer_usa(games: &mut Vec<Value>, wanted: &str, usa: bool) {
@@ -603,6 +641,9 @@ pub fn run(core: &Core, edition_id: Option<&str>) -> usize {
         let updated = core
             .with_db(|db| {
                 if db.edition_by_id(&p.edition.id)?.is_none() {
+                    return Ok(false);
+                }
+                if !reference_is_current(db, p.edition)? {
                     return Ok(false);
                 }
                 let mut current = list(db)?.remove(&p.edition.id).unwrap_or_default();

@@ -366,8 +366,19 @@ impl Core {
         collection: &str,
         name: &str,
         source: &str,
+        reader: impl Read,
+        bytes: u64,
+    ) -> Result<()> {
+        self.media_store_checked(collection, name, source, reader, bytes, None)
+    }
+    pub(crate) fn media_store_checked(
+        &self,
+        collection: &str,
+        name: &str,
+        source: &str,
         mut reader: impl Read,
         bytes: u64,
+        reference: Option<&crate::model::Edition>,
     ) -> Result<()> {
         let (kind, mime, supported) =
             format(name).ok_or_else(|| err("Choose PNG, JPEG, MP4 or WebM media"))?;
@@ -458,7 +469,13 @@ impl Core {
         }
         let id = Uuid::new_v4().to_string();
         let spoiler = kind == "video";
-        self.with_db(|db| {db.conn.execute("INSERT OR IGNORE INTO game_media_assets(id,collection_id,title,kind,mime,media,bytes,source,spoiler) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)",params![id,collection,title(name),kind,if kind=="image"{"image/png"}else{mime},file,size,source,spoiler])?;Ok(())})
+        self.with_db(|db| {
+            if let Some(edition) = reference {
+                if !crate::romfacts::reference_is_current(db, edition)? {
+                    return Err(err("Metadata match changed while downloading this image; refresh again"));
+                }
+            }
+            db.conn.execute("INSERT OR IGNORE INTO game_media_assets(id,collection_id,title,kind,mime,media,bytes,source,spoiler) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)",params![id,collection,title(name),kind,if kind=="image"{"image/png"}else{mime},file,size,source,spoiler])?;Ok(())})
     }
     pub fn media_import(&self, id: &str, paths: Vec<PathBuf>) -> Result<()> {
         if paths.is_empty() || paths.len() > 20 {
