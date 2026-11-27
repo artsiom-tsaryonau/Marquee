@@ -111,7 +111,11 @@ pub fn launch(
         let runner =
             runners::resolve(&runners, &system, profile.as_deref(), selected.as_deref())?.clone();
         runners::require_launchable(&runner)?;
-        let fullscreen = db.get_setting("display_mode")?.as_deref() == Some("fullscreen");
+        // MARQUEE_DISPLAY_MODE overrides the saved mode for one launch (play checks).
+        let mode = std::env::var("MARQUEE_DISPLAY_MODE")
+            .ok()
+            .or(db.get_setting("display_mode")?);
+        let fullscreen = mode.as_deref() == Some("fullscreen");
         let argv = runners::launch_argv(&runner, &media.path, extra_args, fullscreen)?;
         let session_id = Uuid::new_v4().to_string();
         let started = now_rfc3339();
@@ -242,6 +246,7 @@ pub fn launch(
 }
 
 fn spawn(argv: &[String], xdg_config: Option<&Path>) -> std::io::Result<std::process::Child> {
+    let argv = with_launch_prefix(argv);
     let (bin, args) = argv
         .split_first()
         .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidInput, "empty argv"))?;
@@ -311,6 +316,16 @@ fn wait_and_finish(
             }
         }
     }
+}
+
+/// `MARQUEE_LAUNCH_PREFIX` (a JSON array of strings) runs the game inside another
+/// program, such as a headless gamescope for play checks with screenshots.
+pub(crate) fn with_launch_prefix(argv: &[String]) -> Vec<String> {
+    let prefix = std::env::var("MARQUEE_LAUNCH_PREFIX")
+        .ok()
+        .and_then(|raw| serde_json::from_str::<Vec<String>>(&raw).ok())
+        .unwrap_or_default();
+    prefix.into_iter().chain(argv.iter().cloned()).collect()
 }
 
 /// A normal exit sooner than this after launch is a failed start, not a played session.
@@ -722,5 +737,21 @@ mod stop_tests {
         let t = tempfile::tempdir().unwrap();
         let core = crate::Core::open_isolated(Some(t.path().join("data")), true).unwrap();
         assert_eq!(core.stop_game(false).unwrap_err().code, "NOT_RUNNING");
+    }
+}
+
+#[cfg(test)]
+mod prefix_tests {
+    #[test]
+    fn a_launch_prefix_wraps_the_game_command() {
+        let argv = vec!["emu".to_string(), "game.iso".to_string()];
+        // Env is process-wide; this is the only test that sets this variable.
+        std::env::set_var("MARQUEE_LAUNCH_PREFIX", r#"["gamescope","--backend","headless","--"]"#);
+        let wrapped = super::with_launch_prefix(&argv);
+        std::env::set_var("MARQUEE_LAUNCH_PREFIX", "not json");
+        let ignored = super::with_launch_prefix(&argv);
+        std::env::remove_var("MARQUEE_LAUNCH_PREFIX");
+        assert_eq!(wrapped, ["gamescope", "--backend", "headless", "--", "emu", "game.iso"]);
+        assert_eq!(ignored, argv);
     }
 }
