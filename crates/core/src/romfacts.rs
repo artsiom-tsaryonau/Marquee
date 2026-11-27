@@ -288,16 +288,18 @@ struct Companies {
     publishers: BTreeMap<u64, String>,
 }
 
-fn company_list(cache: &Path, key: &str, kind: &str) -> BTreeMap<u64, String> {
+pub(crate) fn provider_names(cache: &Path, key: &str, kind: &str) -> BTreeMap<u64, String> {
     let file = cache.join(format!("tgdb-{kind}.json"));
     let known = romart::load(&file);
     if romart::fresh(&file) {
         return known;
     }
-    let endpoint = if kind == "developers" {
-        "Developers"
-    } else {
-        "Publishers"
+    let endpoint = match kind {
+        "developers" => "Developers",
+        "publishers" => "Publishers",
+        "countries" => "Countries",
+        "regions" => "Regions",
+        _ => return known,
     };
     let Ok(json) = http::get_json(&format!("{TGDB}/{endpoint}?apikey={}", romart::encode(key)))
     else {
@@ -321,7 +323,7 @@ fn company_list(cache: &Path, key: &str, kind: &str) -> BTreeMap<u64, String> {
     names
 }
 
-fn company_names(ids: &Value, names: &BTreeMap<u64, String>) -> Option<String> {
+pub(crate) fn company_names(ids: &Value, names: &BTreeMap<u64, String>) -> Option<String> {
     let found: Vec<_> = ids
         .as_array()?
         .iter()
@@ -592,8 +594,8 @@ pub fn run(core: &Core, edition_id: Option<&str>) -> usize {
         if !todo.is_empty() {
             let genres = tgdb_genres(&cache, key);
             let companies = Companies {
-                developers: company_list(&cache, key, "developers"),
-                publishers: company_list(&cache, key, "publishers"),
+                developers: provider_names(&cache, key, "developers"),
+                publishers: provider_names(&cache, key, "publishers"),
             };
             let left = AtomicI64::new(i64::MAX);
             let stop = AtomicBool::new(false);

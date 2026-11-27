@@ -491,7 +491,10 @@ export interface AppListEntry { id:string; source:string; name:string; project:s
 export interface AppListReview { token:string; source:string; sha256:string; diagnostics:string[]; entries:AppListEntry[]; }
 export interface YoutubeSource { id:string; title:string; uploader:string; url:string; kind:'playlist'|'video'; duration:number|null; }
 export interface YoutubePlaylist { title:string; uploader:string; url:string; tracks:YoutubeSource[]; truncated:boolean; }
-export interface MetadataReview {token:string;provider:string;candidates:{id:number;title:string;system?:string;facts?:{year?:number;genre?:string;players?:number;description?:string}}[];}
+export type FactField = 'year'|'genre'|'developer'|'publisher'|'players'|'description';
+export interface MetadataCandidate {id:number;title:string;system?:string|null;facts?:Partial<GameInfo>|null;release_date?:string|null;country?:string|null;region?:string|null;country_id?:number|null;region_id?:number|null;}
+export interface MetadataReview {token:string;provider:string;candidates:MetadataCandidate[];current?:GameInfo|null;}
+export interface MetadataFactChange {id:string;}
 export interface LibraryApi {
   storageMoveStatus(): Promise<StorageMoveStatus>;
   storageMoveReview(parent: string): Promise<void>;
@@ -512,6 +515,9 @@ export interface LibraryApi {
   searchGameMetadata(editionId:string,query:string):Promise<MetadataReview>;
   searchGameFacts(editionId:string,query:string):Promise<MetadataReview>;
   applyGameFacts(editionId:string,token:string,id:number):Promise<void>;
+  applyGameFactFields(editionId:string,token:string,id:number,fields:FactField[]):Promise<MetadataFactChange>;
+  gameFactChange(editionId:string):Promise<MetadataFactChange|null>;
+  undoGameFactChange(editionId:string,changeId:string):Promise<void>;
   applyMetadataMatch(editionId:string,token:string,candidateId:number):Promise<void>;
 
   mediaCollections(gameKey?:string):Promise<MediaCollection[]>;

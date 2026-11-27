@@ -54,9 +54,10 @@ media identity, names, favourites and play history are not rewritten by enrichme
   Fact and cover retry caches use new versioned names for this expanded lookup.
 
 Provider identities are references for presentation, not verified ROM/release
-identity. Unknown fields remain empty. General manual fact editing, cover/hero
-choice with preview/undo, author/asset provenance for older cover rows and refresh
-progress/cancellation remain separate follow-ups.
+identity. Unknown fields remain empty. Reviewed provider fields can now explicitly
+correct existing values with persistent undo, as described below. Free-form fact
+editing, cover/hero choice with preview/undo, author/asset provenance for older
+cover rows and refresh progress/cancellation remain separate follow-ups.
 
 Primary references: [TheGamesDB API](https://api.thegamesdb.net/),
 [libretro thumbnail repository](https://github.com/libretro-thumbnails/libretro-thumbnails),
@@ -84,7 +85,7 @@ Follow-up status after the gallery reliability and curation fixes:
 | Fixed | **Image spoiler flags have no effect.** The original fixture rendered a flagged image without any label. | Images now show advisory labels in thumbnails and the viewer, matching the owner's recorded preference for immediate opening. |
 | Fixed | **Refresh does not remember curation.** Removed provider assets and unlinked collections previously returned. | Hidden asset records and dismissed links survive reopen and refresh. In-flight inserts recheck these choices; explicit restore preserves captions/flags, and explicit relinking clears the dismissal. |
 | P2 | **Artwork replacement has no asset preview or undo.** The candidate chooser shows a title/provider ID, then the backend downloads the first compatible grid and replaces the cover. | Show available assets, dimensions and provenance; preview beside the current cover and keep a reversible previous selection. |
-| P2 | **Regional matches are difficult to review and populated mistakes cannot be corrected.** A read-only two-release fixture rendered identical titles/platforms/years apart from opaque IDs. Country and full release date are discarded, and Apply only fills empty fields. | Carry region/date/edition information into the review; show field differences and allow explicit per-field correction with undo. |
+| Fixed | **Regional matches are difficult to review and populated mistakes cannot be corrected.** The original fixture rendered identical titles/platforms/years apart from opaque IDs. | Candidates now retain country, provider region and full release date. Review compares current/provider fields; only missing fields default to selected. Explicit selection corrects existing fields, with persistent undo and stale-review checks. |
 | Partial | **Gallery work scales with all assets, even in Videos.** The original fixture requested 50 image URLs in global Images and another 50 in empty Videos. | URL requests now follow only the selected collection and media type, with per-view caching across collection changes. Search/grouping of the 16 collection tabs remains open. |
 | P2 | **Refresh offers no useful progress or cancellation.** The complete cover/fact/gallery pipeline returns one report; the UI holds a single busy flag. | Run a tracked background job with game/provider progress, cancellation and scoped retry. |
 | Partial | **Controller and media-management polish remains.** | Preview summaries now participate in spatial navigation, and edit/remove buttons name their assets. Safe orphan-cache cleanup and a cover/hero picker remain open. |
@@ -98,6 +99,41 @@ The gallery and metadata fixtures had no horizontal overflow at 390 px, and the
 browser reported no JavaScript errors. Full repository checks passed, including
 persisted curation and independent media-resolution regressions. Physical
 controller and native fullscreen behavior remain separate acceptance checks.
+
+### Reviewed release corrections and undo (2026-11-27)
+
+**Game → Metadata → Search → Review details** now shows the provider's full
+release date, country and region, alongside the platform and title/edition.
+Country and region names come from cached provider dictionaries, not inferred
+from a title or ROM filename. Missing names remain unknown or retain a provider
+ID; region labels such as NTSC/PAL are shown exactly as supplied. The selected
+release remains visible above the field comparison.
+
+The review compares year, genre, developer, publisher, players and description.
+Missing fields are checked by default; populated differences require explicit
+selection. Unknown provider values cannot clear a local field. Saving with no
+fields checked changes only the release reference used by future refreshes.
+Names, files, platform, covers, favourites and play history are not part of this
+operation. Automatic enrichment continues to fill gaps without replacing values.
+The legacy fill-missing API retains that behavior.
+
+The server binds the comparison to the current metadata and game identity and
+rejects a save if either changed during review. Only values from the saved,
+edition-scoped, 30-minute provider review can be selected. **Undo last details
+change** survives page reload and application restart, restores the prior fields
+and reference, and refuses to replace later metadata changes. Up to ten recent
+changes per game are retained; undoing the latest can expose the preceding one.
+This is provider correction, not a free-form metadata editor or artwork undo.
+
+Acceptance used a disposable library with a deliberately incorrect Moon year
+and a local developer value. Real provider search distinguished general, UK, US,
+Japanese and French records. Selecting only year changed 2015 to 2016 and kept
+the local developer; undo after page reload restored 2015. The real library was
+not edited. Desktop and 390-pixel comparisons rendered without horizontal overflow
+or script errors. Regressions cover preservation of unchecked fields, country/
+date/company parsing, persisted undo, missing-row restoration, stale metadata,
+changed game identity, wrong-game reviews and unsupported field selection. Full
+repository checks and the final frontend checks/tests/build passed.
 
 
 `Refresh images and details`, automatic refresh after scans, and `Core::refresh_artwork` use

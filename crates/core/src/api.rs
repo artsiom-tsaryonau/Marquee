@@ -126,6 +126,19 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
                 .and_then(Value::as_u64)
                 .ok_or_else(|| AppError::new("BAD_REQUEST", "Missing candidate ID"))?,
         )?),
+        "apply_game_fact_fields" => out(core.apply_game_fact_fields(
+            &text(&args, "edition_id")?,
+            &text(&args, "token")?,
+            args.get("candidate_id")
+                .and_then(Value::as_u64)
+                .ok_or_else(|| AppError::new("BAD_REQUEST", "Missing candidate ID"))?,
+            serde_json::from_value(args.get("fields").cloned().unwrap_or(Value::Null))?,
+        )?),
+        "game_fact_change" => out(core.game_fact_change(&text(&args, "edition_id")?)?),
+        "undo_game_fact_change" => {
+            out(core
+                .undo_game_fact_change(&text(&args, "edition_id")?, &text(&args, "change_id")?)?)
+        }
         "search_game_metadata" => {
             out(core.search_game_metadata(&text(&args, "edition_id")?, &text(&args, "query")?)?)
         }
