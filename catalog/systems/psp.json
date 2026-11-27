@@ -1,0 +1,17 @@
+{
+  "id": "psp",
+  "display_name": "PSP",
+  "supported_extensions": [
+    "iso",
+    "cso",
+    "chd",
+    "pbp"
+  ],
+  "skipped_extensions": [
+    "pkg",
+    "rif"
+  ],
+  "runner_kind": "emulator",
+  "emulator": "ppsspp",
+  "notes": "UMD images (.iso, .cso, .chd) and .pbp files. PSN .pkg packages are converted to ISO before import."
+}

@@ -4,10 +4,39 @@
   "systems": [
     "psp"
   ],
-  "github": "hrydgard/ppsspp",
-  "asset_suffix": "anylinux-x86_64.appimage",
-  "asset_excludes": [],
   "binary": "AppRun",
   "config_subdir": "ppsspp",
-  "requirement": "No BIOS. Game files via library jobs when available; folder scan fallback"
+  "requirement": "PSP emulator. Library Play runs .iso/.cso/.chd disc images and .pbp files; no BIOS. A PSN .pkg is converted to an ISO first (pkg2zip). Saves and settings stay in Marquee's PPSSPP folder.",
+  "download": {
+    "url": "https://github.com/hrydgard/ppsspp/releases/download/v1.20.4/PPSSPP-v1.20.4-anylinux-x86_64.AppImage",
+    "sha256": "661c098e6b7f7610171a57b7c533ce8bba6f2312b71e76d61e850461973eba21",
+    "version": "1.20.4"
+  },
+  "kind": "emulator",
+  "launch": [
+    "{rom}"
+  ],
+  "fullscreen_args": [
+    "--fullscreen"
+  ],
+  "settings": [
+    {
+      "path": "ppsspp/PSP/SYSTEM/ppsspp.ini",
+      "section": "General",
+      "key": "CheckForNewVersion",
+      "value": "False"
+    },
+    {
+      "path": "ppsspp/PSP/SYSTEM/ppsspp.ini",
+      "section": "General",
+      "key": "DiscordRichPresence",
+      "value": "False"
+    },
+    {
+      "path": "ppsspp/PSP/SYSTEM/ppsspp.ini",
+      "section": "General",
+      "key": "FirstRun",
+      "value": "False"
+    }
+  ]
 }

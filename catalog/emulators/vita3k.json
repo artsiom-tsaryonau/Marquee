@@ -1,0 +1,31 @@
+{
+  "id": "vita3k",
+  "name": "Vita3K",
+  "systems": [
+    "vita"
+  ],
+  "github": "Vita3K/Vita3K",
+  "asset_suffix": "x86_64.appimage",
+  "asset_excludes": [
+    "aarch64"
+  ],
+  "binary": "AppRun",
+  "config_subdir": "vita3k",
+  "requirement": "PS Vita emulator (rolling CI build, recorded by file hash). Needs the official firmware (PSVUPDAT.PUP) and font package (PSP2UPDAT.PUP), installed with --firmware. PSN .pkg games install with their zRIF licence. Library Play is not wired yet.",
+  "firmware": [
+    {
+      "name": "PSVUPDAT.PUP",
+      "required": true,
+      "root": "config",
+      "dir": "vita3k/firmware",
+      "note": "PS Vita system software from Sony. Stored here, then installed into Vita3K with --firmware."
+    },
+    {
+      "name": "PSP2UPDAT.PUP",
+      "required": false,
+      "root": "config",
+      "dir": "vita3k/firmware",
+      "note": "PS Vita font package from Sony; Vita3K uses it for system fonts."
+    }
+  ]
+}
