@@ -97,3 +97,7 @@ exdata/
 *.[dD][kK][eE][yY]
 *.[iI][rR][dD]
 *.[eE][dD][aA][tT]
+
+# Console keys the owner drops here (Wii U keys.txt, prod.keys, title.keys)
+keys.txt
+*.keys
