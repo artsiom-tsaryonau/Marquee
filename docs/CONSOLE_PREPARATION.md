@@ -235,6 +235,16 @@ notes; PS5-2 Library Play is not realistic on that title yet.
 
 Primary tool: [ShadPKG v2.1.0](https://github.com/seregonwar/ShadPKG/releases/tag/v2.1.0).
 
+**DriveClub (2026-11-27).** The owner's CUSA00093 RARs each hold one stored PKG,
+unpacked with `marquee_media::archive` (Fedora's 7-Zip has no RAR codec). The
+inspector reads base 01.00 (`gd`) and update 01.28 (`gp`, delta/cumulative patch).
+ShadPKG in the same bubblewrap sandbox extracted the base (85 files, 16 GB,
+`game000.dat` present) but segfaults on the update after writing only `sce_sys`,
+with a disk-backed `/tmp` and an unlimited stack too: its known heap corruption on
+updates ([issue 3](https://github.com/seregonwar/ShadPKG/issues/3)). Candidates:
+LibOrbisPkg `PkgTool pkg_extract` (LGPL-3.0, .NET) or a Rust extractor in Marquee
+(PS4-2). Staging: `~/Games/Marquee/.staging/driveclub/`.
+
 ### shadPS4 launch contract (PS4-1, 2026-11-26)
 
 The managed Linux SDL build keeps Tools/open on `-b`/`--big-picture`. Library Play

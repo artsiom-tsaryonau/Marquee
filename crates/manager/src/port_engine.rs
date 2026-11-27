@@ -25,6 +25,7 @@ const CATALOGUE: &[&str] = &[
     include_str!("../../../catalog/ports/sm64coopdx.json"),
     include_str!("../../../catalog/ports/fallout2-ce.json"),
     include_str!("../../../catalog/ports/uzdoom.json"),
+    include_str!("../../../catalog/ports/driveclub-recomp.json"),
 ];
 
 const MAX_EXTRACTED_BYTES: u64 = 2 * 1024 * 1024 * 1024;
@@ -1301,6 +1302,16 @@ fn configure_launch(command: &mut Command, dir: &Path, def: &PortDef) {
     if def.id == "sm64coopdx" {
         command.arg("--savepath").arg(dir);
     }
+    // DriveClub Recomp: `--play` skips its own launcher window. Naming the data and
+    // game folders keeps it off ~/.local/share/driveclub-recomp and any saved choice.
+    if def.id == "driveclub-recomp" {
+        command
+            .arg("--play")
+            .env("DRIVECLUB_DATA_DIR", dir.join("data"))
+            .env("DRIVECLUB_UPDATE_DIR", dir.join("update"))
+            .env("DRIVECLUB_BASE_DIR", dir.join("base"))
+            .env("APPIMAGE_EXTRACT_AND_RUN", "1");
+    }
 }
 
 /// Open the port folder in the file manager so the user can drop in their own files.
@@ -1381,6 +1392,54 @@ mod tests {
         assert_eq!(args, ["--savepath", dir.to_str().unwrap()]);
     }
 
+    #[test]
+    fn driveclub_plays_directly_with_its_data_and_game_folders_in_its_library() {
+        let mut command = Command::new("engine");
+        let dir = Path::new("/isolated/library/ports/driveclub-recomp");
+        configure_launch(&mut command, dir, &find("driveclub-recomp").unwrap());
+        let args: Vec<_> = command
+            .get_args()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(args, ["--play"]);
+        let env: std::collections::HashMap<_, _> = command
+            .get_envs()
+            .filter_map(|(k, v)| {
+                Some((
+                    k.to_string_lossy().into_owned(),
+                    v?.to_string_lossy().into_owned(),
+                ))
+            })
+            .collect();
+        assert_eq!(
+            env["DRIVECLUB_DATA_DIR"],
+            dir.join("data").to_str().unwrap()
+        );
+        assert_eq!(
+            env["DRIVECLUB_UPDATE_DIR"],
+            dir.join("update").to_str().unwrap()
+        );
+        assert_eq!(
+            env["DRIVECLUB_BASE_DIR"],
+            dir.join("base").to_str().unwrap()
+        );
+    }
+
+    #[test]
+    fn driveclub_is_ready_only_with_both_extracted_folders() {
+        let t = tempfile::tempdir().unwrap();
+        let def = find("driveclub-recomp").unwrap();
+        let dir = t.path();
+        assert_eq!(game_data_status(dir, &def), "needs-data");
+        fs::create_dir_all(dir.join("update/sce_sys")).unwrap();
+        fs::write(dir.join("update/eboot.bin"), b"x").unwrap();
+        fs::write(dir.join("update/sce_sys/param.sfo"), b"x").unwrap();
+        assert_eq!(game_data_status(dir, &def), "needs-data");
+        fs::create_dir_all(dir.join("base")).unwrap();
+        fs::write(dir.join("base/game000.dat"), b"x").unwrap();
+        assert_eq!(game_data_status(dir, &def), "ready");
+    }
+
     fn release() -> serde_json::Value {
         json!({
             "tag_name": "v1.2.2",
@@ -1400,11 +1459,11 @@ mod tests {
     #[test]
     fn catalogue_parses_and_ids_are_unique() {
         let all = catalogue().unwrap();
-        assert_eq!(all.len(), 6);
+        assert_eq!(all.len(), 7);
         let mut ids: Vec<_> = all.iter().map(|p| p.id.clone()).collect();
         ids.sort();
         ids.dedup();
-        assert_eq!(ids.len(), 6);
+        assert_eq!(ids.len(), 7);
     }
 
     #[test]

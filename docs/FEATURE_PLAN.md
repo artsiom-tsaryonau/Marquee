@@ -105,6 +105,7 @@ If UL1 lands before ST3c, swap the numbers here in the same change set.
 | PS4-1 | shadPS4 launch contract and runner | Consoles | S | — | Done 2026-11-26. Live title boot unperformed |
 | PS4-2 | PS4 base-game preparation recipe | Consoles | L | PS4-1 | Open. Blocked on a playable owner title: Shadow of the Colossus is Menus-only in shadPS4 (#502, v0.21.0); both PS4 inputs were removed 2026-11-26 |
 | PS4-3 | PS4 system descriptor and Library Play | Consoles | M | PS4-2 | Open |
+| DC1 | DriveClub Recomp as a native port (PS4 recomp, AppImage v0.4.2) | Ports | M | — | Catalogue entry and launch contract done 2026-11-27 (`--play`, data/update/base inside the port folder). Owner's CUSA00093 base extracted; the 1.28 update is not: ShadPKG v2.1.0 segfaults on it (its known update bug). Needs a working PKG extractor, then a live boot |
 | PS5-1 | KytyPS5 pin and launch contract | Consoles | S | — | Done 2026-11-26. Live --help and save-path check unperformed |
 | PS5-2 | PS5 preparation and Library Play | Consoles | L | PS5-1 | Open |
 | X360-1 | Xbox 360 save/relaunch acceptance support | Consoles | S | — | Done in code. 2026-11-26: Forza 2, Forza 4 and Dreamcast Collection prepared; profile "Player" signs in at boot; Forza 2 wrote a save under it. Relaunch-and-load unperformed; Forza 2 froze once at its menu |

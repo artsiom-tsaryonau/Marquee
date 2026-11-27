@@ -25,7 +25,7 @@ export const platformLabel: Record<Platform, string> = {
   atari2600: 'Atari 2600', atari5200: 'Atari 5200', sms: 'Master System', atari7800: 'Atari 7800',
   tg16: 'TurboGrafx-16', tgcd: 'TurboGrafx-CD', cdi: 'CD-i', segacd: 'Sega CD', jaguar: 'Jaguar',
   '32x': 'Sega 32X', saturn: 'Saturn', jaguarcd: 'Jaguar CD', dreamcast: 'Dreamcast', xbox: 'Xbox',
-  xbox360: 'Xbox 360', 'xbox360-digital': 'Xbox 360 Digital', ps3: 'PlayStation 3', wii: 'Wii', wiiware: 'WiiWare',
+  xbox360: 'Xbox 360', 'xbox360-digital': 'Xbox 360 Digital', ps3: 'PlayStation 3', ps4: 'PlayStation 4', wii: 'Wii', wiiware: 'WiiWare',
   wiiu: 'Wii U', gb: 'Game Boy', lynx: 'Lynx', gamegear: 'Game Gear', virtualboy: 'Virtual Boy', gbc: 'Game Boy Color',
   neogeo: 'Neo Geo', ds: 'Nintendo DS', psp: 'PSP', '3ds': 'Nintendo 3DS',
 };

@@ -1,0 +1,27 @@
+{
+  "id": "driveclub-recomp",
+  "name": "DriveClub Recomp",
+  "game": "DriveClub",
+  "family": "PS4 recomps",
+  "platform": "ps4",
+  "github": "OverkillLabs3/driveclub-recomp",
+  "asset_suffix": "-x86_64.AppImage",
+  "asset_excludes": ["win64"],
+  "binary": null,
+  "requirement": "Requires your own DriveClub CUSA00093 (or CUSA00003) dump in this folder: the extracted 1.28 update in update/ (eboot.bin, sce_sys/param.sfo) and the extracted base game in base/ (game000.dat). Play starts the game directly; settings, the prepared game image, saves and logs stay in data/ here.",
+  "data": {
+    "kind": "data",
+    "source": "https://github.com/OverkillLabs3/driveclub-recomp/blob/v0.4.2/README.md#how-to-play",
+    "files": [
+      { "path": "update/eboot.bin" },
+      { "path": "update/sce_sys/param.sfo" },
+      { "path": "base/game000.dat" }
+    ]
+  },
+  "pinned_release": {
+    "tag": "v0.4.2",
+    "asset": "driveclub-recomp-0.4.2-x86_64.AppImage",
+    "sha256": "46ec6810cf5da1300afb0c15ccc0387668691e49353a9d5fc4848f879d8fa704",
+    "binary_sha256": "46ec6810cf5da1300afb0c15ccc0387668691e49353a9d5fc4848f879d8fa704"
+  }
+}

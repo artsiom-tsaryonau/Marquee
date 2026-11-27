@@ -341,7 +341,8 @@ are tracked in the [feature plan](FEATURE_PLAN.md#tracker).
    option, default profile), then Ymir and Shipwright. Settings-only emulators are
    not forked.
 3. **Owned games waiting for an emulator.** PSP (Persona 3 Portable, PSN package),
-   GameCube (Metroid Prime, Dolphin) and Switch (Nightshade, Eden). Wii U, Vita and
+   GameCube (Metroid Prime, Dolphin), Switch (Nightshade, Eden) and DriveClub through
+   its native recomp (DC1; waiting on the 1.28 update extraction). Wii U, Vita and
    original Xbox wait for owner-supplied keys or firmware.
 4. **Done 2026-11-26.** Shipwright save/restore, Genesis streaming, Saturn (Ymir) and
    3DS (Azahar) Library Play, Xbox 360 profile and saves, no-menu fullscreen play.

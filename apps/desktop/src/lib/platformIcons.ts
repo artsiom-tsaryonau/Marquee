@@ -19,6 +19,7 @@ const styles: Partial<Record<Platform, PlatformIconStyle>> = {
   ps1: { hardware: 'ps1', shell: '#c5cddb', accent: '#7fcaad' },
   ps2: { hardware: 'ps2', shell: '#435580', accent: '#79c9ff' },
   ps3: { hardware: 'ps3', shell: '#444b60', accent: '#a7bbdb' },
+  ps4: { hardware: 'ps3', shell: '#2f3a52', accent: '#7fa8e8' },
   dreamcast: { hardware: 'dreamcast', shell: '#e4e6dd', accent: '#ec9d68' },
   gamecube: { hardware: 'cube', shell: '#8e7dc9', accent: '#c9baf1' },
   wii: { hardware: 'tower', shell: '#e1e8ee', accent: '#83d3ec' },
