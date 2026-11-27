@@ -340,6 +340,7 @@ impl Core {
 
         let staging = dest_dir.join(format!(".marquee-intake-{}", Uuid::new_v4()));
         fs::create_dir_all(&staging)?;
+        let mut original_xbox = false;
         let result = (|| -> Result<()> {
             let todo: Vec<(Entry, PathBuf)> = pending.iter().map(|p| (*p).clone()).collect();
             extract(archive, kind, &todo, &staging)?;
@@ -354,9 +355,22 @@ impl Core {
                 }
             }
             for (_, rel) in &todo {
-                if ext_of(rel) == "iso"
-                    && marquee_media::xbox360::has_partition(&staging.join(rel))?
-                {
+                if ext_of(rel) != "iso" {
+                    continue;
+                }
+                let path = staging.join(rel);
+                // An original Xbox disc (default.xbe) is filed under Xbox; a redump
+                // image is trimmed to the XISO game partition xemu boots.
+                if let Some(offset) = marquee_media::xbox::game_partition(&path)? {
+                    if offset > 0 {
+                        let trimmed = path.with_extension("xiso.part");
+                        marquee_media::xbox::write_xiso(&path, offset, &trimmed)?;
+                        fs::rename(&trimmed, &path)?;
+                    }
+                    original_xbox = true;
+                    continue;
+                }
+                if marquee_media::xbox360::has_partition(&path)? {
                     return Err(AppError::new("INTAKE_PLATFORM", "Xbox-family ISO detected. Use Downloads and archives with an explicit Xbox 360 review. Source retained."));
                 }
             }
@@ -381,7 +395,11 @@ impl Core {
         let _ = fs::remove_dir_all(&staging);
         result?;
 
-        let (system, dest_dir) = if system == "ps1" && is_saturn(&dest_dir, &wanted) {
+        let (system, dest_dir) = if original_xbox {
+            let xbox = self.intake_root("xbox")?;
+            move_published(&dest_dir, &xbox, &wanted)?;
+            ("xbox".to_string(), xbox)
+        } else if system == "ps1" && is_saturn(&dest_dir, &wanted) {
             let saturn = self.intake_root("saturn")?;
             move_published(&dest_dir, &saturn, &wanted)?;
             ("saturn".to_string(), saturn)
@@ -604,6 +622,28 @@ mod tests {
             crate::cue::manifest(&imported).unwrap().tracks[1].file,
             "Moto   (Track 2) (site).bin"
         );
+    }
+
+    #[test]
+    fn an_original_xbox_disc_is_filed_under_xbox() {
+        let tmp = tempfile::tempdir().unwrap();
+        let c = core(&tmp.path().join("data"));
+        // XDVDFS descriptor at sector 32 and a root holding default.xbe at 33.
+        let mut iso = vec![0u8; 34 * 2048];
+        let at = 32 * 2048;
+        iso[at..at + 20].copy_from_slice(b"MICROSOFT*XBOX*MEDIA");
+        iso[at + 20..at + 24].copy_from_slice(&33u32.to_le_bytes());
+        iso[at + 24..at + 28].copy_from_slice(&2048u32.to_le_bytes());
+        iso[33 * 2048 + 13] = 11;
+        iso[33 * 2048 + 14..33 * 2048 + 25].copy_from_slice(b"default.xbe");
+        let archive = tmp.path().join("Halo.zip");
+        make_zip(&archive, &[("Halo.iso", &iso)]);
+        let report = c.intake_archive(&archive, false).unwrap();
+        assert_eq!(report.outcome, Outcome::Imported);
+        assert_eq!(report.system.as_deref(), Some("xbox"));
+        let dest = report.dest.unwrap();
+        assert!(dest.ends_with("xbox"));
+        assert!(dest.join("Halo.iso").is_file());
     }
 
     #[test]

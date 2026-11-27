@@ -9,6 +9,7 @@ mod rar;
 pub mod saturn;
 pub mod time;
 pub mod wiiu;
+pub mod xbox;
 
 pub mod http;
 
