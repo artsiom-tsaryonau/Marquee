@@ -179,6 +179,7 @@ export function commands(call: Call): Omit<LibraryApi, 'kind' | 'pickRoot' | 'su
     setupPort: (portId, path) => call<PortInfo[]>('start_port_setup', { port_id: portId, path }),
     cancelPortInstall: (portId) => call<PortInfo[]>('cancel_port_install', { port_id: portId }),
     launchPort: (portId) => call<void>('launch_port', { port_id: portId }),
+    stopGame: (force) => call<void>('stop_game', { force }),
     portSessions: (portId) => call<GameHistory>('port_sessions', { port_id: portId }),
     openPortFolder: (portId) => call<void>('open_port_folder', { port_id: portId }),
     listEmulators: () => call<EmulatorInfo[]>('list_emulators'),

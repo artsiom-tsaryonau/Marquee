@@ -745,6 +745,35 @@ impl Core {
         port_sessions::launch(self, id)
     }
 
+    /// STOP1: close the running local game or port (SIGTERM, then SIGKILL after
+    /// a grace period; `force` kills at once). Streamed games end via Streaming.
+    pub fn stop_game(&self, force: bool) -> Result<()> {
+        let identity = self.with_db(|db| {
+            let local = db
+                .list_sessions()?
+                .into_iter()
+                .find(|row| row.state == "running");
+            if let Some(row) = local {
+                if row.mode == "stream" {
+                    return Err(AppError::new(
+                        "STREAMED_GAME",
+                        "End the streamed game from the Streaming screen",
+                    ));
+                }
+                return Ok(db
+                    .session_process(&row.id)?
+                    .and_then(|raw| serde_json::from_str::<sessions::ProcessIdentity>(&raw).ok()));
+            }
+            port_sessions::running_process(&db.conn)
+        })?;
+        let identity =
+            identity.ok_or_else(|| AppError::new("NOT_RUNNING", "No game is running"))?;
+        if !sessions::stop_process(identity, force, sessions::STOP_GRACE) {
+            return Err(AppError::new("NOT_RUNNING", "The game has already closed"));
+        }
+        Ok(())
+    }
+
     pub fn port_history(&self, port_id: &str) -> Result<history::GameHistory> {
         port_sessions::history_for(self, port_id)
     }

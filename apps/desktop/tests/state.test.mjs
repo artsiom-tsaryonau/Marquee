@@ -707,3 +707,18 @@ test('device link failures persist and concurrent submissions queue only once', 
     assert.equal(app.transferLinkBusy, false);
   } finally { app.api = api; app.runnerSettings = settings; app.transferLinkError = ''; app.transferLinkBusy = false; }
 });
+test('Stop survives a dismissed overlay, a second Stop forces it, and the end clears it', async () => {
+  const api = app.api; const calls = [];
+  try {
+    app.api = { ...api, stopGame: async (force) => { calls.push(force); }, snapshot: async () => discSnapshot() };
+    app.onEvent({ type: 'session_started', session: { id: 's', edition_id: 'disc-a', state: 'running' } });
+    assert.equal(app.playingId, 'disc-a');
+    app.dismissOverlay();
+    assert.equal(app.running, null); assert.equal(app.playingId, 'disc-a');
+    await app.stopGame(); await app.stopGame();
+    assert.deepEqual(calls, [false, true]);
+    app.onEvent({ type: 'session_ended', session: { id: 's', edition_id: 'disc-a', state: 'ended', duration_seconds: 5 } });
+    assert.equal(app.playingId, null); assert.equal(app.stopping, false);
+    await new Promise((resolve) => setImmediate(resolve));
+  } finally { app.api = api; app.playingId = null; app.stopping = false; }
+});

@@ -1275,6 +1275,8 @@ pub fn launch(
     let cwd = bin.parent().unwrap_or(&dir).to_path_buf();
     let mut command = Command::new(&bin);
     configure_launch(&mut command, &dir, def);
+    // Its own process group, so Marquee's Stop reaches everything the port starts.
+    std::os::unix::process::CommandExt::process_group(&mut command, 0);
     command
         .current_dir(cwd)
         .stdin(Stdio::null())

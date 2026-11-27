@@ -150,6 +150,8 @@
       {:else if offline && g.setupState === 'runner_missing'}
         {#if g.platform === 'ps2'}<InstallMenu tone="primary" />
         {:else}<button class="btn primary" data-nav onclick={() => app.go('tools')}><Icon name="settings" /> Set up {g.platform === 'ps1' ? 'DuckStation' : g.platform === 'genesis' ? 'BlastEm' : g.platform === 'ds' ? 'melonDS' : g.platform === 'neogeo' ? 'FinalBurn Neo' : 'emulator'}</button>{/if}
+      {:else if app.playingId === g.id}
+        <button class="btn primary" data-nav onclick={() => app.stopGame()}><Icon name="x" size={22} /> {app.stopping ? 'Force stop now' : 'Stop game'}</button>
       {:else}
         <button class="btn primary" class:game-play={playLabel === 'Play' || playLabel === 'Open port'} data-nav disabled={app.runnerSelectionBusy || app.runnerSelectionUnconfirmed || headlessActive} onclick={primary}>
           <Icon name={playReady ? 'play' : 'folder'} size={22} /> {playLabel}

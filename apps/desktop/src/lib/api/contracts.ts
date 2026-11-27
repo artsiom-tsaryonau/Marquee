@@ -650,6 +650,8 @@ export interface LibraryApi {
   setupPort(portId: string, path: string): Promise<PortInfo[]>;
   cancelPortInstall(portId: string): Promise<PortInfo[]>;
   launchPort(portId: string): Promise<void>;
+  /** Close the running local game or port; `force` kills it at once. */
+  stopGame(force: boolean): Promise<void>;
   portSessions(portId: string): Promise<GameHistory>;
   openPortFolder(portId: string): Promise<void>;
   listEmulators(): Promise<EmulatorInfo[]>;

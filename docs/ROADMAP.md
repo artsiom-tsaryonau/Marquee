@@ -334,7 +334,8 @@ menus, profiles and first-run prompts handled by Marquee, and personal patches t
 emulators where settings cannot do it (nothing is distributed). The item IDs below
 are tracked in the [feature plan](FEATURE_PLAN.md#tracker).
 
-1. **Stop game (STOP1).** A frozen fullscreen game must have a way out from Marquee.
+1. **Stop game (STOP1). Done in code 2026-11-27.** Stop game on the Playing overlay and
+   game page closes the game, then kills it after 8 s; a live frozen-game stop is pending.
 2. **Emulator patch series (PATCH1–3).** Pinned upstream plus small patches built by
    the existing source-build recipes: Xenia first (force-quit on close, hide-menu
    option, default profile), then Ymir and Shipwright. Settings-only emulators are

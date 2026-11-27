@@ -476,6 +476,9 @@ pub fn dispatch(core: &Arc<Core>, cmd: &str, args: Value) -> Result<Value> {
         "cancel_port_install" => out(core.cancel_port_install(&text(&args, "port_id")?)?),
         "install_port" => out(core.install_port(&text(&args, "port_id")?, sink)?),
         "launch_port" => out(core.launch_port(&text(&args, "port_id")?)?),
+        "stop_game" => {
+            out(core.stop_game(args.get("force").and_then(Value::as_bool).unwrap_or(false))?)
+        }
         "port_sessions" => out(core.port_history(&text(&args, "port_id")?)?),
         "open_port_folder" => out(core.open_port_folder(&text(&args, "port_id")?)?),
         other => Err(AppError::new(

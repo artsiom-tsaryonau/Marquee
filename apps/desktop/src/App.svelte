@@ -202,7 +202,10 @@
       {:else}
         <p class="running"><span class="live"></span> Playing now</p>
         {#if g.platform === 'ps3'}<p>To exit RPCS3, close the game window with Alt+F4 and confirm “Exit Game?”.</p>{/if}
-        <button class="btn glass" data-nav onclick={() => (app.dismissOverlay())}>Return to Marquee <kbd>Esc</kbd></button>
+        <div class="launch-actions">
+          <button class="btn glass" data-nav onclick={() => (app.dismissOverlay())}>Return to Marquee <kbd>Esc</kbd></button>
+          <button class="btn glass" data-nav onclick={() => app.stopGame()}>{app.stopping ? 'Force stop now' : 'Stop game'}</button>
+        </div>
       {/if}
     </div>
   </div>
@@ -516,6 +519,12 @@
     to {
       transform: translateX(250%);
     }
+  }
+  .launch-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
   }
   .running {
     display: inline-flex;

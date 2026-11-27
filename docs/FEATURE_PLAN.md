@@ -135,7 +135,7 @@ If UL1 lands before ST3c, swap the numbers here in the same change set.
 | SAT2 | Mednafen as a second Saturn runner (pinned source build) | Emulators | M | SAT1 | Open |
 | N3DS1 | Nintendo 3DS via Azahar, encrypted-dump warning | Emulators | S | — | Done 2026-11-26. Pokémon Moon boots, takes input, exits; Driver: Renegade imported |
 | UX1 | Fullscreen default and per-emulator enforced settings (no menus while playing) | Emulators | S | — | Done 2026-11-26. Xenia, Azahar, Ymir verified chrome-free |
-| STOP1 | Stop game for local Play (close, then force after a timeout) | Emulators | S | — | Open. Next: a frozen fullscreen game currently has no way out |
+| STOP1 | Stop game for local Play (close, then force after a timeout) | Emulators | S | — | Done in code 2026-11-27. Stop game on the Playing overlay and game page (SIGTERM to the game's process group, SIGKILL after 8 s; a second Stop forces it); stopped sessions end with playtime credited. Live stop of a frozen emulator unperformed |
 | PATCH1 | Xenia patch series: force-quit on window close, hide-menu option, default profile | Emulators | M | STOP1 | Open |
 | PATCH2 | Ymir patch series: hide-menu option, automatic BIOS language and clock | Emulators | S | SAT1 | Open |
 | PATCH3 | Shipwright: generate assets without the first-launch dialogs | Ports | S | NP3 | Open |

@@ -53,6 +53,14 @@ pub fn has_running(conn: &Connection) -> Result<bool> {
         .is_some())
 }
 
+/// The live process of the running port session, if any.
+pub(crate) fn running_process(conn: &Connection) -> Result<Option<sessions::ProcessIdentity>> {
+    Ok(running_rows(conn)?
+        .into_iter()
+        .filter_map(|row| row.process_identity)
+        .find_map(|raw| serde_json::from_str(&raw).ok()))
+}
+
 pub fn totals(conn: &Connection, port_id: &str) -> Result<(i64, i64, Option<String>)> {
     conn.query_row(
         "SELECT COALESCE(SUM(duration_seconds), 0), COUNT(*), MAX(ended_at)
@@ -215,6 +223,7 @@ pub fn recover(db: &Arc<Mutex<Db>>, sink: Arc<dyn EventSink>) -> Result<()> {
                     drop(guard);
                     thread::sleep(std::time::Duration::from_millis(250));
                 }
+                sessions::take_stop(identity.pid());
                 let guard = db.lock().unwrap_or_else(|error| error.into_inner());
                 let duration = identity.elapsed();
                 if finish(&guard.conn, &id, duration, None, "ended", None).is_err() {

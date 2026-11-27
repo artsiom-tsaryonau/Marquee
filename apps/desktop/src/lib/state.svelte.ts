@@ -122,6 +122,10 @@ class AppState {
 
   launching = $state<GameEntry | null>(null);
   running = $state<GameEntry | null>(null);
+  /** Library id of the game playing locally, kept after the overlay is dismissed (STOP1). */
+  playingId = $state<string | null>(null);
+  /** Stop was requested; the next Stop forces it. */
+  stopping = $state(false);
   toast = $state<string | null>(null);
   lastInput = $state<string>('—');
 
@@ -201,10 +205,12 @@ class AppState {
     if (active) {
       const game = this.games.find((g) => g.id === active.edition_id) ?? null;
       this.launching = null;
+      this.playingId = active.edition_id;
       if (!this.overlayDismissed) this.running = game;
     } else if (!this.launching) {
       this.running = null;
       this.overlayDismissed = false;
+      if (!this.playingId?.startsWith('port:')) { this.playingId = null; this.stopping = false; }
     }
   }
 
@@ -216,11 +222,15 @@ class AppState {
       const game = this.games.find((g) => g.id === (event.session.port_id ? `port:${event.session.port_id}` : event.session.edition_id));
       this.launching = null;
       this.running = game ?? this.running;
+      this.playingId = event.session.port_id ? `port:${event.session.port_id}` : event.session.edition_id;
+      this.stopping = false;
     }
     if (event.type === 'session_ended' || event.type === 'session_failed') {
       const ended = event.session;
       this.launching = null;
       this.running = null;
+      this.playingId = null;
+      this.stopping = false;
       this.overlayDismissed = false;
       if (ended.port_id) void this.loadPorts();
       void this.api.snapshot().then((snap) => {
@@ -386,6 +396,19 @@ class AppState {
       this.running = null;
       const message = (err as { message?: string }).message ?? 'Launch failed';
       this.notify(message);
+    }
+  }
+
+  /** Close the running game; a second request kills it at once. */
+  async stopGame() {
+    const force = this.stopping;
+    this.stopping = true;
+    try {
+      await this.api.stopGame(force);
+      this.notify(force ? 'Force-stopping the game…' : 'Closing the game…');
+    } catch (err) {
+      this.stopping = false;
+      this.notify((err as { message?: string }).message ?? 'Could not stop the game');
     }
   }
 

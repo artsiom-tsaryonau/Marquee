@@ -250,6 +250,8 @@ fn spawn(argv: &[String], xdg_config: Option<&Path>) -> std::io::Result<std::pro
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
+    // Its own process group, so Stop also reaches wrapper children (Wine, flatpak).
+    std::os::unix::process::CommandExt::process_group(&mut cmd, 0);
     if let Some(home) = xdg_config {
         cmd.env("XDG_CONFIG_HOME", home);
     }
@@ -329,6 +331,7 @@ pub(crate) fn watch_child(
     early_failure: bool,
     mut checkpoint: impl FnMut(i64),
 ) -> WatchedExit {
+    let pid = child.id();
     let start = Instant::now();
     let status = loop {
         match child.try_wait() {
@@ -368,6 +371,15 @@ pub(crate) fn watch_child(
             }
         }
         Err(err) => (None, "failed", Some(err.to_string())),
+    };
+    // A game the owner stopped was played, not a failed start: credit its time.
+    let (state, error) = match take_stop(pid) {
+        Some(Stop::Closed) => ("ended", Some("Stopped from Marquee".to_string())),
+        Some(Stop::Forced) => (
+            "ended",
+            Some("Force-stopped from Marquee: it did not close in time".to_string()),
+        ),
+        None => (state, error),
     };
     WatchedExit {
         duration,
@@ -411,6 +423,9 @@ impl ProcessIdentity {
             began: uptime()?,
         })
     }
+    pub(crate) fn pid(&self) -> u32 {
+        self.pid
+    }
     pub(crate) fn alive(&self) -> bool {
         Self::read(self.pid).is_some_and(|p| p.boot == self.boot && p.ticks == self.ticks)
     }
@@ -419,6 +434,74 @@ impl ProcessIdentity {
             .map(|now| (now - self.began).max(0.0) as i64)
             .unwrap_or(0)
     }
+}
+
+/// STOP1: how long a game gets to close after SIGTERM before it is killed.
+pub(crate) const STOP_GRACE: Duration = Duration::from_secs(8);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Stop {
+    Closed,
+    Forced,
+}
+
+/// Stops requested for live game processes, keyed by PID, read by `watch_child`.
+static STOPS: Mutex<std::collections::BTreeMap<u32, Stop>> =
+    Mutex::new(std::collections::BTreeMap::new());
+
+fn mark_stop(pid: u32, stop: Stop) {
+    STOPS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .insert(pid, stop);
+}
+
+pub(crate) fn take_stop(pid: u32) -> Option<Stop> {
+    STOPS.lock().unwrap_or_else(|e| e.into_inner()).remove(&pid)
+}
+
+/// Signal the game and, when it leads its own process group, everything it started.
+/// A process that is not a group leader shares Marquee's group, so only it is signalled.
+fn signal(identity: &ProcessIdentity, sig: libc::c_int) {
+    if !identity.alive() {
+        return;
+    }
+    let pid = identity.pid as libc::pid_t;
+    // SAFETY: plain syscalls on a PID whose boot and start time were just verified.
+    unsafe {
+        if libc::getpgid(pid) == pid {
+            libc::kill(-pid, sig);
+        } else {
+            libc::kill(pid, sig);
+        }
+    }
+}
+
+/// Ask a running game to close (SIGTERM), then kill it if it is still running after
+/// `grace`. `force` kills at once. Returns without waiting; the session watcher
+/// records the exit.
+pub(crate) fn stop_process(identity: ProcessIdentity, force: bool, grace: Duration) -> bool {
+    if !identity.alive() {
+        return false;
+    }
+    if force {
+        mark_stop(identity.pid, Stop::Forced);
+        signal(&identity, libc::SIGKILL);
+        return true;
+    }
+    mark_stop(identity.pid, Stop::Closed);
+    signal(&identity, libc::SIGTERM);
+    thread::spawn(move || {
+        let deadline = Instant::now() + grace;
+        while identity.alive() && Instant::now() < deadline {
+            thread::sleep(Duration::from_millis(100));
+        }
+        if identity.alive() {
+            mark_stop(identity.pid, Stop::Forced);
+            signal(&identity, libc::SIGKILL);
+        }
+    });
+    true
 }
 
 pub fn recover(
@@ -452,13 +535,18 @@ pub fn recover(
                         .checkpoint_session(&row.id, identity.elapsed());
                     thread::sleep(Duration::from_millis(250));
                 }
+                let note = match take_stop(identity.pid) {
+                    Some(Stop::Closed) => "Stopped from Marquee",
+                    Some(Stop::Forced) => "Force-stopped from Marquee: it did not close in time",
+                    None => "Recovered process ended; exit status unavailable",
+                };
                 let guard = db.lock().unwrap_or_else(|e| e.into_inner());
                 if let Err(err) = guard.complete_session(
                     &row.id,
                     identity.elapsed(),
                     None,
                     "ended",
-                    Some("Recovered process ended; exit status unavailable"),
+                    Some(note),
                     true,
                 ) {
                     eprintln!("could not finalize recovered session {}: {err}", row.id);
@@ -563,5 +651,76 @@ mod recovery_tests {
         assert_eq!(snap.sessions[0].state, SessionState::Failed);
         assert_eq!(snap.editions[0].playtime_seconds, 17);
         assert_eq!(snap.editions[0].play_count, 1);
+    }
+}
+
+#[cfg(test)]
+mod stop_tests {
+    use super::*;
+    use std::io::BufRead;
+    use std::os::unix::process::CommandExt;
+
+    fn group(script: &str) -> std::process::Child {
+        let mut cmd = Command::new("/bin/sh");
+        cmd.args(["-c", script])
+            .stdout(Stdio::piped())
+            .process_group(0);
+        cmd.spawn().unwrap()
+    }
+
+    fn gone(pid: u32) -> bool {
+        std::fs::read_to_string(format!("/proc/{pid}/stat"))
+            .map(|stat| {
+                stat.rsplit_once(')')
+                    .is_some_and(|(_, rest)| rest.trim_start().starts_with('Z'))
+            })
+            .unwrap_or(true)
+    }
+
+    #[test]
+    fn stop_closes_the_whole_group_and_credits_the_session() {
+        let mut child = group("sleep 30 & echo $!; wait");
+        let mut line = String::new();
+        std::io::BufReader::new(child.stdout.take().unwrap())
+            .read_line(&mut line)
+            .unwrap();
+        let helper: u32 = line.trim().parse().unwrap();
+        let identity = ProcessIdentity::read(child.id()).unwrap();
+        let watched_identity = ProcessIdentity::read(child.id()).unwrap();
+        assert!(stop_process(identity, false, Duration::from_secs(5)));
+        let started = Instant::now();
+        let watched = watch_child(child, Some(&watched_identity), true, |_| {});
+        assert!(started.elapsed() < Duration::from_secs(3));
+        assert_eq!(watched.state, "ended");
+        assert_eq!(watched.error.as_deref(), Some("Stopped from Marquee"));
+        for _ in 0..40 {
+            if gone(helper) {
+                break;
+            }
+            thread::sleep(Duration::from_millis(25));
+        }
+        assert!(gone(helper), "a process the game started survived Stop");
+    }
+
+    #[test]
+    fn a_game_that_ignores_close_is_killed_after_the_grace_period() {
+        let child = group("trap '' TERM; while :; do sleep 1; done");
+        thread::sleep(Duration::from_millis(100));
+        let identity = ProcessIdentity::read(child.id()).unwrap();
+        let watched_identity = ProcessIdentity::read(child.id()).unwrap();
+        let started = Instant::now();
+        assert!(stop_process(identity, false, Duration::from_millis(300)));
+        let watched = watch_child(child, Some(&watched_identity), true, |_| {});
+        assert!(started.elapsed() >= Duration::from_millis(300));
+        assert!(started.elapsed() < Duration::from_secs(3));
+        assert_eq!(watched.state, "ended");
+        assert!(watched.error.unwrap().starts_with("Force-stopped"));
+    }
+
+    #[test]
+    fn stopping_with_no_game_running_says_so() {
+        let t = tempfile::tempdir().unwrap();
+        let core = crate::Core::open_isolated(Some(t.path().join("data")), true).unwrap();
+        assert_eq!(core.stop_game(false).unwrap_err().code, "NOT_RUNNING");
     }
 }
