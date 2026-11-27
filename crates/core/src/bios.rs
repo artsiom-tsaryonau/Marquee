@@ -188,6 +188,9 @@ fn safe_name(path: &Path) -> Option<String> {
 /// into Marquee's store, plus firmware a catalogue emulator names (Saturn IPL,
 /// Dreamcast boot ROM, xemu files). Anything unrecognised is left alone.
 pub fn import(paths: &Paths, source: &Path) -> Result<ImportReport> {
+    if let Some(report) = import_switch_firmware(paths, source)? {
+        return Ok(report);
+    }
     let mut report = import_console_bios(paths, source)?;
     let before = report.added.len();
     if source.is_dir() {
@@ -201,6 +204,76 @@ pub fn import(paths: &Paths, source: &Path) -> Result<ImportReport> {
     let firmware = (report.added.len() - before) as u32;
     report.ignored = report.ignored.saturating_sub(firmware);
     Ok(report)
+}
+
+/// Where Eden keeps installed system titles (its NAND, inside Marquee's folder).
+pub fn eden_firmware_dir(paths: &Paths) -> PathBuf {
+    paths
+        .data_dir
+        .join("eden/xdg-data/eden/nand/system/Contents/registered")
+}
+
+/// A Switch firmware dump: a zip holding only `.nca` system titles. Its files
+/// go straight into Eden's NAND; files already there are kept.
+fn import_switch_firmware(paths: &Paths, source: &Path) -> Result<Option<ImportReport>> {
+    let is_zip = source
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("zip"));
+    if !is_zip || !source.is_file() {
+        return Ok(None);
+    }
+    let Ok(mut zip) = zip::ZipArchive::new(fs::File::open(source)?) else {
+        return Ok(None);
+    };
+    let names: Vec<String> = (0..zip.len())
+        .filter_map(|i| zip.by_index(i).ok().map(|f| f.name().to_string()))
+        .filter(|n| !n.ends_with('/'))
+        .collect();
+    let nca = |n: &String| {
+        let base = n.rsplit('/').next().unwrap_or(n);
+        base.len() > 4
+            && base.to_ascii_lowercase().ends_with(".nca")
+            && base[..base.len() - 4]
+                .trim_end_matches(".cnmt")
+                .bytes()
+                .all(|b| b.is_ascii_hexdigit())
+    };
+    if names.len() < 50 || !names.iter().all(nca) {
+        return Ok(None);
+    }
+    let dir = eden_firmware_dir(paths);
+    fs::create_dir_all(&dir)?;
+    let mut report = ImportReport::default();
+    for i in 0..zip.len() {
+        let mut entry = zip
+            .by_index(i)
+            .map_err(|e| AppError::new("INTAKE_FORMAT", format!("Bad ZIP entry: {e}")))?;
+        if entry.is_dir() {
+            continue;
+        }
+        let name = entry
+            .name()
+            .rsplit('/')
+            .next()
+            .unwrap_or_default()
+            .to_string();
+        let target = dir.join(&name);
+        if target.exists() {
+            report.ignored += 1;
+            continue;
+        }
+        let part = dir.join(format!(".{name}.part"));
+        let mut out = fs::File::create(&part)?;
+        std::io::copy(&mut entry, &mut out)?;
+        fs::rename(&part, &target)?;
+        report.added.push(BiosFile {
+            system: "switch".into(),
+            file: name,
+            region: String::new(),
+            version: "firmware".into(),
+        });
+    }
+    Ok(Some(report))
 }
 
 /// PS1 and PS2 BIOS images only.
@@ -748,5 +821,30 @@ mod tests {
             ),
             "[Filenames]\nBIOS = x.bin\nOther = 1\n[UI]\n"
         );
+    }
+    #[test]
+    fn a_switch_firmware_zip_goes_into_edens_nand() {
+        let t = tempfile::tempdir().unwrap();
+        let paths = Paths::resolve(Some(t.path().join("data"))).unwrap();
+        let archive = t.path().join("Firmware.23.5.0.zip");
+        {
+            let mut zip = zip::ZipWriter::new(fs::File::create(&archive).unwrap());
+            for i in 0..60 {
+                let name = if i == 0 {
+                    format!("{i:032x}.cnmt.nca")
+                } else {
+                    format!("{i:032x}.nca")
+                };
+                zip.start_file(name, zip::write::SimpleFileOptions::default())
+                    .unwrap();
+                std::io::Write::write_all(&mut zip, b"nca").unwrap();
+            }
+            zip.finish().unwrap();
+        }
+        let report = import(&paths, &archive).unwrap();
+        assert_eq!(report.added.len(), 60);
+        let dir = eden_firmware_dir(&paths);
+        assert!(dir.join(format!("{:032x}.nca", 5)).is_file());
+        assert_eq!(import(&paths, &archive).unwrap().ignored, 60);
     }
 }
