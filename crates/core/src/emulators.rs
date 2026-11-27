@@ -54,6 +54,18 @@ pub struct SeedFile {
     pub root: Option<String>,
 }
 
+/// A whole INI section written once: only when the file has no `[section]` yet, so
+/// whatever the owner later sets there (another layout, a controller) is kept.
+#[derive(Debug, Clone, Deserialize)]
+pub struct SeedSection {
+    pub path: String,
+    #[serde(default)]
+    pub root: Option<String>,
+    pub section: String,
+    /// The section's lines, without its `[header]`.
+    pub contents: String,
+}
+
 /// One `key = value` in an INI or flat TOML file under the emulator's folders.
 #[derive(Debug, Clone, Deserialize)]
 pub struct EnforcedSetting {
@@ -120,7 +132,52 @@ fn apply_settings(def: &EmulatorDef, home: &Path) {
 /// re-apply its enforced settings.
 pub fn seed_config(def: &EmulatorDef, home: &Path) {
     write_seeds(def, home);
+    write_seed_sections(def, home);
     apply_settings(def, home);
+}
+
+fn write_seed_sections(def: &EmulatorDef, home: &Path) {
+    for seed in &def.seed_sections {
+        let rel = Path::new(&seed.path);
+        if !rel
+            .components()
+            .all(|c| matches!(c, std::path::Component::Normal(_)))
+            || seed.section.contains([']', '\n'])
+        {
+            continue;
+        }
+        let Some(base) = seed_base(home, seed.root.as_deref()) else {
+            continue;
+        };
+        let target = base.join(rel);
+        let before = fs::read_to_string(&target).unwrap_or_default();
+        let header = format!("[{}]", seed.section);
+        if before.lines().any(|line| line.trim() == header) {
+            continue;
+        }
+        let mut after = before.clone();
+        if !after.is_empty() && !after.ends_with('\n') {
+            after.push('\n');
+        }
+        if !after.is_empty() {
+            after.push('\n');
+        }
+        after.push_str(&header);
+        after.push_str("\n\n");
+        after.push_str(seed.contents.trim_end());
+        after.push('\n');
+        let Some(parent) = target.parent() else {
+            continue;
+        };
+        if fs::create_dir_all(parent).is_err() {
+            continue;
+        }
+        if let Ok(mut tmp) = tempfile::NamedTempFile::new_in(parent) {
+            if std::io::Write::write_all(&mut tmp, after.as_bytes()).is_ok() {
+                let _ = tmp.persist(&target);
+            }
+        }
+    }
 }
 
 fn write_seeds(def: &EmulatorDef, home: &Path) {
@@ -290,6 +347,9 @@ pub struct EmulatorDef {
     /// prompts). Everything else in the file stays the emulator's.
     #[serde(default)]
     pub settings: Vec<EnforcedSetting>,
+    /// INI sections written once when absent (default input layouts).
+    #[serde(default)]
+    pub seed_sections: Vec<SeedSection>,
     /// Icon to fetch at install time when the download holds no image.
     #[serde(default)]
     pub icon_download: Option<IconDownload>,
@@ -1193,6 +1253,33 @@ mod tests {
         assert!(fs::read_to_string(&path)
             .unwrap()
             .contains("keyboard_mode = 0"));
+    }
+
+    #[test]
+    fn rmg_gets_a_keyboard_controller_once_and_keeps_the_owners_layout() {
+        let def = find("rmg").unwrap();
+        let seed = &def.seed_sections[0];
+        let mut codes = std::collections::BTreeSet::new();
+        for line in seed.contents.lines().filter(|l| l.contains("_Data = ")) {
+            let code = line.split('"').nth(1).unwrap();
+            assert!(codes.insert(code.to_string()), "key {code} bound twice");
+        }
+        assert_eq!(codes.len(), 18);
+        let temp = tempfile::tempdir().unwrap();
+        let path = temp.path().join("RMG/mupen64plus.cfg");
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(&path, "[Core]\n\nOnScreenDisplay = True\n").unwrap();
+        seed_config(&def, temp.path());
+        let text = fs::read_to_string(&path).unwrap();
+        assert!(text.starts_with(
+            "[Core]\n\nOnScreenDisplay = True\n\n[Rosalie's Mupen GUI - Input Plugin Profile 0]\n"
+        ));
+        assert!(text.contains("DeviceType = 3\n") && text.contains("A_Data = \"13\"\n"));
+        let owner =
+            "[Rosalie's Mupen GUI - Input Plugin Profile 0]\n\nPluggedIn = True\nDeviceType = 4\n";
+        fs::write(&path, owner).unwrap();
+        seed_config(&def, temp.path());
+        assert_eq!(fs::read_to_string(&path).unwrap(), owner);
     }
 
     #[test]

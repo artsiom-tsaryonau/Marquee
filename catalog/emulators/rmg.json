@@ -21,5 +21,12 @@
   "requirement": "No firmware needed",
   "fullscreen_args": [
     "--fullscreen"
+  ],
+  "seed_sections": [
+    {
+      "path": "RMG/mupen64plus.cfg",
+      "section": "Rosalie's Mupen GUI - Input Plugin Profile 0",
+      "contents": "PluggedIn = True\nDeviceName = \"Keyboard\"\nDeviceType = 3\nDevicePath = \"\"\nDeviceSerial = \"\"\nDeviceGuid = \"\"\nDeadzone = 9\nSensitivity = 100\nPak = 0\nRemoveDuplicateMappings = True\nFilterEventsForButtons = True\nFilterEventsForAxis = True\nA_InputType = \"-1\"\nA_Name = \"J\"\nA_Data = \"13\"\nA_ExtraData = \"0\"\nB_InputType = \"-1\"\nB_Name = \"K\"\nB_Data = \"14\"\nB_ExtraData = \"0\"\nStart_InputType = \"-1\"\nStart_Name = \"Return\"\nStart_Data = \"40\"\nStart_ExtraData = \"0\"\nDpadUp_InputType = \"-1\"\nDpadUp_Name = \"Up\"\nDpadUp_Data = \"82\"\nDpadUp_ExtraData = \"0\"\nDpadDown_InputType = \"-1\"\nDpadDown_Name = \"Down\"\nDpadDown_Data = \"81\"\nDpadDown_ExtraData = \"0\"\nDpadLeft_InputType = \"-1\"\nDpadLeft_Name = \"Left\"\nDpadLeft_Data = \"80\"\nDpadLeft_ExtraData = \"0\"\nDpadRight_InputType = \"-1\"\nDpadRight_Name = \"Right\"\nDpadRight_Data = \"79\"\nDpadRight_ExtraData = \"0\"\nCButtonUp_InputType = \"-1\"\nCButtonUp_Name = \"T\"\nCButtonUp_Data = \"23\"\nCButtonUp_ExtraData = \"0\"\nCButtonDown_InputType = \"-1\"\nCButtonDown_Name = \"G\"\nCButtonDown_Data = \"10\"\nCButtonDown_ExtraData = \"0\"\nCButtonLeft_InputType = \"-1\"\nCButtonLeft_Name = \"F\"\nCButtonLeft_Data = \"9\"\nCButtonLeft_ExtraData = \"0\"\nCButtonRight_InputType = \"-1\"\nCButtonRight_Name = \"H\"\nCButtonRight_Data = \"11\"\nCButtonRight_ExtraData = \"0\"\nLeftTrigger_InputType = \"-1\"\nLeftTrigger_Name = \"1\"\nLeftTrigger_Data = \"30\"\nLeftTrigger_ExtraData = \"0\"\nRightTrigger_InputType = \"-1\"\nRightTrigger_Name = \"E\"\nRightTrigger_Data = \"8\"\nRightTrigger_ExtraData = \"0\"\nZTrigger_InputType = \"-1\"\nZTrigger_Name = \"Q\"\nZTrigger_Data = \"20\"\nZTrigger_ExtraData = \"0\"\nAnalogStickUp_InputType = \"-1\"\nAnalogStickUp_Name = \"W\"\nAnalogStickUp_Data = \"26\"\nAnalogStickUp_ExtraData = \"0\"\nAnalogStickDown_InputType = \"-1\"\nAnalogStickDown_Name = \"S\"\nAnalogStickDown_Data = \"22\"\nAnalogStickDown_ExtraData = \"0\"\nAnalogStickLeft_InputType = \"-1\"\nAnalogStickLeft_Name = \"A\"\nAnalogStickLeft_Data = \"4\"\nAnalogStickLeft_ExtraData = \"0\"\nAnalogStickRight_InputType = \"-1\"\nAnalogStickRight_Name = \"D\"\nAnalogStickRight_Data = \"7\"\nAnalogStickRight_ExtraData = \"0\"\n"
+    }
   ]
 }
