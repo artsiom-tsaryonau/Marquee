@@ -1,6 +1,6 @@
 # Marquee roadmap
 
-Updated 2026-11-26. This document owns product priority and milestone status.
+Updated 2026-11-27. This document owns product priority and milestone status.
 [Marquee manager](MARQUEE_MANAGER.md) owns the acquisition architecture and detailed
 implementation sequence. Dated feature reports do not override these decisions.
 
@@ -327,26 +327,47 @@ setup, native saves and gameplay/relaunch acceptance remain open. No game data
 was downloaded or an engine launched by this installation-only test.
 
 
-## Current owner priority: emulators the owner plays (2026-11-26)
+## Current owner priority: emulators the owner plays (2026-11-27)
 
 The owner plays alone and wants games to start ready: fullscreen with no emulator
 menus, profiles and first-run prompts handled by Marquee, and personal patches to
 emulators where settings cannot do it (nothing is distributed). The item IDs below
 are tracked in the [feature plan](FEATURE_PLAN.md#tracker).
 
-1. **Stop game (STOP1). Done in code 2026-11-27.** Stop game on the Playing overlay and
-   game page closes the game, then kills it after 8 s; a live frozen-game stop is pending.
-2. **Emulator patch series (PATCH1–3).** Pinned upstream plus small patches built by
-   the existing source-build recipes: Xenia first (force-quit on close, hide-menu
-   option, default profile), then Ymir and Shipwright. Settings-only emulators are
-   not forked.
-3. **Owned games waiting for an emulator.** PSP (Persona 3 Portable, PSN package),
-   GameCube (Metroid Prime, Dolphin), Switch (Nightshade, Eden) and DriveClub through
-   its native recomp (DC1; waiting on the 1.28 update extraction). Wii U, Vita and
-   original Xbox wait for owner-supplied keys or firmware.
-4. **Done 2026-11-26.** Shipwright save/restore, Genesis streaming, Saturn (Ymir) and
-   3DS (Azahar) Library Play, Xbox 360 profile and saves, no-menu fullscreen play.
-   PS4 stays blocked: the only PS4 title reached menus only, and was removed.
+**Next, in order:**
+
+1. **Live checks the owner runs.** A frozen-game Stop (STOP1), a played DriveClub race
+   through Marquee's Install and Play (DC1), Forza Motorsport's title screen (XBOX1),
+   a Smash Bros. match on the keyboard GamePad (WIIU1), RMG keys in an N64 game,
+   Shipwright's first launch (PATCH3).
+2. **PSP packages in intake (PSP1).** A managed pkg2zip build so intake converts PSN
+   `.pkg` files to ISO itself; and Switch update/DLC `.nsp` files filed into Eden's
+   external-content folder by intake (NSW1).
+3. **Headless and streaming for every runner (HL1, HL2, then Cemu, xemu, PPSSPP,
+   Azahar, Ymir, Dolphin, Eden), then LAN publish (ST5) and phone play (ST6)** through
+   Moonlight's on-screen touch controller.
+4. **Vita games (VITA1).** Vita3K and firmware 3.74 are ready; it waits for a game
+   that installs without a zRIF (NoNpDrm or cartridge dump with `work.bin`, `.vpk`).
+5. **Per-game compatibility work when the owner reports a title.** Logs and known
+   issues first, per-game settings and patches next, emulator source patches last.
+
+**Done 2026-11-27.**
+
+- Stop game for local Play and ports (STOP1); RPCS3 exits without its prompt; RMG
+  gets a keyboard controller; Shipwright first launch skips three dialogs (PATCH3).
+  PATCH1 (Xenia) proved unnecessary and PATCH2 (Ymir) is deferred.
+- DriveClub Recomp boots from the owner's dumps (DC1); the crash was a LibOrbisPkg
+  extraction bug, fixed and kept in `catalog/source-builds/liborbispkg/`.
+- New Library Play systems: Wii U (Cemu), original Xbox (xemu, intake trims redump
+  images to XISO), PSP (PPSSPP; Persona 3 Portable runs), GameCube (Dolphin; Metroid
+  Prime runs), Switch (Eden; Nightshade and Breath of the Wild with its DLC). Switch
+  firmware zips install through the BIOS import.
+- README now describes what Marquee adds on top of the emulators.
+
+**Done 2026-11-26.** Shipwright save/restore, Genesis streaming, Saturn (Ymir) and
+3DS (Azahar) Library Play, Xbox 360 profile and saves, no-menu fullscreen play.
+PS4 stays blocked for emulation: the only shadPS4 title reached menus only. PS4
+games with a native recomp go through ports instead (DriveClub).
 
 ## Owner priority: decomps, PS4 and PS5 (2026-10-25; superseded above)
 

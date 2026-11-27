@@ -158,9 +158,11 @@ Items in one wave can run in parallel unless the conflict map says otherwise.
 3. **Wave 3, built on wave 2:** NP3, NP4, PS4-2, HL1, MP1, SL2, F3, F4.
 4. **Wave 4:** PS4-3, PS5-2, HL2, ST5, S1B, E1, MP2.
 5. **Wave 5:** G1, MP3, UL1.
-6. **Owner order 2026-11-26 (emulators):** STOP1, then PATCH1; PSP1, GC1 and
-   NSW1 in parallel; PATCH2, PATCH3 and SAT2 after. WIIU1, VITA1 and XBOX1 wait for
-   owner-supplied keys or firmware.
+6. **Owner order 2026-11-26 (emulators):** done 2026-11-27 except live checks:
+   STOP1, PATCH3, PSP1, GC1, NSW1, WIIU1, XBOX1 and DC1 play or start from Library
+   Play; PATCH1 not needed, PATCH2 deferred, VITA1 waits for a zRIF-free game.
+7. **Owner order 2026-11-27:** intake steps (pkg2zip for PSP1, Switch add-ons for
+   NSW1), then HL1/HL2 and headless adapters for the new runners, ST5, ST6.
 
 UL1 can start earlier as a design and migration-fixture change, but its cutover
 waits until S1A and E1 show which installation shapes the model must hold.
