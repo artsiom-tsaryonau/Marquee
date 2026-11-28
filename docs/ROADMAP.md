@@ -339,9 +339,9 @@ judged by play checks.
 
 **Open, in order:**
 
-1. **Broken:** Forza Motorsport 2 (black screen); The Last Guardian (needs the
-   console's `libSceNgs2.sprx`, or the missing Ngs2 calls written into a
-   source-built shadPS4); samsh5nd (missing file).
+1. **Broken:** Forza Motorsport 2 (black screen); The Last Guardian (waits for
+   shadPS4's Ngs2 custom racks: the 2026-11-28 preview has Ngs2 but not those;
+   the alternative is the console's `libSceNgs2.sprx`); samsh5nd (missing file).
 2. **Partly working:** Dreamcast Collection's picker; Forza Motorsport 4 and Need
    for Speed past their intros; the "menus" rows played further.
 3. **Untested:** 42 of the 43 Ren'Py games and 8 of the 9 Windows games taken

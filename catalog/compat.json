@@ -22,7 +22,7 @@
       "key": "CUSA03745",
       "status": "broken",
       "checked": "2026-11-28",
-      "note": "Silent; stops at the wake-up prompt. shadPS4 stubs the Ngs2 sound library.",
+      "note": "Silent; stops at the wake-up prompt. Tried shadPS4 preview d117c44 (2026-11-28), which adds Ngs2: still silent and stuck, log 'Custom rack creation is not implemented'. Retest when shadPS4 implements Ngs2 custom racks.",
       "runner": "shadps4"
     },
     {
