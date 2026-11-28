@@ -13,6 +13,21 @@ and mutable user data. Firmware originals have their own versioned vault;
 emulators use managed working copies. A title can have several source artifacts
 and installations without duplicating its identity in Games.
 
+## Project folder and source files (2026-11-28 cleanup)
+
+The checkout holds no loose game downloads. Local-only (git-ignored) and links:
+
+| Path | Holds |
+| --- | --- |
+| `packages/` | Verified `.marquee` packages of the PS4 games installed from deleted downloads (The Last of Us, The Order, Red Dead Redemption). They keep the installed files, not the original `.pkg`s |
+| `roms`, `sample_images` | Links the library still uses; keep them |
+| `data/` | Earlier pilot data; a streaming setting points into `data/streaming-pilot`. `data/diag/` has a save backup and the cleanup log |
+
+Under `~/Games/Marquee/sources/`: `not-yet-supported/{ps3,vita,neogeo}` (files
+Marquee cannot package or run yet, and the PS3 packages `ps3-install` reads),
+`extras/ps4` (The Last of Us add-on packages), `keys-and-firmware/` (private:
+disc keys, licences, console keys, BIOS and firmware inputs) and `imported/`.
+
 ## Recommended eventual layout
 
 ```text
