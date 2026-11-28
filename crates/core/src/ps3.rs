@@ -554,6 +554,27 @@ mod tests {
         out.extend(data);
         out
     }
+    #[test]
+    fn the_library_lists_only_installed_ps3_games_by_their_eboot() {
+        let dir = tempfile::tempdir().unwrap();
+        let games = dir.path().join("game");
+        let folders = [("NPEB00001", "HG"), ("BCUS98111", "GD"), ("PS3_GAME", "DG")];
+        for (id, category) in folders {
+            fs::create_dir_all(games.join(id).join("USRDIR")).unwrap();
+            fs::write(games.join(id).join("PARAM.SFO"), metadata(category)).unwrap();
+            fs::write(games.join(id).join("USRDIR/EBOOT.BIN"), b"x").unwrap();
+            fs::write(games.join(id).join("USRDIR/data.bin"), b"x").unwrap();
+        }
+        let db = crate::db::Db::open_in_memory().unwrap();
+        db.upsert_root("root", &games, "folder", "ps3", None)
+            .unwrap();
+        let report = crate::library::scan_root(&db, None).unwrap();
+        assert_eq!(report.added, 1);
+        let snap = crate::library::snapshot(&db).unwrap();
+        assert_eq!(snap.editions[0].title, "Example PS3 title");
+        assert!(snap.media[0].path.ends_with("NPEB00001/USRDIR/EBOOT.BIN"));
+    }
+
     fn metadata(category: &str) -> Vec<u8> {
         sfo(&[
             ("TITLE", "Example PS3 title"),

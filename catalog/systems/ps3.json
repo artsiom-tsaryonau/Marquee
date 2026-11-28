@@ -2,7 +2,8 @@
   "id": "ps3",
   "display_name": "PlayStation 3",
   "supported_extensions": [
-    "iso"
+    "iso",
+    "bin"
   ],
   "skipped_extensions": [
     "pkg",
@@ -11,6 +12,6 @@
     "rar"
   ],
   "runner_kind": "emulator",
-  "notes": "Verified base-disc ISO registration and direct RPCS3 launch. PKG, licenses and encrypted-image preparation remain unsupported.",
+  "notes": "Verified base-disc ISO registration, games already installed in RPCS3 (USRDIR/EBOOT.BIN with an HG PARAM.SFO) and direct RPCS3 launch. Installing a PKG or its licence and preparing encrypted images remain unsupported.",
   "emulator": "rpcs3"
 }

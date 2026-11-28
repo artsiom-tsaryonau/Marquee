@@ -91,6 +91,8 @@ impl MediaKind {
         match ext.to_ascii_lowercase().as_str() {
             "iso" if system == "xbox360" => Some(Self::Xbox360Iso),
             "iso" if system == "ps3" => Some(Self::Ps3Iso),
+            // An installed game; the scanner accepts only its USRDIR/EBOOT.BIN.
+            "bin" if system == "ps3" => Some(Self::Rom),
             "iso" if system == SYSTEM_PS1 => Some(Self::Ps1Iso),
             "iso" if system == SYSTEM_PS2 => Some(Self::Iso),
             "chd" if system == SYSTEM_PS1 => Some(Self::Ps1Chd),

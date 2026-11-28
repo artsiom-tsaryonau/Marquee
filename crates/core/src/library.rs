@@ -159,6 +159,16 @@ fn walk_dir(
         if descriptor.id == "ps4" && ps4_param(&path).is_none() {
             continue;
         }
+        // Likewise a PS3 game installed in RPCS3: only its EBOOT.BIN, and only
+        // for installed games (not disc folders, updates or DLC).
+        if descriptor.id == "ps3"
+            && path
+                .extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("bin"))
+            && ps3_installed_param(&path).is_none()
+        {
+            continue;
+        }
         let ext = path
             .extension()
             .and_then(|e| e.to_str())
@@ -224,6 +234,9 @@ fn ingest_disc(
         None
     };
     let ps4 = (descriptor.id == "ps4").then(|| ps4_param(path)).flatten();
+    let installed = (descriptor.id == "ps3" && kind == MediaKind::Rom)
+        .then(|| ps3_installed_param(path))
+        .flatten();
     // Wii U folder games are named by meta/meta.xml, not by the .rpx file name.
     let wiiu = (descriptor.id == "wiiu")
         .then(|| marquee_media::wiiu::meta(path))
@@ -231,6 +244,14 @@ fn ingest_disc(
     let identity = match kind {
         _ if ps4.is_some() => {
             let m = ps4.as_ref().unwrap();
+            crate::iso::DiscIdentity {
+                serial: Some(m.title_id.clone()),
+                serial_raw: Some(m.title_id.clone()),
+                region: None,
+            }
+        }
+        _ if installed.is_some() => {
+            let m = installed.as_ref().unwrap();
             crate::iso::DiscIdentity {
                 serial: Some(m.title_id.clone()),
                 serial_raw: Some(m.title_id.clone()),
@@ -291,6 +312,7 @@ fn ingest_disc(
     let title = ps3
         .as_ref()
         .map(|m| m.title.clone())
+        .or_else(|| installed.as_ref().map(|m| m.title.replace(['™', '®'], "")))
         .or_else(|| wiiu.as_ref().map(|m| m.title.clone()))
         .or_else(|| ps4.as_ref().map(|m| m.title.replace(['™', '®'], "")))
         .unwrap_or_else(|| title_from_filename(path));
@@ -340,6 +362,30 @@ fn is_ps4_overlay(dir: &Path) -> bool {
         name.strip_suffix(suffix)
             .is_some_and(|base| !base.is_empty() && dir.with_file_name(base).is_dir())
     })
+}
+
+/// PARAM.SFO of a PS3 game installed in RPCS3 (`<ID>/USRDIR/EBOOT.BIN`). Category
+/// `HG` is an installed game and `DG` a disc game installed from a package; `GD`
+/// is update or install data. A dumped disc folder (`PS3_GAME`) is not an
+/// installation, and the digital manuals some games add are not games.
+fn ps3_installed_param(path: &Path) -> Option<crate::ps3::Metadata> {
+    let usrdir = path.parent()?;
+    if !path.file_name()?.eq_ignore_ascii_case("EBOOT.BIN")
+        || !usrdir.file_name()?.eq_ignore_ascii_case("USRDIR")
+    {
+        return None;
+    }
+    let game = usrdir.parent()?;
+    if game.file_name()?.eq_ignore_ascii_case("PS3_GAME") {
+        return None;
+    }
+    let sfo = game.join("PARAM.SFO");
+    if fs::metadata(&sfo).ok()?.len() > 1024 * 1024 {
+        return None;
+    }
+    let meta = crate::ps3::parse_sfo(&fs::read(sfo).ok()?).ok()?;
+    (matches!(meta.category.as_str(), "HG" | "DG") && !meta.title.ends_with("Digital Manual"))
+        .then_some(meta)
 }
 
 /// PARAM.SFO of a prepared PS4 game, read beside its eboot.bin.
