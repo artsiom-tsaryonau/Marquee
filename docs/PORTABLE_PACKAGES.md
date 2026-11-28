@@ -69,6 +69,12 @@ place. It never replaces an existing file; a damaged or altered package changes
 nothing. Nothing in a package is executed. Hashes prove the files match the
 manifest, not who made the package: import only packages you made or trust.
 
+Real-game check (2026-11-28): The Last of Us Remastered with update 1.11 and 7
+add-ons (189 files, 63.6 GB; export 73 s, import 45 s on this NVMe disk) and a DS
+ROM were imported into a separate empty library. All files matched the originals
+byte for byte and both appeared in that library. They were not launched there
+(no emulator installed in it), which is MP2.
+
 Running a game still happens from the unpacked files. Emulator packages are
 worth adding only for a locally modified emulator or an offline second PC; no
 emulator has been modified so far.
