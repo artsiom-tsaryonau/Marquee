@@ -307,13 +307,15 @@ existing locally attached Sonic 2 album is unaffected. Durable acquisition,
 per-track progress/cancel/retry and verified importer handoff remain the next
 music-manager step. See [YouTube integration](YOUTUBE_OST.md).
 
-### Portable installation packages — proposed 2026-10-25
+### Portable installation packages
 
-[Portable packages](PORTABLE_PACKAGES.md) should transfer immutable prepared game
-payloads and reviewed runtime requirements between Marquee instances, preserving
-separate saves and host settings. MP0–MP3 define manifest, local export/import,
-cross-instance acceptance and later private transfer. This is planned work, not
-native PS3 conversion or an implemented package format.
+[Portable packages](PORTABLE_PACKAGES.md) move prepared games between Marquee
+instances, preserving separate saves and host settings. **MP0 and MP1 are done
+(2026-11-28, CLI):** `.marquee` export and import for PS4 games (with update and
+add-ons) and single-file games. Next: the desktop UI, PS3 installed games and
+Switch updates/DLC; then MP2 (a real second instance launching the game) and MP3
+(private transfer). This is not native conversion: games still run from the
+unpacked files.
 
 The owner also resumed [Quiver integration](QUIVER_INTEGRATION.md). Q0 now pins
 upstream, retains notices and defines existing/new Linux port fixtures. Q1 now provides bounded local-file preview, selected import, stable source-scoped identities and existing-recipe mappings through Tools, shared APIs and CLI. Q2 native install/setup/launch acceptance remains next; hosted-catalogue mirroring and unattended installs are outside this slice.

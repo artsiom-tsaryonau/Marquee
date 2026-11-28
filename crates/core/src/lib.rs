@@ -28,6 +28,7 @@ pub mod music;
 mod music_discovery;
 mod music_metadata;
 pub mod neogeo;
+pub mod packages;
 pub mod paths;
 pub mod port_sessions;
 pub mod ports;

@@ -1,0 +1,31 @@
+{
+  "schema": 2,
+  "platform": "ps4",
+  "title_id": "CUSA00000",
+  "title": "Example",
+  "folder": "Example [CUSA00000]",
+  "entry": "eboot.bin",
+  "files": [
+    {
+      "path": "game/eboot.bin",
+      "size": 12,
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "path": "update/eboot.bin",
+      "size": 12,
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "path": "addcont/EXAMPLEDLC000001/sce_sys/param.sfo",
+      "size": 12,
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "runtime": {
+    "id": "shadps4",
+    "version": "v.0.21.0",
+    "os": "linux",
+    "cpu": "x86_64"
+  }
+}

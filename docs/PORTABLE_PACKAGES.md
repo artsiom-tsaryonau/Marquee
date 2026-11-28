@@ -1,7 +1,8 @@
 # Portable Marquee installations — proposal
 
-Updated 2026-10-25. Design/roadmap only; no package exporter, importer or new
-executable format is implemented.
+Updated 2026-11-28. **Game packages work** (MP1, CLI only): export and import of
+`.marquee` files. Runtime (emulator) packages, a desktop UI and network transfer
+are not built. See [Using game packages](#using-game-packages).
 
 A prepared game can be reusable across Marquee instances without converting it
 into a native executable. For PS3, retain the verified disc ISO that RPCS3 already
@@ -41,38 +42,43 @@ authority. An output manifest remains useful after an optional source archive is
 removed. Torrent seeding still depends on the exact original torrent payload,
 not the prepared installation; package exports cannot replace that dependency.
 
-## Recommended shape (2026-11-28, owner asked about a unified `.marquee` format)
+## Using game packages
 
-Not implemented. The proposal: one container, two kinds, told apart by name.
+    marquee package export <edition-id> --out <folder>
+    marquee package inspect <file>          # checks the manifest and file list, changes nothing
+    marquee package import <file> [--into <library folder>]
 
-- `The Last of Us Remastered [CUSA00556].ps4.marquee`: a game.
-- `shadps4-0.21.0.runtime.marquee`: an emulator or port, including any patched
-  binary or tool, so a locally modified build moves with the games that need it.
+`marquee list` shows edition IDs. A package is a ZIP64 with stored (uncompressed)
+members: `marquee.json` (schema 2, `crates/manager/src/portable.rs`), then
+`game/` and, for PS4, `update/` and `addcont/`. Code:
+`crates/core/src/packages.rs`.
 
-The container is **ZIP64 with stored (uncompressed) members**, plus
-`marquee.json` as the first member. A plain ZIP would move the files; the
-manifest is what lets another instance verify them (SHA-256), place them, apply
-the per-title settings and patches, and refuse a package whose runtime is
-missing. Disc data is mostly compressed already, so compressing again costs time
-for little space. Any ZIP tool can still open the file.
+| Packaged | Not packaged |
+| --- | --- |
+| PS4 game folder, its `-UPDATE` or `-patch` folder, shadPS4 add-ons for the title | Saves, BIOS, firmware, keys, `.rap` licences |
+| Single-file games (ISO, ROM, XISO, NSP and similar) | Per-title fixes and key bindings: the receiving Marquee seeds them from its catalogue |
+| The exporting emulator's ID and version, as information | The emulator itself |
 
-A game package holds `game/`, `update/`, `dlc/` and `title-settings/`. A runtime
-package holds the program, its recipe and, for patched builds, the patch and
-source revision. Saves are opt-in. Firmware, BIOS and keys stay out by default;
-an explicit private "this machine" export may include them for the owner's own
-second PC.
+Not supported yet, and refused: `.cue`/`.gdi`/`.m3u` sets, Wii U folder games,
+PS3 games installed in RPCS3, and extra content kept outside the game file for
+other systems (Switch updates and DLC, Wii U add-ons).
 
-It is a **transfer and archive format, not a run format**: import unpacks it.
-Running from one file stays with each system's native format where one exists
-(ISO, CHD, RVZ, XISO, CSO, NSP/XCI, Cemu `.wua`, and shadPS4's `.zar`, whose
-reader is in the 0.21.0 source; none of the last two is tried here).
+Import needs a library folder for the system, checks free space, extracts into a
+hidden staging folder, verifies every SHA-256, and only then moves the game into
+place. It never replaces an existing file; a damaged or altered package changes
+nothing. Nothing in a package is executed. Hashes prove the files match the
+manifest, not who made the package: import only packages you made or trust.
+
+Running a game still happens from the unpacked files. Emulator packages are
+worth adding only for a locally modified emulator or an offline second PC; no
+emulator has been modified so far.
 
 ## Implementation sequence
 
-1. **MP0 — Manifest/receipt contract.** Specify a versioned JSON schema and create
+1. **MP0 — Manifest/receipt contract.** *(Done; schema 2 dropped the required receipt.)* Specify a versioned JSON schema and create
    a small synthetic fixture. Keep local instance IDs out of portable identity;
    define input/output artifact references and runtime requirements.
-2. **MP1 — Reviewed local export/import.** Begin with a small already supported
+2. **MP1 — Reviewed local export/import.** *(Done from the CLI. Not yet: manager jobs, receipts, save conflict review, restart recovery: an interrupted import can leave a hidden `.marquee-import-*` folder to delete.)* Begin with a small already supported
    emulator game. Preview contents, space, dependencies and save conflicts. Use
    manager jobs, bounded extraction, no-replace publication, immutable receipts,
    idempotent registration and failure/restart recovery. Verify paths, hashes,

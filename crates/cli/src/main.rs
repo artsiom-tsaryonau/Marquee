@@ -98,6 +98,9 @@ enum Command {
     Ps3Inspect {
         path: PathBuf,
     },
+    /// `.marquee` game packages: one file holding a prepared game
+    #[command(subcommand)]
+    Package(PackageCmd),
     /// Read-only PS4 package / PS5 and Xbox-family archive inventory; never extracts or launches
     ConsoleInspect {
         #[arg(long)]
@@ -105,6 +108,30 @@ enum Command {
         path: PathBuf,
     },
     Health,
+}
+
+#[derive(Subcommand)]
+enum PackageCmd {
+    /// Write a library game (PS4 with its update and add-ons, or a single-file game)
+    Export {
+        edition_id: String,
+        /// Folder to write the package into
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Check a package and show what importing it would create; changes nothing
+    Inspect {
+        package: PathBuf,
+        #[arg(long)]
+        into: Option<PathBuf>,
+    },
+    /// Add a package's game to this library without replacing anything
+    Import {
+        package: PathBuf,
+        /// Which of the system's library folders, when it has several
+        #[arg(long)]
+        into: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -786,6 +813,18 @@ fn run() -> marquee_core::error::Result<()> {
             } => core.link_catalogue(&edition_id, &record_id, &media_id)?,
             CatalogueCmd::Unlink { edition_id } => core.unlink_catalogue(&edition_id)?,
         },
+        Command::Package(PackageCmd::Export { edition_id, out }) => {
+            let exported = core.export_package(&edition_id, &out)?;
+            println!("{}", serde_json::to_string_pretty(&exported)?);
+        }
+        Command::Package(PackageCmd::Inspect { package, into }) => {
+            let report = core.import_package(&package, into.as_deref(), true)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Command::Package(PackageCmd::Import { package, into }) => {
+            let report = core.import_package(&package, into.as_deref(), false)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
         Command::Library(LibraryCmd::AddRoot { system, path }) => {
             // Validates against the shipped descriptors (ps2, ps1).
             let label = marquee_core::catalog::by_id(&system)?.display_name;
