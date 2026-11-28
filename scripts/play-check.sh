@@ -12,8 +12,8 @@
 # stay in OUT/saves-after); --keep-saves leaves them. See scripts/play_check_saves.py.
 #
 # Needs gamescope (with gamescopectl), and for --record GStreamer pipewiresrc and
-# openh264enc. Uses target/release/marquee unless MARQUEE_BIN is set. Games get no
-# audio server (silent); scripts/play_check_audio_guard.py kills the game if a
+# openh264enc. Uses target/release/marquee unless MARQUEE_BIN is set. Games get a
+# private silent audio server; scripts/play_check_audio_guard.py kills the game if a
 # stream still reaches an output.
 set -euo pipefail
 
@@ -44,17 +44,33 @@ out=$(cd "$out" && pwd)
 rm -f "$out/stop" "$out/xdisplay" "$out/wayland" "$out/exited"
 runtime=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
 
-# Silence: the game gets no audio server at all. SDL uses its dummy driver, and
-# PulseAudio/PipeWire (also behind ALSA's pipewire plugin) point at sockets that do
-# not exist, so nothing can reach the speakers whatever device a game asks for.
+# Silence: the game talks to a private PipeWire with one null sink and no sound
+# cards ("-p policy" runs WirePlumber without hardware monitors), so nothing can
+# reach the speakers whatever device a game asks for. A server is needed because
+# some emulators refuse to start without audio: PPSSPP's AppImage forces
+# SDL_AUDIODRIVER=pulseaudio.
 silent_dir=$(mktemp -d)
+audio_pids=()
+# exec: the background job must be the server itself, so cleanup can kill it.
+private() { exec env XDG_RUNTIME_DIR="$silent_dir" PIPEWIRE_RUNTIME_DIR="$silent_dir" PULSE_RUNTIME_PATH="$silent_dir/pulse" "$@"; }
+wait_socket() { for _ in $(seq 1 100); do [ -S "$1" ] && return 0; sleep 0.1; done; echo "private audio server did not start ($1)" >&2; return 1; }
+start_silent_audio() {
+    private pipewire > "$silent_dir/pipewire.log" 2>&1 & audio_pids+=($!)
+    wait_socket "$silent_dir/pipewire-0"
+    private wireplumber -p policy > "$silent_dir/wireplumber.log" 2>&1 & audio_pids+=($!)
+    private pipewire-pulse > "$silent_dir/pulse.log" 2>&1 & audio_pids+=($!)
+    wait_socket "$silent_dir/pulse/native"
+    PULSE_SERVER="unix:$silent_dir/pulse/native" pactl load-module module-null-sink sink_name=silent > /dev/null
+}
 # Only the game gets these (after gamescope's --): gamescope and the recorder still
-# need PipeWire for the video stream.
-silence="\"sh\",\"-c\",\"printf %s \\\"\$DISPLAY\\\" > '$out/xdisplay'; exec \\\"\$0\\\" \\\"\$@\\\"\",\"env\",\"SDL_AUDIODRIVER=dummy\",\"SDL_AUDIO_DRIVER=dummy\",\"ALSOFT_DRIVERS=null\",\"PULSE_SERVER=unix:$silent_dir/no-pulse\",\"PIPEWIRE_REMOTE=$silent_dir/no-pipewire\""
+# need the real PipeWire for the video stream. The shell step also tells the driver
+# which XWayland display the game got, and keeps the emulator's own output.
+silence="\"sh\",\"-c\",\"printf %s \\\"\$DISPLAY\\\" > '$out/xdisplay'; exec \\\"\$0\\\" \\\"\$@\\\" > '$out/game.log' 2>&1\",\"env\",\"PULSE_SERVER=unix:$silent_dir/pulse/native\",\"PIPEWIRE_REMOTE=$silent_dir/pipewire-0\""
 # On any exit, stop the game first.
 cleanup() {
     pkill -KILL -f "gamescope --backend headless -W $w -H $h" 2>/dev/null || true
     kill "${guard:-}" 2>/dev/null || true
+    [ ${#audio_pids[@]} -eq 0 ] || kill "${audio_pids[@]}" 2>/dev/null || true
     if [ "${snapshot:-0}" = 1 ]; then
         sleep 1
         python3 "$root/scripts/play_check_saves.py" restore "$out" || echo "SAVE RESTORE FAILED: originals are in $out/saves-before" >&2
@@ -69,6 +85,7 @@ if [ "$keep_saves" = 0 ]; then
     python3 "$root/scripts/play_check_saves.py" snapshot "$out"
     snapshot=1
 fi
+start_silent_audio
 marker=$(mktemp)
 export MARQUEE_DISPLAY_MODE=window
 export MARQUEE_LAUNCH_PREFIX="[\"gamescope\",\"--backend\",\"headless\",\"-W\",\"$w\",\"-H\",\"$h\",\"-w\",\"$w\",\"-h\",\"$h\",\"--\",$silence]"

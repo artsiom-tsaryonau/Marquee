@@ -1,4 +1,4 @@
-"""Play-check safety net: watch audio streams from processes under the newest
+"""Play-check safety net: watch the real audio server for streams from processes under the newest
 headless gamescope; if one reaches a sink other than no audio server at all, kill that process tree at once. Usage: play_check_audio_guard.py SECONDS"""
 import json, subprocess, sys, time
 deadline = time.time() + float(sys.argv[1])
