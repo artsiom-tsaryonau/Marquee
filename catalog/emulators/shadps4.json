@@ -40,6 +40,16 @@
       "path": "shadPS4/custom_configs/CUSA00556.json",
       "root": "data",
       "contents": "{\n  \"GPU\": {\n    \"readbacks_mode\": 2\n  },\n  \"Vulkan\": {\n    \"pipeline_cache_enabled\": true\n  }\n}\n"
+    },
+    {
+      "path": "shadPS4/patches/marquee/files.json",
+      "root": "data",
+      "contents": "{\n  \"TheLastOfUsRemastered.xml\": [\"CUSA00556\"]\n}\n"
+    },
+    {
+      "path": "shadPS4/patches/marquee/TheLastOfUsRemastered.xml",
+      "root": "data",
+      "contents": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<!-- From shadps4-emu/ps4_cheats cf33d5ba, PATCHES/TheLastOfUsRemastered.xml (this entry only). -->\n<Patch>\n    <TitleID>\n        <ID>CUSA00556</ID>\n    </TitleID>\n    <Metadata Title=\"The Last of Us Remastered\" Name=\"Remove 2-second frame time assert\" Note=\"The game halts itself when a frame takes over 2 seconds, which shader compiles can cause.\" Author=\"junminlee2004\" PatchVer=\"1.0\" AppVer=\"01.00\" AppElf=\"eboot.bin\" isEnabled=\"true\">\n        <PatchList>\n            <Line Type=\"bytes\" Address=\"0xd92862\" Value=\"9090\"/>\n        </PatchList>\n    </Metadata>\n    <Metadata Title=\"The Last of Us Remastered\" Name=\"Remove 2-second frame time assert\" Note=\"The game halts itself when a frame takes over 2 seconds, which shader compiles can cause.\" Author=\"junminlee2004\" PatchVer=\"1.0\" AppVer=\"01.11\" AppElf=\"eboot.bin\" isEnabled=\"true\">\n        <PatchList>\n            <Line Type=\"bytes\" Address=\"0xf3d88f\" Value=\"9090\"/>\n        </PatchList>\n    </Metadata>\n</Patch>\n"
     }
   ]
 }
