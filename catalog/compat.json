@@ -226,6 +226,14 @@
       "status": "broken",
       "checked": "2026-11-28",
       "note": "A required file is missing."
+    },
+    {
+      "system": "ps3",
+      "key": "NPEA80017",
+      "status": "gameplay",
+      "checked": "2026-11-28",
+      "note": "A race. Store release (installs to folder NPEA90006, serial NPEA80017). Write Color Buffers. E/T drive.",
+      "runner": "rpcs3"
     }
   ]
 }

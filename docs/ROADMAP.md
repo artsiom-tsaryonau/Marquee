@@ -347,7 +347,7 @@ judged by play checks.
 3. **Untested:** 42 of the 43 Ren'Py games and 8 of the 9 Windows games taken
    over from Lutris ([Windows runner](LAUNCHERS.md)); one of each ran on the
    desktop with sound and no console (no input sent, screens not captured),
-   Metal Gear Solid disc 2, MotorStorm `NPEA90006`, King of Fighters '94.
+   Metal Gear Solid disc 2, King of Fighters '94.
 4. **Not wired:** Vita (Vita3K has no library adapter; the MotorStorm RC
    packages also need their licences), PS5.
 5. **Packaging:** MP2 (launch an imported game in a second library), desktop UI,
