@@ -62,10 +62,12 @@ start_silent_audio() {
     wait_socket "$silent_dir/pulse/native"
     PULSE_SERVER="unix:$silent_dir/pulse/native" pactl load-module module-null-sink sink_name=silent > /dev/null
 }
-# Only the game gets these (after gamescope's --): gamescope and the recorder still
+# Only the game gets these (after gamescope's --). Its runtime folder is private so
+# containers mount the silent sockets; gamescope's own sockets are linked in, or
+# its Vulkan layer cannot connect and some games abort. gamescope and the recorder still
 # need the real PipeWire for the video stream. The shell step also tells the driver
 # which XWayland display the game got, and keeps the emulator's own output.
-silence="\"sh\",\"-c\",\"printf %s \\\"\$DISPLAY\\\" > '$out/xdisplay'; exec \\\"\$0\\\" \\\"\$@\\\" > '$out/game.log' 2>&1\",\"env\",\"MARQUEE_PLAY_CHECK=$silent_dir\",\"PULSE_SERVER=unix:$silent_dir/pulse/native\",\"PIPEWIRE_REMOTE=$silent_dir/pipewire-0\",\"XDG_RUNTIME_DIR=$silent_dir\""
+silence="\"sh\",\"-c\",\"printf %s \\\"\$DISPLAY\\\" > '$out/xdisplay'; for s in \\\"\$XDG_RUNTIME_DIR\\\"/gamescope-* \\\"\$XDG_RUNTIME_DIR\\\"/bus; do [ -e \\\"\$s\\\" ] && ln -sf \\\"\$s\\\" '$silent_dir'/; done; exec \\\"\$0\\\" \\\"\$@\\\" > '$out/game.log' 2>&1\",\"env\",\"MARQUEE_PLAY_CHECK=$silent_dir\",\"PULSE_SERVER=unix:$silent_dir/pulse/native\",\"PIPEWIRE_REMOTE=$silent_dir/pipewire-0\",\"XDG_RUNTIME_DIR=$silent_dir\""
 # Every process the game starts inherits this marker, so they can all be found even
 # after gamescope exits: xemu ignores SIGTERM and would otherwise keep running.
 game_pids() { grep -lsz "^MARQUEE_PLAY_CHECK=$silent_dir\$" /proc/[0-9]*/environ 2>/dev/null | cut -d/ -f3 || true; }
