@@ -142,6 +142,9 @@ fn walk_dir(
             }
         }
         if meta.is_dir() {
+            if descriptor.id == "ps4" && is_ps4_overlay(&path) {
+                continue; // shadPS4 loads it on top of its base game.
+            }
             walk_dir(db, &path, descriptor, report, skip_map)?;
             continue;
         }
@@ -327,6 +330,18 @@ fn ingest_disc(
     Ok(())
 }
 
+/// A PS4 update or mod folder: `<game>-UPDATE`, `<game>-patch` or `<game>-mods`
+/// beside `<game>`. Alone it is not skipped, so a stray folder stays visible.
+fn is_ps4_overlay(dir: &Path) -> bool {
+    let Some(name) = dir.file_name().and_then(|n| n.to_str()) else {
+        return false;
+    };
+    ["-UPDATE", "-patch", "-mods"].iter().any(|suffix| {
+        name.strip_suffix(suffix)
+            .is_some_and(|base| !base.is_empty() && dir.with_file_name(base).is_dir())
+    })
+}
+
 /// PARAM.SFO of a prepared PS4 game, read beside its eboot.bin.
 fn ps4_param(path: &Path) -> Option<crate::ps3::Metadata> {
     if !path.file_name()?.eq_ignore_ascii_case("eboot.bin") {
@@ -503,4 +518,26 @@ pub(crate) fn ingest_ps3_disc(
         MediaKind::Ps3Iso,
         report,
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ps4_overlay_needs_its_base_game_beside_it() {
+        let dir = tempfile::tempdir().unwrap();
+        for name in [
+            "Game",
+            "Game-UPDATE",
+            "Game-patch",
+            "Game-mods",
+            "Alone-UPDATE",
+        ] {
+            fs::create_dir(dir.path().join(name)).unwrap();
+        }
+        let overlay = |name: &str| is_ps4_overlay(&dir.path().join(name));
+        assert!(overlay("Game-UPDATE") && overlay("Game-patch") && overlay("Game-mods"));
+        assert!(!overlay("Game") && !overlay("Alone-UPDATE"));
+    }
 }

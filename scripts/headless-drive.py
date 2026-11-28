@@ -20,6 +20,13 @@ Commands (DISPLAY must name that XWayland):
     key KEYSYM [MS] [N]     press an X keysym (x, space, Return, Up) via XTest
     click X Y | move X Y    pointer in window coordinates via Gamescope's libei socket
     close [NAME]            ask the largest window (or the one titled NAME) to close
+    seq "STEP; STEP; ..."   play a script. Steps: wait SECONDS | key KEYSYM [MS] [N] |
+                            hold KEYSYM[+KEYSYM] MS | click X Y | shot NAME
+
+With a `play-check.sh --drive --out DIR` run, `--session DIR` replaces DISPLAY
+and writes shots into DIR:
+
+    headless-drive.py --session DIR seq "key Return; wait 3; hold w 2000; shot walk"
 
 XTest key events reach X clients here; XTest pointer events do not, so pointer
 input goes through Gamescope's EIS socket, whose absolute coordinates are those
@@ -29,6 +36,7 @@ pointer input needs libei.so.1. Nothing here touches the physical desktop.
 import ctypes
 import os
 import select
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -215,9 +223,82 @@ def pointer(x, y, press):
     print("click" if press else "move", x, y)
 
 
+def hold(disp, chord, hold_ms):
+    """Keep several keys down together, for example walking while turning."""
+    from Xlib import X, XK
+    from Xlib.ext import xtest
+
+    largest(disp)[0].set_input_focus(X.RevertToParent, X.CurrentTime)
+    codes = []
+    for keysym in chord.split("+"):
+        code = disp.keysym_to_keycode(XK.string_to_keysym(keysym))
+        if not code:
+            sys.exit(f"Unknown keysym {keysym}")
+        codes.append(code)
+    for code in codes:
+        xtest.fake_input(disp, X.KeyPress, code)
+    disp.sync()
+    time.sleep(hold_ms / 1000)
+    for code in reversed(codes):
+        xtest.fake_input(disp, X.KeyRelease, code)
+    disp.sync()
+    time.sleep(0.25)
+    print("hold", chord, hold_ms)
+
+
+def session(folder):
+    """Point this process at the gamescope that `play-check.sh --drive` started."""
+    folder = Path(folder)
+    deadline = time.time() + 30
+    while time.time() < deadline:
+        if all((folder / n).is_file() and (folder / n).stat().st_size for n in ("xdisplay", "wayland")):
+            break
+        time.sleep(0.2)
+    try:
+        os.environ["DISPLAY"] = (folder / "xdisplay").read_text().strip()
+        wayland = (folder / "wayland").read_text().strip()
+    except FileNotFoundError:
+        sys.exit(f"No running play check in {folder}")
+    os.environ["GAMESCOPE_WAYLAND_DISPLAY"] = wayland
+    os.environ["EI_SOCKET"] = f"{wayland}-ei"
+    os.environ.pop("WAYLAND_DISPLAY", None)
+    return folder
+
+
+def sequence(folder, script):
+    if folder is None:
+        sys.exit("seq needs --session DIR")
+    for step in filter(None, (part.strip() for part in script.split(";"))):
+        if (folder / "exited").exists():
+            sys.exit(f"The game exited; stopped before: {step}")
+        verb, *args = step.split()
+        if verb == "wait":
+            time.sleep(float(args[0]))
+        elif verb == "shot":
+            # gamescope's own screenshot sees Vulkan output that XGetImage misses.
+            path = folder / f"{args[0]}.png"
+            subprocess.run(["gamescopectl", "screenshot", str(path)], capture_output=True, check=False)
+            time.sleep(0.5)
+            print("shot", path)
+        elif verb == "key":
+            key(x_display(), args[0], *(int(value) for value in args[1:3]))
+        elif verb == "hold":
+            hold(x_display(), args[0], int(args[1]))
+        elif verb == "click":
+            pointer(float(args[0]), float(args[1]), True)
+        else:
+            sys.exit(f"Unknown step {step}")
+
+
 def main(argv):
     if not argv or argv[0] in ("-h", "--help"):
         print(__doc__)
+        return
+    folder = None
+    if argv[0] == "--session":
+        folder, argv = session(argv[1]), argv[2:]
+    if argv[0] == "seq":
+        sequence(folder, argv[1])
         return
     command, args = argv[0], argv[1:]
     if command in ("click", "move"):

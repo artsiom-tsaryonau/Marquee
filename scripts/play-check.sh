@@ -4,7 +4,12 @@
 # Nothing appears on the desktop.
 #
 #   scripts/play-check.sh <edition-id> [--seconds 60] [--shots 20,40,60]
-#                         [--size 1280x720] [--record] [--out DIR]
+#                         [--size 1280x720] [--record] [--out DIR] [--drive] [--keep-saves]
+#
+# --drive keeps the game running until --seconds pass or OUT/stop appears, so
+# scripts/headless-drive.py can play it: `headless-drive.py --session OUT seq ...`.
+# Emulator saves are snapshotted first and restored afterwards (the run's own saves
+# stay in OUT/saves-after); --keep-saves leaves them. See scripts/play_check_saves.py.
 #
 # Needs gamescope (with gamescopectl), and for --record GStreamer pipewiresrc and
 # openh264enc. Uses target/release/marquee unless MARQUEE_BIN is set. Games get no
@@ -12,27 +17,31 @@
 # stream still reaches an output.
 set -euo pipefail
 
-usage() { sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 [ $# -ge 1 ] || usage
 id=$1; shift
-seconds=60; shots=""; size=1280x720; record=0; out=""
+seconds=60; shots=""; size=1280x720; record=0; out=""; drive=0; keep_saves=0
 while [ $# -gt 0 ]; do
     case $1 in
         --seconds) seconds=$2; shift 2 ;;
         --shots) shots=$2; shift 2 ;;
         --size) size=$2; shift 2 ;;
         --record) record=1; shift ;;
+        --drive) drive=1; shift ;;
+        --keep-saves) keep_saves=1; shift ;;
         --out) out=$2; shift 2 ;;
         *) usage ;;
     esac
 done
 [[ $size =~ ^([0-9]+)x([0-9]+)$ ]] || usage
 w=${BASH_REMATCH[1]}; h=${BASH_REMATCH[2]}
-[ -n "$shots" ] || shots=$(seq -s, 15 15 "$seconds")
+[ -n "$shots" ] || [ "$drive" = 1 ] || shots=$(seq -s, 15 15 "$seconds")
 root=$(cd "$(dirname "$0")/.." && pwd)
 bin=${MARQUEE_BIN:-$root/target/release/marquee}
 out=${out:-$root/data/play-checks/$(date +%Y%m%d-%H%M%S)-$id}
 mkdir -p "$out"
+out=$(cd "$out" && pwd)
+rm -f "$out/stop" "$out/xdisplay" "$out/wayland" "$out/exited"
 runtime=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
 
 # Silence: the game gets no audio server at all. SDL uses its dummy driver, and
@@ -41,16 +50,25 @@ runtime=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
 silent_dir=$(mktemp -d)
 # Only the game gets these (after gamescope's --): gamescope and the recorder still
 # need PipeWire for the video stream.
-silence="\"env\",\"SDL_AUDIODRIVER=dummy\",\"SDL_AUDIO_DRIVER=dummy\",\"ALSOFT_DRIVERS=null\",\"PULSE_SERVER=unix:$silent_dir/no-pulse\",\"PIPEWIRE_REMOTE=$silent_dir/no-pipewire\""
+silence="\"sh\",\"-c\",\"printf %s \\\"\$DISPLAY\\\" > '$out/xdisplay'; exec \\\"\$0\\\" \\\"\$@\\\"\",\"env\",\"SDL_AUDIODRIVER=dummy\",\"SDL_AUDIO_DRIVER=dummy\",\"ALSOFT_DRIVERS=null\",\"PULSE_SERVER=unix:$silent_dir/no-pulse\",\"PIPEWIRE_REMOTE=$silent_dir/no-pipewire\""
 # On any exit, stop the game first.
 cleanup() {
     pkill -KILL -f "gamescope --backend headless -W $w -H $h" 2>/dev/null || true
     kill "${guard:-}" 2>/dev/null || true
+    if [ "${snapshot:-0}" = 1 ]; then
+        sleep 1
+        python3 "$root/scripts/play_check_saves.py" restore "$out" || echo "SAVE RESTORE FAILED: originals are in $out/saves-before" >&2
+    fi
     rm -rf "$marker" "$silent_dir"
 }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
 
+if [ "$keep_saves" = 0 ]; then
+    # Refuses to run while any emulator is open, so a real session is never touched.
+    python3 "$root/scripts/play_check_saves.py" snapshot "$out"
+    snapshot=1
+fi
 marker=$(mktemp)
 export MARQUEE_DISPLAY_MODE=window
 export MARQUEE_LAUNCH_PREFIX="[\"gamescope\",\"--backend\",\"headless\",\"-W\",\"$w\",\"-H\",\"$h\",\"-w\",\"$w\",\"-h\",\"$h\",\"--\",$silence]"
@@ -73,6 +91,7 @@ if [ -z "$display" ]; then
     wait "$launcher" || true
     exit 1
 fi
+printf %s "$display" > "$out/wayland"
 echo "display $display, output $out"
 
 recorder=""
@@ -107,7 +126,10 @@ for mark in "${marks[@]}"; do
     done
     GAMESCOPE_WAYLAND_DISPLAY=$display gamescopectl screenshot "$out/shot-$(printf '%03d' "$mark")s.png" >/dev/null 2>&1 || true
 done
-while [ $(( $(date +%s) - start )) -lt "$seconds" ] && kill -0 "$launcher" 2>/dev/null; do sleep 0.5; done
+while [ $(( $(date +%s) - start )) -lt "$seconds" ] && kill -0 "$launcher" 2>/dev/null && [ ! -e "$out/stop" ]; do sleep 0.5; done
+if ! kill -0 "$launcher" 2>/dev/null; then
+    echo "game exited by itself after $(( $(date +%s) - start ))s" | tee "$out/exited"
+fi
 
 # Finish the recording first (EOS writes the MP4 index), then stop the game the
 # way Marquee's Stop does: the gamescope group gets SIGTERM.

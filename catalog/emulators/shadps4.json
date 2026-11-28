@@ -35,6 +35,11 @@
       "path": "shadPS4/custom_configs/CUSA03745.json",
       "root": "data",
       "contents": "{\n  \"GPU\": {\n    \"readbacks_mode\": 2\n  }\n}\n"
+    },
+    {
+      "path": "shadPS4/custom_configs/CUSA00556.json",
+      "root": "data",
+      "contents": "{\n  \"GPU\": {\n    \"readbacks_mode\": 2\n  },\n  \"Vulkan\": {\n    \"pipeline_cache_enabled\": true\n  }\n}\n"
     }
   ]
 }
