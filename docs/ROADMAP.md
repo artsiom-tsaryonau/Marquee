@@ -345,9 +345,12 @@ short while, not completed. Sound was not checked, performance only where noted.
 
 **Demon's Souls PS3 (`NPEB01202`) unblocked (2026-11-28).** The owner supplied
 the licence file; RPCS3 unlocks the program with it. The game is installed in
-Marquee's RPCS3 profile with the `.rap` in `exdata/`. It has not been booted yet,
-is not a Library entry, and Soulbrandt 0.2.0 (downloaded, checksum-verified) has
-not been run.
+Marquee's RPCS3 profile with the `.rap` in `exdata/`. It is a Library entry
+(installed-game scanning, new) and plays in RPCS3 through Library Play: new game,
+character creation and walking in the tutorial, after enabling Write Color
+Buffers for `BLES00932` (the world was black without it). Keyboard: X is Cross,
+Enter is Start. Sound and longer play are not checked. Soulbrandt 0.2.0
+(downloaded, checksum-verified) has not been run; it is now optional.
 
 **The Order: 1886 (2026-11-28).** `CUSA00076` with 1.02 beside it is in the
 library. shadPS4 0.21.0 crashes at 33 s (`tiling.h` GetArrayMode). JulioCacko's
