@@ -369,7 +369,9 @@ same Write Color Buffers setting (a race; `T` accelerates, `X` boosts). **Pacifi
 Rift (`BCES00129`) plays too:** with the owner's disc key beside the image
 (`<image name>.dkey`, no PS3Dec) RPCS3 decrypts while reading, and the same Write
 Color Buffers setting removes a white-out in races. Checked: menus and driving.
-Its update 1.03 and add-ons are separate packages.
+Update 1.03 is
+installed with the new `marquee ps3-install <pkg>... [--rap <file>]`; both
+add-ons need their own `.rap` licences, which are not on this PC.
 
 **Red Dead Redemption (`CUSA36843` + 1.04, 2026-11-28)** is in the library and
 boots in shadPS4 0.21.0 to Rockstar's licence agreement. Accepting it is left to

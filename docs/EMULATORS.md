@@ -702,6 +702,8 @@ file conversion, one patched unpacking tool or Marquee's own code. Recipes live 
 | N64 (RMG) | No keyboard controller | Seeded layout | `catalog/emulators/rmg.json` |
 | Shipwright | Three first-launch dialogs | Reduced to one | port setup |
 | DriveClub Recomp | Crashed on an update extracted by the broken tool | Re-extracted with the patched LibOrbisPkg | see PS4 updates |
+| PS3 packages | Installing a game, update or add-on was a manual RPCS3 step | `marquee ps3-install <pkg>... [--rap <file>]`: checks the licence first, then that files arrived | `crates/core/src/ps3_packages.rs` |
+| PS3 encrypted discs | Refused | Accepted with `<image name>.dkey` or `.key` beside it; RPCS3 decrypts while reading | `crates/core/src/ps3.rs` |
 | PS3 installed games | Only disc images could be listed or launched | Installed RPCS3 games are scanned and launched | `crates/core/src/library.rs`, `ps3.rs` |
 | PS3, Demon's Souls and both MotorStorms | Black world, or white-out in Pacific Rift | Write Color Buffers, per title | `catalog/emulators/rpcs3.json` |
 | Wii U | Needs a keyboard GamePad and no first-run prompts | Seeded settings and controller profile | `catalog/emulators/cemu.json` |

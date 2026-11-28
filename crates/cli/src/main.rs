@@ -98,6 +98,15 @@ enum Command {
     Ps3Inspect {
         path: PathBuf,
     },
+    /// Install PS3 packages (game, update, add-ons) into Marquee's RPCS3, then rescan
+    Ps3Install {
+        /// Packages in install order: a game before its update
+        #[arg(required = true)]
+        packages: Vec<PathBuf>,
+        /// Your licence file(s), each named <content id>.rap
+        #[arg(long)]
+        rap: Vec<PathBuf>,
+    },
     /// `.marquee` game packages: one file holding a prepared game
     #[command(subcommand)]
     Package(PackageCmd),
@@ -813,6 +822,11 @@ fn run() -> marquee_core::error::Result<()> {
             } => core.link_catalogue(&edition_id, &record_id, &media_id)?,
             CatalogueCmd::Unlink { edition_id } => core.unlink_catalogue(&edition_id)?,
         },
+        Command::Ps3Install { packages, rap } => {
+            let installed = core.install_ps3_packages(&packages, &rap)?;
+            core.scan(None, None)?;
+            println!("{}", serde_json::to_string_pretty(&installed)?);
+        }
         Command::Package(PackageCmd::Export { edition_id, out }) => {
             let exported = core.export_package(&edition_id, &out)?;
             println!("{}", serde_json::to_string_pretty(&exported)?);

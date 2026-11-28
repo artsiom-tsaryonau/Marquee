@@ -36,6 +36,7 @@ pub mod preparation;
 pub mod profiles;
 pub mod ps3;
 mod ps3_firmware;
+pub mod ps3_packages;
 pub mod purple;
 pub mod romart;
 pub mod romfacts;
