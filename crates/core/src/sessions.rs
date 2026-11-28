@@ -492,6 +492,15 @@ fn signal(identity: &ProcessIdentity, sig: libc::c_int) {
     }
 }
 
+fn leads_group(identity: &ProcessIdentity) -> Option<libc::pid_t> {
+    let pid = libc::pid_t::try_from(identity.pid).ok()?;
+    (unsafe { libc::getpgid(pid) } == pid).then_some(pid)
+}
+
+fn group_alive(pgid: libc::pid_t) -> bool {
+    unsafe { libc::kill(-pgid, 0) == 0 }
+}
+
 /// Ask a running game to close (SIGTERM), then kill it if it is still running after
 /// `grace`. `force` kills at once. Returns without waiting; the session watcher
 /// records the exit.
@@ -505,15 +514,22 @@ pub(crate) fn stop_process(identity: ProcessIdentity, force: bool, grace: Durati
         return true;
     }
     mark_stop(identity.pid, Stop::Closed);
+    let group = leads_group(&identity);
     signal(&identity, libc::SIGTERM);
     thread::spawn(move || {
+        // A wrapper such as gamescope can exit while the emulator it started
+        // ignores SIGTERM (xemu does), so wait for the whole group.
+        let running = || identity.alive() || group.is_some_and(group_alive);
         let deadline = Instant::now() + grace;
-        while identity.alive() && Instant::now() < deadline {
+        while running() && Instant::now() < deadline {
             thread::sleep(Duration::from_millis(100));
         }
         if identity.alive() {
             mark_stop(identity.pid, Stop::Forced);
             signal(&identity, libc::SIGKILL);
+        } else if let Some(pgid) = group.filter(|pgid| group_alive(*pgid)) {
+            // The id stays reserved while the group has members.
+            unsafe { libc::kill(-pgid, libc::SIGKILL) };
         }
     });
     true
@@ -715,6 +731,28 @@ mod stop_tests {
             thread::sleep(Duration::from_millis(25));
         }
         assert!(gone(helper), "a process the game started survived Stop");
+    }
+
+    #[test]
+    fn a_child_that_outlives_its_wrapper_is_killed_too() {
+        // The leader exits on SIGTERM; what it started ignores it.
+        let mut child = group("(trap '' TERM; exec sleep 30) & echo $!; wait");
+        let mut line = String::new();
+        std::io::BufReader::new(child.stdout.take().unwrap())
+            .read_line(&mut line)
+            .unwrap();
+        let stubborn: u32 = line.trim().parse().unwrap();
+        thread::sleep(Duration::from_millis(100));
+        let identity = ProcessIdentity::read(child.id()).unwrap();
+        assert!(stop_process(identity, false, Duration::from_millis(300)));
+        let _ = child.wait();
+        for _ in 0..80 {
+            if gone(stubborn) {
+                break;
+            }
+            thread::sleep(Duration::from_millis(25));
+        }
+        assert!(gone(stubborn), "a process the game started survived Stop");
     }
 
     #[test]

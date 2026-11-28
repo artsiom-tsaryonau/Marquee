@@ -65,9 +65,20 @@ start_silent_audio() {
 # Only the game gets these (after gamescope's --): gamescope and the recorder still
 # need the real PipeWire for the video stream. The shell step also tells the driver
 # which XWayland display the game got, and keeps the emulator's own output.
-silence="\"sh\",\"-c\",\"printf %s \\\"\$DISPLAY\\\" > '$out/xdisplay'; exec \\\"\$0\\\" \\\"\$@\\\" > '$out/game.log' 2>&1\",\"env\",\"PULSE_SERVER=unix:$silent_dir/pulse/native\",\"PIPEWIRE_REMOTE=$silent_dir/pipewire-0\""
+silence="\"sh\",\"-c\",\"printf %s \\\"\$DISPLAY\\\" > '$out/xdisplay'; exec \\\"\$0\\\" \\\"\$@\\\" > '$out/game.log' 2>&1\",\"env\",\"MARQUEE_PLAY_CHECK=$silent_dir\",\"PULSE_SERVER=unix:$silent_dir/pulse/native\",\"PIPEWIRE_REMOTE=$silent_dir/pipewire-0\""
+# Every process the game starts inherits this marker, so they can all be found even
+# after gamescope exits: xemu ignores SIGTERM and would otherwise keep running.
+game_pids() { grep -lsz "^MARQUEE_PLAY_CHECK=$silent_dir\$" /proc/[0-9]*/environ 2>/dev/null | cut -d/ -f3 || true; }
+stop_game() {
+    pkill -TERM -f "gamescope --backend headless -W $w -H $h" 2>/dev/null || true
+    for pid in $(game_pids); do kill -TERM "$pid" 2>/dev/null || true; done
+    for _ in $(seq 1 50); do [ -n "$(game_pids)" ] || return 0; sleep 0.2; done
+    for pid in $(game_pids); do kill -KILL "$pid" 2>/dev/null || true; done
+    for _ in $(seq 1 50); do [ -n "$(game_pids)" ] || return 0; sleep 0.2; done
+}
 # On any exit, stop the game first.
 cleanup() {
+    stop_game
     pkill -KILL -f "gamescope --backend headless -W $w -H $h" 2>/dev/null || true
     kill "${guard:-}" 2>/dev/null || true
     [ ${#audio_pids[@]} -eq 0 ] || kill "${audio_pids[@]}" 2>/dev/null || true
@@ -75,7 +86,7 @@ cleanup() {
         sleep 1
         python3 "$root/scripts/play_check_saves.py" restore "$out" || echo "SAVE RESTORE FAILED: originals are in $out/saves-before" >&2
     fi
-    rm -rf "$marker" "$silent_dir"
+    rm -rf ${marker:+"$marker"} "$silent_dir"
 }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
@@ -154,7 +165,7 @@ if [ -n "$recorder" ]; then
     kill -INT "$recorder" 2>/dev/null || true
     wait "$recorder" 2>/dev/null || true
 fi
-pkill -TERM -f "gamescope --backend headless -W $w -H $h" 2>/dev/null || true
+stop_game
 wait "$launcher" 2>/dev/null || true
 sleep 1
 ls -1 "$out"
