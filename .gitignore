@@ -101,3 +101,6 @@ exdata/
 # Console keys the owner drops here (Wii U keys.txt, prod.keys, title.keys)
 keys.txt
 *.keys
+
+# Console game packages dropped in the checkout
+*.[pP][kK][gG]
