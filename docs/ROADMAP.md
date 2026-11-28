@@ -371,6 +371,11 @@ on this PC; its update and add-ons were not installed. RPCS3 decrypts while
 reading (no PS3Dec needed) when `<image name>.dkey` or `.key` is beside the
 image, and Marquee now accepts such a disc (not yet tried with a real key).
 
+**Red Dead Redemption (`CUSA36843` + 1.04, 2026-11-28)** is in the library and
+boots in shadPS4 0.21.0 to Rockstar's licence agreement. Accepting it is left to
+the owner; nothing past it is tested. Play checks restore saves, so the owner's
+acceptance must happen in a normal Play session.
+
 **Next, in order:** the broken and inconclusive rows; Demon's Souls PS3
 (`NPEB01202`) through Soulbrandt; The Order: 1886 (`CUSA00076` + 1.02) through
 JulioCacko's port; Red Dead Redemption (`CUSA36843`) in shadPS4; then the
