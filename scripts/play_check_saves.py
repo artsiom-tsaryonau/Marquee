@@ -1,20 +1,24 @@
 """Keep play checks away from the owner's saves.
 
 snapshot OUT  refuse if an emulator is already running, then copy every save
-              location that exists into OUT/saves-before.
-restore OUT   move what the run left behind into OUT/saves-after and put the
-              originals back.
+              location that exists into a work folder named in OUT/saves.json.
+restore OUT   move what the run left behind into WORK/after, put the originals
+              back, then drop the copies.
 
-MARQUEE_DATA_DIR overrides the data folder.
+Work folders sit beside the data folder, on the same disk: reflinks make the
+copies nearly free and the restore can rename. /tmp is the wrong place (it is
+in memory and filled up). MARQUEE_DATA_DIR overrides the data folder.
 """
 import json
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 DATA = Path(os.environ.get("MARQUEE_DATA_DIR", Path.home() / ".local/share/marquee"))
+WORK = DATA.parent / "marquee-play-checks"
 
 # Globs below the data folder: folders, or single files (xemu keeps saves inside
 # its virtual hard disk).
@@ -79,26 +83,39 @@ def snapshot(out: Path):
     busy = running_emulators()
     if busy:
         sys.exit("An emulator is already running; not touching its saves:\n" + "\n".join(busy))
-    before = out / "saves-before"
-    if before.exists():
-        sys.exit(f"{before} exists; use a new --out folder")
-    before.mkdir(parents=True)
+    record = out / "saves.json"
+    if record.exists():
+        sys.exit(f"{record} exists; use a new --out folder")
+    WORK.mkdir(parents=True, exist_ok=True)
+    work = Path(tempfile.mkdtemp(prefix=f"{out.name}-", dir=WORK))
     kept = matches()
-    for item in kept:
-        copy(DATA / item, before / item)
-    (out / "saves.json").write_text(json.dumps(kept, indent=1))
+    try:
+        for item in kept:
+            copy(DATA / item, work / "before" / item)
+    except BaseException:
+        shutil.rmtree(work, ignore_errors=True)  # Nothing was touched yet.
+        raise
+    record.write_text(json.dumps({"work": str(work), "items": kept}, indent=1))
 
 
 def restore(out: Path):
-    kept = json.loads((out / "saves.json").read_text())
+    record = json.loads((out / "saves.json").read_text())
+    work, kept = Path(record["work"]), record["items"]
     busy = running_emulators()
     if busy:
-        sys.exit("An emulator is still running:\n" + "\n".join(busy))
-    for item in matches():
-        copy(DATA / item, out / "saves-after" / item)
-        remove(DATA / item)
-    for item in kept:
-        copy(out / "saves-before" / item, DATA / item)
+        sys.exit("An emulator is still running:\n" + "\n".join(busy) + f"\nOriginals: {work}/before")
+    try:
+        # A rename needs no free space, so a full disk cannot stop this half way.
+        for item in matches():
+            target = work / "after" / item
+            target.parent.mkdir(parents=True, exist_ok=True)
+            os.rename(DATA / item, target)
+        for item in kept:
+            (DATA / item).parent.mkdir(parents=True, exist_ok=True)
+            copy(work / "before" / item, DATA / item)
+    except (OSError, subprocess.CalledProcessError) as error:
+        sys.exit(f"{error}\nOriginals: {work}/before")
+    shutil.rmtree(work / "before", ignore_errors=True)
 
 
 if __name__ == "__main__":

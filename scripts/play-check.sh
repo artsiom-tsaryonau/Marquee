@@ -8,8 +8,8 @@
 #
 # --drive keeps the game running until --seconds pass or OUT/stop appears, so
 # scripts/headless-drive.py can play it: `headless-drive.py --session OUT seq ...`.
-# Emulator saves are snapshotted first and restored afterwards (the run's own saves
-# stay in OUT/saves-after); --keep-saves leaves them. See scripts/play_check_saves.py.
+# Emulator saves are snapshotted first and restored afterwards (where they are kept
+# is recorded in OUT/saves.json); --keep-saves leaves them. See scripts/play_check_saves.py.
 #
 # Needs gamescope (with gamescopectl), and for --record GStreamer pipewiresrc and
 # openh264enc. Uses target/release/marquee unless MARQUEE_BIN is set. Games get a
@@ -84,7 +84,7 @@ cleanup() {
     [ ${#audio_pids[@]} -eq 0 ] || kill "${audio_pids[@]}" 2>/dev/null || true
     if [ "${snapshot:-0}" = 1 ]; then
         sleep 1
-        python3 "$root/scripts/play_check_saves.py" restore "$out" || echo "SAVE RESTORE FAILED: originals are in $out/saves-before" >&2
+        python3 "$root/scripts/play_check_saves.py" restore "$out" || echo "SAVE RESTORE FAILED (see the message above for where the originals are)" | tee "$out/restore-failed" >&2
     fi
     rm -rf ${marker:+"$marker"} "$silent_dir"
 }

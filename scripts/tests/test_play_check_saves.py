@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import os
 import tempfile
 import unittest
@@ -36,8 +37,11 @@ class PlayCheckSaves(unittest.TestCase):
             saves.restore(out)
             self.assertEqual((card / "Mcd001.ps2").read_text(), "owner")
             self.assertFalse(fresh.exists())
-            kept = out / "saves-after/pcsx2/xdg-config/PCSX2/memcards/Mcd001.ps2"
+            work = Path(json.loads((out / "saves.json").read_text())["work"])
+            self.assertEqual(work.parent, data.parent / "marquee-play-checks")
+            kept = work / "after/pcsx2/xdg-config/PCSX2/memcards/Mcd001.ps2"
             self.assertEqual(kept.read_text(), "play check")
+            self.assertFalse((work / "before").exists())
 
 
 if __name__ == "__main__":

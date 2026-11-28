@@ -158,11 +158,21 @@ pub fn selection_for<'a>(
     selected: Option<&str>,
     system: &str,
 ) -> Option<&'a str> {
-    let id = selected?;
+    let id = current_id(selected?);
     runners
         .iter()
         .find(|r| r.id == id && compatible(r, system))
         .map(|r| r.id.as_str())
+}
+
+/// A saved choice may still name a runner row that was renamed. It is the same
+/// engine with the same saves, so follow the rename.
+fn current_id(id: &str) -> &str {
+    if id == LEGACY_PCSX2_ID {
+        PCSX2_RUNNER_ID
+    } else {
+        id
+    }
 }
 
 /// Explicit selections never fall back to a different engine with different saves.
@@ -172,7 +182,7 @@ pub fn resolve<'a>(
     profile: Option<&str>,
     selected: Option<&str>,
 ) -> Result<&'a Runner> {
-    if let Some(id) = profile.or(selected) {
+    if let Some(id) = profile.or(selected).map(current_id) {
         let runner = runners.iter().find(|r| r.id == id && compatible(r, system))
             .ok_or_else(|| AppError::new("RUNNER_MISSING", "The selected emulator is unavailable or incompatible. Choose another emulator."))?;
         require_launchable(runner)?;
@@ -360,4 +370,15 @@ pub fn open_setup(db: &Db, runner_id: &str, xdg_config: Option<&Path>) -> Result
             .with_context(json!({ "argv": runner.command }))
     })?;
     Ok(())
+}
+
+#[cfg(test)]
+mod rename_tests {
+    use super::*;
+
+    #[test]
+    fn a_saved_choice_follows_the_renamed_pcsx2_runner() {
+        assert_eq!(current_id(LEGACY_PCSX2_ID), PCSX2_RUNNER_ID);
+        assert_eq!(current_id("runner.pcsx2.flatpak"), "runner.pcsx2.flatpak");
+    }
 }
