@@ -358,8 +358,11 @@ Enter is Start. Sound and longer play are not checked. Soulbrandt 0.2.0
 library. shadPS4 0.21.0 crashes at 33 s (`tiling.h` GetArrayMode). JulioCacko's
 port 0.2.7 (checksum-verified) runs on Linux in
 `<data>/builds/order1886-0.2.7/sandbox.sh` (no network, no home folder, no sound
-devices): title, new game, save, and the opening cutscene at 30 FPS. Space is
-Cross. Gameplay and sound are not checked, and it is not wired into Library Play.
+devices): title, new game, save, load (Continue), the prologue's quick-time
+events, then third-person camera and walking, with its overlay showing 30 FPS.
+Keys: Space Cross, Q Triangle, E Square, Left Shift Circle, WASD move, arrows
+camera. A "mash" prompt needed about 10 presses a second. Combat and sound are
+not checked, and it is not wired into Library Play.
 
 **MotorStorm (`BCES00006`, 2026-11-28)** plays through Library Play after the
 same Write Color Buffers setting (a race; `T` accelerates, `X` boosts). **Pacific
