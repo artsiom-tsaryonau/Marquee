@@ -343,6 +343,14 @@ short while, not completed. Sound was not checked, performance only where noted.
 | Inconclusive | God of War III (still compiling shaders when time ran out), Dreamcast Collection (stayed on its game picker) |
 | Missing file | samsh5nd (Neo Geo) |
 
+**Demon's Souls PS3 (`NPEB01202`) is blocked (2026-11-28).** The package installs
+in RPCS3, but its program uses a local licence (NPD type 2) and RPCS3 asks for
+`EP0700-NPEB01202_00-DEMONSSOULSDL001.rap`, which the archive does not include.
+It needs that licence file from the owner's own console or account, or a disc
+dump (`BLUS30443` / `BLES00932`), which Soulbrandt also supports. Soulbrandt
+0.2.0 for Linux is downloaded and checksum-verified under
+`<data>/builds/soulbrandt-0.2.0/`; it has not been run.
+
 **Next, in order:** the broken and inconclusive rows; Demon's Souls PS3
 (`NPEB01202`) through Soulbrandt; The Order: 1886 (`CUSA00076` + 1.02) through
 JulioCacko's port; Red Dead Redemption (`CUSA36843`) in shadPS4; then the
