@@ -361,6 +361,11 @@ port 0.2.7 (checksum-verified) runs on Linux in
 devices): title, new game, save, and the opening cutscene at 30 FPS. Space is
 Cross. Gameplay and sound are not checked, and it is not wired into Library Play.
 
+**MotorStorm (`BCES00006`, 2026-11-28)** plays through Library Play after the
+same Write Color Buffers setting (a race; `T` accelerates, `X` boosts). **Pacific
+Rift (`BCES00129`) is blocked:** its disc image is encrypted and no disc key
+(`.dkey`/`.ird`) is on this PC; its update and add-ons were not installed.
+
 **Next, in order:** the broken and inconclusive rows; Demon's Souls PS3
 (`NPEB01202`) through Soulbrandt; The Order: 1886 (`CUSA00076` + 1.02) through
 JulioCacko's port; Red Dead Redemption (`CUSA36843`) in shadPS4; then the

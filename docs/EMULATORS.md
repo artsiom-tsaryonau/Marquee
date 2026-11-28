@@ -703,7 +703,7 @@ file conversion, one patched unpacking tool or Marquee's own code. Recipes live 
 | Shipwright | Three first-launch dialogs | Reduced to one | port setup |
 | DriveClub Recomp | Crashed on an update extracted by the broken tool | Re-extracted with the patched LibOrbisPkg | see PS4 updates |
 | PS3 installed games | Only disc images could be listed or launched | Installed RPCS3 games are scanned and launched | `crates/core/src/library.rs`, `ps3.rs` |
-| PS3, Demon's Souls | Black world under a working HUD | Write Color Buffers, per title | `catalog/emulators/rpcs3.json` |
+| PS3, Demon's Souls and MotorStorm | Black world under a working HUD | Write Color Buffers, per title | `catalog/emulators/rpcs3.json` |
 | Wii U | Needs a keyboard GamePad and no first-run prompts | Seeded settings and controller profile | `catalog/emulators/cemu.json` |
 | Switch | Updates, DLC and firmware installation | Managed external-content folder; firmware zips through BIOS import | Eden recipe |
 

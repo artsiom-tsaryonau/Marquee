@@ -45,6 +45,10 @@
     {
       "path": "rpcs3/custom_configs/config_BLES00932.yml",
       "contents": "Video:\n  Write Color Buffers: true\n"
+    },
+    {
+      "path": "rpcs3/custom_configs/config_BCES00006.yml",
+      "contents": "Video:\n  Write Color Buffers: true\n"
     }
   ]
 }
