@@ -709,6 +709,22 @@ Also fixed 2026-11-28: every PS2 launch failed when the saved emulator choice
 still named PCSX2's old runner ID (`crates/core/src/runners.rs`), and melonDS
 needed a rebuild because its local container image was gone.
 
+### Moving the fixes to another PC
+
+The fixes need no package of their own: clone the repository, build Marquee, and
+its recipes seed settings, per-title configs, game patches and keyboard bindings
+at first launch (settings you already have are kept). Not carried by the
+repository:
+
+- Prepared game folders and shadPS4 add-ons (add-ons live in the shadPS4 profile,
+  `xdg-data/shadPS4/addcont/<title ID>/`, not beside the game).
+- BIOS, firmware, keys and saves.
+- Locally built things: the patched LibOrbisPkg and the BlastEm and melonDS
+  container images. Their recipes are in `catalog/source-builds/`.
+- Exact emulator versions where a recipe follows the latest release: Azahar,
+  DuckStation, Flycast, PCSX2, RMG, RPCS3 and Vita3K. shadPS4 is pinned to
+  0.21.0 since 2026-11-28.
+
 Keyboard notes: Saturn (Ymir) Start is `F`. In Xenia's "No active profile"
 popup press Left, then Enter. In shadPS4's **own** dialogs (such as the save-slot picker) confirm
 with Space; the key mapped to Cross works only inside the game.

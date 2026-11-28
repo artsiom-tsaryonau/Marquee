@@ -11,6 +11,11 @@
     "win"
   ],
   "archive_appimage": "Shadps4-sdl.AppImage",
+  "download": {
+    "url": "https://github.com/shadps4-emu/shadPS4/releases/download/v.0.21.0/shadps4-linux-sdl-0.21.0.zip",
+    "sha256": "7c41c58254461d742b5edf564e23795697b63e9e46de11d0e1ed67bd2cbaae68",
+    "version": "v.0.21.0"
+  },
   "binary": "AppRun",
   "open_args": [
     "-b"
