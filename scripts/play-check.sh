@@ -7,7 +7,9 @@
 #                         [--size 1280x720] [--record] [--out DIR]
 #
 # Needs gamescope (with gamescopectl), and for --record GStreamer pipewiresrc and
-# openh264enc. Uses target/release/marquee unless MARQUEE_BIN is set.
+# openh264enc. Uses target/release/marquee unless MARQUEE_BIN is set. Games get no
+# audio server (silent); scripts/play_check_audio_guard.py kills the game if a
+# stream still reaches an output.
 set -euo pipefail
 
 usage() { sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
@@ -33,33 +35,30 @@ out=${out:-$root/data/play-checks/$(date +%Y%m%d-%H%M%S)-$id}
 mkdir -p "$out"
 runtime=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
 
-# Sound goes to a private null sink, never to the speakers. SDL, PulseAudio and
-# PipeWire clients all follow these variables; the sink is removed at the end.
-sink="marquee_check_$$"
-module=$(pactl load-module module-null-sink sink_name="$sink" \
-    sink_properties=device.description="Marquee-play-check") || {
-    echo "could not create a silent audio sink; not starting the game" >&2
-    exit 1
-}
-# On any exit, stop the game before removing the sink: a removed sink's streams
-# would otherwise move to the default output (the speakers).
+# Silence: the game gets no audio server at all. SDL uses its dummy driver, and
+# PulseAudio/PipeWire (also behind ALSA's pipewire plugin) point at sockets that do
+# not exist, so nothing can reach the speakers whatever device a game asks for.
+silent_dir=$(mktemp -d)
+# Only the game gets these (after gamescope's --): gamescope and the recorder still
+# need PipeWire for the video stream.
+silence="\"env\",\"SDL_AUDIODRIVER=dummy\",\"SDL_AUDIO_DRIVER=dummy\",\"ALSOFT_DRIVERS=null\",\"PULSE_SERVER=unix:$silent_dir/no-pulse\",\"PIPEWIRE_REMOTE=$silent_dir/no-pipewire\""
+# On any exit, stop the game first.
 cleanup() {
     pkill -KILL -f "gamescope --backend headless -W $w -H $h" 2>/dev/null || true
-    sleep 1
-    pactl unload-module "$module" 2>/dev/null || true
-    rm -f "$marker"
+    kill "${guard:-}" 2>/dev/null || true
+    rm -rf "$marker" "$silent_dir"
 }
 trap cleanup EXIT
 trap 'exit 130' INT TERM
-export PULSE_SINK="$sink" PIPEWIRE_NODE="$sink"
-# SDL can talk to PipeWire directly and ignore PULSE_SINK; make it use PulseAudio.
-export SDL_AUDIODRIVER=pulseaudio SDL_AUDIO_DRIVER=pulseaudio
 
 marker=$(mktemp)
 export MARQUEE_DISPLAY_MODE=window
-export MARQUEE_LAUNCH_PREFIX="[\"gamescope\",\"--backend\",\"headless\",\"-W\",\"$w\",\"-H\",\"$h\",\"-w\",\"$w\",\"-h\",\"$h\",\"--\"]"
+export MARQUEE_LAUNCH_PREFIX="[\"gamescope\",\"--backend\",\"headless\",\"-W\",\"$w\",\"-H\",\"$h\",\"-w\",\"$w\",\"-h\",\"$h\",\"--\",$silence]"
 "$bin" launch "$id" > "$out/marquee.log" 2>&1 &
 launcher=$!
+# Safety net: any stream that still reaches a real output kills the game at once.
+python3 "$root/scripts/play_check_audio_guard.py" "$((seconds + 30))" > "$out/audio.log" 2>&1 &
+guard=$!
 
 display=""
 for _ in $(seq 1 100); do

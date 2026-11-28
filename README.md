@@ -97,7 +97,7 @@ separate levels of support. The current emulator names and roles are:
 | Original Xbox | **xemu** | Library launch with the owner's BIOS, MCPX ROM and hard disk; XISO images (redump trimmed); Forza Motorsport starts |
 | PSP / PS Vita | **PPSSPP / Vita3K** | PSP library launch (ISO/CSO/CHD/PBP); Persona 3 Portable runs. Vita3K installed with firmware 3.74, games need their licence key |
 | GameCube / Switch | **Dolphin / Eden** | Library launch; Metroid Prime (CISO) and Nightshade / Breath of the Wild run; Switch keys and firmware placed by Marquee |
-| PS4 / PS5 | **shadPS4 / KytyPS5** | PS4 library launch of extracted games named from `param.sfo`, per-game fixes as config overrides; The Last Guardian runs. KytyPS5 setup only |
+| PS4 / PS5 | **shadPS4 / KytyPS5** | PS4 library launch of extracted games named from `param.sfo`, per-game fixes as config overrides; The Last Guardian and The King of Fighters XV reach their title screens. KytyPS5 setup only |
 
 Managed native-engine recipes include **Shipwright / Ship of Harkinian**,
 **2Ship2Harkinian**, **Zelda 64: Recompiled**, **sm64coopdx**, **Fallout 2 Community
