@@ -329,64 +329,32 @@ setup, native saves and gameplay/relaunch acceptance remain open. No game data
 was downloaded or an engine launched by this installation-only test.
 
 
-## Play audit (2026-11-28)
+## Play status and open work (2026-11-28)
 
-Every library game was started through Library Play on a hidden display, sent
-keyboard input and checked from screenshots (`scripts/play-check.sh --drive`).
-Saves are restored after each run. "Gameplay" means the game was controlled for a
-short while, not completed. Sound was not checked, performance only where noted.
+What runs, what each game needed and when it was checked lives only in the
+**compatibility registry**, [`catalog/compat.json`](../catalog/compat.json);
+`marquee compat` joins it with the library. Add or change an entry there after a
+play check. "gameplay" means controlled for a while, not completed; sound is not
+judged by play checks.
 
-| State | Games |
-| --- | --- |
-| Gameplay | The Last of Us Remastered (60 FPS), Metroid Prime, Breath of the Wild (30 FPS), Super Smash Bros. (a match), Forza Motorsport (a race, after the keyboard fix), GTA Vice City (after the PS2 fix), Silent Hill, Vanquish (tutorial; popup: Left, then Enter), God of War III (first fight, no fix needed), Demon's Souls and MotorStorm (after the PS3 video setting) |
-| Story, menus or race setup reached | Persona 3 Portable, Nightshade (name entry), Pokémon Moon, Pokémon Platinum (after rebuilding the missing melonDS image), Driver Renegade, XS Moto (race loading), Metal Gear Solid (difficulty select), Euro 96 (main menu; Saturn Start is F) |
-| Boots to video or intro only | Forza Motorsport 4, Need for Speed Underground |
-| Broken or blocked | The Last Guardian (silent, stuck at the wake-up prompt), KOF XV (cursor cannot leave Decline on the user agreement), Sonic 2 and Streets of Rage 2 (BlastEm closes on Enter in play checks, where it has no audio device), Forza Motorsport 2 (black screen) |
-| Inconclusive | Dreamcast Collection (stayed on its game picker) |
-| Missing file | samsh5nd (Neo Geo) |
+**Open, in order:**
 
-**Demon's Souls PS3 (`NPEB01202`) unblocked (2026-11-28).** The owner supplied
-the licence file; RPCS3 unlocks the program with it. The game is installed in
-Marquee's RPCS3 profile with the `.rap` in `exdata/`. It is a Library entry
-(installed-game scanning, new) and plays in RPCS3 through Library Play: new game,
-character creation and walking in the tutorial, after enabling Write Color
-Buffers for `BLES00932` (the world was black without it). Keyboard: X is Cross,
-Enter is Start. Sound and longer play are not checked. Soulbrandt 0.2.0
-(downloaded, checksum-verified) has not been run; it is now optional.
+1. **Broken:** Forza Motorsport 2 (black screen); The Last Guardian (needs the
+   console's `libSceNgs2.sprx`, or the missing Ngs2 calls written into a
+   source-built shadPS4); samsh5nd (missing file).
+2. **Partly working:** Dreamcast Collection's picker; Forza Motorsport 4 and Need
+   for Speed past their intros; the "menus" rows played further.
+3. **Untested:** the 43 Ren'Py games and 10 Lutris entries (wired in
+   2026-11-28; one Ren'Py copy ran for 40 s, Lutris scripts export for all 10),
+   Metal Gear Solid disc 2, MotorStorm `NPEA90006`, King of Fighters '94.
+4. **Not wired:** Vita (Vita3K has no library adapter; the MotorStorm RC
+   packages also need their licences), PS5.
+5. **Packaging:** MP2 (launch an imported game in a second library), desktop UI,
+   installed PS3 games and Switch updates.
+6. **Waiting for the owner:** the Red Dead Redemption and KOF XV agreements;
+   hearing The Order's sound; Pacific Rift add-on licences.
 
-**The Order: 1886 (2026-11-28) plays from Library Play.** `CUSA00076` with 1.02
-beside it; shadPS4 0.21.0 crashes on it, so the `order1886` runner (JulioCacko's
-port 0.2.7, pinned; `marquee emulators install order1886`) is used for its title
-IDs. It runs sandboxed (no network or home folder; GPU and controllers only;
-one-way sound, see `catalog/launchers/order1886.sh`). Checked: title, menu, new
-game, load, prologue quick-time events, camera and walking; audio signal arrives
-at a silent test output. Not checked: by ear, combat, a desktop session, a
-gamepad. Keys: Space Cross, Q Triangle, E Square, Left Shift Circle, WASD move,
-arrows camera.
-
-**MotorStorm (`BCES00006`, 2026-11-28)** plays through Library Play after the
-same Write Color Buffers setting (a race; `T` accelerates, `X` boosts). **Pacific
-Rift (`BCES00129`) plays too:** with the owner's disc key beside the image
-(`<image name>.dkey`, no PS3Dec) RPCS3 decrypts while reading, and the same Write
-Color Buffers setting removes a white-out in races. Checked: menus and driving.
-Update 1.03 is
-installed with the new `marquee ps3-install <pkg>... [--rap <file>]`; both
-add-ons need their own `.rap` licences, which are not on this PC.
-
-**Red Dead Redemption (`CUSA36843` + 1.04, 2026-11-28)** is in the library and
-boots in shadPS4 0.21.0 to Rockstar's licence agreement. Accepting it is left to
-the owner; nothing past it is tested. Play checks restore saves, so the owner's
-acceptance must happen in a normal Play session.
-
-**Next, in order:** the broken and inconclusive rows; Demon's Souls PS3
-(`NPEB01202`) through Soulbrandt; The Order: 1886 (`CUSA00076` + 1.02) through
-JulioCacko's port; Red Dead Redemption (`CUSA36843`) in shadPS4; then the
-`.marquee` package ([shape](PORTABLE_PACKAGES.md)). Third-party ports are
-downloaded with checksums and run sandboxed.
-
-Play-check gap: containerized runners (BlastEm, melonDS) mount the host's real
-PipeWire and PulseAudio sockets, so the private silent server and the leak guard
-do not cover them. BlastEm's log showed it opened no audio device in these runs.
+Third-party ports are downloaded with pinned checksums and run sandboxed.
 
 ## Current owner priority: emulators the owner plays (2026-11-27)
 

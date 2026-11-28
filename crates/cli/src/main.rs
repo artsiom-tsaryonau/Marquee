@@ -98,6 +98,11 @@ enum Command {
     Ps3Inspect {
         path: PathBuf,
     },
+    /// What has been seen to run, for every library game (catalog/compat.json)
+    Compat {
+        #[arg(long)]
+        json: bool,
+    },
     /// Install PS3 packages (game, update, add-ons) into Marquee's RPCS3, then rescan
     Ps3Install {
         /// Packages in install order: a game before its update
@@ -822,6 +827,27 @@ fn run() -> marquee_core::error::Result<()> {
             } => core.link_catalogue(&edition_id, &record_id, &media_id)?,
             CatalogueCmd::Unlink { edition_id } => core.unlink_catalogue(&edition_id)?,
         },
+        Command::Compat { json } => {
+            let rows = core.compat_report()?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&rows)?);
+            } else {
+                for row in &rows {
+                    let status = format!("{:?}", row.status).to_lowercase();
+                    let note = row.note.as_deref().unwrap_or("");
+                    println!("{status:9} {:8} {}  {note}", row.system, row.title);
+                }
+                let mut totals = std::collections::BTreeMap::new();
+                for row in &rows {
+                    *totals.entry(row.status).or_insert(0) += 1;
+                }
+                let totals: Vec<_> = totals
+                    .iter()
+                    .map(|(s, n)| format!("{n} {}", format!("{s:?}").to_lowercase()))
+                    .collect();
+                println!("{} games: {}", rows.len(), totals.join(", "));
+            }
+        }
         Command::Ps3Install { packages, rap } => {
             let installed = core.install_ps3_packages(&packages, &rap)?;
             core.scan(None, None)?;

@@ -1,0 +1,231 @@
+{
+  "schema": 1,
+  "games": [
+    {
+      "system": "ps4",
+      "key": "CUSA00556",
+      "status": "gameplay",
+      "checked": "2026-11-28",
+      "note": "60 FPS. Seeded 2-second assert patch, precise readbacks, pipeline cache.",
+      "runner": "shadps4"
+    },
+    {
+      "system": "ps4",
+      "key": "CUSA00076",
+      "status": "gameplay",
+      "checked": "2026-11-28",
+      "note": "Prologue walking. shadPS4 crashes; uses the title runner. Sound reaches a silent test output, not yet heard.",
+      "runner": "order1886"
+    },
+    {
+      "system": "ps4",
+      "key": "CUSA03745",
+      "status": "broken",
+      "checked": "2026-11-28",
+      "note": "Silent; stops at the wake-up prompt. shadPS4 stubs the Ngs2 sound library.",
+      "runner": "shadps4"
+    },
+    {
+      "system": "ps4",
+      "key": "CUSA25273",
+      "status": "owner",
+      "checked": "2026-11-28",
+      "note": "Title screen. A user agreement is the owner's to accept; the cursor did not leave Decline in tests.",
+      "runner": "shadps4"
+    },
+    {
+      "system": "ps4",
+      "key": "CUSA36843",
+      "status": "owner",
+      "checked": "2026-11-28",
+      "note": "Boots to Rockstar's licence agreement, which is the owner's to accept.",
+      "runner": "shadps4"
+    },
+    {
+      "system": "ps3",
+      "key": "BLES00932",
+      "status": "gameplay",
+      "checked": "2026-11-28",
+      "note": "Tutorial walking. Write Color Buffers. Installed package with its .rap.",
+      "runner": "rpcs3"
+    },
+    {
+      "system": "ps3",
+      "key": "BCUS98111",
+      "status": "gameplay",
+      "checked": "2026-11-28",
+      "note": "First fight. No fix; the first shader build takes minutes.",
+      "runner": "rpcs3"
+    },
+    {
+      "system": "ps3",
+      "key": "BCES00006",
+      "status": "gameplay",
+      "checked": "2026-11-28",
+      "note": "A race. Write Color Buffers. T accelerates, X boosts.",
+      "runner": "rpcs3"
+    },
+    {
+      "system": "ps3",
+      "key": "BCES00129",
+      "status": "gameplay",
+      "checked": "2026-11-28",
+      "note": "Driving. Needs its disc key; Write Color Buffers. Update 1.03 installed; add-ons need licences.",
+      "runner": "rpcs3"
+    },
+    {
+      "system": "gamecube",
+      "key": "Metroid Prime (USA) (Rev 2)",
+      "status": "gameplay",
+      "checked": "2026-11-28",
+      "note": "Movement and shooting."
+    },
+    {
+      "system": "switch",
+      "key": "The Legend of Zelda Breath of the Wild [01007EF00011E800]",
+      "status": "gameplay",
+      "checked": "2026-11-28",
+      "note": "30 FPS, walking."
+    },
+    {
+      "system": "switch",
+      "key": "Nightshade [010042300C4F6000]",
+      "status": "menus",
+      "checked": "2026-11-28",
+      "note": "Reaches name entry."
+    },
+    {
+      "system": "wiiu",
+      "key": "0005000010145000",
+      "status": "gameplay",
+      "checked": "2026-11-28",
+      "note": "A match, keyboard GamePad."
+    },
+    {
+      "system": "xbox",
+      "key": "Forza Motorsport",
+      "status": "gameplay",
+      "checked": "2026-11-28",
+      "note": "A race, after assigning the keyboard to port 1."
+    },
+    {
+      "system": "ps2",
+      "key": "SLUS_205.52",
+      "status": "gameplay",
+      "checked": "2026-11-28",
+      "note": "Walking, after the old runner ID fix."
+    },
+    {
+      "system": "ps2",
+      "key": "SLUS_208.11",
+      "status": "boots",
+      "checked": "2026-11-28",
+      "note": "Intro video only."
+    },
+    {
+      "system": "ps1",
+      "key": "SLUS_007.07",
+      "status": "gameplay",
+      "checked": "2026-11-28",
+      "note": "Reaches the town."
+    },
+    {
+      "system": "ps1",
+      "key": "SLUS_005.94",
+      "status": "menus",
+      "checked": "2026-11-28",
+      "note": "Difficulty selection."
+    },
+    {
+      "system": "ps1",
+      "key": "SLES_040.95",
+      "status": "menus",
+      "checked": "2026-11-28",
+      "note": "Race loading screen."
+    },
+    {
+      "system": "xbox360",
+      "key": "53450841",
+      "status": "gameplay",
+      "checked": "2026-11-28",
+      "note": "Tutorial. In the 'No active profile' popup press Left, then Enter."
+    },
+    {
+      "system": "xbox360",
+      "key": "4D530910",
+      "status": "boots",
+      "checked": "2026-11-28",
+      "note": "Intro video."
+    },
+    {
+      "system": "xbox360",
+      "key": "4D5307EA",
+      "status": "broken",
+      "checked": "2026-11-28",
+      "note": "Black screen."
+    },
+    {
+      "system": "xbox360",
+      "key": "5345085A",
+      "status": "menus",
+      "checked": "2026-11-28",
+      "note": "Stays on the game picker; not yet passed."
+    },
+    {
+      "system": "genesis",
+      "key": "Sonic The Hedgehog 2 (World) (Rev B) (Sonic Compilation ~ Sonic Classics)",
+      "status": "gameplay",
+      "checked": "2026-11-28",
+      "note": "Level 1. The earlier 'closes on Enter' was the test harness."
+    },
+    {
+      "system": "genesis",
+      "key": "Streets of Rage 2 (USA)",
+      "status": "gameplay",
+      "checked": "2026-11-28",
+      "note": "First stage."
+    },
+    {
+      "system": "psp",
+      "key": "Persona 3 Portable [ULES01523]",
+      "status": "menus",
+      "checked": "2026-11-28",
+      "note": "Story dialogue."
+    },
+    {
+      "system": "3ds",
+      "key": "Pokemon Moon (axekin.com)",
+      "status": "menus",
+      "checked": "2026-11-28",
+      "note": "Story dialogue."
+    },
+    {
+      "system": "3ds",
+      "key": "Driver - Renegade (axekin.com)",
+      "status": "menus",
+      "checked": "2026-11-28",
+      "note": "Mission cinematic."
+    },
+    {
+      "system": "ds",
+      "key": "3787 - Pokemon - Edicion Platino (Spain)",
+      "status": "menus",
+      "checked": "2026-11-28",
+      "note": "New-game story."
+    },
+    {
+      "system": "saturn",
+      "key": "UEFA Euro 96 - England   (axekin.com)",
+      "status": "menus",
+      "checked": "2026-11-28",
+      "note": "Main menu. Start is F."
+    },
+    {
+      "system": "neogeo",
+      "key": "samsh5nd",
+      "status": "broken",
+      "checked": "2026-11-28",
+      "note": "A required file is missing."
+    }
+  ]
+}
