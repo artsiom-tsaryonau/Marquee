@@ -23,7 +23,7 @@ use std::time::Duration;
 
 const CATALOGUE: &[&str] = &[
     include_str!("../../../catalog/emulators/renpy.json"),
-    include_str!("../../../catalog/emulators/lutris.json"),
+    include_str!("../../../catalog/emulators/windows.json"),
     include_str!("../../../catalog/emulators/order1886.json"),
     include_str!("../../../catalog/emulators/xenia.json"),
     include_str!("../../../catalog/emulators/ymir.json"),
@@ -558,7 +558,7 @@ fn bundled_launcher(name: &str) -> Option<&'static str> {
     match name {
         "order1886" => Some(include_str!("../../../catalog/launchers/order1886.sh")),
         "renpy" => Some(include_str!("../../../catalog/launchers/renpy.sh")),
-        "lutris" => Some(include_str!("../../../catalog/launchers/lutris.sh")),
+        "windows" => Some(include_str!("../../../catalog/launchers/windows.py")),
         _ => None,
     }
 }

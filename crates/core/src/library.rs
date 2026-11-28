@@ -172,9 +172,6 @@ fn walk_dir(
         if descriptor.id == "renpy" && !is_renpy_start_script(&path) {
             continue; // Libraries inside a game ship shell scripts of their own.
         }
-        if descriptor.id == "lutris" && !is_lutris_game(&path) {
-            continue;
-        }
         let ext = path
             .extension()
             .and_then(|e| e.to_str())
@@ -321,7 +318,11 @@ fn ingest_disc(
         .or_else(|| installed.as_ref().map(|m| m.title.replace(['™', '®'], "")))
         .or_else(|| wiiu.as_ref().map(|m| m.title.clone()))
         .or_else(|| ps4.as_ref().map(|m| m.title.replace(['™', '®'], "")))
-        .or_else(|| (descriptor.id == "lutris").then(|| lutris_title(path)))
+        .or_else(|| {
+            (descriptor.id == "windows")
+                .then(|| crate::windows::read(path).ok().map(|game| game.name))
+                .flatten()
+        })
         .unwrap_or_else(|| title_from_filename(path));
     db.upsert_edition(
         &edition_id,
@@ -378,31 +379,6 @@ fn is_renpy_start_script(path: &Path) -> bool {
         && path.parent().is_some_and(|dir| {
             dir.join("renpy").is_dir() && dir.join("game").is_dir() && dir.join("lib").is_dir()
         })
-}
-
-/// A Lutris per-game config has a top-level `game:` section.
-fn is_lutris_game(path: &Path) -> bool {
-    path.extension().is_some_and(|e| e == "yml")
-        && fs::metadata(path).is_ok_and(|m| m.len() <= 256 * 1024)
-        && fs::read_to_string(path).is_ok_and(|raw| raw.lines().any(|line| line == "game:"))
-}
-
-/// `my-game-1789379322.yml` is shown as `My Game`.
-fn lutris_title(path: &Path) -> String {
-    let stem = title_from_filename(path);
-    let slug = match stem.rsplit_once('-') {
-        Some((slug, stamp)) if stamp.bytes().all(|b| b.is_ascii_digit()) => slug,
-        _ => &stem,
-    };
-    slug.split('-')
-        .filter(|word| !word.is_empty())
-        .map(|word| {
-            let mut letters = word.chars();
-            let first = letters.next().map(|c| c.to_ascii_uppercase());
-            first.into_iter().chain(letters).collect::<String>()
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
 }
 
 /// PARAM.SFO of a PS3 game installed in RPCS3 (`<ID>/USRDIR/EBOOT.BIN`). Category
@@ -612,7 +588,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn only_a_games_own_script_or_lutris_config_is_listed() {
+    fn only_a_games_own_start_script_is_listed() {
         let dir = tempfile::tempdir().unwrap();
         let game = dir.path().join("Example-1.0-pc");
         for folder in ["renpy", "game", "lib/py3"] {
@@ -624,14 +600,6 @@ mod tests {
         assert!(is_renpy_start_script(&game.join("Example.sh")));
         assert!(!is_renpy_start_script(&game.join("update.sh")));
         assert!(!is_renpy_start_script(&game.join("lib/py3/helper.sh")));
-
-        let config = dir.path().join("my-game-1789379322.yml");
-        fs::write(&config, "game:\n  exe: a.exe\nslug: my-game\n").unwrap();
-        assert!(is_lutris_game(&config));
-        assert_eq!(lutris_title(&config), "My Game");
-        let other = dir.path().join("settings.yml");
-        fs::write(&other, "system:\n  game: x\n").unwrap();
-        assert!(!is_lutris_game(&other));
     }
 
     #[test]

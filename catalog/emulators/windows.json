@@ -1,0 +1,15 @@
+{
+  "id": "windows",
+  "name": "Windows games (Proton)",
+  "kind": "emulator",
+  "systems": [
+    "windows"
+  ],
+  "binary": "marquee-run.py",
+  "launcher": "windows",
+  "config_subdir": "windows",
+  "launch": [
+    "{rom}"
+  ],
+  "requirement": "Runs Windows games with Marquee's own pinned umu-launcher and copies of Proton. Run `marquee windows setup` once. Games are not sandboxed."
+}

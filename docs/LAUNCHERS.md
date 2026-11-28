@@ -4,6 +4,24 @@ Current shortcut features were implemented 2026-10-20. Direction updated 2026-10
 
 The target normal flow detects and manages Steam/Legendary/gogdl/umu/Proton dependencies from Marquee. Users should not need this executable/argument editor to connect stores or play a supported game. The editor remains an advanced escape hatch. Open **Tools** from the sidebar or Library header. Store/launcher marks and source references are documented [below](#launcher-and-store-marks).
 
+## Windows games without Lutris (2026-11-28)
+
+Marquee runs Windows games itself: a pinned umu-launcher and its own copies of
+Proton builds under `<data>/windows/`, one `games/<slug>.mqwin` file per game,
+and the game's existing prefix (saves live there).
+
+    marquee windows add <program.exe> --name "Name" [--prefix <dir>] [--proton <build>]
+    marquee windows run <game.mqwin> winecfg        # or winetricks <verbs>, or an installer
+    marquee windows import-lutris [--dry-run]       # one-time takeover; reads Lutris only
+
+**Before uninstalling Lutris:** keep `~/Games/` (the prefixes, including
+`umu/umu-default`) and `~/.local/share/umu/` (umu's Steam runtime). Marquee does
+not offer Lutris's online install scripts, a settings editor, or Epic/GOG sign-in;
+Epic and EA run as their own launchers. Steam games stay in Steam. umu may
+download or update its Steam runtime. Verified: Notepad through the whole chain in
+a test library, and stopping it left no process in the prefix. The imported games
+have not been started from Marquee.
+
 ## What works
 
 - Launcher cards show readiness, executable, configured argument count, and pin state.

@@ -1,0 +1,11 @@
+{
+  "id": "windows",
+  "display_name": "Windows",
+  "supported_extensions": [
+    "mqwin"
+  ],
+  "skipped_extensions": [],
+  "runner_kind": "emulator",
+  "emulator": "windows",
+  "notes": "One .mqwin file per game, created by `marquee windows add` or `marquee windows import-lutris`."
+}

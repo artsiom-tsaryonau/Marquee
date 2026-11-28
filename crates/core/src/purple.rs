@@ -541,6 +541,18 @@ fn download(
     })?;
     Ok(())
 }
+/// Download the pinned umu-launcher zipapp to `dest` (Windows games use it too).
+pub(crate) fn fetch_umu(dest: &Path) -> Result<()> {
+    let parent = dest
+        .parent()
+        .ok_or_else(|| AppError::new("ARCHIVE", "bad umu destination"))?;
+    fs::create_dir_all(parent)?;
+    let temp = tempfile::tempdir_in(parent)?;
+    let tar = temp.path().join("umu.tar");
+    download(UMU_URL, UMU_SHA, &tar, 1024 * 1024, |_| {})?;
+    extract_helper(&tar, dest)
+}
+
 fn extract_helper(tar: &Path, dest: &Path) -> Result<()> {
     let mut archive = tar::Archive::new(fs::File::open(tar)?);
     let mut helper = None;

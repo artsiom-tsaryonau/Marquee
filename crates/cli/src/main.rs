@@ -103,6 +103,9 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Windows games run by Marquee itself (umu-launcher and Proton)
+    #[command(subcommand)]
+    Windows(WindowsCmd),
     /// Install PS3 packages (game, update, add-ons) into Marquee's RPCS3, then rescan
     Ps3Install {
         /// Packages in install order: a game before its update
@@ -122,6 +125,34 @@ enum Command {
         path: PathBuf,
     },
     Health,
+}
+
+#[derive(Subcommand)]
+enum WindowsCmd {
+    /// Download Marquee's umu-launcher and create the games folder
+    Setup,
+    /// Take over the Windows games configured in Lutris (its files are only read)
+    ImportLutris {
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Add a Windows program to the library
+    Add {
+        exe: PathBuf,
+        #[arg(long)]
+        name: String,
+        /// Use an existing Wine prefix; otherwise the game gets its own
+        #[arg(long)]
+        prefix: Option<PathBuf>,
+        #[arg(long, default_value = "GE-Proton11-7-x86_64")]
+        proton: String,
+    },
+    /// Run something in a game's prefix: an installer, winecfg, winetricks
+    Run {
+        game_file: PathBuf,
+        #[arg(required = true, trailing_var_arg = true, allow_hyphen_values = true)]
+        program: Vec<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -847,6 +878,26 @@ fn run() -> marquee_core::error::Result<()> {
                     .collect();
                 println!("{} games: {}", rows.len(), totals.join(", "));
             }
+        }
+        Command::Windows(WindowsCmd::Setup) => {
+            println!("{}", core.setup_windows()?.display());
+        }
+        Command::Windows(WindowsCmd::ImportLutris { dry_run }) => {
+            let report = core.import_lutris(dry_run)?;
+            println!("{}", serde_json::to_string_pretty(&report)?);
+        }
+        Command::Windows(WindowsCmd::Add {
+            exe,
+            name,
+            prefix,
+            proton,
+        }) => {
+            let path = core.add_windows_game(&exe, &name, prefix, &proton)?;
+            println!("{}", path.display());
+        }
+        Command::Windows(WindowsCmd::Run { game_file, program }) => {
+            let code = core.run_in_windows_game(&game_file, &program)?;
+            println!("exit {code}");
         }
         Command::Ps3Install { packages, rap } => {
             let installed = core.install_ps3_packages(&packages, &rap)?;

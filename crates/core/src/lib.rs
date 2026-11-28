@@ -52,6 +52,7 @@ mod storage_moves;
 pub mod streaming;
 pub mod transfer;
 pub mod wanted;
+pub mod windows;
 pub mod xenia_saves;
 
 use crate::db::Db;
