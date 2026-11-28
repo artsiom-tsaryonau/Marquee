@@ -343,13 +343,18 @@ short while, not completed. Sound was not checked, performance only where noted.
 | Inconclusive | God of War III (still compiling shaders when time ran out), Dreamcast Collection (stayed on its game picker) |
 | Missing file | samsh5nd (Neo Geo) |
 
-**Demon's Souls PS3 (`NPEB01202`) is blocked (2026-11-28).** The package installs
-in RPCS3, but its program uses a local licence (NPD type 2) and RPCS3 asks for
-`EP0700-NPEB01202_00-DEMONSSOULSDL001.rap`, which the archive does not include.
-It needs that licence file from the owner's own console or account, or a disc
-dump (`BLUS30443` / `BLES00932`), which Soulbrandt also supports. Soulbrandt
-0.2.0 for Linux is downloaded and checksum-verified under
-`<data>/builds/soulbrandt-0.2.0/`; it has not been run.
+**Demon's Souls PS3 (`NPEB01202`) unblocked (2026-11-28).** The owner supplied
+the licence file; RPCS3 unlocks the program with it. The game is installed in
+Marquee's RPCS3 profile with the `.rap` in `exdata/`. It has not been booted yet,
+is not a Library entry, and Soulbrandt 0.2.0 (downloaded, checksum-verified) has
+not been run.
+
+**The Order: 1886 (2026-11-28).** `CUSA00076` with 1.02 beside it is in the
+library. shadPS4 0.21.0 crashes at 33 s (`tiling.h` GetArrayMode). JulioCacko's
+port 0.2.7 (checksum-verified) runs on Linux in
+`<data>/builds/order1886-0.2.7/sandbox.sh` (no network, no home folder, no sound
+devices): title, new game, save, and the opening cutscene at 30 FPS. Space is
+Cross. Gameplay and sound are not checked, and it is not wired into Library Play.
 
 **Next, in order:** the broken and inconclusive rows; Demon's Souls PS3
 (`NPEB01202`) through Soulbrandt; The Order: 1886 (`CUSA00076` + 1.02) through
