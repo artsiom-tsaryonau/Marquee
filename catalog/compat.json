@@ -7,7 +7,8 @@
       "status": "gameplay",
       "checked": "2026-11-28",
       "note": "60 FPS. Seeded 2-second assert patch, precise readbacks, pipeline cache.",
-      "runner": "shadps4"
+      "runner": "shadps4",
+      "upstream": "shadPS4's Linux report says nothing runs (updated 2026-09-02)."
     },
     {
       "system": "ps4",
@@ -15,7 +16,8 @@
       "status": "gameplay",
       "checked": "2026-11-28",
       "note": "Prologue walking. shadPS4 crashes; uses the title runner. Sound reaches a silent test output, not yet heard.",
-      "runner": "order1886"
+      "runner": "order1886",
+      "upstream": "shadPS4's Linux report: boots."
     },
     {
       "system": "ps4",
@@ -23,23 +25,26 @@
       "status": "broken",
       "checked": "2026-11-28",
       "note": "Silent; stops at the wake-up prompt. Tried shadPS4 preview d117c44 (2026-11-28), which adds Ngs2: still silent and stuck, log 'Custom rack creation is not implemented'. Retest when shadPS4 implements Ngs2 custom racks.",
-      "runner": "shadps4"
+      "runner": "shadps4",
+      "upstream": "shadPS4's Linux report: in-game. Its reports require the console's own firmware libraries."
     },
     {
       "system": "ps4",
       "key": "CUSA25273",
-      "status": "owner",
+      "status": "gameplay",
       "checked": "2026-11-28",
-      "note": "Title screen. A user agreement is the owner's to accept; the cursor did not leave Decline in tests.",
-      "runner": "shadps4"
+      "note": "A Versus match at 60 FPS. Accept the agreement with short taps: held directions repeat and wrap.",
+      "runner": "shadps4",
+      "upstream": "No shadPS4 report for this ID."
     },
     {
       "system": "ps4",
       "key": "CUSA36843",
-      "status": "owner",
+      "status": "gameplay",
       "checked": "2026-11-28",
-      "note": "Boots to Rockstar's licence agreement, which is the owner's to accept.",
-      "runner": "shadps4"
+      "note": "Walking at Armadillo, 28-30 FPS. Three Rockstar agreements first (accepted with the owner's approval).",
+      "runner": "shadps4",
+      "upstream": "No shadPS4 report for this ID."
     },
     {
       "system": "ps3",
@@ -47,7 +52,8 @@
       "status": "gameplay",
       "checked": "2026-11-28",
       "note": "Tutorial walking. Write Color Buffers. Installed package with its .rap.",
-      "runner": "rpcs3"
+      "runner": "rpcs3",
+      "upstream": "RPCS3: Playable."
     },
     {
       "system": "ps3",
@@ -55,7 +61,8 @@
       "status": "gameplay",
       "checked": "2026-11-28",
       "note": "First fight. No fix; the first shader build takes minutes.",
-      "runner": "rpcs3"
+      "runner": "rpcs3",
+      "upstream": "RPCS3: Ingame."
     },
     {
       "system": "ps3",
@@ -63,7 +70,8 @@
       "status": "gameplay",
       "checked": "2026-11-28",
       "note": "A race. Write Color Buffers. T accelerates, X boosts.",
-      "runner": "rpcs3"
+      "runner": "rpcs3",
+      "upstream": "RPCS3: Playable."
     },
     {
       "system": "ps3",
@@ -71,7 +79,8 @@
       "status": "gameplay",
       "checked": "2026-11-28",
       "note": "Driving. Needs its disc key; Write Color Buffers. Update 1.03 installed; add-ons need licences.",
-      "runner": "rpcs3"
+      "runner": "rpcs3",
+      "upstream": "RPCS3: Playable."
     },
     {
       "system": "gamecube",
@@ -232,8 +241,9 @@
       "key": "NPEA80017",
       "status": "gameplay",
       "checked": "2026-11-28",
-      "note": "A race. Store release (installs to folder NPEA90006, serial NPEA80017). Write Color Buffers. E/T drive.",
-      "runner": "rpcs3"
+      "note": "A race. The MotorStorm Demo (installs to folder NPEA90006). Write Color Buffers. E/T drive.",
+      "runner": "rpcs3",
+      "upstream": "RPCS3: Playable (listed as MotorStorm Demo)."
     }
   ]
 }

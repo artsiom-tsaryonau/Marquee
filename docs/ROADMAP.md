@@ -352,8 +352,8 @@ judged by play checks.
    packages also need their licences), PS5.
 5. **Packaging:** MP2 (launch an imported game in a second library), desktop UI,
    installed PS3 games and Switch updates.
-6. **Waiting for the owner:** the Red Dead Redemption and KOF XV agreements;
-   hearing The Order's sound; Pacific Rift add-on licences.
+6. **Waiting for the owner:** hearing The Order's sound; Pacific Rift add-on
+   licences.
 
 Third-party ports are downloaded with pinned checksums and run sandboxed.
 

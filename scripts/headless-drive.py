@@ -20,6 +20,8 @@ Commands (DISPLAY must name that XWayland):
     key KEYSYM [MS] [N]     press an X keysym (x, space, Return, Up) via XTest
     click X Y | move X Y    pointer in window coordinates via Gamescope's libei socket
     close [NAME]            ask the largest window (or the one titled NAME) to close
+    Menus repeat while a key is held (a long hold can wrap back to where it
+    started): navigate menus with short taps (`key Left 80`), `hold` to move.
     seq "STEP; STEP; ..."   play a script. Steps: wait SECONDS | key KEYSYM [MS] [N] |
                             hold KEYSYM[+KEYSYM] MS | click X Y | shot NAME
 

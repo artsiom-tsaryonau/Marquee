@@ -30,6 +30,9 @@ pub struct Entry {
     pub status: Status,
     pub checked: String,
     pub note: String,
+    /// What the emulator's own public list said when checked, for comparison.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub upstream: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub runner: Option<String>,
 }
@@ -41,6 +44,7 @@ pub struct Row {
     pub status: Status,
     pub checked: Option<String>,
     pub note: Option<String>,
+    pub upstream: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -89,6 +93,7 @@ impl Core {
                     status: found.map_or(Status::Untested, |e| e.status),
                     checked: found.map(|e| e.checked.clone()),
                     note: found.map(|e| e.note.clone()),
+                    upstream: found.and_then(|e| e.upstream.clone()),
                     system: game.system,
                     title: game.title,
                 }
