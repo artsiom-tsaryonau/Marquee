@@ -56,12 +56,20 @@ def main() -> int:
 
     child = subprocess.Popen(command, cwd=cwd, env=env)
     # Stop from Marquee signals the group; pass it on and still run post-exit.
+    stopped = []
+
+    def stop(number, _frame):
+        stopped.append(number)
+        child.send_signal(number)
+
     for number in (signal.SIGTERM, signal.SIGINT):
-        signal.signal(number, lambda n, _: child.send_signal(n))
+        signal.signal(number, stop)
     code = child.wait()
     after = game.get("post_exit")
     if after and len(sys.argv) == 2 and os.access(after, os.X_OK):
         subprocess.run([after], env=env, check=False)
+    if stopped:
+        return 0  # Being asked to close is not a crash, whatever Proton returns.
     return code if code >= 0 else 128 - code
 
 

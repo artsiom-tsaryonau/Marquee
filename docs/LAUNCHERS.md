@@ -19,8 +19,14 @@ and the game's existing prefix (saves live there).
 not offer Lutris's online install scripts, a settings editor, or Epic/GOG sign-in;
 Epic and EA run as their own launchers. Steam games stay in Steam. umu may
 download or update its Steam runtime. Verified: Notepad through the whole chain in
-a test library, and stopping it left no process in the prefix. The imported games
-have not been started from Marquee.
+a test library; one imported Unity game on the real desktop with `marquee launch`
+(Direct3D 12 on the GPU, sound, existing save folder kept, no Lutris process,
+nothing left after stop). A requested stop used to be recorded as a failure; the
+launcher now exits 0 for it. The other imported games are untested.
+
+**No console window:** Marquee starts games with no terminal and discards their
+output, for Windows games and for Ren'Py's `.sh` scripts alike (checked on the
+desktop with one of each).
 
 ## What works
 
