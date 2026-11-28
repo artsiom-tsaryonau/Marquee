@@ -5,6 +5,11 @@
 #
 #   scripts/play-check.sh <edition-id> [--seconds 60] [--shots 20,40,60]
 #                         [--size 1280x720] [--record] [--out DIR] [--drive] [--keep-saves]
+#                         [--visible]
+#
+# --visible shows the game in a window on the desktop, with sound, so the owner can
+# watch. Input from headless-drive.py still goes only to that window's private
+# display. Containerized runners and saves behave as in a hidden run.
 #
 # --drive keeps the game running until --seconds pass or OUT/stop appears, so
 # scripts/headless-drive.py can play it: `headless-drive.py --session OUT seq ...`.
@@ -17,10 +22,10 @@
 # stream still reaches an output.
 set -euo pipefail
 
-usage() { sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
+usage() { sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 2; }
 [ $# -ge 1 ] || usage
 id=$1; shift
-seconds=60; shots=""; size=1280x720; record=0; out=""; drive=0; keep_saves=0
+seconds=60; shots=""; size=1280x720; record=0; out=""; drive=0; keep_saves=0; visible=0
 while [ $# -gt 0 ]; do
     case $1 in
         --seconds) seconds=$2; shift 2 ;;
@@ -29,6 +34,7 @@ while [ $# -gt 0 ]; do
         --record) record=1; shift ;;
         --drive) drive=1; shift ;;
         --keep-saves) keep_saves=1; shift ;;
+        --visible) visible=1; shift ;;
         --out) out=$2; shift 2 ;;
         *) usage ;;
     esac
@@ -37,6 +43,9 @@ done
 w=${BASH_REMATCH[1]}; h=${BASH_REMATCH[2]}
 [ -n "$shots" ] || [ "$drive" = 1 ] || shots=$(seq -s, 15 15 "$seconds")
 root=$(cd "$(dirname "$0")/.." && pwd)
+backend=headless
+[ "$visible" = 0 ] || backend=wayland
+[ "$visible" = 0 ] || [ -n "${WAYLAND_DISPLAY:-}" ] || { echo "--visible needs the desktop's Wayland session" >&2; exit 2; }
 bin=${MARQUEE_BIN:-$root/target/release/marquee}
 out=${out:-$root/data/play-checks/$(date +%Y%m%d-%H%M%S)-$id}
 mkdir -p "$out"
@@ -72,7 +81,7 @@ silence="\"sh\",\"-c\",\"printf %s \\\"\$DISPLAY\\\" > '$out/xdisplay'; for s in
 # after gamescope exits: xemu ignores SIGTERM and would otherwise keep running.
 game_pids() { grep -lsz "^MARQUEE_PLAY_CHECK=$silent_dir\$" /proc/[0-9]*/environ 2>/dev/null | cut -d/ -f3 || true; }
 stop_game() {
-    pkill -TERM -f "gamescope --backend headless -W $w -H $h" 2>/dev/null || true
+    pkill -TERM -f "gamescope --backend $backend -W $w -H $h" 2>/dev/null || true
     for pid in $(game_pids); do kill -TERM "$pid" 2>/dev/null || true; done
     for _ in $(seq 1 50); do [ -n "$(game_pids)" ] || return 0; sleep 0.2; done
     for pid in $(game_pids); do kill -KILL "$pid" 2>/dev/null || true; done
@@ -81,7 +90,7 @@ stop_game() {
 # On any exit, stop the game first.
 cleanup() {
     stop_game
-    pkill -KILL -f "gamescope --backend headless -W $w -H $h" 2>/dev/null || true
+    pkill -KILL -f "gamescope --backend $backend -W $w -H $h" 2>/dev/null || true
     kill "${guard:-}" 2>/dev/null || true
     [ ${#audio_pids[@]} -eq 0 ] || kill "${audio_pids[@]}" 2>/dev/null || true
     if [ "${snapshot:-0}" = 1 ]; then
@@ -98,15 +107,24 @@ if [ "$keep_saves" = 0 ]; then
     python3 "$root/scripts/play_check_saves.py" snapshot "$out"
     snapshot=1
 fi
-start_silent_audio
+if [ "$visible" = 0 ]; then
+    start_silent_audio
+else
+    # Watched run: the game keeps the desktop's audio and runtime folder.
+    silence="${silence%%\"PULSE_SERVER=*}"
+    silence="${silence%,}"
+fi
 marker=$(mktemp)
 export MARQUEE_DISPLAY_MODE=window
-export MARQUEE_LAUNCH_PREFIX="[\"gamescope\",\"--backend\",\"headless\",\"-W\",\"$w\",\"-H\",\"$h\",\"-w\",\"$w\",\"-h\",\"$h\",\"--\",$silence]"
+export MARQUEE_LAUNCH_PREFIX="[\"gamescope\",\"--backend\",\"$backend\",\"-W\",\"$w\",\"-H\",\"$h\",\"-w\",\"$w\",\"-h\",\"$h\",\"--\",$silence]"
 "$bin" launch "$id" > "$out/marquee.log" 2>&1 &
 launcher=$!
 # Safety net: any stream that still reaches a real output kills the game at once.
-python3 "$root/scripts/play_check_audio_guard.py" "$((seconds + 30))" > "$out/audio.log" 2>&1 &
-guard=$!
+guard=""
+if [ "$visible" = 0 ]; then
+    python3 "$root/scripts/play_check_audio_guard.py" "$((seconds + 30))" > "$out/audio.log" 2>&1 &
+    guard=$!
+fi
 
 display=""
 for _ in $(seq 1 100); do
