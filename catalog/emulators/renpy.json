@@ -1,0 +1,15 @@
+{
+  "id": "renpy",
+  "name": "Ren'Py games (Linux)",
+  "kind": "emulator",
+  "systems": [
+    "renpy"
+  ],
+  "binary": "marquee-run.sh",
+  "launcher": "renpy",
+  "config_subdir": "renpy",
+  "launch": [
+    "{rom}"
+  ],
+  "requirement": "No download. Runs each Linux Ren'Py game through its own script, with your usual ~/.renpy saves. Games are not sandboxed."
+}

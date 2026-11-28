@@ -1,0 +1,11 @@
+{
+  "id": "renpy",
+  "display_name": "Ren'Py",
+  "supported_extensions": [
+    "sh"
+  ],
+  "skipped_extensions": [],
+  "runner_kind": "emulator",
+  "emulator": "renpy",
+  "notes": "A Linux Ren'Py game: Name.sh beside Name.py, renpy/ and game/."
+}

@@ -22,6 +22,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 const CATALOGUE: &[&str] = &[
+    include_str!("../../../catalog/emulators/renpy.json"),
+    include_str!("../../../catalog/emulators/lutris.json"),
     include_str!("../../../catalog/emulators/order1886.json"),
     include_str!("../../../catalog/emulators/xenia.json"),
     include_str!("../../../catalog/emulators/ymir.json"),
@@ -555,6 +557,8 @@ pub fn program_dir(paths: &Paths, id: &str) -> PathBuf {
 fn bundled_launcher(name: &str) -> Option<&'static str> {
     match name {
         "order1886" => Some(include_str!("../../../catalog/launchers/order1886.sh")),
+        "renpy" => Some(include_str!("../../../catalog/launchers/renpy.sh")),
+        "lutris" => Some(include_str!("../../../catalog/launchers/lutris.sh")),
         _ => None,
     }
 }
@@ -759,7 +763,28 @@ fn pick(def: &EmulatorDef, release: &serde_json::Value) -> Result<Release> {
     })
 }
 
+/// A runner that is only a script shipped with Marquee: nothing to download.
+fn is_local(def: &EmulatorDef) -> bool {
+    def.download.is_none() && def.github.is_empty() && def.launcher.is_some()
+}
+
+/// Its version follows the script, so an updated Marquee offers the update.
+fn local_version(def: &EmulatorDef) -> String {
+    use sha2::{Digest, Sha256};
+    let script = def.launcher.as_deref().and_then(bundled_launcher);
+    let digest = format!("{:x}", Sha256::digest(script.unwrap_or_default()));
+    format!("bundled-{}", &digest[..12])
+}
+
 fn latest(def: &EmulatorDef) -> Result<Release> {
+    if is_local(def) {
+        return Ok(Release {
+            version: local_version(def),
+            name: String::new(),
+            url: String::new(),
+            sha256: String::new(),
+        });
+    }
     if let Some(d) = &def.download {
         let sha256 = d.sha256.to_ascii_lowercase();
         if sha256.len() != 64 || !sha256.bytes().all(|b| b.is_ascii_hexdigit()) {
@@ -803,12 +828,27 @@ fn say(sink: &Arc<dyn EventSink>, id: &str, message: impl Into<String>) {
 
 /// Download, verify against the published checksum, unpack into a staging folder
 /// and only then swap it in, so a failed update leaves the working install alone.
+fn install_local(paths: &Paths, def: &EmulatorDef) -> Result<Installed> {
+    let current = program_dir(paths, &def.id);
+    fs::create_dir_all(&current)?;
+    let name = def.launcher.as_deref().unwrap_or_default();
+    write_launcher(&current.join(&def.binary), name)?;
+    fs::create_dir_all(config_home(paths, &def.id))?;
+    Ok(Installed {
+        version: local_version(def),
+        bin: def.binary.clone(),
+    })
+}
+
 pub fn install(paths: &Paths, def: &EmulatorDef, sink: &Arc<dyn EventSink>) -> Result<Installed> {
     if crate::source_builds::supported(&def.id) {
         return Err(AppError::new(
             "SOURCE_BUILD_REQUIRED",
             "Use Build from source for this emulator",
         ));
+    }
+    if is_local(def) {
+        return install_local(paths, def);
     }
     say(sink, &def.id, format!("Looking up {}…", def.name));
     let release = latest(def)?;
@@ -1830,6 +1870,8 @@ mod tests {
             kinds,
             [
                 "duckstation",
+                "emulator",
+                "emulator",
                 "emulator",
                 "emulator",
                 "emulator",
