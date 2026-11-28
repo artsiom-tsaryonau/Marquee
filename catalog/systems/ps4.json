@@ -9,5 +9,8 @@
   ],
   "runner_kind": "emulator",
   "emulator": "shadps4",
+  "alternative_emulators": [
+    "order1886"
+  ],
   "notes": "Prepared (extracted) game folders: the eboot.bin beside sce_sys/param.sfo is the entry and names the game. Packages are extracted first (ShadPKG for bases, patched LibOrbisPkg for updates)."
 }

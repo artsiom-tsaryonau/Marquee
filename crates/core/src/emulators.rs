@@ -22,6 +22,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 const CATALOGUE: &[&str] = &[
+    include_str!("../../../catalog/emulators/order1886.json"),
     include_str!("../../../catalog/emulators/xenia.json"),
     include_str!("../../../catalog/emulators/ymir.json"),
     include_str!("../../../catalog/emulators/blastem.json"),
@@ -310,6 +311,14 @@ pub struct DirectDownload {
 pub struct EmulatorDef {
     pub id: String,
     pub name: String,
+    /// A start script shipped with Marquee (`catalog/launchers/<name>.sh`),
+    /// written into the program folder as `binary` when the download lacks one.
+    #[serde(default)]
+    pub launcher: Option<String>,
+    /// Title IDs this runner is for. It is the default for them and runs
+    /// nothing else.
+    #[serde(default)]
+    pub titles: Vec<String>,
     /// Runner kind this emulator registers as (`duckstation`). Without one the
     /// emulator can be installed and opened, but library games do not launch
     /// through it yet.
@@ -543,6 +552,26 @@ pub fn program_dir(paths: &Paths, id: &str) -> PathBuf {
 }
 
 /// The emulator's isolated `XDG_CONFIG_HOME`.
+fn bundled_launcher(name: &str) -> Option<&'static str> {
+    match name {
+        "order1886" => Some(include_str!("../../../catalog/launchers/order1886.sh")),
+        _ => None,
+    }
+}
+
+fn write_launcher(target: &Path, name: &str) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let script = bundled_launcher(name)
+        .ok_or_else(|| AppError::new("SPAWN_FAILED", format!("unknown launcher: {name}")))?;
+    // Never follow a link the downloaded archive may have put there.
+    if target.symlink_metadata().is_ok() {
+        fs::remove_file(target)?;
+    }
+    fs::write(target, script)?;
+    fs::set_permissions(target, fs::Permissions::from_mode(0o755))?;
+    Ok(())
+}
+
 pub fn config_home(paths: &Paths, id: &str) -> PathBuf {
     paths.data_dir.join(id).join("xdg-config")
 }
@@ -866,6 +895,9 @@ pub fn install(paths: &Paths, def: &EmulatorDef, sink: &Arc<dyn EventSink>) -> R
         } else {
             root
         };
+        if let Some(name) = def.launcher.as_deref() {
+            write_launcher(&root.join(&def.binary), name)?;
+        }
         if !root.join(&def.binary).is_file() {
             return Err(AppError::new(
                 "SPAWN_FAILED",
@@ -1798,6 +1830,7 @@ mod tests {
             kinds,
             [
                 "duckstation",
+                "emulator",
                 "emulator",
                 "emulator",
                 "emulator",

@@ -52,7 +52,7 @@ runtime=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}
 silent_dir=$(mktemp -d)
 audio_pids=()
 # exec: the background job must be the server itself, so cleanup can kill it.
-private() { exec env XDG_RUNTIME_DIR="$silent_dir" PIPEWIRE_RUNTIME_DIR="$silent_dir" PULSE_RUNTIME_PATH="$silent_dir/pulse" "$@"; }
+private() { exec env -u PIPEWIRE_REMOTE -u PULSE_SERVER XDG_RUNTIME_DIR="$silent_dir" PIPEWIRE_RUNTIME_DIR="$silent_dir" PULSE_RUNTIME_PATH="$silent_dir/pulse" "$@"; }
 wait_socket() { for _ in $(seq 1 100); do [ -S "$1" ] && return 0; sleep 0.1; done; echo "private audio server did not start ($1)" >&2; return 1; }
 start_silent_audio() {
     private pipewire > "$silent_dir/pipewire.log" 2>&1 & audio_pids+=($!)

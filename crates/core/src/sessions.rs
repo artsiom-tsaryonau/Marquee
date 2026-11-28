@@ -108,6 +108,14 @@ pub fn launch(
                     .map(str::to_owned)
             });
         let profile = db.profile_runner(edition_id)?;
+        // A runner made for this title beats the system-wide choice, never the
+        // owner's choice for this game.
+        let titled = media
+            .serial
+            .as_deref()
+            .and_then(|serial| runners::for_title(&runners, &system, serial))
+            .map(str::to_owned);
+        let selected = titled.or(selected);
         let runner =
             runners::resolve(&runners, &system, profile.as_deref(), selected.as_deref())?.clone();
         runners::require_launchable(&runner)?;

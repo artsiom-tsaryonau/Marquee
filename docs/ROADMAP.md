@@ -354,15 +354,15 @@ Buffers for `BLES00932` (the world was black without it). Keyboard: X is Cross,
 Enter is Start. Sound and longer play are not checked. Soulbrandt 0.2.0
 (downloaded, checksum-verified) has not been run; it is now optional.
 
-**The Order: 1886 (2026-11-28).** `CUSA00076` with 1.02 beside it is in the
-library. shadPS4 0.21.0 crashes at 33 s (`tiling.h` GetArrayMode). JulioCacko's
-port 0.2.7 (checksum-verified) runs on Linux in
-`<data>/builds/order1886-0.2.7/sandbox.sh` (no network, no home folder, no sound
-devices): title, new game, save, load (Continue), the prologue's quick-time
-events, then third-person camera and walking, with its overlay showing 30 FPS.
-Keys: Space Cross, Q Triangle, E Square, Left Shift Circle, WASD move, arrows
-camera. A "mash" prompt needed about 10 presses a second. Combat and sound are
-not checked, and it is not wired into Library Play.
+**The Order: 1886 (2026-11-28) plays from Library Play.** `CUSA00076` with 1.02
+beside it; shadPS4 0.21.0 crashes on it, so the `order1886` runner (JulioCacko's
+port 0.2.7, pinned; `marquee emulators install order1886`) is used for its title
+IDs. It runs sandboxed (no network or home folder; GPU and controllers only;
+one-way sound, see `catalog/launchers/order1886.sh`). Checked: title, menu, new
+game, load, prologue quick-time events, camera and walking; audio signal arrives
+at a silent test output. Not checked: by ear, combat, a desktop session, a
+gamepad. Keys: Space Cross, Q Triangle, E Square, Left Shift Circle, WASD move,
+arrows camera.
 
 **MotorStorm (`BCES00006`, 2026-11-28)** plays through Library Play after the
 same Write Color Buffers setting (a race; `T` accelerates, `X` boosts). **Pacific

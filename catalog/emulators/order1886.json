@@ -1,0 +1,30 @@
+{
+  "id": "order1886",
+  "name": "The Order: 1886 port (JulioCacko)",
+  "kind": "emulator",
+  "systems": [
+    "ps4"
+  ],
+  "titles": [
+    "CUSA00076",
+    "CUSA00035",
+    "CUSA00070",
+    "CUSA00100",
+    "CUSA00670",
+    "CUSA00785"
+  ],
+  "github": "JulioCacko/The-Order-1886_pc",
+  "download": {
+    "url": "https://github.com/JulioCacko/The-Order-1886_pc/releases/download/v0.2.7/order1886-linux-x86_64.tar.gz",
+    "sha256": "50d8c0d55886c78ebde7439e38cfa84fc51f4663c0834c81afdd4b919d1eba08",
+    "version": "v0.2.7",
+    "archive_root": "The Order 1886"
+  },
+  "binary": "marquee-run.sh",
+  "launcher": "order1886",
+  "config_subdir": "order1886",
+  "launch": [
+    "{rom}"
+  ],
+  "requirement": "Third-party compatibility port for The Order: 1886 only, run sandboxed (no network or home folder; one-way sound). Needs bubblewrap, and PipeWire tools for sound. Keyboard: Space Cross, Left Shift Circle, E Square, Q Triangle, WASD move, arrows camera."
+}

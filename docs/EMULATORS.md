@@ -693,6 +693,7 @@ file conversion, one patched unpacking tool or Marquee's own code. Recipes live 
 | PS4, The Last of Us | Halted itself during the opening (2-second frame assert) | Two-byte patch from `shadps4-emu/ps4_cheats`, applied in memory at launch | `catalog/emulators/shadps4.json` |
 | PS4, The Last of Us | Solid black shapes in menus | Precise readbacks and the pipeline cache, per title | same |
 | PS4, The Last Guardian | Graphics need readbacks | Precise readbacks, per title | same |
+| PS4, The Order: 1886 | shadPS4 crashes at 33 s | A title-specific runner for JulioCacko's port, sandboxed, with sound through a private audio server that cannot reach the microphone | `catalog/emulators/order1886.json`, `catalog/launchers/order1886.sh` |
 | PS4 updates | ShadPKG crashed on update packages; stock LibOrbisPkg wrote mostly zeros | LibOrbisPkg patched (full block reads, read-only input, .NET 10) | `catalog/source-builds/liborbispkg/` |
 | PS4 scan | An update folder would list as a second game | `-UPDATE`, `-patch` and `-mods` folders are skipped | `crates/core/src/library.rs` |
 | Original Xbox | Forza ignored the keyboard at "Press A to start" | Keyboard assigned to controller port 1 | `catalog/emulators/xemu.json` |

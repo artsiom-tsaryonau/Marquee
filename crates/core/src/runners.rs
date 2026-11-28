@@ -135,6 +135,23 @@ fn compatible_systems(id: &str, kind: &RunnerKind) -> Vec<String> {
         .collect()
 }
 
+/// Whether the catalogue limits this runner to certain titles.
+fn limited_to_titles(runner_id: &str) -> bool {
+    emulator_for_runner(runner_id).is_some_and(|d| !d.titles.is_empty())
+}
+
+/// The installed runner made for this exact title, if there is one.
+pub fn for_title<'a>(runners: &'a [Runner], system: &str, serial: &str) -> Option<&'a str> {
+    runners
+        .iter()
+        .find(|r| {
+            r.available
+                && compatible(r, system)
+                && emulator_for_runner(&r.id).is_some_and(|d| d.titles.iter().any(|t| t == serial))
+        })
+        .map(|r| r.id.as_str())
+}
+
 pub fn pick_for_system<'a>(runners: &'a [Runner], system: &str) -> Option<&'a Runner> {
     let default = emulator_runner_for(system);
     runners
@@ -149,7 +166,7 @@ pub fn pick_for_system<'a>(runners: &'a [Runner], system: &str) -> Option<&'a Ru
         .or_else(|| {
             runners
                 .iter()
-                .find(|r| r.available && compatible(r, system))
+                .find(|r| r.available && compatible(r, system) && !limited_to_titles(&r.id))
         })
 }
 
@@ -380,5 +397,36 @@ mod rename_tests {
     fn a_saved_choice_follows_the_renamed_pcsx2_runner() {
         assert_eq!(current_id(LEGACY_PCSX2_ID), PCSX2_RUNNER_ID);
         assert_eq!(current_id("runner.pcsx2.flatpak"), "runner.pcsx2.flatpak");
+    }
+}
+
+#[cfg(test)]
+mod title_runner_tests {
+    use super::*;
+
+    fn runner(id: &str) -> Runner {
+        Runner {
+            id: crate::emulators::runner_id(id),
+            kind: RunnerKind::Emulator,
+            display_name: id.into(),
+            command: vec!["/x".into()],
+            bios_state: crate::model::BiosState::Unverified,
+            bios_hint: None,
+            source: "marquee".into(),
+            available: true,
+            systems: vec!["ps4".into()],
+        }
+    }
+
+    #[test]
+    fn a_title_runner_serves_only_its_titles() {
+        let both = [runner("order1886"), runner("shadps4")];
+        let order = crate::emulators::runner_id("order1886");
+        assert_eq!(for_title(&both, "ps4", "CUSA00076"), Some(order.as_str()));
+        assert_eq!(for_title(&both, "ps4", "CUSA03745"), None);
+        let default = pick_for_system(&both, "ps4").unwrap();
+        assert_eq!(default.id, crate::emulators::runner_id("shadps4"));
+        // Without the general emulator, other games do not fall to the port.
+        assert!(pick_for_system(&both[..1], "ps4").is_none());
     }
 }

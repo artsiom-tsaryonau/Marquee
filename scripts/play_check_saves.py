@@ -33,6 +33,7 @@ SAVES = [
     "eden/xdg-data/eden/nand/user/save",
     "eden/xdg-data/eden/nand/system/save",
     "melonds/xdg-config/melonDS",
+    "order1886/user/order1886/savedata",
     "pcsx2/xdg-config/PCSX2/memcards",
     "ppsspp/xdg-config/ppsspp/PSP/SAVEDATA",
     "rpcs3/xdg-config/rpcs3/dev_hdd0/home/*/savedata",
