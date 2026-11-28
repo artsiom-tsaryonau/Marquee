@@ -336,11 +336,11 @@ short while, not completed. Sound was not checked, performance only where noted.
 
 | State | Games |
 | --- | --- |
-| Gameplay | The Last of Us Remastered (60 FPS), Metroid Prime, Breath of the Wild (30 FPS), Super Smash Bros. (a match), Forza Motorsport (a race, after the keyboard fix), GTA Vice City (after the PS2 fix), Silent Hill |
-| Story or race setup reached | Persona 3 Portable, Nightshade (name entry), Pokémon Moon, Driver Renegade, XS Moto (race loading) |
+| Gameplay | The Last of Us Remastered (60 FPS), Metroid Prime, Breath of the Wild (30 FPS), Super Smash Bros. (a match), Forza Motorsport (a race, after the keyboard fix), GTA Vice City (after the PS2 fix), Silent Hill, Vanquish (tutorial; popup: Left, then Enter) |
+| Story, menus or race setup reached | Persona 3 Portable, Nightshade (name entry), Pokémon Moon, Pokémon Platinum (after rebuilding the missing melonDS image), Driver Renegade, XS Moto (race loading), Metal Gear Solid (difficulty select), Euro 96 (main menu; Saturn Start is F) |
 | Boots to video or intro only | Forza Motorsport 4, Need for Speed Underground |
-| Broken or blocked | The Last Guardian (silent, stuck at the wake-up prompt), KOF XV (cursor cannot leave Decline on the user agreement), Pokémon Platinum (melonDS container image missing), Sonic 2 and Streets of Rage 2 (BlastEm closes on Enter in play checks), Vanquish (Xenia "No active profile" popup not passed), Forza Motorsport 2 (black screen) |
-| Inconclusive | Metal Gear Solid and Euro 96 (stayed at Press Start; the sweep's key may be wrong), God of War III (still compiling shaders when time ran out), Dreamcast Collection (stayed on its game picker) |
+| Broken or blocked | The Last Guardian (silent, stuck at the wake-up prompt), KOF XV (cursor cannot leave Decline on the user agreement), Sonic 2 and Streets of Rage 2 (BlastEm closes on Enter in play checks, where it has no audio device), Forza Motorsport 2 (black screen) |
+| Inconclusive | God of War III (still compiling shaders when time ran out), Dreamcast Collection (stayed on its game picker) |
 | Missing file | samsh5nd (Neo Geo) |
 
 **Next, in order:** the broken and inconclusive rows; Demon's Souls PS3

@@ -705,7 +705,12 @@ file conversion, one patched unpacking tool or Marquee's own code. Recipes live 
 | Wii U | Needs a keyboard GamePad and no first-run prompts | Seeded settings and controller profile | `catalog/emulators/cemu.json` |
 | Switch | Updates, DLC and firmware installation | Managed external-content folder; firmware zips through BIOS import | Eden recipe |
 
-Keyboard note: in shadPS4's **own** dialogs (such as the save-slot picker) confirm
+Also fixed 2026-11-28: every PS2 launch failed when the saved emulator choice
+still named PCSX2's old runner ID (`crates/core/src/runners.rs`), and melonDS
+needed a rebuild because its local container image was gone.
+
+Keyboard notes: Saturn (Ymir) Start is `F`. In Xenia's "No active profile"
+popup press Left, then Enter. In shadPS4's **own** dialogs (such as the save-slot picker) confirm
 with Space; the key mapped to Cross works only inside the game.
 
 Known gap that needs an emulator change or a console file: **The Last Guardian**
