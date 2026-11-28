@@ -6,7 +6,7 @@
   ],
   "binary": "AppRun",
   "config_subdir": "xemu",
-  "requirement": "Original Xbox emulator. Library Play boots an Xbox disc image (XISO) with the owner's MCPX boot ROM, flash BIOS and hard disk image, placed from the BIOS inbox. Keyboard drives controller 1.",
+  "requirement": "Original Xbox emulator. Library Play boots an Xbox disc image (XISO) with the owner's MCPX boot ROM, flash BIOS and hard disk image, placed from the BIOS inbox. Keyboard drives controller 1 (A B X Y keys, Enter, arrows; E S D F stick, W and O triggers). With a gamepad, assign it to port 1 in xemu's input settings.",
   "firmware": [
     {
       "name": "mcpx_1.0.bin",
@@ -60,6 +60,14 @@
       "path": "xemu/xemu/xemu.toml",
       "root": "data",
       "contents": "[general]\nshow_welcome = false\nskip_boot_anim = true\n\n[general.updates]\ncheck = false\n\n[sys.files]\nbootrom_path = '{xdg-data}/xemu/xemu/mcpx_1.0.bin'\nflashrom_path = '{xdg-data}/xemu/xemu/Complex_4627.bin'\nhdd_path = '{xdg-data}/xemu/xemu/xbox_hdd.qcow2'\neeprom_path = '{xdg-data}/xemu/xemu/eeprom.bin'\n"
+    }
+  ],
+  "seed_sections": [
+    {
+      "path": "xemu/xemu/xemu.toml",
+      "root": "data",
+      "section": "input.bindings",
+      "contents": "port1 = 'keyboard'\n"
     }
   ]
 }
