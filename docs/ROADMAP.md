@@ -327,6 +327,32 @@ setup, native saves and gameplay/relaunch acceptance remain open. No game data
 was downloaded or an engine launched by this installation-only test.
 
 
+## Play audit (2026-11-28)
+
+Every library game was started through Library Play on a hidden display, sent
+keyboard input and checked from screenshots (`scripts/play-check.sh --drive`).
+Saves are restored after each run. "Gameplay" means the game was controlled for a
+short while, not completed. Sound was not checked, performance only where noted.
+
+| State | Games |
+| --- | --- |
+| Gameplay | The Last of Us Remastered (60 FPS), Metroid Prime, Breath of the Wild (30 FPS), Super Smash Bros. (a match), Forza Motorsport (a race, after the keyboard fix), GTA Vice City (after the PS2 fix), Silent Hill |
+| Story or race setup reached | Persona 3 Portable, Nightshade (name entry), Pokémon Moon, Driver Renegade, XS Moto (race loading) |
+| Boots to video or intro only | Forza Motorsport 4, Need for Speed Underground |
+| Broken or blocked | The Last Guardian (silent, stuck at the wake-up prompt), KOF XV (cursor cannot leave Decline on the user agreement), Pokémon Platinum (melonDS container image missing), Sonic 2 and Streets of Rage 2 (BlastEm closes on Enter in play checks), Vanquish (Xenia "No active profile" popup not passed), Forza Motorsport 2 (black screen) |
+| Inconclusive | Metal Gear Solid and Euro 96 (stayed at Press Start; the sweep's key may be wrong), God of War III (still compiling shaders when time ran out), Dreamcast Collection (stayed on its game picker) |
+| Missing file | samsh5nd (Neo Geo) |
+
+**Next, in order:** the broken and inconclusive rows; Demon's Souls PS3
+(`NPEB01202`) through Soulbrandt; The Order: 1886 (`CUSA00076` + 1.02) through
+JulioCacko's port; Red Dead Redemption (`CUSA36843`) in shadPS4; then the
+`.marquee` package ([shape](PORTABLE_PACKAGES.md)). Third-party ports are
+downloaded with checksums and run sandboxed.
+
+Play-check gap: containerized runners (BlastEm, melonDS) mount the host's real
+PipeWire and PulseAudio sockets, so the private silent server and the leak guard
+do not cover them. BlastEm's log showed it opened no audio device in these runs.
+
 ## Current owner priority: emulators the owner plays (2026-11-27)
 
 The owner plays alone and wants games to start ready: fullscreen with no emulator
