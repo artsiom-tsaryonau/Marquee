@@ -485,7 +485,13 @@ impl crate::Core {
                     "Install PS3 firmware through Tools → RPCS3 → Firmware setup before playing",
                 )
             })?;
-        let metadata = inspect_disc_metadata(&media.path)?;
+        // A disc image, or a game installed in RPCS3 (its identity is beside it).
+        let metadata = if media.kind == crate::model::MediaKind::Ps3Iso {
+            inspect_disc_metadata(&media.path)?
+        } else {
+            crate::library::ps3_installed_param(&media.path)
+                .ok_or_else(|| invalid("Installed game files changed; rescan before playing"))?
+        };
         if media.serial.as_deref() != Some(metadata.title_id.as_str()) {
             return Err(invalid(
                 "Disc identity changed; rescan this game before playing",

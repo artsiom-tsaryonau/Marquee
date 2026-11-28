@@ -368,7 +368,7 @@ fn is_ps4_overlay(dir: &Path) -> bool {
 /// `HG` is an installed game and `DG` a disc game installed from a package; `GD`
 /// is update or install data. A dumped disc folder (`PS3_GAME`) is not an
 /// installation, and the digital manuals some games add are not games.
-fn ps3_installed_param(path: &Path) -> Option<crate::ps3::Metadata> {
+pub(crate) fn ps3_installed_param(path: &Path) -> Option<crate::ps3::Metadata> {
     let usrdir = path.parent()?;
     if !path.file_name()?.eq_ignore_ascii_case("EBOOT.BIN")
         || !usrdir.file_name()?.eq_ignore_ascii_case("USRDIR")
