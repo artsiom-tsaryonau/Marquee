@@ -42,6 +42,14 @@ class PlayCheckSaves(unittest.TestCase):
             kept = work / "after/pcsx2/xdg-config/PCSX2/memcards/Mcd001.ps2"
             self.assertEqual(kept.read_text(), "play check")
             self.assertFalse((work / "before").exists())
+            unrestored = saves.WORK / "failed-run"
+            (unrestored / "before").mkdir(parents=True)
+            for index in range(5):
+                (saves.WORK / f"done-{index}").mkdir()
+            saves.prune(keep=2)
+            left = sorted(p.name for p in saves.WORK.iterdir())
+            self.assertEqual(len(left), 3, left)
+            self.assertIn("failed-run", left)
 
 
 if __name__ == "__main__":

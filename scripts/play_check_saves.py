@@ -19,6 +19,7 @@ from pathlib import Path
 
 DATA = Path(os.environ.get("MARQUEE_DATA_DIR", Path.home() / ".local/share/marquee"))
 WORK = DATA.parent / "marquee-play-checks"
+KEEP_RUNS = 3
 
 # Globs below the data folder: folders, or single files (xemu keeps saves inside
 # its virtual hard disk).
@@ -80,6 +81,18 @@ def matches():
     return sorted({str(p.relative_to(DATA)) for pattern in SAVES for p in DATA.glob(pattern)})
 
 
+def prune(keep: int):
+    """Drop old finished runs. A run that still has `before` was not restored, so
+    it holds originals and is never removed."""
+    finished = sorted(
+        (p for p in WORK.iterdir() if p.is_dir() and not (p / "before").exists()),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    for old in finished[keep:]:
+        shutil.rmtree(old, ignore_errors=True)
+
+
 def snapshot(out: Path):
     busy = running_emulators()
     if busy:
@@ -117,6 +130,7 @@ def restore(out: Path):
     except (OSError, subprocess.CalledProcessError) as error:
         sys.exit(f"{error}\nOriginals: {work}/before")
     shutil.rmtree(work / "before", ignore_errors=True)
+    prune(keep=KEEP_RUNS)
 
 
 if __name__ == "__main__":
