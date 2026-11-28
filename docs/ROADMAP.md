@@ -366,10 +366,10 @@ not checked, and it is not wired into Library Play.
 
 **MotorStorm (`BCES00006`, 2026-11-28)** plays through Library Play after the
 same Write Color Buffers setting (a race; `T` accelerates, `X` boosts). **Pacific
-Rift (`BCES00129`) is blocked:** its disc image is encrypted and no disc key is
-on this PC; its update and add-ons were not installed. RPCS3 decrypts while
-reading (no PS3Dec needed) when `<image name>.dkey` or `.key` is beside the
-image, and Marquee now accepts such a disc (not yet tried with a real key).
+Rift (`BCES00129`) plays too:** with the owner's disc key beside the image
+(`<image name>.dkey`, no PS3Dec) RPCS3 decrypts while reading, and the same Write
+Color Buffers setting removes a white-out in races. Checked: menus and driving.
+Its update 1.03 and add-ons are separate packages.
 
 **Red Dead Redemption (`CUSA36843` + 1.04, 2026-11-28)** is in the library and
 boots in shadPS4 0.21.0 to Rockstar's licence agreement. Accepting it is left to
