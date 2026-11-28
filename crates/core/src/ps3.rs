@@ -412,6 +412,22 @@ pub fn inspect(path: &Path) -> Result<Inspection> {
     Ok(report)
 }
 
+/// RPCS3 decrypts a disc image while reading it when `<image>.dkey` or
+/// `<image>.key` is beside it. Only the file's shape is checked here (32 hex
+/// digits, or 16 raw bytes); RPCS3 refuses a key that belongs to another disc.
+fn has_disc_key(image: &Path) -> bool {
+    ["dkey", "key"].iter().any(|extension| {
+        let key = image.with_extension(extension);
+        if !fs::metadata(&key).is_ok_and(|m| m.is_file() && m.len() <= 64) {
+            return false;
+        }
+        fs::read(&key).is_ok_and(|bytes| {
+            let text = bytes.trim_ascii();
+            bytes.len() == 16 || (text.len() == 32 && text.iter().all(u8::is_ascii_hexdigit))
+        })
+    })
+}
+
 /// Resolve a disc title through bounded ISO directory reads; no key access.
 pub fn inspect_disc_metadata(path: &Path) -> Result<Metadata> {
     let (mut reader, size) = crate::game_media::disc_member(path, "/PS3_GAME/PARAM.SFO")?;
@@ -427,9 +443,9 @@ pub fn inspect_disc_metadata(path: &Path) -> Result<Metadata> {
     let (mut boot, _) = crate::game_media::disc_member(path, "/PS3_GAME/USRDIR/EBOOT.BIN")?;
     let mut magic = [0; 4];
     boot.read_exact(&mut magic)?;
-    if magic != *b"SCE\0" {
+    if magic != *b"SCE\0" && !has_disc_key(path) {
         return Err(invalid(
-            "Disc executable header is not readable; preparation is required",
+            "This disc image is encrypted. Put its key file beside it, named like the image with .dkey or .key",
         ));
     }
     let (mut sfb, _) = crate::game_media::disc_member(path, "/PS3_DISC.SFB")?;
@@ -663,6 +679,27 @@ mod tests {
         bytes[33 * 2048..33 * 2048 + 4].copy_from_slice(b".SFB");
         fs::write(path, bytes).unwrap();
     }
+    #[test]
+    fn an_encrypted_disc_needs_a_well_formed_key_file_beside_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let image = dir.path().join("Game [BCUS98111].iso");
+        disc_iso(&image, "DG");
+        let mut bytes = fs::read(&image).unwrap();
+        bytes[32 * 2048..32 * 2048 + 4].copy_from_slice(&[0x47, 0xaf, 0xd1, 0x23]);
+        fs::write(&image, bytes).unwrap();
+        let refused = inspect_disc_metadata(&image).unwrap_err();
+        assert!(refused.message.contains("encrypted"), "{}", refused.message);
+        let key = image.with_extension("dkey");
+        for bad in ["", "not a key", "0123456789abcdef"] {
+            fs::write(&key, bad).unwrap();
+            if bad.len() != 16 {
+                assert!(inspect_disc_metadata(&image).is_err(), "{bad:?}");
+            }
+        }
+        fs::write(&key, "0123456789ABCDEF0123456789abcdef\n").unwrap();
+        assert_eq!(inspect_disc_metadata(&image).unwrap().title_id, "BCUS98111");
+    }
+
     #[test]
     fn firmware_comparison_and_rpc3_launch_recipe() {
         assert!(firmware_number("4.93").unwrap() > firmware_number("04.2100").unwrap());

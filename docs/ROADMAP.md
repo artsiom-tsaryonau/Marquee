@@ -363,8 +363,10 @@ Cross. Gameplay and sound are not checked, and it is not wired into Library Play
 
 **MotorStorm (`BCES00006`, 2026-11-28)** plays through Library Play after the
 same Write Color Buffers setting (a race; `T` accelerates, `X` boosts). **Pacific
-Rift (`BCES00129`) is blocked:** its disc image is encrypted and no disc key
-(`.dkey`/`.ird`) is on this PC; its update and add-ons were not installed.
+Rift (`BCES00129`) is blocked:** its disc image is encrypted and no disc key is
+on this PC; its update and add-ons were not installed. RPCS3 decrypts while
+reading (no PS3Dec needed) when `<image name>.dkey` or `.key` is beside the
+image, and Marquee now accepts such a disc (not yet tried with a real key).
 
 **Next, in order:** the broken and inconclusive rows; Demon's Souls PS3
 (`NPEB01202`) through Soulbrandt; The Order: 1886 (`CUSA00076` + 1.02) through
