@@ -41,6 +41,32 @@ authority. An output manifest remains useful after an optional source archive is
 removed. Torrent seeding still depends on the exact original torrent payload,
 not the prepared installation; package exports cannot replace that dependency.
 
+## Recommended shape (2026-11-28, owner asked about a unified `.marquee` format)
+
+Not implemented. The proposal: one container, two kinds, told apart by name.
+
+- `The Last of Us Remastered [CUSA00556].ps4.marquee`: a game.
+- `shadps4-0.21.0.runtime.marquee`: an emulator or port, including any patched
+  binary or tool, so a locally modified build moves with the games that need it.
+
+The container is **ZIP64 with stored (uncompressed) members**, plus
+`marquee.json` as the first member. A plain ZIP would move the files; the
+manifest is what lets another instance verify them (SHA-256), place them, apply
+the per-title settings and patches, and refuse a package whose runtime is
+missing. Disc data is mostly compressed already, so compressing again costs time
+for little space. Any ZIP tool can still open the file.
+
+A game package holds `game/`, `update/`, `dlc/` and `title-settings/`. A runtime
+package holds the program, its recipe and, for patched builds, the patch and
+source revision. Saves are opt-in. Firmware, BIOS and keys stay out by default;
+an explicit private "this machine" export may include them for the owner's own
+second PC.
+
+It is a **transfer and archive format, not a run format**: import unpacks it.
+Running from one file stays with each system's native format where one exists
+(ISO, CHD, RVZ, XISO, CSO, NSP/XCI, Cemu `.wua`, and shadPS4's `.zar`, whose
+reader is in the 0.21.0 source; none of the last two is tried here).
+
 ## Implementation sequence
 
 1. **MP0 — Manifest/receipt contract.** Specify a versioned JSON schema and create

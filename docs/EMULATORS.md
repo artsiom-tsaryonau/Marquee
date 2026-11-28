@@ -680,3 +680,37 @@ per-game selector, literal target/display flags, first-run keyboard defaults and
 isolated log/save paths are implemented. The earlier runtime-only description is
 historical; [current adapter and live gates](CONSOLE_PREPARATION.md#xbox-360-verified-iso-adapter-2026-10-25)
 are authoritative. Installation or format validation alone is not game acceptance.
+
+## Fixes for this machine (as of 2026-11-28)
+
+What was changed so the owner's games start and play. **No emulator program has
+been modified or rebuilt**: every fix is a setting, an in-memory game patch, a
+file conversion, one patched unpacking tool or Marquee's own code. Recipes live in
+`catalog/`, so they travel with the repository.
+
+| Area | Problem | Fix | Where |
+| --- | --- | --- | --- |
+| PS4, The Last of Us | Halted itself during the opening (2-second frame assert) | Two-byte patch from `shadps4-emu/ps4_cheats`, applied in memory at launch | `catalog/emulators/shadps4.json` |
+| PS4, The Last of Us | Solid black shapes in menus | Precise readbacks and the pipeline cache, per title | same |
+| PS4, The Last Guardian | Graphics need readbacks | Precise readbacks, per title | same |
+| PS4 updates | ShadPKG crashed on update packages; stock LibOrbisPkg wrote mostly zeros | LibOrbisPkg patched (full block reads, read-only input, .NET 10) | `catalog/source-builds/liborbispkg/` |
+| PS4 scan | An update folder would list as a second game | `-UPDATE`, `-patch` and `-mods` folders are skipped | `crates/core/src/library.rs` |
+| Original Xbox | Forza ignored the keyboard at "Press A to start" | Keyboard assigned to controller port 1 | `catalog/emulators/xemu.json` |
+| Original Xbox | Redump disc images do not boot | Intake trims them to XISO | intake |
+| Stop game | A child ignoring SIGTERM (xemu under a wrapper) survived Stop | Stop waits for, then kills, the whole process group | `crates/core/src/sessions.rs` |
+| RPCS3 | Closing asked "Exit Game?" | Prompt turned off | RPCS3 recipe |
+| N64 (RMG) | No keyboard controller | Seeded layout | `catalog/emulators/rmg.json` |
+| Shipwright | Three first-launch dialogs | Reduced to one | port setup |
+| DriveClub Recomp | Crashed on an update extracted by the broken tool | Re-extracted with the patched LibOrbisPkg | see PS4 updates |
+| Wii U | Needs a keyboard GamePad and no first-run prompts | Seeded settings and controller profile | `catalog/emulators/cemu.json` |
+| Switch | Updates, DLC and firmware installation | Managed external-content folder; firmware zips through BIOS import | Eden recipe |
+
+Keyboard note: in shadPS4's **own** dialogs (such as the save-slot picker) confirm
+with Space; the key mapped to Cross works only inside the game.
+
+Known gap that needs an emulator change or a console file: **The Last Guardian**
+is silent and stops at the opening wake-up prompt. shadPS4 only stubs Sony's
+`Ngs2` synthesizer (`sceNgs2VoiceGetState` returns success without writing any
+state). That this causes the stall is a likely explanation, not proven. Options:
+supply `libSceNgs2.sprx` dumped from a PS4, or implement the missing calls in a
+source-built shadPS4.
